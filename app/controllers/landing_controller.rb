@@ -3,7 +3,7 @@ class LandingController < ApplicationController
 
   def index
     if user_authenticated?
-      # Render a different view or perform an action for authenticated users
+      redirect_to home_path
     end
     # This will render app/views/landing/index.html.erb by default
   end
