@@ -24,6 +24,17 @@
 
   <body>
     <main>
+      <% if user_signed_in? %>
+        <%= button_to "Sign Out", signout_path, method: :delete %>
+      <% else %>
+        <%= link_to "Sign In with Slack", signin_path %>
+      <% end %>
+      <% if notice %>
+        <p>Notice: <%= notice %></p>
+      <% end %>
+      <% if alert %>
+        <p>Alert: <%= alert %></p>
+      <% end %>
       <%= yield %>
     </main>
   </body>

@@ -51,4 +51,8 @@ Rails.application.routes.draw do
   delete "auth/signout" => "sessions#destroy", as: :signout
 
   get "home" => "home#index", as: :home
+
+  namespace :admin do
+    get "/" => "static_pages#index", as: :root
+  end
 end
