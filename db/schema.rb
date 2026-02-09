@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_25_011828) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_09_222352) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -137,7 +137,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_25_011828) do
 
   create_table "users", force: :cascade do |t|
     t.string "avatar", null: false
-    t.string "slack_id", null: false
+    t.string "slack_id"
     t.string "display_name", null: false
     t.string "timezone", null: false
     t.integer "role", default: 0, null: false
@@ -145,6 +145,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_25_011828) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "email", null: false
+    t.string "hca_id"
+    t.index ["hca_id"], name: "index_users_on_hca_id", unique: true
   end
 
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

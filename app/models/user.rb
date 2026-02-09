@@ -11,73 +11,73 @@
 #  timezone     :string           not null
 #  created_at   :datetime         not null
 #  updated_at   :datetime         not null
-#  slack_id     :string           not null
+#  slack_id     :string
+#  hca_id       :string
 #
 class User < ApplicationRecord
   enum :role, { user: 0, admin: 1 }
 
-  validates :avatar, :slack_id, :display_name, :timezone, presence: true
+  validates :avatar, :display_name, :timezone, presence: true
+  validates :hca_id, presence: true, uniqueness: true
   validates :role, presence: true
   validates :is_banned, inclusion: { in: [ true, false ] }
 
-  def self.exchange_slack_token(code, redirect_uri)
-    response = Faraday.post("https://slack.com/api/oauth.v2.access",
+  def self.exchange_hca_token(code, redirect_uri)
+    response = Faraday.post("#{HCAService.host}/oauth/token",
                             {
-                              client_id: ENV.fetch("SLACK_CLIENT_ID", nil),
-                              client_secret: ENV.fetch("SLACK_CLIENT_SECRET", nil),
+                              client_id: ENV.fetch("HCA_CLIENT_ID"),
+                              client_secret: ENV.fetch("HCA_CLIENT_SECRET"),
                               redirect_uri: redirect_uri,
-                              code: code
+                              code: code,
+                              grant_type: "authorization_code"
                             })
 
     result = JSON.parse(response.body)
 
-    unless result["ok"]
-      Rails.logger.error("Slack OAuth error: #{result['error']}")
-      # Honeybadger.notify("Slack OAuth error: #{result['error']}")
-      raise StandardError, "Failed to authenticate with Slack: #{result['error']}"
+    unless response.success?
+      Rails.logger.error("HCA OAuth error: #{result['error'] || result}")
+      raise StandardError, "Failed to authenticate with HCA: #{result['error_description'] || result['error']}"
     end
 
-    slack_id = result["authed_user"]["id"]
-    user = User.find_by(slack_id: slack_id)
+    access_token = result["access_token"]
+    user_info = HCAService.me(access_token)
+
+    unless user_info
+      raise StandardError, "Failed to fetch user info from HCA"
+    end
+
+    hca_id = user_info["id"]
+    user = User.find_by(hca_id: hca_id)
+
     if user.present?
       Rails.logger.tagged("UserCreation") do
         Rails.logger.info({
           event: "existing_user_found",
-          slack_id: slack_id,
+          hca_id: hca_id,
           user_id: user.id,
           email: user.email
         }.to_json)
       end
 
-      user.refresh_profile!
-
+      user.refresh_profile!(user_info)
       return user
     end
 
-    user = create_from_slack(slack_id)
-    user
+    create_from_hca(user_info)
   end
 
-  def self.create_from_slack(slack_id)
-    user_info = fetch_slack_user_info(slack_id)
-    if user_info.user.is_bot
-      Rails.logger.warn({
-        event: "slack_user_is_bot",
-        slack_id: slack_id,
-        user_info: user_info.to_h
-      }.to_json)
-      return nil
-    end
-
-    email = user_info.user.profile.email
-    display_name = user_info.user.profile.display_name.presence || user_info.user.profile.real_name
-    timezone = user_info.user.tz
-    avatar = user_info.user.profile.image_192 || user_info.user.profile.image_512
+  def self.create_from_hca(user_info)
+    hca_id = user_info["id"]
+    identity = user_info["identity"] || {}
+    email = user_info["email"]
+    display_name = identity["full_name"].presence || email&.split("@")&.first || "User"
+    timezone = identity["timezone"].presence || "America/New_York"
+    avatar = identity["avatar_url"].presence || "https://auth.hackclub.com/avatars/default.png"
 
     Rails.logger.tagged("UserCreation") do
       Rails.logger.info({
-        event: "slack_user_found",
-        slack_id: slack_id,
+        event: "hca_user_found",
+        hca_id: hca_id,
         email: email,
         display_name: display_name,
         timezone: timezone,
@@ -87,21 +87,16 @@ class User < ApplicationRecord
 
     if email.blank? || !(email =~ URI::MailTo::EMAIL_REGEXP)
       Rails.logger.warn({
-        event: "slack_user_missing_or_invalid_email",
-        slack_id: slack_id,
+        event: "hca_user_missing_or_invalid_email",
+        hca_id: hca_id,
         email: email,
-        user_info: user_info.to_h
+        user_info: user_info
       }.to_json)
-      # Honeybadger.notify("Slack email missing??", context: {
-      #   slack_id: slack_id,
-      #   email: email,
-      #   user_info: user_info.to_h
-      # })
-      raise StandardError, "Slack ID #{slack_id} has an invalid email: #{email.inspect}"
+      raise StandardError, "HCA ID #{hca_id} has an invalid email: #{email.inspect}"
     end
 
     User.create!(
-      slack_id: slack_id,
+      hca_id: hca_id,
       display_name: display_name,
       email: email,
       timezone: timezone,
@@ -110,42 +105,22 @@ class User < ApplicationRecord
     )
   end
 
-  def self.fetch_slack_user_info(slack_id)
-    client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
-
-    r = 0
-    begin
-      client.users_info(user: slack_id)
-    rescue Slack::Web::Api::Errors::TooManyRequestsError => e
-      if r < 3
-        s = e.retry_after
-        Rails.logger.warn("Slack API ratelimit, retry in #{s} count#{r + 1}")
-        sleep s
-        r += 1
-        retry
-      else
-        Rails.logger.error("Slack API ratelimit, max retries on #{slack_id}.")
-        Honeybadger.notify("Slack API ratelimit, max retries on #{slack_id}.")
-        raise
-      end
-    end
-  end
-
-  def refresh_profile!
+  def refresh_profile!(user_info = nil)
     Rails.logger.tagged("ProfileRefresh") do
       Rails.logger.info({
         event: "refreshing_profile_data",
         user_id: id,
-        slack_id: slack_id
+        hca_id: hca_id
       }.to_json)
     end
 
-    user_info = User.fetch_slack_user_info(slack_id)
+    return unless user_info
 
-    new_display_name = user_info.user.profile.display_name.presence || user_info.user.profile.real_name
-    new_email = user_info.user.profile.email
-    new_timezone = user_info.user.tz
-    new_avatar = user_info.user.profile.image_original.presence || user_info.user.profile.image_512
+    identity = user_info["identity"] || {}
+    new_display_name = identity["full_name"].presence || email&.split("@")&.first || display_name
+    new_email = user_info["email"] || email
+    new_timezone = identity["timezone"].presence || timezone
+    new_avatar = identity["avatar_url"].presence || avatar
 
     changes = {}
     changes[:display_name] = { from: display_name, to: new_display_name } if display_name != new_display_name
@@ -158,7 +133,7 @@ class User < ApplicationRecord
         Rails.logger.info({
           event: "profile_changes_detected",
           user_id: id,
-          slack_id: slack_id,
+          hca_id: hca_id,
           changes: changes
         }.to_json)
       end
@@ -174,7 +149,7 @@ class User < ApplicationRecord
         Rails.logger.info({
           event: "profile_refresh_success",
           user_id: id,
-          slack_id: slack_id
+          hca_id: hca_id
         }.to_json)
       end
     else
@@ -182,7 +157,7 @@ class User < ApplicationRecord
         Rails.logger.debug({
           event: "profile_refresh_no_change",
           user_id: id,
-          slack_id: slack_id
+          hca_id: hca_id
         }.to_json)
       end
     end
@@ -191,11 +166,9 @@ class User < ApplicationRecord
       Rails.logger.error({
         event: "profile_refresh_failed",
         user_id: id,
-        slack_id: slack_id,
+        hca_id: hca_id,
         error: e.message
       }.to_json)
     end
-
-    # Honeybadger.notify(e, context: { user_id: id, slack_id: slack_id })
   end
 end
