@@ -1,0 +1,36 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+# == Schema Information
+#
+# Table name: users
+#
+#  id           :bigint           not null, primary key
+#  avatar       :string           not null
+#  display_name :string           not null
+#  email        :string           not null
+#  is_banned    :boolean          default(FALSE), not null
+#  role         :integer          default("user"), not null
+#  timezone     :string           not null
+#  created_at   :datetime         not null
+#  updated_at   :datetime         not null
+#  slack_id     :string           not null
+#
+one:
+  avatar: MyString
+  slack_id: MyString
+  display_name: MyString
+  timezone: MyString
+  first_name: MyString
+  last_name: MyString
+  role: 1
+  is_banned: false
+
+two:
+  avatar: MyString
+  slack_id: MyString
+  display_name: MyString
+  timezone: MyString
+  first_name: MyString
+  last_name: MyString
+  role: 1
+  is_banned: false
