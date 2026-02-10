@@ -46,9 +46,9 @@ Rails.application.routes.draw do
   root "landing#index"
 
   # Slack authentication
-  get "auth/slack" => "sessions#new", as: :signin
-  get "auth/slack/callback" => "sessions#create", as: :slack_callback
-  delete "auth/signout" => "sessions#destroy", as: :signout
+  get "auth/slack" => "auth#new", as: :signin
+  get "auth/slack/callback" => "auth#create", as: :slack_callback
+  delete "auth/signout" => "auth#destroy", as: :signout
 
   get "home" => "home#index", as: :home
 
