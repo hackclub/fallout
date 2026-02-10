@@ -19,7 +19,7 @@ You can spin up a local Postgres instance using Docker:
 
 ```sh
 docker run -d \
-  --name blueprint-postgres \
+  --name hc-rails-starter-postgres \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=starter \
   -e POSTGRES_DB=hc_rails_starter_development \
