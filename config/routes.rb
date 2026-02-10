@@ -45,9 +45,9 @@ Rails.application.routes.draw do
   # Defines the root path route for unauthenticated users
   root "landing#index"
 
-  # Slack authentication
-  get "auth/slack" => "auth#new", as: :signin
-  get "auth/slack/callback" => "auth#create", as: :slack_callback
+  # HCA OAuth authentication
+  get "auth/hca/start" => "auth#new", as: :signin
+  get "auth/hca/callback" => "auth#create", as: :hca_callback
   delete "auth/signout" => "auth#destroy", as: :signout
 
   get "home" => "home#index", as: :home

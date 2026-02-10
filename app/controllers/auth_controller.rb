@@ -1,19 +1,12 @@
 class AuthController < ApplicationController
   allow_unauthenticated_access only: %i[ new create ]
-  rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to new_session_url, alert: "Try again later." }
+  rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to signin_path, alert: "Try again later." }
 
   def new
     state = SecureRandom.hex(24)
     session[:state] = state
 
-    params = {
-      client_id: ENV.fetch("SLACK_CLIENT_ID", nil),
-      redirect_uri: slack_callback_url,
-      state: state,
-      user_scope: "identity.basic,identity.email,identity.team,identity.avatar",
-      team: "T0266FRGM"
-    }
-    redirect_to "https://slack.com/oauth/v2/authorize?#{params.to_query}", allow_other_host: true
+    redirect_to HcaService.authorize_url(hca_callback_url, state), allow_other_host: true
   end
 
   def create
@@ -31,14 +24,14 @@ class AuthController < ApplicationController
     end
 
     begin
-      user = User.exchange_slack_token(params[:code], slack_callback_url)
+      user = User.exchange_hca_token(params[:code], hca_callback_url)
       session[:user_id] = user.id
 
       Rails.logger.tagged("Authentication") do
         Rails.logger.info({
           event: "authentication_successful",
           user_id: user.id,
-          slack_id: user.slack_id
+          email: user.email
         }.to_json)
       end
 
