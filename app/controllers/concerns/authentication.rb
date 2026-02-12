@@ -6,6 +6,7 @@ module Authentication
   included do
       before_action :set_current_user
       before_action :authenticate_user!
+      before_action :redirect_banned_user!
       helper_method :current_user, :user_signed_in?
   end
 
@@ -33,6 +34,10 @@ module Authentication
 
   def current_user
     @current_user
+  end
+
+  def redirect_banned_user!
+    redirect_to sorry_path if current_user&.is_banned?
   end
 
   def terminate_session

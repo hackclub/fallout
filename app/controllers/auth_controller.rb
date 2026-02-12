@@ -1,5 +1,6 @@
 class AuthController < ApplicationController
   allow_unauthenticated_access only: %i[ new create ]
+  skip_before_action :redirect_banned_user!, only: %i[destroy]
   rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to signin_path, alert: "Try again later." }
 
   def new

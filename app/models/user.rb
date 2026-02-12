@@ -96,19 +96,20 @@ class User < ApplicationRecord
       raise StandardError, "No identity data in HCA response"
     end
 
+    hca_id = identity["id"]
     email = identity["primary_email"]
-    user = User.find_by(email: email)
+    user = User.find_by(hca_id: hca_id)
 
     if user.present?
       Rails.logger.tagged("UserCreation") do
         Rails.logger.info({
           event: "existing_user_found",
-          email: email,
+          hca_id: hca_id,
           user_id: user.id
         }.to_json)
       end
 
-      user.update(hca_token: access_token, hca_id: identity["id"])
+      user.update(hca_token: access_token, email: email)
       user.refresh_profile_from_slack
       return user
     end
