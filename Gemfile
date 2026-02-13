@@ -82,18 +82,18 @@ gem "geocoder"
 
 gem "pundit", "~> 2.4"
 gem "paper_trail", "~> 17.0"
-gem "mission_control-jobs", "~> 0.6"
+gem "mission_control-jobs", "~> 1.1"
 
 gem "skylight", "~> 7.0"
 
-gem "sentry-ruby", "~> 5.23"
-gem "sentry-rails", "~> 5.23"
+gem "sentry-ruby", "~> 5.28"
+gem "sentry-rails", "~> 5.28"
 
 gem "redcarpet", "~> 3.6"
 
 gem "aws-sdk-s3", require: false
 
-gem "pagy", "~> 9.0"
+gem "pagy", "~> 43.2"
 gem "pg_search", "~> 2.3"
 
 gem "inertia_rails", "~> 3.10"

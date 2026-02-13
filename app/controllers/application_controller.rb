@@ -2,7 +2,7 @@ class ApplicationController < ActionController::Base
   include Authentication
   include Pundit::Authorization
   include SentryContext
-  include Pagy::Backend
+  include Pagy::Method
   include InertiaPagination
 
   before_action :track_ahoy_visit

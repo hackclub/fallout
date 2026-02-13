@@ -12,7 +12,7 @@ module InertiaPagination
       limit: pagy.limit,
       pages: pagy.pages,
       next: pagy.next,
-      prev: pagy.prev
+      prev: pagy.previous
     }
   end
 end

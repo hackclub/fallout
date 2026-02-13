@@ -1,5 +1,5 @@
 class Api::V1::ProjectsController < Api::V1::BaseController
-  include Pagy::Backend
+  include Pagy::Method
 
   def index
     scope = Project.kept.listed.order(created_at: :desc)
@@ -8,7 +8,7 @@ class Api::V1::ProjectsController < Api::V1::BaseController
 
     render json: {
       data: @projects.as_json(only: [ :id, :name, :description, :tags, :demo_link, :repo_link, :created_at, :updated_at ]),
-      pagination: pagy_metadata(@pagy)
+      pagination: @pagy.data_hash(data_keys: %i[count page limit last in from to previous next])
     }
   end
 

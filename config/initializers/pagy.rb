@@ -1,1 +1,1 @@
-Pagy::DEFAULT[:limit] = 20
+Pagy.options[:limit] = 20
