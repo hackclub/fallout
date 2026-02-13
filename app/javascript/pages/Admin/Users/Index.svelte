@@ -3,8 +3,8 @@
   import Pagination from '@/components/Pagination.svelte'
   import type { AdminUserRow, PagyProps } from '@/types'
 
-  let { users, pagy, query }: { users: AdminUserRow[]; pagy: PagyProps; query: string } = $props()
-  let searchQuery = $state(query)
+  let props: { users: AdminUserRow[]; pagy: PagyProps; query: string } = $props()
+  let searchQuery = $state(props.query)
 
   function search(e: Event) {
     e.preventDefault()
@@ -38,7 +38,7 @@
       </tr>
     </thead>
     <tbody>
-      {#each users as user}
+      {#each props.users as user}
         <tr class="border-b hover:bg-gray-50" class:opacity-50={user.is_discarded}>
           <td class="py-2 px-3">
             <Link href="/admin/users/{user.id}" class="text-blue-600 hover:underline">{user.display_name}</Link>
@@ -55,5 +55,5 @@
     </tbody>
   </table>
 
-  <Pagination {pagy} />
+  <Pagination pagy={props.pagy} />
 </div>

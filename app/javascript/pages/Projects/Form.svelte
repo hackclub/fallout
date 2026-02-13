@@ -2,12 +2,7 @@
   import { useForm, page } from '@inertiajs/svelte'
   import type { ProjectForm, SharedProps } from '@/types'
 
-  let {
-    project,
-    title,
-    submit_url,
-    method,
-  }: {
+  let props: {
     project: ProjectForm
     title: string
     submit_url: string
@@ -17,26 +12,26 @@
   let shared = $derived($page.props as unknown as SharedProps)
 
   let form = useForm({
-    name: project.name,
-    description: project.description,
-    demo_link: project.demo_link,
-    repo_link: project.repo_link,
-    is_unlisted: project.is_unlisted,
-    tags: project.tags,
+    name: props.project.name,
+    description: props.project.description,
+    demo_link: props.project.demo_link,
+    repo_link: props.project.repo_link,
+    is_unlisted: props.project.is_unlisted,
+    tags: props.project.tags,
   })
 
   function submit(e: Event) {
     e.preventDefault()
-    if (method === 'patch') {
-      $form.patch(submit_url)
+    if (props.method === 'patch') {
+      $form.patch(props.submit_url)
     } else {
-      $form.post(submit_url)
+      $form.post(props.submit_url)
     }
   }
 </script>
 
 <div class="max-w-2xl mx-auto py-8">
-  <h1 class="font-bold text-4xl mb-6">{title}</h1>
+  <h1 class="font-bold text-4xl mb-6">{props.title}</h1>
 
   <form onsubmit={submit} class="space-y-4">
     {#if Object.keys(shared.errors).length > 0}

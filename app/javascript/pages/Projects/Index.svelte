@@ -3,8 +3,8 @@
   import Pagination from '@/components/Pagination.svelte'
   import type { ProjectCard, PagyProps } from '@/types'
 
-  let { projects, pagy, query }: { projects: ProjectCard[]; pagy: PagyProps; query: string } = $props()
-  let searchQuery = $state(query)
+  let props: { projects: ProjectCard[]; pagy: PagyProps; query: string } = $props()
+  let searchQuery = $state(props.query)
 
   function search(e: Event) {
     e.preventDefault()
@@ -30,8 +30,8 @@
     </div>
   </form>
 
-  {#if projects.length > 0}
-    {#each projects as project}
+  {#if props.projects.length > 0}
+    {#each props.projects as project}
       <div class="border rounded-lg p-4 mb-4">
         <div class="flex items-center justify-between">
           <h2 class="text-xl font-semibold">
@@ -61,7 +61,7 @@
       </div>
     {/each}
 
-    <Pagination {pagy} />
+    <Pagination pagy={props.pagy} />
   {:else}
     <p class="text-gray-500">No projects yet.</p>
   {/if}
