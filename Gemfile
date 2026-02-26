@@ -93,7 +93,7 @@ gem "redcarpet", "~> 3.6"
 
 gem "aws-sdk-s3", require: false
 
-gem "pagy", "~> 43.2"
+gem "pagy", "~> 43.3"
 gem "pg_search", "~> 2.3"
 
 gem "inertia_rails", "~> 3.10"
