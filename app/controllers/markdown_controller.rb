@@ -1,5 +1,6 @@
 class MarkdownController < ApplicationController
   allow_unauthenticated_access only: %i[show]
+  allow_trial_access only: %i[show]
 
   def show
     slug = params[:slug].to_s

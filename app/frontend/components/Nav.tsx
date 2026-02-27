@@ -12,7 +12,12 @@ export default function Nav() {
   return (
     <nav>
       {shared.auth.user ? (
-        <button onClick={signOut}>Sign Out</button>
+        <>
+          {shared.auth.user.is_trial && (
+            <a href={shared.sign_in_path}>Verify your account</a>
+          )}
+          <button onClick={signOut}>Sign Out</button>
+        </>
       ) : (
         <a href={shared.sign_in_path}>Sign In with Slack</a>
       )}

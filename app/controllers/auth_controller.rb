@@ -1,5 +1,6 @@
 class AuthController < ApplicationController
-  allow_unauthenticated_access only: %i[ new create ]
+  allow_unauthenticated_access only: %i[new create]
+  allow_trial_access only: %i[new create destroy]
   skip_before_action :redirect_banned_user!, only: %i[destroy]
   rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to signin_path, alert: "Try again later." }
 
@@ -22,6 +23,15 @@ class AuthController < ApplicationController
 
     begin
       user = User.exchange_hca_token(params[:code], hca_callback_url)
+
+      if current_user&.trial?
+        current_user.projects.update_all(user_id: user.id)
+        cookies.delete(:trial_device_token)
+      end
+
+      TrialUser.kept.where(email: user.email).discard_all
+
+      terminate_session
       session[:user_id] = user.id
 
       Rails.logger.tagged("Authentication") do

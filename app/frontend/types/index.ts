@@ -7,6 +7,7 @@ export interface User {
   is_admin: boolean
   is_staff: boolean
   is_banned: boolean
+  is_trial: boolean
 }
 
 export type FlashData = Record<string, string>
@@ -16,6 +17,7 @@ export interface SharedProps {
   flash: FlashData
   sign_in_path: string
   sign_out_path: string
+  trial_session_path: string
   errors: Record<string, string[]>
   [key: string]: unknown
 }

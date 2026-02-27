@@ -1,4 +1,5 @@
 class ProjectsController < ApplicationController
+  allow_trial_access
   before_action :set_project, only: %i[show edit update destroy]
 
   def index

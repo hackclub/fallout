@@ -7,12 +7,18 @@ module Authentication
       before_action :set_current_user
       before_action :authenticate_user!
       before_action :redirect_banned_user!
+      before_action :redirect_discarded_trial_user!
+      before_action :authenticate_verified_user!
       helper_method :current_user, :user_signed_in?
   end
 
   class_methods do
     def allow_unauthenticated_access(only: nil)
       skip_before_action :authenticate_user!, only: only
+    end
+
+    def allow_trial_access(only: nil)
+      skip_before_action :authenticate_verified_user!, only: only
     end
   end
 
@@ -22,6 +28,10 @@ module Authentication
     unless current_user
       redirect_to root_path, alert: "You need to be logged in to see this!"
     end
+  end
+
+  def authenticate_verified_user!
+    redirect_to signin_path, alert: "Please verify your account to access this." if current_user&.trial?
   end
 
   def user_signed_in?
@@ -38,6 +48,15 @@ module Authentication
 
   def redirect_banned_user!
     redirect_to sorry_path if current_user&.is_banned?
+  end
+
+  def redirect_discarded_trial_user!
+    return unless current_user&.trial? && current_user.discarded?
+
+    @current_user = nil
+    terminate_session
+    cookies.delete(:trial_device_token)
+    redirect_to signin_path, notice: "Your trial session has expired. Please sign in to continue."
   end
 
   def terminate_session

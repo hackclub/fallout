@@ -10,6 +10,7 @@ class ShipPolicy < ApplicationPolicy
   end
 
   def create?
+    return false if user&.trial?
     admin? || owner?
   end
 

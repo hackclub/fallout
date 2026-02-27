@@ -23,7 +23,8 @@ class ApplicationController < ActionController::Base
           roles: u.roles,
           is_admin: u.admin?,
           is_staff: u.staff?,
-          is_banned: u.is_banned
+          is_banned: u.is_banned,
+          is_trial: u.trial?
         }
       }
     }
@@ -31,6 +32,7 @@ class ApplicationController < ActionController::Base
   inertia_share flash: -> { flash.to_hash }
   inertia_share sign_in_path: -> { signin_path }
   inertia_share sign_out_path: -> { signout_path }
+  inertia_share trial_session_path: -> { trial_session_path }
 
   private
 

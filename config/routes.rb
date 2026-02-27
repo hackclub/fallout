@@ -121,6 +121,8 @@ Rails.application.routes.draw do
   get "auth/lapse/start" => "lapse_auth#start", as: :lapse_start
   get "auth/lapse/callback" => "lapse_auth#callback", as: :lapse_callback
 
+  post "trial_session" => "trial_sessions#create", as: :trial_session
+
   get "sorry" => "bans#show", as: :sorry
 
   get "dashboard" => "dashboard#index", as: :dashboard

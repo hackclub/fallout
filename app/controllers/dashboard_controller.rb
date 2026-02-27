@@ -1,4 +1,5 @@
 class DashboardController < ApplicationController
+  allow_trial_access
   def index
     render inertia: {
       user: {

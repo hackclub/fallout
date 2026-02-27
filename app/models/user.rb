@@ -4,6 +4,7 @@
 #
 #  id                  :bigint           not null, primary key
 #  avatar              :string           not null
+#  device_token        :string
 #  discarded_at        :datetime
 #  display_name        :string           not null
 #  email               :string           not null
@@ -13,15 +14,18 @@
 #  lapse_token         :text
 #  roles               :string           default([]), not null, is an Array
 #  timezone            :string           not null
+#  type                :string
 #  verification_status :string
 #  created_at          :datetime         not null
 #  updated_at          :datetime         not null
-#  hca_id              :string           not null
-#  slack_id            :string           not null
+#  hca_id              :string
+#  slack_id            :string
 #
 # Indexes
 #
-#  index_users_on_discarded_at  (discarded_at)
+#  index_users_on_device_token        (device_token)
+#  index_users_on_discarded_at        (discarded_at)
+#  index_users_unique_verified_email  (email) UNIQUE WHERE ((type IS NULL) AND (discarded_at IS NULL))
 #
 class User < ApplicationRecord
   include Discardable
@@ -40,10 +44,12 @@ class User < ApplicationRecord
   encrypts :hca_token
   encrypts :lapse_token
 
+  scope :verified, -> { where.not(type: "TrialUser") }
+
   validates :avatar, :display_name, :email, :timezone, presence: true
-  validates :slack_id, presence: true
-  validates :hca_id, presence: true
-  validates :roles, presence: true
+  validates :slack_id, presence: true, unless: :trial?
+  validates :hca_id, presence: true, unless: :trial?
+  validates :roles, presence: true, unless: :trial?
   validates :is_banned, inclusion: { in: [ true, false ] }
 
   def has_role?(role)
@@ -74,6 +80,14 @@ class User < ApplicationRecord
 
   def staff?
     admin? || reviewer?
+  end
+
+  def trial?
+    false
+  end
+
+  def verified?
+    true
   end
 
   def self.exchange_hca_token(code, redirect_uri)
