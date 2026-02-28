@@ -293,7 +293,7 @@ function Landing() {
             >
               {currentSection === section.id && (
                 <img
-                  src="/landing/star.png"
+                  src="/landing/star.webp"
                   alt=""
                   aria-hidden="true"
                   className="w-5 h-5 md:w-6 md:h-6"
