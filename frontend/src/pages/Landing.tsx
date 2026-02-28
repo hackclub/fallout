@@ -79,7 +79,7 @@ function Landing() {
 
         <div className="z-1 flex flex-col items-center w-full px-4 md:px-0 mt-6 sm:mt-14 gap-3 sm:gap-4">
           <div className="text-white text-lg md:text-xl lg:text-2xl tracking-[5%]">
-            July 1-7, 2026
+            July 1-7, 2026 - Starting Soon
           </div>
           <h1 className="text-white text-center tracking-[5%] text-shadow-md text-shadow-blue text-3xl! sm:text-4xl! xl:text-6xl!">
             Build 60h of hardware projects,
@@ -292,7 +292,12 @@ function Landing() {
             ${currentSection === section.id ? "text-yellow font-bold" : "text-white"}`}
             >
               {currentSection === section.id && (
-                <img src="/landing/star.png" alt="" aria-hidden="true" className="w-5 h-5 md:w-6 md:h-6" />
+                <img
+                  src="/landing/star.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="w-5 h-5 md:w-6 md:h-6"
+                />
               )}
               {section.label}
             </button>
@@ -312,13 +317,21 @@ function Landing() {
               {section.id === "overview" && (
                 <>
                   <h2 className="text-2xl font-semibold mb-4">OVERVIEW</h2>
-                  <p>Welcome to Fallout!</p>
+                  <p>
+                    Welcome to Fallout! We're still working on releasing this,
+                    but it'll be soon!
+                  </p>
+                  <p>
+                    <strong>
+                      RSVP above and we'll let you know when we kick off!
+                    </strong>
+                  </p>
                   <p>
                     Imagine kicking off summer in Shenzhen, the hardware capital
                     of the world.
                   </p>
                   <p>
-                    Never tried hardware before? Now is your chance to start.
+                    Never tried hardware before? This is your chance to start.
                   </p>
                   <p>
                     <strong>
