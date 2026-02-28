@@ -109,12 +109,15 @@ function Landing() {
             </form>
           </Frame>
           {error && (
-            <p role="alert" className="text-red-400 text-lg">
+            <p role="alert" className="text-white bg-red-400 px-4 py-2 text-lg">
               {error}
             </p>
           )}
           {submitted && (
-            <p role="status" className="text-green-400 text-lg">
+            <p
+              role="status"
+              className="text-white bg-green-500 px-4 py-2 text-lg"
+            >
               You're on the list!
             </p>
           )}
