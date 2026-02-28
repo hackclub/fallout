@@ -433,7 +433,7 @@ function Landing() {
                   <p>
                     If you have any questions or concerns, please do not
                     hesitate to reach out to us at{" "}
-                    <a href="mailto:fallout@hackclub.com" class="underline">
+                    <a href="mailto:fallout@hackclub.com" className="underline">
                       fallout@hackclub.com
                     </a>
                     .
