@@ -122,7 +122,7 @@ function Landing() {
               role="status"
               className="text-white bg-green-500 px-4 py-2 text-lg"
             >
-              You're on the list!
+              You're subscribed!
             </p>
           )}
         </div>
