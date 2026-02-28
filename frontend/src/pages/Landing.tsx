@@ -62,8 +62,12 @@ function Landing() {
       <meta property="og:site_name" content="Fallout" />
 
       <section className="relative w-full min-h-svh md:h-[120vh] flex flex-col items-center pt-4 md:p-5 gap-4">
+        <div className="w-full flex justify-center items-start translate-y-50 xs:translate-y-20 md:translate-y-40 lg:translate-y-0 top-0 gap-[20%] absolute">
+          <img src="/landing/cloud_1.webp" alt="" className="h-full w-auto" />
+          <img src="/landing/cloud_2.webp" alt="" className="h-full w-auto" />
+        </div>
         <img
-          className="absolute inset-0 w-full h-full object-cover 2xl:object-top z-0"
+          className="absolute inset-0 w-full h-full object-cover scale-110 z-0 -top-10"
           src="/landing/bg.webp"
           alt=""
           aria-hidden="true"
@@ -171,7 +175,7 @@ function Landing() {
             muted
             playsInline
           />
-          <div className="absolute inset-0 bg-blue/40"></div>
+          <div className="absolute inset-0 bg-black/40"></div>
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="text-white text-3xl sm:text-5xl md:text-6xl font-bold text-center">
               It's one of a kind.
@@ -185,7 +189,7 @@ function Landing() {
           <div className="min-w-60 bg-green rounded-xl p-8 pb-12 space-y-4 text-center flex flex-col items-center text-white tracking-[5%]">
             <h2 className="font-bold">DESIGN</h2>
             <div
-              className="w-full bg-white/40 rounded-xl aspect-2/1 bg-cover bg-center"
+              className="w-full opacity-90 rounded-xl aspect-2/1 bg-cover bg-center"
               style={{ backgroundImage: "url(/landing/step_1.webp)" }}
             ></div>{" "}
             <h3 className="font-medium">Design. Learn. Repeat.</h3>
@@ -198,7 +202,7 @@ function Landing() {
           <div className="min-w-60 bg-[#F5C634] rounded-xl p-8 pb-12 space-y-4 text-center flex flex-col items-center text-white tracking-[5%]">
             <h2 className="font-bold">BUILD</h2>
             <div
-              className="w-full bg-white/40 rounded-xl aspect-2/1 bg-cover bg-center"
+              className="w-full opacity-90 rounded-xl aspect-2/1 bg-cover bg-center"
               style={{ backgroundImage: "url(/landing/step_2.webp)" }}
             ></div>
             <h3 className="font-medium">Build. Iterate. Repeat.</h3>
@@ -209,7 +213,7 @@ function Landing() {
           <div className="min-w-60 bg-[#F761BD] rounded-xl p-8 pb-12 space-y-4 text-center flex flex-col items-center text-white tracking-[5%]">
             <h2 className="font-bold">BUILD IRL</h2>
             <div
-              className="w-full bg-white/40 rounded-xl aspect-2/1 bg-cover bg-center"
+              className="w-full opacity-90 rounded-xl aspect-2/1 bg-cover bg-center"
               style={{ backgroundImage: "url(/landing/step_3.webp)" }}
             ></div>
             <h3 className="font-medium">Join us in ShenZhen</h3>
@@ -274,7 +278,7 @@ function Landing() {
         <div
           role="tablist"
           aria-label="Event information"
-          className="flex flex-row md:flex-col flex-wrap justify-center md:justify-start whitespace-nowrap gap-2 md:gap-3 mb-4 md:mb-0 md:pr-4"
+          className="flex-1/4 flex flex-row md:flex-col flex-wrap justify-center items-center md:justify-start whitespace-nowrap gap-2 md:gap-3 mb-4 md:mb-0 md:pr-4"
         >
           {sections.map((section) => (
             <button
@@ -284,9 +288,12 @@ function Landing() {
               aria-controls={`panel-${section.id}`}
               id={`tab-${section.id}`}
               onClick={() => setCurrentSection(section.id)}
-              className={`py-1 md:py-2 rounded-md text-base md:text-2xl
-            ${currentSection === section.id ? "text-yellow" : "text-white"}`}
+              className={`py-1 md:py-2 rounded-md text-base md:text-2xl flex items-center  gap-2
+            ${currentSection === section.id ? "text-yellow font-bold" : "text-white"}`}
             >
+              {currentSection === section.id && (
+                <img src="/landing/star.png" alt="" aria-hidden="true" className="w-5 h-5 md:w-6 md:h-6" />
+              )}
               {section.label}
             </button>
           ))}
