@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
-html, body {
-  background-color: #38C9FF;
+@theme {
+  --font-outfit: "Outfit", sans-serif;
+
+  /* Primary */
+  --color-blue: #38c9ff;
+  --color-dark-brown: #61453a;
+  --color-brown: #9f715d;
+  --color-light-brown: #edd1b0;
+
+  /* Secondary */
+  --color-light-green: #c8e6d8;
+  --color-green: #37b576;
+  --color-light-blue: #c3efff;
+  --color-yellow: #ffebad;
+  --color-pink: #fc90d2;
+  --color-coral: #ff7d70;
 }
 
 @font-face {
-  font-family: 'Outfit';
-  src: url('/fonts/Outfit-Regular.ttf') format('truetype');
+  font-family: "Outfit";
+  src: url("/fonts/Outfit-Regular.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
 }
 
 @font-face {
-  font-family: 'Outfit';
-  src: url('/fonts/Outfit-Bold.ttf') format('truetype');
+  font-family: "Outfit";
+  src: url("/fonts/Outfit-Bold.ttf") format("truetype");
   font-weight: bold;
   font-style: normal;
 }
 
-@font-face {
-  font-family: 'Source Sans Pro';
-  src: url('/fonts/SourceSansPro-Regular.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
+:root {
+  @apply overscroll-none;
+}
+body {
+  @apply font-outfit bg-blue;
+}
+
+h1 {
+  @apply text-5xl xl:text-6xl font-bold;
+}
+
+h2 {
+  @apply text-4xl xl:text-5xl font-bold;
+}
+
+h3 {
+  @apply text-3xl leading-8;
+}
+
+img {
+  @apply select-none;
+}
+
+@keyframes popUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  70% {
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
