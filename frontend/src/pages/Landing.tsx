@@ -63,8 +63,16 @@ function Landing() {
 
       <section className="relative w-full min-h-svh md:h-[120vh] flex flex-col items-center pt-4 md:p-5 gap-4">
         <div className="w-full flex justify-center items-center lg:items-start h-full top-0 absolute gap-[10%]">
-          <img src="/landing/cloud_1.webp" alt="" className="h-auto lg:h-[80%] w-auto pointer-events-none" />
-          <img src="/landing/cloud_2.webp" alt="" className=" h-auto lg:h-[80%] w-auto pointer-events-none" />
+          <img
+            src="/landing/cloud_1.webp"
+            alt=""
+            className="h-auto lg:h-[80%] w-auto pointer-events-none"
+          />
+          <img
+            src="/landing/cloud_2.webp"
+            alt=""
+            className=" h-auto lg:h-[80%] w-auto pointer-events-none"
+          />
         </div>
         <img
           className="absolute inset-0 w-full h-full object-cover scale-110 z-0 -top-10"
@@ -364,9 +372,10 @@ function Landing() {
                     </li>
                     <li>
                       Ship it! We’ll fund up to $5 per hour you work to buy
-                      parts Build your project
+                      parts
                     </li>
-                    <li>IRL Repeat!</li>
+                    <li>Build your project IRL</li>
+                    <li>Repeat!</li>
                   </ol>
                 </>
               )}
