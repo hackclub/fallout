@@ -62,9 +62,9 @@ function Landing() {
       <meta property="og:site_name" content="Fallout" />
 
       <section className="relative w-full min-h-svh md:h-[120vh] flex flex-col items-center pt-4 md:p-5 gap-4">
-        <div className="w-full flex justify-center items-start translate-y-50 xs:translate-y-20 md:translate-y-40 lg:translate-y-0 top-0 gap-[20%] absolute">
-          <img src="/landing/cloud_1.webp" alt="" className="h-full w-auto" />
-          <img src="/landing/cloud_2.webp" alt="" className="h-full w-auto" />
+        <div className="w-full flex justify-center items-center lg:items-start h-full top-0 absolute gap-[10%]">
+          <img src="/landing/cloud_1.webp" alt="" className="h-auto lg:h-[80%] w-auto pointer-events-none" />
+          <img src="/landing/cloud_2.webp" alt="" className=" h-auto lg:h-[80%] w-auto pointer-events-none" />
         </div>
         <img
           className="absolute inset-0 w-full h-full object-cover scale-110 z-0 -top-10"
@@ -77,8 +77,8 @@ function Landing() {
           <img className="w-auto h-full" src="/hackclub.svg" alt="hackclub" />
         </div>
 
-        <div className="z-1 flex flex-col items-center w-full px-4 md:px-0 mt-6 sm:mt-14 gap-3 sm:gap-4">
-          <div className="text-white text-lg md:text-xl lg:text-2xl tracking-[5%]">
+        <div className="z-1 flex flex-col items-center w-full px-4 md:px-0 mt-6 sm:mt-14 xl:mt-24 gap-3 sm:gap-4">
+          <div className="text-white text-lg md:text-xl lg:text-2xl tracking-[5%] text-center">
             July 1-7, 2026 - Starting Soon
           </div>
           <h1 className="text-white text-center tracking-[5%] text-shadow-md text-shadow-blue text-3xl! sm:text-4xl! xl:text-6xl!">
