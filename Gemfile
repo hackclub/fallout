@@ -86,8 +86,8 @@ gem "mission_control-jobs", "~> 1.1"
 
 gem "skylight", "~> 7.0"
 
-gem "sentry-ruby", "~> 5.28"
-gem "sentry-rails", "~> 5.28"
+gem "sentry-ruby", "~> 6.4"
+gem "sentry-rails", "~> 6.4"
 
 gem "redcarpet", "~> 3.6"
 
