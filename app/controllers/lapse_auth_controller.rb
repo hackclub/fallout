@@ -1,4 +1,5 @@
 class LapseAuthController < ApplicationController
+  skip_onboarding_redirect
   rate_limit to: 10, within: 3.minutes, only: :callback, with: -> { redirect_to root_path, alert: "Try again later." }
 
   def start

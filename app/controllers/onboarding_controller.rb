@@ -3,6 +3,7 @@
 class OnboardingController < ApplicationController
   allow_trial_access
   skip_before_action :redirect_to_onboarding!
+  skip_authorization
 
   def show
     return redirect_to dashboard_path if current_user.onboarded?
@@ -31,9 +32,25 @@ class OnboardingController < ApplicationController
     end
 
     unless step["type"] == "dialogue"
+      answer_text = params[:answer_text].to_s
+      is_other = params[:is_other] == true || params[:is_other] == "true"
+
+      if step["options"].present? && !is_other
+        valid_answers = step["type"] == "multi_choice" ? (JSON.parse(answer_text) rescue []) : [ answer_text ]
+        unless valid_answers.all? { |a| step["options"].include?(a) }
+          redirect_to onboarding_path, alert: "Invalid answer."
+          return
+        end
+      end
+
+      if is_other && !step["allow_other"]
+        redirect_to onboarding_path, alert: "Invalid answer."
+        return
+      end
+
       response = current_user.onboarding_responses.find_or_initialize_by(question_key: step["key"])
-      response.answer_text = params[:answer_text].to_s
-      response.is_other = params[:is_other] == true || params[:is_other] == "true"
+      response.answer_text = answer_text
+      response.is_other = is_other
 
       unless response.save
         redirect_to onboarding_path, inertia: { errors: response.errors.messages }

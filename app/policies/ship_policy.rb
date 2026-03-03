@@ -41,6 +41,7 @@ class ShipPolicy < ApplicationPolicy
       if user&.admin? || user&.reviewer?
         scope.all
       else
+        return scope.none unless user
         scope.for_user(user).or(scope.where(reviewer: user))
       end
     end

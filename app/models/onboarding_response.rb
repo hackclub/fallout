@@ -23,4 +23,5 @@ class OnboardingResponse < ApplicationRecord
   belongs_to :user
 
   validates :question_key, presence: true, uniqueness: { scope: :user_id }
+  validates :answer_text, length: { maximum: 1000 }
 end

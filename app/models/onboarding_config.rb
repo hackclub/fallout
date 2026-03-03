@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class OnboardingConfig
-  STEPS = YAML.load_file(Rails.root.join("config", "onboarding.yml")).fetch("steps").freeze
+  STEPS = YAML.safe_load_file(Rails.root.join("config", "onboarding.yml")).fetch("steps").freeze
 
   def self.steps
     Rails.env.development? ? load_steps : STEPS
@@ -12,7 +12,7 @@ class OnboardingConfig
   def self.step_count = steps.size
 
   def self.load_steps
-    YAML.load_file(Rails.root.join("config", "onboarding.yml")).fetch("steps")
+    YAML.safe_load_file(Rails.root.join("config", "onboarding.yml")).fetch("steps")
   end
 
   private_class_method :load_steps

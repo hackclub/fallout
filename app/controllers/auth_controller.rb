@@ -26,9 +26,11 @@ class AuthController < ApplicationController
       user = User.exchange_hca_token(params[:code], hca_callback_url)
 
       if current_user&.trial?
-        current_user.projects.update_all(user_id: user.id)
-        current_user.onboarding_responses.update_all(user_id: user.id)
-        user.update!(onboarded: true) if current_user.onboarded?
+        ActiveRecord::Base.transaction do
+          current_user.projects.update_all(user_id: user.id)
+          current_user.onboarding_responses.update_all(user_id: user.id)
+          user.update!(onboarded: true) if current_user.onboarded?
+        end
         cookies.delete(:trial_device_token)
       end
 
