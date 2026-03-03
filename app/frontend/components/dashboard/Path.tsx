@@ -1,35 +1,475 @@
-import { useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-const items = [...Array(10)]
-const FREQUENCY = 1.4
-const imagePath = (i: number): string => {
-  if (i === 0) return '/path/star.png'
-  if (i === 2) return '/path/slack.png'
-  if (i % 2 === 0) return '/path/2.png'
-  if (i % 3 === 0) return '/path/3.png'
-  return '/path/1.png'
+const HORIZON_PCT = 0
+const PERSPECTIVE = 800
+const MAX_WIDTH = 1152 // 6xl
+const GROUND_ANGLE = 60 // degrees
+const LANES = 3
+const BILLBOARD_COUNT = 60
+const BILLBOARD_H = 300
+const BILLBOARD_Y_OFFSET = 60 // vertical offset for billboard content (px)
+const BILLBOARD_SPACING = 400 // px between rows on the ground plane
+const INFLECTION_PCT = 20 // % from top of screen where billboard bottoms peak
+const SCROLL_SPEED = 1.5
+
+const GRASS_DENSITY = 7 // blades per 1000px of ground depth
+const GRASS_X_MIN = -150 // % of ground plane width
+const GRASS_X_MAX = 250 // % of ground plane width
+const GRASS_W = 80
+const GRASS_H = 120
+const GRASS_Y_OFFSET = 20
+const GRASS_BASE_SCALE = 0.5
+const GRASS_SCALE_RANGE = 0.1 // scale varies ± this from base
+const GRASS_BASE_ROTATION = 0 // degrees (rotateZ lean)
+const GRASS_ROTATION_RANGE = 15 // rotation varies ± this from base
+const GRASS_IMAGES = Array.from({ length: 11 }, (_, i) => `/grass/${i + 1}.svg`)
+
+const BILLBOARD_IMAGES = ['/path/1.png', '/path/2.png', '/path/3.png']
+
+const LANE_PATTERN = [1, 2, 1, 0] // middle, right, middle, left
+
+const COS_A = Math.cos((GROUND_ANGLE * Math.PI) / 180)
+const SIN_A = Math.sin((GROUND_ANGLE * Math.PI) / 180)
+
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
 }
 
+function generateGrass() {
+  const rng = mulberry32(42)
+  const maxY = BILLBOARD_COUNT * BILLBOARD_SPACING + 200
+  const count = Math.round((GRASS_DENSITY * maxY) / 1000)
+  return Array.from({ length: count }, (_, i) => ({
+    id: i,
+    x: GRASS_X_MIN + rng() * (GRASS_X_MAX - GRASS_X_MIN),
+    y: rng() * maxY,
+    src: GRASS_IMAGES[Math.floor(rng() * GRASS_IMAGES.length)],
+    scale: GRASS_BASE_SCALE + (rng() - 0.5) * 2 * GRASS_SCALE_RANGE,
+    rotation: GRASS_BASE_ROTATION + (rng() - 0.5) * 2 * GRASS_ROTATION_RANGE,
+    flipX: rng() > 0.5 ? -1 : 1,
+  })).sort((a, b) => b.y - a.y)
+}
+
+function generateBillboards() {
+  return Array.from({ length: BILLBOARD_COUNT }, (_, i) => ({
+    id: i,
+    lane: LANE_PATTERN[i % LANE_PATTERN.length],
+    y: i * BILLBOARD_SPACING + 200,
+    src: BILLBOARD_IMAGES[i % BILLBOARD_IMAGES.length],
+  }))
+}
+
+// With rotateX < 90°, edges converge d*cot(θ) pixels ABOVE perspectiveOrigin.
+// Offset perspectiveOrigin down so the visual vanishing point lands at the horizon.
+const COT_ANGLE = Math.cos((GROUND_ANGLE * Math.PI) / 180) / Math.sin((GROUND_ANGLE * Math.PI) / 180)
+const PERSPECTIVE_OFFSET_PX = Math.round(PERSPECTIVE * COT_ANGLE)
+
 export default function Path() {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [billboards] = useState(generateBillboards)
+  const [grass] = useState(generateGrass)
+
+  const [ready, setReady] = useState(false)
+  const scrollRef = useRef(0)
+  const rafRef = useRef(0)
+  const backBillboardRefs = useRef<(HTMLDivElement | null)[]>([])
+  const frontBillboardRefs = useRef<(HTMLDivElement | null)[]>([])
+  const backCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const frontCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const backCtxRef = useRef<CanvasRenderingContext2D | null>(null)
+  const frontCtxRef = useRef<CanvasRenderingContext2D | null>(null)
+  const grassImagesRef = useRef<Map<string, HTMLImageElement>>(new Map())
+
+  const { planetRadius, inflectionScreenY, inflectionGroundY, middleGroundY } = useMemo(() => {
+    const H = typeof window !== 'undefined' ? window.innerHeight : 900
+    const O = PERSPECTIVE_OFFSET_PX
+    const P = PERSPECTIVE
+    const cosA = Math.cos((GROUND_ANGLE * Math.PI) / 180)
+    const sinA = Math.sin((GROUND_ANGLE * Math.PI) / 180)
+    const targetScreenY = (INFLECTION_PCT / 100) * H
+
+    const screenYAt = (d: number, R: number) => {
+      const cZ = (d * d) / (2 * R)
+      const yw = H - d * cosA + cZ * sinA
+      const zw = -d * sinA - cZ * cosA
+      return O + ((yw - O) * P) / (P - zw)
+    }
+
+    const findPeakD = (R: number) => {
+      let dLo = 0,
+        dHi = 50000
+      for (let i = 0; i < 60; i++) {
+        const mid = (dLo + dHi) / 2
+        const eps = 0.5
+        const deriv = (screenYAt(mid + eps, R) - screenYAt(mid - eps, R)) / (2 * eps)
+        if (deriv < 0) dLo = mid
+        else dHi = mid
+      }
+      return (dLo + dHi) / 2
+    }
+
+    let rLo = 100,
+      rHi = 1000000
+    for (let i = 0; i < 60; i++) {
+      const rMid = (rLo + rHi) / 2
+      const peakD = findPeakD(rMid)
+      const peakScreenY = screenYAt(peakD, rMid)
+      if (peakScreenY < targetScreenY) rHi = rMid
+      else rLo = rMid
+    }
+    const radius = (rLo + rHi) / 2
+    const peakD = findPeakD(radius)
+    const screenY = screenYAt(peakD, radius)
+
+    const middleScreenY = (screenY + H) / 2
+    let mLo = 0,
+      mHi = peakD
+    for (let i = 0; i < 60; i++) {
+      const mid = (mLo + mHi) / 2
+      if (screenYAt(mid, radius) > middleScreenY) mLo = mid
+      else mHi = mid
+    }
+
+    return {
+      planetRadius: radius,
+      inflectionScreenY: screenY,
+      inflectionGroundY: peakD,
+      middleGroundY: (mLo + mHi) / 2,
+    }
+  }, [])
+
+  const firstBillboardY = billboards[0].y
+  const lastBillboardY = billboards[billboards.length - 1].y
+  const maxScroll = (lastBillboardY - firstBillboardY) / SCROLL_SPEED
+
+  useEffect(() => {
+    const W = window.innerWidth
+    const H = window.innerHeight
+    const O = PERSPECTIVE_OFFSET_PX
+    const P = PERSPECTIVE
+    const dpr = window.devicePixelRatio || 1
+    const invTwoR = 1 / (2 * planetRadius)
+
+    const setupCanvas = (canvas: HTMLCanvasElement) => {
+      canvas.width = W * dpr
+      canvas.height = H * dpr
+      canvas.style.width = `${W}px`
+      canvas.style.height = `${H}px`
+      const ctx = canvas.getContext('2d')!
+      ctx.scale(dpr, dpr)
+      return ctx
+    }
+
+    if (backCanvasRef.current) backCtxRef.current = setupCanvas(backCanvasRef.current)
+    if (frontCanvasRef.current) frontCtxRef.current = setupCanvas(frontCanvasRef.current)
+
+    GRASS_IMAGES.forEach((src) => {
+      if (!grassImagesRef.current.has(src)) {
+        const img = new Image()
+        img.src = src
+        grassImagesRef.current.set(src, img)
+      }
+    })
+
+    const drawGrass = (ctx: CanvasRenderingContext2D, scrollOffset: number, showPast: boolean) => {
+      ctx.save()
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.clearRect(0, 0, W, H)
+
+      for (const g of grass) {
+        if (g.y + scrollOffset <= 0) break
+        const effectiveY = g.y + scrollOffset
+        const pastInflection = effectiveY >= inflectionGroundY
+        if (showPast && !pastInflection) break
+        if (!showPast && pastInflection) continue
+
+        const curveZ = effectiveY * effectiveY * invTwoR
+        const worldY = H - effectiveY * COS_A + curveZ * SIN_A
+        const worldZ = -effectiveY * SIN_A - curveZ * COS_A
+        const perspScale = P / (P - worldZ)
+        const screenY = O + (worldY - O) * perspScale
+
+        const s = perspScale * g.scale
+        const h = GRASS_H * s
+        if (screenY - h > H || screenY < 0) continue
+
+        const pivotX = (g.x / 100) * W + GRASS_W / 2
+        const screenX = W / 2 + (pivotX - W / 2) * perspScale
+        const w = GRASS_W * s
+        const yOff = GRASS_Y_OFFSET * s
+
+        const img = grassImagesRef.current.get(g.src)
+        if (!img?.complete) continue
+
+        ctx.save()
+        ctx.translate(screenX, screenY + yOff)
+        ctx.rotate((g.rotation * Math.PI) / 180)
+        ctx.scale(g.flipX, 1)
+        ctx.drawImage(img, -w / 2, -h, w, h)
+        ctx.restore()
+      }
+
+      ctx.restore()
+    }
+
+    let prevLow = 0
+    let prevHigh = billboards.length - 1
+
+    const update = () => {
+      const scrollOffset = scrollRef.current * SCROLL_SPEED + middleGroundY - lastBillboardY
+
+      const lowIdx = Math.max(0, Math.ceil((-BILLBOARD_H - scrollOffset - firstBillboardY) / BILLBOARD_SPACING))
+
+      for (let i = prevLow; i < Math.min(lowIdx, billboards.length); i++) {
+        const back = backBillboardRefs.current[i]
+        const front = frontBillboardRefs.current[i]
+        if (back) back.style.display = 'none'
+        if (front) front.style.display = 'none'
+      }
+
+      let highIdx = lowIdx - 1
+      for (let i = lowIdx; i < billboards.length; i++) {
+        const b = billboards[i]
+        const rawY = b.y + scrollOffset
+        const effectiveY = Math.max(0, rawY)
+        const curveZ = effectiveY * effectiveY * invTwoR
+        const worldZ = -effectiveY * SIN_A - curveZ * COS_A
+
+        if (P / (P - worldZ) < 0.03) break
+
+        highIdx = i
+        const pastInflection = effectiveY >= inflectionGroundY
+        const bottom = `${rawY}px`
+        const transform = `translateZ(${-curveZ}px) rotateX(-${GROUND_ANGLE}deg)`
+
+        const back = backBillboardRefs.current[i]
+        if (back) {
+          back.style.display = ''
+          back.style.bottom = bottom
+          back.style.transform = transform
+          back.style.visibility = pastInflection ? 'visible' : 'hidden'
+        }
+        const front = frontBillboardRefs.current[i]
+        if (front) {
+          front.style.display = ''
+          front.style.bottom = bottom
+          front.style.transform = transform
+          front.style.visibility = pastInflection ? 'hidden' : 'visible'
+        }
+      }
+
+      for (let i = Math.max(highIdx + 1, lowIdx); i <= prevHigh; i++) {
+        const back = backBillboardRefs.current[i]
+        const front = frontBillboardRefs.current[i]
+        if (back) back.style.display = 'none'
+        if (front) front.style.display = 'none'
+      }
+
+      prevLow = lowIdx
+      prevHigh = highIdx
+
+      if (backCtxRef.current) drawGrass(backCtxRef.current, scrollOffset, true)
+      if (frontCtxRef.current) drawGrass(frontCtxRef.current, scrollOffset, false)
+    }
+
+    let ticking = false
+    const handleScroll = () => {
+      scrollRef.current = window.scrollY
+      if (!ticking) {
+        rafRef.current = requestAnimationFrame(() => {
+          update()
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+
+    const loadPromises = GRASS_IMAGES.map((src) => {
+      const img = grassImagesRef.current.get(src)
+      return img?.decode().catch(() => {})
+    })
+    Promise.all(loadPromises).then(() => update())
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    update()
+    setReady(true)
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [billboards, grass, planetRadius, inflectionGroundY, middleGroundY, lastBillboardY])
 
   return (
-    <div ref={containerRef} className="w-[80%] max-w-150" style={{ position: 'relative', margin: '0 auto' }}>
-      {items.map((_, i) => {
-        const containerWidth = containerRef.current?.offsetWidth ?? 300
-        const AMPLITUDE = containerWidth * -0.3
-        const x = Math.sin(i * FREQUENCY) * AMPLITUDE
-        const src = imagePath(i)
-        return (
+    <>
+      <div style={{ height: `calc(100vh + ${maxScroll}px)` }} />
+      <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
+        {/* Sky */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: `${INFLECTION_PCT}%`,
+            background: 'var(--color-light-blue)',
+          }}
+        />
+
+        {/* Clouds — behind all 3D content, constrained to sky band */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: `${INFLECTION_PCT}%`,
+            overflow: 'hidden',
+            pointerEvents: 'none',
+          }}
+        >
+          <img src="/clouds/4.png" alt="" className="absolute bottom-0 left-0 h-30 md:h-50 -translate-x-1/3" />
+          <img src="/clouds/1.png" alt="" className="absolute bottom-0 left-40 h-30 translate-x-1/3" />
+          <img src="/clouds/2.png" alt="" className="absolute bottom-0 right-0 -translate-x-5/6 h-30" />
+          <img src="/clouds/3.png" alt="" className="absolute bottom-0 right-0 h-30 md:h-50 w-auto translate-x-1/3" />
+        </div>
+
+        {/* Ground */}
+        <div
+          style={{
+            position: 'absolute',
+            top: `${INFLECTION_PCT}%`,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: '#acc094',
+          }}
+        />
+
+        {/* Back grass canvas */}
+        <canvas ref={backCanvasRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', visibility: ready ? 'visible' : 'hidden' }} />
+
+        {/* Back billboard scene — past inflection (behind cover) */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            perspective: `${PERSPECTIVE}px`,
+            perspectiveOrigin: `50% calc(${HORIZON_PCT}% + ${PERSPECTIVE_OFFSET_PX}px)`,
+            visibility: ready ? 'visible' : 'hidden',
+          }}
+        >
           <div
-            key={i}
-            className="relative w-10 md:w-40 flex items-center justify-center text-blue font-bold mb-30"
-            style={{ left: `calc(50% + ${x}px)`, transform: 'translateX(-50%)' }}
+            style={{
+              position: 'absolute',
+              top: '-10000%',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              maxWidth: MAX_WIDTH,
+              margin: '0 auto',
+              transformOrigin: 'bottom center',
+              transformStyle: 'preserve-3d',
+              transform: 'rotateX(60deg)',
+            }}
           >
-            <img src={src} width="100%" height="auto" />
+            {billboards.map((b, i) => (
+              <div
+                key={b.id}
+                ref={(el) => {
+                  backBillboardRefs.current[i] = el
+                }}
+                style={{
+                  position: 'absolute',
+                  left: `${(b.lane * 100) / LANES}%`,
+                  width: `${100 / LANES}%`,
+                  height: BILLBOARD_H,
+                  transformOrigin: 'bottom center',
+                }}
+              >
+                <div style={{ width: '100%', height: '100%', transform: `translateY(${BILLBOARD_Y_OFFSET}px)` }}>
+                  <img
+                    src={b.src}
+                    fetchPriority="high"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'bottom center' }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-        )
-      })}
-    </div>
+        </div>
+
+        {/* Hill cover */}
+        <div
+          style={{
+            position: 'absolute',
+            top: inflectionScreenY,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'var(--color-light-green)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Front grass canvas */}
+        <canvas ref={frontCanvasRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', visibility: ready ? 'visible' : 'hidden' }} />
+
+        {/* Front billboard scene — before inflection (in front of cover) */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            perspective: `${PERSPECTIVE}px`,
+            perspectiveOrigin: `50% calc(${HORIZON_PCT}% + ${PERSPECTIVE_OFFSET_PX}px)`,
+            pointerEvents: 'none',
+            visibility: ready ? 'visible' : 'hidden',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: '-10000%',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              maxWidth: MAX_WIDTH,
+              margin: '0 auto',
+              transformOrigin: 'bottom center',
+              transformStyle: 'preserve-3d',
+              transform: 'rotateX(60deg)',
+            }}
+          >
+            {billboards.map((b, i) => (
+              <div
+                key={b.id}
+                ref={(el) => {
+                  frontBillboardRefs.current[i] = el
+                }}
+                style={{
+                  position: 'absolute',
+                  left: `${(b.lane * 100) / LANES}%`,
+                  width: `${100 / LANES}%`,
+                  height: BILLBOARD_H,
+                  transformOrigin: 'bottom center',
+                }}
+              >
+                <div style={{ width: '100%', height: '100%', transform: `translateY(${BILLBOARD_Y_OFFSET}px)` }}>
+                  <img
+                    src={b.src}
+                    fetchPriority="high"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'bottom center' }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
   )
 }

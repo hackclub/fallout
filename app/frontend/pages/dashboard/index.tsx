@@ -83,20 +83,7 @@ export default function DashboardIndex() {
         </button>
       </div>
 
-      <div className="relative w-screen min-h-screen flex flex-col">
-        <div className="relative w-full h-50 bg-light-blue overflow-x-hidden">
-          <img src="/clouds/4.png" alt="" className="absolute bottom-0 left-0 h-30 md:h-50 -translate-x-1/3 z-0" />
-          <img src="/clouds/1.png" alt="" className="absolute bottom-0 left-40 h-30 translate-x-1/3 z-0" />
-          <img src="/clouds/2.png" alt="" className="absolute bottom-0 right-0 -translate-x-5/6 h-30 z-0" />
-          <img
-            src="/clouds/3.png"
-            alt=""
-            className="absolute bottom-0 right-0 h-30 md:h-50 w-auto translate-x-1/3 z-0"
-          />
-        </div>
-
-        <main className="min-h-screen w-full bg-light-green pt-8">{/* <Path /> */}</main>
-      </div>
+      <Path />
     </>
   )
 }
