@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { usePage } from '@inertiajs/react'
+import { Link } from '@inertiajs/react'
 import { ModalLink } from '@inertiaui/modal-react'
 import Shop from '@/components/Shop'
 import Projects from '@/components/Projects'
@@ -70,9 +71,14 @@ export default function DashboardIndex() {
       </div>
 
       <div className="fixed bottom-6 left-6 flex flex-col items-start space-y-4 z-10">
-        <button>
-          <img src="/icon/guide.png" alt="Guide" className="w-25 cursor-pointer" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger>
+            <Link href="/docs">
+              <img src="/icon/guide.png" alt="Guide" className="w-25 cursor-pointer" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent>Guide</TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger>
             <ModalLink href="/projects">
@@ -81,12 +87,22 @@ export default function DashboardIndex() {
           </TooltipTrigger>
           <TooltipContent>Projects</TooltipContent>
         </Tooltip>
-        <button>
-          <img src="/icon/shop.png" alt="Shop" className="w-25 cursor-pointer" />
-        </button>
-        <button className="col-span-2 -mt-4">
-          <img src="/icon/clearing.png" alt="Clearing" className="w-50 cursor-pointer" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger>
+            <button>
+              <img src="/icon/shop.png" alt="Shop" className="w-25 cursor-pointer" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Shop</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <button className="col-span-2 -mt-4">
+              <img src="/icon/clearing.png" alt="Clearing" className="w-50 cursor-pointer" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Clearing</TooltipContent>
+        </Tooltip>
       </div>
 
       <Path nodes={pathNodes} />

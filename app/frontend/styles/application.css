@@ -1,4 +1,18 @@
 @import 'tailwindcss';
+
+@font-face {
+  font-family: 'Outfit';
+  src: url('/fonts/Outfit-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Outfit';
+  src: url('/fonts/Outfit-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
 @source '../../../node_modules/@inertiaui/modal-react';
 
 /* @plugin '@tailwindcss/typography'; */
@@ -28,6 +42,7 @@
 :root {
   @apply font-outfit bg-light-blue text-dark-brown overscroll-none;
 }
+
 
 .im-modal-positioner {
   @apply h-full!;
