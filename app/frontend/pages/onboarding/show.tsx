@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import FlashMessages from '@/components/FlashMessages'
+import { notify } from '@/lib/notifications'
 import { router } from '@inertiajs/react'
 import Progress from '@/components/onboarding/Progress'
 import Dialogue from '@/components/onboarding/Dialogue'
@@ -56,6 +58,7 @@ export default function OnboardingShow({ step, step_index, total_steps, existing
       },
       {
         onFinish: () => setProcessing(false),
+        onError: () => notify('alert', 'Something went wrong. Please try again.'),
       },
     )
   }
@@ -64,6 +67,7 @@ export default function OnboardingShow({ step, step_index, total_steps, existing
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
+      <FlashMessages />
       <Progress current={step_index} total={total_steps} />
       <div className="w-full max-w-lg mt-8">
         {StepComponent && (

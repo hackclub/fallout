@@ -3,7 +3,8 @@
 class OnboardingController < ApplicationController
   allow_trial_access only: %i[show update] # Both trial and full users complete onboarding
   skip_before_action :redirect_to_onboarding!, only: %i[show update] # This IS the onboarding destination
-  skip_after_action :verify_authorized, only: %i[show update] # Responses scoped to current_user, no authorizable resource
+  skip_after_action :verify_authorized # No authorizable resource on any action
+  skip_after_action :verify_policy_scoped # No index action; no policy-scoped queries
 
   def show
     return redirect_to dashboard_path if current_user.onboarded?
@@ -80,6 +81,6 @@ class OnboardingController < ApplicationController
 
   def complete_onboarding
     current_user.update!(onboarded: true)
-    redirect_to dashboard_path, notice: "You're all set!"
+    redirect_to dashboard_path, notice: "Welcome to the dashboard!"
   end
 end

@@ -42,7 +42,7 @@ export default function ProjectsForm({
 
       <form onSubmit={submit} className="space-y-4">
         {Object.keys(errors).length > 0 && (
-          <div className="bg-red-50 text-red-700 p-4 rounded mb-4">
+          <div className="bg-coral/30 border-2 border-dark-brown text-dark-brown p-4 mb-4">
             <ul>
               {Object.entries(errors).map(([field, messages]) =>
                 messages.map((msg) => (

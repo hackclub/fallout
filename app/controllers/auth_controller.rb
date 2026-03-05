@@ -11,7 +11,7 @@ class AuthController < ApplicationController
     state = SecureRandom.hex(24)
     session[:state] = state
 
-    redirect_to HcaService.authorize_url(hca_callback_url, state), allow_other_host: true
+    redirect_to HcaService.authorize_url(hca_callback_url, state, login_hint: params[:login_hint]), allow_other_host: true
   end
 
   def create
@@ -28,10 +28,16 @@ class AuthController < ApplicationController
       user = User.exchange_hca_token(params[:code], hca_callback_url)
 
       if current_user&.trial?
+        if current_user.email != user.email
+          redirect_to dashboard_path, alert: "This email already has an account! Please sign out and log in with HCA."
+          return
+        end
+
         ActiveRecord::Base.transaction do
           current_user.projects.update_all(user_id: user.id)
-          current_user.onboarding_responses.update_all(user_id: user.id)
-          user.update!(onboarded: true) if current_user.onboarded?
+          existing_keys = user.onboarding_responses.pluck(:question_key)
+          current_user.onboarding_responses.where.not(question_key: existing_keys).update_all(user_id: user.id)
+          user.update!(onboarded: true) if current_user.onboarded? && !user.onboarded?
         end
         cookies.delete(:trial_device_token)
       end

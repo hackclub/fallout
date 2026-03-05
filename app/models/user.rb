@@ -46,7 +46,7 @@ class User < ApplicationRecord
   encrypts :hca_token
   encrypts :lapse_token
 
-  scope :verified, -> { where.not(type: "TrialUser") }
+  scope :verified, -> { where(type: nil) } # STI: verified users have type=nil; TrialUser subclass has type='TrialUser'
 
   validates :avatar, :display_name, :email, :timezone, presence: true
   validates :slack_id, presence: true, unless: :trial?

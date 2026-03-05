@@ -3,6 +3,8 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { SharedProps } from '@/types'
 import Frame from '@/components/shared/Frame'
+import FlashMessages from '@/components/FlashMessages'
+import { notify } from '@/lib/notifications'
 
 export default function LandingIndex() {
   const shared = usePage<SharedProps>().props
@@ -15,6 +17,7 @@ export default function LandingIndex() {
     router.post(shared.trial_session_path, { email }, {
       onStart: () => setSubmitting(true),
       onFinish: () => setSubmitting(false),
+      onError: () => notify('alert', 'Something went wrong. Please try again.'),
     })
   }
 
@@ -79,6 +82,7 @@ export default function LandingIndex() {
               </button>
             </form>
           </Frame>
+          <FlashMessages />
           <a href={shared.sign_in_path} className="text-white underline text-sm">
             Sign in with HCA
           </a>

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { usePage } from '@inertiajs/react'
 import { Link } from '@inertiajs/react'
+import type { SharedProps } from '@/types'
 import { ModalLink } from '@inertiaui/modal-react'
 import Shop from '@/components/Shop'
 import Projects from '@/components/Projects'
@@ -10,6 +11,7 @@ import PathNode from '@/components/dashboard/PathNode'
 import SignUpCta from '@/components/dashboard/SignUpCta'
 import Leaderboard from '@/components/dashboard/Leaderboard'
 import Header from '@/components/dashboard/Header'
+import FlashMessages from '@/components/FlashMessages'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
 
 type LeaderboardUser = {
@@ -27,10 +29,14 @@ type PageProps = {
 }
 
 export default function DashboardIndex() {
-  const { user } = usePage<PageProps>().props
+  const {
+    user,
+    auth: { user: authUser },
+    sign_in_path,
+  } = usePage<PageProps & SharedProps>().props
   const [mail] = useState<boolean>(true)
   const [notPressed] = useState<boolean>(true)
-  const [loggedIn, setLoggedIn] = useState(false)
+  const [loggedIn] = useState(false)
   const [users] = useState<LeaderboardUser[]>([
     { user: 'John Cena', hours: 100 },
     { user: 'Bobberson', hours: 45 },
@@ -40,10 +46,7 @@ export default function DashboardIndex() {
   ])
   const [shopOpen, setShopOpen] = useState<boolean>(false)
 
-  const pathNodes = useMemo(
-    () => Array.from({ length: 60 }, (_, i) => <PathNode key={i} index={i} />),
-    [],
-  )
+  const pathNodes = useMemo(() => Array.from({ length: 60 }, (_, i) => <PathNode key={i} index={i} />), [])
 
   useEffect(() => {
     const isMobile = window.innerWidth < 640
@@ -59,13 +62,14 @@ export default function DashboardIndex() {
 
   return (
     <>
+      <FlashMessages />
       <div className="fixed top-6 left-6 right-6 z-20">
         <Header koiBalance={user.koi} mail={mail} avatar={user.avatar} displayName={user.display_name} />
       </div>
 
-      <div className="fixed top-6 bottom-6 right-6 z-10 flex items-center pt-[10%]">
+      <div className="fixed top-6 bottom-6 right-6 z-10 flex items-end pt-[10%]">
         <div className="flex flex-col items-end space-y-6">
-          <SignUpCta onSignUp={() => setLoggedIn(true)} />
+          {authUser?.is_trial && <SignUpCta signInPath={sign_in_path} />}
           <Leaderboard users={users} />
         </div>
       </div>

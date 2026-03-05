@@ -1,7 +1,8 @@
 class MarkdownController < ApplicationController
   allow_unauthenticated_access only: %i[show] # Public documentation
   allow_trial_access only: %i[show] # Trial users can read docs
-  skip_after_action :verify_authorized, only: %i[show] # No authorizable resource
+  skip_after_action :verify_authorized # No authorizable resource on any action
+  skip_after_action :verify_policy_scoped # No index action; no policy-scoped queries
 
   def show
     slug = params[:slug].to_s

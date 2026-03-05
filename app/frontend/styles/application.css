@@ -1,18 +1,5 @@
 @import 'tailwindcss';
 
-@font-face {
-  font-family: 'Outfit';
-  src: url('/fonts/Outfit-Regular.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Outfit';
-  src: url('/fonts/Outfit-Bold.ttf') format('truetype');
-  font-weight: bold;
-  font-style: normal;
-}
 @source '../../../node_modules/@inertiaui/modal-react';
 
 /* @plugin '@tailwindcss/typography'; */

@@ -1,10 +1,13 @@
 class TrialSessionsController < ApplicationController
   allow_unauthenticated_access only: %i[create] # Unauthenticated users create trial sessions
   skip_onboarding_redirect only: %i[create] # Session creation happens before onboarding
-  skip_after_action :verify_authorized, only: %i[create] # No authorizable resource
-  rate_limit to: 1, within: 10.minutes, only: :create, with: -> { redirect_to root_path, alert: "Try again later." }
+  skip_after_action :verify_authorized # No authorizable resource on any action
+  skip_after_action :verify_policy_scoped # No index action; no policy-scoped queries
+  rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to root_path, alert: "Try again later." }
 
   def create
+    redirect_to dashboard_path and return if user_signed_in? && !current_user.trial? # Verified users cannot create trial sessions
+
     email = params[:email].to_s.strip.downcase
 
     unless email.match?(URI::MailTo::EMAIL_REGEXP)
@@ -13,7 +16,10 @@ class TrialSessionsController < ApplicationController
     end
 
     if User.verified.exists?(email: email)
-      redirect_to signin_path
+      # Inertia XHR cannot follow external redirects (CORS). Use Inertia's location redirect
+      # so the client does window.location.href = url, letting the browser navigate natively.
+      response.headers["X-Inertia-Location"] = signin_path(login_hint: email)
+      head :conflict
       return
     end
 
@@ -29,6 +35,6 @@ class TrialSessionsController < ApplicationController
     }
 
     session[:user_id] = trial_user.id
-    redirect_to projects_path, notice: "Welcome! Create your first project to get started."
+    redirect_to dashboard_path, notice: "Welcome!"
   end
 end

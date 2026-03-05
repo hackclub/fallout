@@ -1,4 +1,5 @@
 import { router, Link } from '@inertiajs/react'
+import { notify } from '@/lib/notifications'
 import type { ProjectDetail } from '@/types'
 
 function isSafeUrl(url: string | null): boolean {
@@ -20,7 +21,7 @@ export default function ProjectsShow({
 }) {
   function deleteProject() {
     if (confirm('Are you sure?')) {
-      router.delete(`/projects/${project.id}`)
+      router.delete(`/projects/${project.id}`, { onError: () => notify('alert', 'Failed to delete project. Please try again.') })
     }
   }
 
