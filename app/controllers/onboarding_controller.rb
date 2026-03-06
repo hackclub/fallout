@@ -9,17 +9,20 @@ class OnboardingController < ApplicationController
   def show
     return redirect_to dashboard_path if current_user.onboarded?
 
-    step = current_step
+    step = requested_step || current_step
     return complete_onboarding if step.nil?
 
     step_index = OnboardingConfig.step_keys.index(step["key"])
     existing = current_user.onboarding_responses.find_by(question_key: step["key"])
 
+    prev_key = step_index.positive? ? OnboardingConfig.step_keys[step_index - 1] : nil
+
     render inertia: {
       step: step,
       step_index: step_index,
       total_steps: OnboardingConfig.step_count,
-      existing_answer: existing&.then { |r| { answer_text: r.answer_text, is_other: r.is_other } }
+      existing_answer: existing&.then { |r| { answer_text: r.answer_text, is_other: r.is_other } },
+      prev_step_key: prev_key
     }
   end
 
@@ -69,6 +72,17 @@ class OnboardingController < ApplicationController
   end
 
   private
+
+  # Allows navigating back to a previously answered step via ?step= param
+  def requested_step
+    return unless params[:step]
+
+    step = OnboardingConfig.find_step(params[:step])
+    return unless step
+
+    answered_keys = current_user.onboarding_responses.pluck(:question_key)
+    step if answered_keys.include?(step["key"])
+  end
 
   def current_step
     answered_keys = current_user.onboarding_responses.pluck(:question_key)

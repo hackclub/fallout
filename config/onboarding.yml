@@ -1,25 +1,41 @@
 steps:
-  - key: welcome
+  - key: welcome_1
     type: dialogue
-    prompt: "Welcome to Fallout!"
-    subtitle: "Let's get you set up. This will only take a minute."
+    prompt: "Hi there! I'm Soup!"
 
-  - key: referral_source
+  - key: welcome_2
+    type: dialogue
+    prompt: "And I'm hungry"
+
+  - key: welcome_3
+    type: dialogue
+    prompt: "Build hardware projects to get koi fish, & feed me!"
+
+  - key: welcome_4
+    type: dialogue
+    prompt: "In exchange, I'll give you prizes! Maybe an invite to our base in Shenzhen..."
+
+  - key: how_heard
     type: multi_choice
-    prompt: "How did you hear about us?"
-    allow_other: true
+    prompt: "How did you hear about Fallout?"
     options:
-      - "Friend or classmate"
-      - "Hack Club Slack"
-      - "Social media"
-      - "Search engine"
+      - "Friends/Family"
+      - "Instagram/Youtube"
+      - "Hack Club Site"
+      - "Slack"
+      - "Email"
+      - "School"
+      - "Other"
 
-  - key: experience_level
+  - key: experience
     type: single_choice
-    prompt: "How much coding experience do you have?"
-    allow_other: false
+    prompt: "What's your hardware experience?"
     options:
-      - "Just getting started"
-      - "Less than a year"
-      - "1-3 years"
-      - "3+ years"
+      - "I'm new to hardware!"
+      - "I've made guided projects!"
+      - "I've made projects beyond guides!"
+      - "I live and breathe hardware"
+
+  - key: timelapse_reminder
+    type: dialogue
+    prompt: "Remember to timelapse your work!"

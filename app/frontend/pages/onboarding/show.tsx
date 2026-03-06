@@ -1,198 +1,146 @@
-import SpeechBubble from "../../components/onboarding/SpeechBubble";
-import { useEffect, useState } from "react";
-import { router } from '@inertiajs/react';
+import { type ReactNode, useState } from "react";
+import { router } from "@inertiajs/react";
+import DialogueStep from "../../components/onboarding/DialogueStep";
+import SingleChoiceStep from "../../components/onboarding/SingleChoiceStep";
+import MultiChoiceStep from "../../components/onboarding/MultiChoiceStep";
 
-const stages = [1, 2, 3, 4];
-
-const options = {
-    howHeard: ["Friends/Family", "Instagram/Youtube", "Hack Club Site", "Slack", "Email", "School", "Other"],
-    experience: [
-        "I'm new to hardware!",
-        "I've made guided projects!",
-        "I've made projects beyond guides!",
-        "I live and breathe hardware"
-    ]
-};
-
-const stageOne = [
-    "Hi there! I'm Soup!",
-    "And I'm hungry",
-    "Build hardware projects to get koi fish, & feed me!",
-    "In exchange, I'll give you prizes! Maybe an invite to our base in Shenzhen... "
-];
-
-const QUESTION_KEYS = {
-    2: "how_heard",
-    3: "experience",
-    4: "timelapse_reminder" 
-};
-
-function OnboardingShow() {
-    const [stage, setStage] = useState(1);
-    const [answers, setAnswers] = useState({ howHeard: null, experience: null });
-    const [textIndex, setTextIndex] = useState(0);
-    const [processing, setProcessing] = useState(false);
-
-    useEffect(() => {
-        if (stage !== 1) return;
-        if (textIndex >= stageOne.length - 1) return;
-        const timer = setTimeout(() => setTextIndex(i => i + 1), 2000);
-        return () => clearTimeout(timer);
-    }, [textIndex, stage]);
-
-    function advanceText() {
-        if (textIndex < stageOne.length - 1) {
-            setTextIndex(i => i + 1);
-        } else {
-            return;
-        }
-    }
-
-    const currentStageIndex = stages.indexOf(stage);
-    const progress = (currentStageIndex / (stages.length - 1)) * 100;
-
-    function postStep(questionKey, answerText, isOther = false) {
-        return new Promise((resolve, reject) => {
-            setProcessing(true);
-            router.post('/onboarding', {
-                question_key: questionKey,
-                answer_text: answerText,
-                is_other: isOther,
-            }, {
-                onSuccess: () => { setProcessing(false); resolve(); },
-                onError: () => { setProcessing(false); reject(); },
-                preserveState: true,
-            });
-        });
-    }
-
-    async function onButtonClick() {
-        if (processing) return;
-
-        if (stage === 1) {
-          try {
-              await postStep("welcome", "acknowledged");
-              setStage(2);
-          } catch { }
-          return;
-        }
-
-        if (stage === 2) {
-          if (!answers.howHeard) return; 
-          try {
-              await postStep(QUESTION_KEYS[2], answers.howHeard);
-              setStage(3);
-          } catch { }
-          return;
-        }
-
-        if (stage === 3) {
-          if (!answers.experience) return;
-          try {
-              await postStep(QUESTION_KEYS[3], answers.experience);
-              setStage(4);
-          } catch { }
-          return;
-        }
-
-        if (stage === 4) {
-          try {
-              await postStep(QUESTION_KEYS[4], "acknowledged");
-          } catch { }
-        }
-    }
-
-    function onBack() {
-        if (currentStageIndex > 0) {
-            setStage(stages[currentStageIndex - 1]);
-            setTextIndex(0);
-        }
-    }
-
-    function onSelect(key, value) {
-        setAnswers(prev => ({ ...prev, [key]: value }));
-    }
-
-    return (
-        <div className="w-screen h-screen overflow-y-hidden bg-light-blue flex flex-col items-center text-dark-brown p-4 text-center text-xl lg:text-2xl">
-            <div className="w-full lg:w-[50%] bg-white rounded-full h-4 z-50">
-                <div
-                    className="bg-blue h-4 rounded-full transition-all duration-500"
-                    style={{ width: `${progress}%` }}
-                />
-            </div>
-
-            <div className="absolute bottom-0 left-0 bg-light-green h-[80%] max-h-200 w-full "></div>
-            <div className="z-20 absolute bottom-5 right-5 flex items-end gap-8">
-                <button className="text-2xl underline cursor-pointer" onClick={onBack}>go back</button>
-                <button
-                    className={`py-4 px-10 bg-dark-brown text-light-brown rounded-xl font-bold text-2xl hover:bg-light-brown hover:text-dark-brown transition-all border-dark-brown border-2 ${processing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onClick={onButtonClick}
-                    disabled={processing}
-                >
-                    {processing ? 'saving...' : 'continue'}
-                </button>
-            </div>
-
-            {stage === 1 && (
-                <section onMouseDown={advanceText} className="relative z-1 w-full flex-1 flex justify-center items-center flex-col">
-                    <SpeechBubble text={stageOne[textIndex]} />
-                    <img src="/chineseHeidi.gif" className="w-100 h-auto" />
-                </section>
-            )}
-
-            {stage === 2 && (
-                <section className="relative z-1 w-full flex-1 pt-10 flex flex-col items-center lg:justify-center">
-                    <div className="flex items-center">
-                        <img src="/chineseHeidi.gif" className="w-40 lg:w-60 h-auto" />
-                        <SpeechBubble dir="left" text="How did you hear about Fallout?" />
-                    </div>
-                    <ul className="grid grid-cols-2 gap-2 lg:gap-4 w-full lg:w-[50%] lg:min-w-[400px]">
-                        {options.howHeard.map((option) => (
-                            <li key={option}>
-                                <button
-                                    className={`w-full min-h-24 rounded-xl lg:text-left lg:pl-20 cursor-pointer ease-in-out transition-all hover:scale-104 hover:border-2 hover:border-dark-brown p-2
-                                        ${answers.howHeard === option ? "bg-dark-brown text-light-brown" : "bg-white"}`}
-                                    onClick={() => onSelect("howHeard", option)}
-                                >
-                                    {option}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            )}
-
-            {stage === 3 && (
-                <section className="relative z-1 w-full flex-1 pt-10 flex flex-col items-center lg:justify-center">
-                    <div className="flex items-center">
-                        <img src="/chineseHeidi.gif" className="w-40 lg:w-60 h-auto" />
-                        <SpeechBubble dir="left" text="What's your hardware experience?" />
-                    </div>
-                    <ul className="space-y-2 lg:space-y-4 w-full lg:w-[50%] lg:min-w-[400px]">
-                        {options.experience.map((option) => (
-                            <li key={option}>
-                                <button
-                                    className={`w-full min-h-24 rounded-xl lg:text-left lg:pl-20 cursor-pointer ease-in-out transition-all hover:scale-104 hover:border-2 hover:border-dark-brown
-                                        ${answers.experience === option ? "bg-dark-brown text-light-brown" : "bg-white"}`}
-                                    onClick={() => onSelect("experience", option)}
-                                >
-                                    {option}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            )}
-
-            {stage === 4 && (
-                <section className="relative z-1 w-full flex-1 flex justify-center items-center flex-col">
-                    <SpeechBubble text="Remember to timelapse your work!" />
-                    <img src="/chineseHeidi.gif" className="w-100 max-w-full h-auto" />
-                </section>
-            )}
-        </div>
-    );
+interface OnboardingStep {
+  key: string;
+  type: "dialogue" | "single_choice" | "multi_choice";
+  prompt: string;
+  options?: string[];
 }
+
+interface PageProps {
+  step: OnboardingStep;
+  step_index: number;
+  total_steps: number;
+  existing_answer: { answer_text: string; is_other: boolean } | null;
+  prev_step_key: string | null;
+}
+
+function parseExistingMulti(existing: { answer_text: string } | null): string[] {
+  if (!existing?.answer_text) return [];
+  try { return JSON.parse(existing.answer_text); } catch { return []; }
+}
+
+function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_step_key }: PageProps) {
+  const [selected, setSelected] = useState<string | null>(
+    step.type === "single_choice" ? (existing_answer?.answer_text ?? null) : null
+  );
+  const [multiSelected, setMultiSelected] = useState<string[]>(
+    step.type === "multi_choice" ? parseExistingMulti(existing_answer) : []
+  );
+  const [processing, setProcessing] = useState(false);
+
+  const progress = total_steps > 1 ? (step_index / (total_steps - 1)) * 100 : 0;
+
+  const canContinue =
+    step.type === "dialogue" ||
+    (step.type === "single_choice" && !!selected) ||
+    (step.type === "multi_choice" && multiSelected.length > 0);
+
+  function handleContinue() {
+    if (processing || !canContinue) return;
+
+    let answerText: string;
+    if (step.type === "dialogue") answerText = "acknowledged";
+    else if (step.type === "multi_choice") answerText = JSON.stringify(multiSelected);
+    else answerText = selected!;
+
+    setProcessing(true);
+    router.post(
+      "/onboarding",
+      {
+        question_key: step.key,
+        answer_text: answerText,
+        is_other: false,
+      },
+      {
+        onFinish: () => setProcessing(false),
+      }
+    );
+  }
+
+  function handleBack() {
+    if (prev_step_key) {
+      router.get(`/onboarding?step=${prev_step_key}`);
+    }
+  }
+
+  function handleMultiToggle(option: string) {
+    setMultiSelected((prev) =>
+      prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]
+    );
+  }
+
+  return (
+    <div className="w-screen h-screen overflow-y-hidden bg-light-blue flex flex-col items-center text-dark-brown p-3 text-center text-base lg:text-lg">
+      {step.type !== "dialogue" && (
+        <div className="w-full lg:w-[40%] bg-white rounded-full h-3 z-50">
+          <div
+            className="bg-blue h-3 rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+
+      <div className="absolute bottom-0 left-0 bg-light-green h-[45%] w-full" />
+
+      {/* Clouds — pinned to bottom of sky band, overflow hidden */}
+      <div className="absolute top-0 left-0 right-0 h-[55%] overflow-hidden pointer-events-none">
+        <img src="/clouds/4.png" alt="" className="absolute bottom-0 left-0 h-20 md:h-36 -translate-x-1/3" />
+        <img src="/clouds/1.png" alt="" className="absolute bottom-0 left-40 h-20 md:h-32 translate-x-1/3" />
+        <img src="/clouds/2.png" alt="" className="absolute bottom-0 right-0 -translate-x-5/6 h-20 md:h-28" />
+        <img src="/clouds/3.png" alt="" className="absolute bottom-0 right-0 h-20 md:h-36 translate-x-1/3" />
+      </div>
+
+      {/* Grass */}
+      <img src="/grass/1.svg" className="absolute bottom-[32%] left-[3%] z-1 w-8" />
+      <img src="/grass/2.svg" className="absolute bottom-[22%] left-[12%] z-1 w-10" />
+      <img src="/grass/3.svg" className="absolute bottom-[10%] left-[8%] z-1 w-9" />
+      <img src="/grass/4.svg" className="absolute bottom-[28%] left-[28%] z-1 w-7" />
+      <img src="/grass/5.svg" className="absolute bottom-[15%] left-[22%] z-1 w-8" />
+      <img src="/grass/6.svg" className="absolute bottom-[8%] left-[35%] z-1 w-7" />
+      <img src="/grass/7.svg" className="absolute bottom-[30%] left-[45%] z-1 w-8" />
+      <img src="/grass/8.svg" className="absolute bottom-[18%] left-[50%] z-1 w-9" />
+      <img src="/grass/9.svg" className="absolute bottom-[5%] left-[55%] z-1 w-7" />
+      <img src="/grass/10.svg" className="absolute bottom-[25%] right-[20%] z-1 w-8" />
+      <img src="/grass/11.svg" className="absolute bottom-[12%] right-[12%] z-1 w-10" />
+      <img src="/grass/1.svg" className="absolute bottom-[35%] right-[8%] z-1 w-7" />
+      <img src="/grass/3.svg" className="absolute bottom-[6%] right-[3%] z-1 w-8" />
+      <img src="/grass/5.svg" className="absolute bottom-[20%] right-[30%] z-1 w-6 hidden lg:block" />
+      <img src="/grass/7.svg" className="absolute bottom-[3%] left-[42%] z-1 w-7 hidden lg:block" />
+
+      {prev_step_key && (
+        <button className="z-20 absolute bottom-4 left-4 text-lg underline cursor-pointer flex items-center h-12" onClick={handleBack}>
+          go back
+        </button>
+      )}
+
+      {canContinue && (
+        <button
+          className={`z-20 absolute bottom-4 right-4 py-3 px-8 bg-dark-brown text-light-brown rounded-xl font-bold text-lg hover:bg-light-brown hover:text-dark-brown transition-all border-dark-brown border-2 ${processing ? "opacity-50 cursor-not-allowed" : ""}`}
+          onClick={handleContinue}
+          disabled={processing}
+        >
+          {processing ? "saving..." : "continue"}
+        </button>
+      )}
+
+      {step.type === "dialogue" && <DialogueStep step={step} />}
+
+      {step.type === "single_choice" && step.options && (
+        <SingleChoiceStep step={{ prompt: step.prompt, options: step.options }} selected={selected} onSelect={setSelected} />
+      )}
+
+      {step.type === "multi_choice" && step.options && (
+        <MultiChoiceStep step={{ prompt: step.prompt, options: step.options }} selected={multiSelected} onToggle={handleMultiToggle} />
+      )}
+    </div>
+  );
+}
+
+OnboardingShow.layout = (page: ReactNode) => page;
 
 export default OnboardingShow;
