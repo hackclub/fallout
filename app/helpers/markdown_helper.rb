@@ -3,6 +3,34 @@ require "uri"
 require "digest"
 
 module MarkdownHelper
+  # Hosts allowed to serve images in user-generated content (e.g. journals).
+  # Same-origin images (Active Storage, relative paths) are always allowed.
+  ALLOWED_IMAGE_HOSTS = %w[
+    hc-cdn.hel1.your-objectstorage.com
+    cdn.hackclub.com
+    github.com
+    raw.githubusercontent.com
+  ].freeze
+
+  # Tags permitted in sanitized user-generated HTML
+  ALLOWED_UGC_TAGS = %w[
+    p br em strong i b u s del strike sup sub
+    h1 h2 h3 h4 h5 h6
+    ul ol li
+    blockquote pre code hr
+    a img
+    table thead tbody tfoot tr th td
+    input span div
+  ].freeze
+
+  # Attributes permitted in sanitized user-generated HTML
+  ALLOWED_UGC_ATTRIBUTES = %w[
+    href rel target
+    src alt title width height loading
+    type checked disabled
+    class
+  ].freeze
+
   def self.canonical_base_url
     host = ENV["APPLICATION_HOST"]
     host.present? ? "https://#{host}" : nil
@@ -57,6 +85,72 @@ module MarkdownHelper
     def default_port(scheme)
       scheme.to_s.downcase == "https" ? 443 : 80
     end
+  end
+
+  # Renders user-generated markdown (journals, etc.) with HTML sanitization.
+  # Uses escape_html to turn raw HTML in source into visible text (not rendered).
+  # External images from untrusted hosts are replaced with a link callout.
+  def render_user_markdown(text)
+    base_url = MarkdownHelper.canonical_base_url || (request.base_url rescue nil)
+
+    renderer = GuidesLinkRenderer.new(
+      with_toc_data: true,
+      hard_wrap: true,
+      escape_html: true, # Escape raw HTML in user input — renders as literal text
+      prettify: true,
+      base_url: base_url
+    )
+    md = Redcarpet::Markdown.new(
+      renderer,
+      autolink: true,
+      tables: true,
+      fenced_code_blocks: true,
+      strikethrough: true,
+      lax_spacing: true,
+      space_after_headers: true,
+      footnotes: true
+    )
+
+    html = md.render(text)
+    sanitize_user_html(html)
+  end
+
+  def sanitize_user_html(html)
+    sanitized = sanitize(html.to_s, tags: ALLOWED_UGC_TAGS, attributes: ALLOWED_UGC_ATTRIBUTES)
+
+    doc = Nokogiri::HTML::DocumentFragment.parse(sanitized)
+
+    doc.css("img[src]").each do |img|
+      src = img["src"].to_s
+
+      if external_link?(src) && !allowed_image_host?(src)
+        wrapper = Nokogiri::XML::Node.new("div", doc)
+        wrapper["class"] = "external-image-callout"
+        wrapper.add_child(Nokogiri::XML::Text.new("External images are not supported. ", doc))
+
+        link = Nokogiri::XML::Node.new("a", doc)
+        link["href"] = src
+        link["rel"] = "nofollow noopener"
+        link["target"] = "_blank"
+        link.content = "View original"
+
+        wrapper.add_child(link)
+        img.replace(wrapper)
+      else
+        img["loading"] = "lazy"
+      end
+    end
+
+    doc.css("a[href]").each do |a|
+      a["rel"] = "nofollow noopener"
+
+      href = a["href"].to_s
+      if external_link?(href)
+        a["target"] = a["target"].presence || "_blank"
+      end
+    end
+
+    doc.to_html.html_safe
   end
 
   def render_markdown(text, base_url: nil)
@@ -232,6 +326,38 @@ module MarkdownHelper
   end
 
   private
+
+  def external_link?(href)
+    return false if href.start_with?("#", "/", "./", "../")
+    return false unless href =~ /\Ahttps?:\/\//i
+
+    base_url = MarkdownHelper.canonical_base_url || (request.base_url rescue nil)
+    return true if base_url.blank?
+
+    begin
+      base = URI.parse(base_url)
+      u = URI.parse(href)
+      base.scheme != u.scheme || base.host != u.host ||
+        (base.port || default_port(base.scheme)) != (u.port || default_port(u.scheme))
+    rescue URI::InvalidURIError
+      true
+    end
+  end
+
+  def default_port(scheme)
+    scheme.to_s.downcase == "https" ? 443 : 80
+  end
+
+  def allowed_image_host?(href)
+    return false unless href =~ /\Ahttps?:\/\//i
+
+    begin
+      uri = URI.parse(href)
+      ALLOWED_IMAGE_HOSTS.include?(uri.host)
+    rescue URI::InvalidURIError
+      false
+    end
+  end
 
   def strip_front_matter_table(text)
     lines = text.lines

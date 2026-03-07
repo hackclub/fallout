@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Deferred as InertiaDeferred, router } from '@inertiajs/react'
 import { Deferred as ModalDeferred, Modal } from '@inertiaui/modal-react'
 import Frame from '@/components/shared/Frame'
+import MarkdownEditor from '@/components/shared/MarkdownEditor'
 
 type Project = { id: number; name: string }
 
@@ -20,11 +21,12 @@ type HackatimeProject = {
   timelapses: Timelapse[]
 }
 
-function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, hackatime_projects }: {
+function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, direct_upload_url, hackatime_projects }: {
   projects: Project[]
   selected_project_id: number | null
   lapse_connected: boolean
   is_modal: boolean
+  direct_upload_url: string
   hackatime_projects: HackatimeProject[] | null
 }) {
   const initialProject = selected_project_id
@@ -33,6 +35,8 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(initialProject)
   const [selectedTimelapses, setSelectedTimelapses] = useState<Set<string>>(new Set())
+  const [markdown, setMarkdown] = useState('')
+  const [blobSignedIds, setBlobSignedIds] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
 
   const Deferred = is_modal ? ModalDeferred : InertiaDeferred
@@ -51,6 +55,8 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
     setSubmitting(true)
     router.post(`/projects/${selectedProject.id}/journal_entries`, {
       timelapse_ids: Array.from(selectedTimelapses),
+      content: markdown,
+      images: blobSignedIds,
     }, {
       onFinish: () => setSubmitting(false),
     })
@@ -78,6 +84,16 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
           />
         </Deferred>
       )}
+      <div className="mt-6">
+        <h2 className="font-bold text-xl mb-3">Write about your work</h2>
+        <MarkdownEditor
+          value={markdown}
+          onChange={setMarkdown}
+          onBlobsChange={setBlobSignedIds}
+          directUploadUrl={direct_upload_url}
+          previewUrl="/journal_entries/preview"
+        />
+      </div>
       {selectedTimelapses.size > 0 && (
         <div className="mt-6">
           <button
