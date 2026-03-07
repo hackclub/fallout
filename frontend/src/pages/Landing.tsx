@@ -62,13 +62,13 @@ function Landing() {
       <title>Fallout: Hardware Hackathon</title>
       <meta
         name="description"
-        content="A seven-day hardware hackathon in ShenZhen, China in 2026. Design hardware projects, build them, & qualify!"
+        content="A seven-day hardware hackathon in Shenzhen, China in 2026. Design hardware projects, build them, & qualify!"
       />
       <meta property="og:type" content="website" />
       <meta property="og:title" content="Fallout: Hardware Hackathon" />
       <meta
         property="og:description"
-        content="A seven-day hardware hackathon in ShenZhen, China in 2026. Design hardware projects, build them, & qualify!"
+        content="A seven-day hardware hackathon in Shenzhen, China in 2026. Design hardware projects, build them, & qualify!"
       />
       <meta property="og:site_name" content="Fallout" />
 
@@ -103,7 +103,7 @@ function Landing() {
           <h1 className="text-white text-center tracking-[5%] text-shadow-md text-shadow-blue text-3xl! sm:text-4xl! xl:text-6xl!">
             Build 60h of hardware projects,
             <br />
-            Go to ShenZhen!
+            Go to Shenzhen!
           </h1>
 
           <Frame className="w-full max-w-[calc(100%-1rem)] sm:max-w-150 ml-1">
@@ -235,7 +235,7 @@ function Landing() {
               className="w-full opacity-90 rounded-xl aspect-2/1 bg-cover bg-center"
               style={{ backgroundImage: "url(/landing/step_3.webp)" }}
             ></div>
-            <h3 className="font-medium">Join us in ShenZhen</h3>
+            <h3 className="font-medium">Join us in Shenzhen</h3>
             <span className="text-2xl font-light text-left">
               Share your project to the world, get an invite to build in-person!
             </span>
@@ -442,7 +442,7 @@ function Landing() {
                   </h2>
                   <p>
                     We’re running Fallout at the center of the world’s tech
-                    manufacturing, ShenZhen China. For the week of July 1-7,
+                    manufacturing, Shenzhen China. For the week of July 1-7,
                     you’ll be able to browse the world’s largest hardware and
                     electronics market, Huaqiangbei, to build whatever creation
                     you dream up, with friends you meet along the way.
