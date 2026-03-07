@@ -15,7 +15,14 @@ type Timelapse = {
   createdAt: number
 }
 
-function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, direct_upload_url, timelapses }: {
+function NewJournal({
+  projects,
+  selected_project_id,
+  lapse_connected,
+  is_modal,
+  direct_upload_url,
+  timelapses,
+}: {
   projects: Project[]
   selected_project_id: number | null
   lapse_connected: boolean
@@ -24,8 +31,10 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
   timelapses: Timelapse[] | null
 }) {
   const initialProject = selected_project_id
-    ? projects.find((p) => p.id === selected_project_id) ?? null
-    : projects.length === 1 ? projects[0] : null
+    ? (projects.find((p) => p.id === selected_project_id) ?? null)
+    : projects.length === 1
+      ? projects[0]
+      : null
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(initialProject)
   const [selectedTimelapses, setSelectedTimelapses] = useState<Set<string>>(new Set())
@@ -36,7 +45,11 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
   const draftKey = selectedProject ? `journal-draft-${selectedProject.id}` : null
   const [markdown, setMarkdown] = useState(() => {
     if (!draftKey) return ''
-    try { return localStorage.getItem(draftKey) ?? '' } catch { return '' }
+    try {
+      return localStorage.getItem(draftKey) ?? ''
+    } catch {
+      return ''
+    }
   })
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -44,7 +57,9 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
 
   useEffect(() => {
     if (draftKey && draftKey !== prevDraftKey.current) {
-      try { setMarkdown(localStorage.getItem(draftKey) ?? '') } catch {}
+      try {
+        setMarkdown(localStorage.getItem(draftKey) ?? '')
+      } catch {}
       setDraftStatus(null)
     }
     prevDraftKey.current = draftKey
@@ -58,10 +73,14 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
     setDraftStatus('Saving draft...')
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      try { localStorage.setItem(draftKey, markdown) } catch {}
+      try {
+        localStorage.setItem(draftKey, markdown)
+      } catch {}
       setDraftStatus('Draft saved locally.')
     }, 500)
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+    }
   }, [markdown, draftKey])
 
   const Deferred = is_modal ? ModalDeferred : InertiaDeferred
@@ -78,27 +97,39 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
   function handleSubmit() {
     if (!selectedProject || selectedTimelapses.size === 0) return
     setSubmitting(true)
-    router.post(`/projects/${selectedProject.id}/journal_entries`, {
-      timelapse_ids: Array.from(selectedTimelapses),
-      content: markdown,
-      images: blobSignedIds,
-    }, {
-      onSuccess: () => {
-        if (draftKey) try { localStorage.removeItem(draftKey) } catch {}
+    router.post(
+      `/projects/${selectedProject.id}/journal_entries`,
+      {
+        timelapse_ids: Array.from(selectedTimelapses),
+        content: markdown,
+        images: blobSignedIds,
       },
-      onFinish: () => setSubmitting(false),
-    })
+      {
+        onSuccess: () => {
+          if (draftKey)
+            try {
+              localStorage.removeItem(draftKey)
+            } catch {}
+        },
+        onFinish: () => setSubmitting(false),
+      },
+    )
   }
 
   const content = selectedProject ? (
     <div className="w-full h-full mx-auto p-8 overflow-y-auto">
       <h1 className="font-bold text-3xl mb-4">New Journal</h1>
-      <p className="text-lg">Journaling for: <span className="font-bold">{selectedProject.name}</span></p>
+      <p className="text-lg">
+        Journaling for: <span className="font-bold">{selectedProject.name}</span>
+      </p>
       {!lapse_connected && (
         <div className="mt-6 p-4 border border-amber-300 bg-amber-50 rounded-lg">
           <p className="text-lg font-bold mb-2">Connect Lapse</p>
           <p className="mb-3">You need to connect Lapse to record timelapses for your journal.</p>
-          <a href={`/auth/lapse/start?return_to=journal&project_id=${selectedProject.id}`} className="inline-block px-4 py-2 bg-dark-brown text-white rounded font-bold hover:opacity-90">
+          <a
+            href={`/auth/lapse/start?return_to=journal&project_id=${selectedProject.id}`}
+            className="inline-block px-4 py-2 bg-dark-brown text-white rounded font-bold hover:opacity-90"
+          >
             Connect Lapse
           </a>
         </div>
@@ -113,7 +144,7 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
         </Deferred>
       )}
       <div className="mt-6">
-        <h2 className="font-bold text-xl mb-3">Write about your work</h2>
+        <h2 className="font-bold text-xl mb-3">Write about what you did</h2>
         <MarkdownEditor
           value={markdown}
           onChange={setMarkdown}
@@ -130,7 +161,9 @@ function NewJournal({ projects, selected_project_id, lapse_connected, is_modal, 
             disabled={submitting}
             className="px-6 py-3 bg-dark-brown text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 cursor-pointer"
           >
-            {submitting ? 'Creating...' : `Create Journal (${selectedTimelapses.size} timelapse${selectedTimelapses.size !== 1 ? 's' : ''})`}
+            {submitting
+              ? 'Creating...'
+              : `Create Journal (${selectedTimelapses.size} timelapse${selectedTimelapses.size !== 1 ? 's' : ''})`}
           </button>
         </div>
       )}
@@ -187,14 +220,18 @@ function formatDuration(seconds: number): string {
   return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`
 }
 
-function TimelapseBrowser({ timelapses, selectedTimelapses, onToggle }: {
+function TimelapseBrowser({
+  timelapses,
+  selectedTimelapses,
+  onToggle,
+}: {
   timelapses: Timelapse[]
   selectedTimelapses: Set<string>
   onToggle: (id: string) => void
 }) {
   if (timelapses.length === 0) {
     return (
-      <div className="mt-6 p-4 border border-gray-200 rounded-lg text-gray-500">
+      <div className="mt-6 p-4 border-2 border-dark-brown/30 rounded text-dark-brown/50">
         No timelapses found. Start coding to generate timelapses!
       </div>
     )
@@ -211,18 +248,20 @@ function TimelapseBrowser({ timelapses, selectedTimelapses, onToggle }: {
               key={timelapse.id}
               type="button"
               onClick={() => onToggle(timelapse.id)}
-              className={`group relative aspect-video rounded-lg overflow-hidden bg-gray-100 border-2 cursor-pointer transition-all ${
-                selected ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-gray-200 hover:border-gray-300'
+              className={`group relative aspect-video rounded overflow-hidden bg-gray-100 border-2 cursor-pointer transition-all ${
+                selected ? 'border-dark-brown ring-2 ring-dark-brown/30' : 'border-dark-brown/30 hover:border-dark-brown/60'
               }`}
             >
-              <img
-                src={timelapse.thumbnailUrl}
-                alt={timelapse.name}
-                className="w-full h-full object-cover"
-              />
+              <img src={timelapse.thumbnailUrl} alt={timelapse.name} className="w-full h-full object-cover" />
               {selected && (
-                <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <div className="absolute top-2 right-2 w-6 h-6 bg-dark-brown rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-4 h-4 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
