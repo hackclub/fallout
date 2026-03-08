@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { usePage } from '@inertiajs/react'
 // @ts-expect-error useModalStack lacks type declarations in this beta package
 import { ModalLink, useModalStack } from '@inertiaui/modal-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
+import { notify } from '@/lib/notifications'
+import type { SharedProps } from '@/types'
 
 const BILLBOARD_IMAGES = ['/path/1.png', '/path/2.png', '/path/3.png']
 
@@ -19,6 +22,11 @@ export default function PathNode({
   const activeIndex = hasProjects ? journalEntryCount + 1 : 0
   const state: 'completed' | 'active' | 'locked' =
     index < activeIndex ? 'completed' : index === activeIndex ? 'active' : 'locked'
+
+  const {
+    auth: { user: authUser },
+  } = usePage<SharedProps>().props
+  const isTrial = authUser?.is_trial ?? false
 
   const { stack } = useModalStack()
   const modalOpen = stack.length > 0
@@ -61,9 +69,18 @@ export default function PathNode({
           starImage
         )
       ) : state === 'active' && interactive ? (
-        <ModalLink href="/journal_entries/new" className="outline-0">
-          {billboardImage}
-        </ModalLink>
+        isTrial ? (
+          <button
+            onClick={() => notify('alert', 'You need to verify your account before continuing!')}
+            className="outline-0"
+          >
+            {billboardImage}
+          </button>
+        ) : (
+          <ModalLink href="/journal_entries/new" className="outline-0">
+            {billboardImage}
+          </ModalLink>
+        )
       ) : (
         billboardImage
       )}
