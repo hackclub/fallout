@@ -39,6 +39,7 @@ class User < ApplicationRecord
 
   has_many :ahoy_visits, class_name: "Ahoy::Visit", dependent: :nullify
   has_many :ahoy_events, class_name: "Ahoy::Event", dependent: :nullify
+  has_one :latest_locatable_visit, -> { where.not(country: [ nil, "" ]).order(started_at: :desc) }, class_name: "Ahoy::Visit"
   has_many :projects, dependent: :destroy
   has_many :ships, through: :projects
   has_many :reviewed_ships, class_name: "Ship", foreign_key: :reviewer_id, dependent: :nullify, inverse_of: :reviewer

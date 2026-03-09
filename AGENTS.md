@@ -50,7 +50,7 @@ For values that change over time — especially currencies like koi — store ea
 
 # Code Quality
 
-Use Rails, Inertia, React, and Pundit best practices. Keep code DRY with partials, helpers, and concerns. Minimize database queries (use `includes`, avoid N+1). Use background jobs for long-running tasks. Use caching where appropriate. When adding the `private` keyword in Rails, verify nothing below is affected — private methods should always be at the bottom of the class.
+Use Rails, Inertia, React, and Pundit best practices. Keep code DRY with partials, helpers, and concerns. Follow this ordering for model internals: constants, enums, includes/concerns, associations, validations, callbacks, scopes, class methods, instance methods (public then private). Minimize database queries (use `includes`, avoid N+1). Use background jobs for long-running tasks. Use caching where appropriate. When adding the `private` keyword in Rails, verify nothing below is affected — private methods should always be at the bottom of the class.
 
 Maintain existing functionality; do not introduce bugs. Before finishing, run `git diff` to review changes, then run `bin/rubocop -f github` and `bin/brakeman --no-pager`. Flag unrelated issues but you don't have to fix them.
 
