@@ -11,19 +11,21 @@ export default function LandingIndex() {
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [currentSection, setCurrentSection] = useState('overview')
-  const isSoup = new URLSearchParams(window.location.search).get('soup') === 'true'
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     router.post(
-      isSoup ? shared.trial_session_path : shared.rsvp_path,
+      shared.trial_session_path,
       { email },
       {
         onStart: () => setSubmitting(true),
         onFinish: () => setSubmitting(false),
         onSuccess: (page) => {
           const flash = (page.props as unknown as SharedProps).flash
-          if (flash.notice) { notify('notice', flash.notice); setEmail('') }
+          if (flash.notice) {
+            notify('notice', flash.notice)
+            setEmail('')
+          }
           if (flash.alert) notify('alert', flash.alert)
         },
         onError: () => notify('alert', 'Something went wrong. Please try again.'),
@@ -99,16 +101,14 @@ export default function LandingIndex() {
                 aria-label="Submit"
                 disabled={submitting}
               >
-                {submitting ? '...' : isSoup ? 'Get Started' : 'RSVP'}
+                {submitting ? '...' : 'Join Beta'}
               </button>
             </form>
           </Frame>
           <FlashMessages />
-          {isSoup && (
-            <a href={shared.sign_in_path} className="text-white underline text-sm">
-              Sign in with HCA
-            </a>
-          )}
+          <a href={shared.sign_in_path} className="text-white underline text-sm">
+            Sign in with HCA
+          </a>
         </div>
       </section>
 
