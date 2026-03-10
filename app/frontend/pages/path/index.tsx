@@ -10,6 +10,7 @@ import Path from '@/components/path/Path'
 import PathNode from '@/components/path/PathNode'
 import SignUpCta from '@/components/path/SignUpCta'
 import Leaderboard from '@/components/path/Leaderboard'
+import BgmPlayer from '@/components/path/BgmPlayer'
 import Header from '@/components/path/Header'
 import FlashMessages from '@/components/FlashMessages'
 import { notify } from '@/lib/notifications'
@@ -87,6 +88,7 @@ export default function PathIndex() {
         <div className="flex flex-col items-end space-y-6">
           {authUser?.is_trial && <SignUpCta signInPath={sign_in_path} />}
           <Leaderboard />
+          <BgmPlayer />
         </div>
       </div>
 
