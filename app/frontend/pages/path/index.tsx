@@ -99,7 +99,7 @@ export default function PathIndex() {
         <Tooltip>
           <TooltipTrigger>
             <Link href="/docs">
-              <img src="/icon/guide.png" alt="Guide" className="w-25 cursor-pointer" />
+              <img src="/icon/guide.webp" alt="Guide" className="w-25 cursor-pointer" />
             </Link>
           </TooltipTrigger>
           <TooltipContent>Docs & Resources</TooltipContent>
@@ -107,7 +107,7 @@ export default function PathIndex() {
         <Tooltip>
           <TooltipTrigger>
             <button onClick={() => notify('alert', 'This is coming soon. Check back later!')}>
-              <img src="/icon/project.png" alt="Projects" className="w-25 cursor-pointer" />
+              <img src="/icon/project.webp" alt="Projects" className="w-25 cursor-pointer" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Projects</TooltipContent>
@@ -115,7 +115,7 @@ export default function PathIndex() {
         <Tooltip>
           <TooltipTrigger>
             <button onClick={() => notify('alert', "The shop isn't open yet. Check back later!")}>
-              <img src="/icon/shop.png" alt="Shop" className="w-25 cursor-pointer" />
+              <img src="/icon/shop.webp" alt="Shop" className="w-25 cursor-pointer" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Shop</TooltipContent>
@@ -126,7 +126,7 @@ export default function PathIndex() {
               className="col-span-2 -mt-4"
               onClick={() => notify('alert', "The clearing isn't open yet. Check back later!")}
             >
-              <img src="/icon/clearing.png" alt="Clearing" className="w-50 cursor-pointer" />
+              <img src="/icon/clearing.webp" alt="Clearing" className="w-50 cursor-pointer" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Clearing</TooltipContent>

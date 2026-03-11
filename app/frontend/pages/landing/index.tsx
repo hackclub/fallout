@@ -221,14 +221,14 @@ export default function LandingIndex() {
 
         <div className="relative w-full h-24 sm:h-40 overflow-x-hidden">
           <img
-            src="/clouds/4.png"
+            src="/clouds/4.webp"
             alt=""
             className="absolute bottom-0 left-0 h-20 sm:h-30 md:h-40 -translate-x-1/4 z-0"
           />
-          <img src="/clouds/1.png" alt="" className="absolute bottom-0 left-1/4 sm:left-40 h-20 sm:h-30 z-0" />
-          <img src="/clouds/2.png" alt="" className="absolute bottom-0 right-1/4 h-20 sm:h-30 z-0" />
+          <img src="/clouds/1.webp" alt="" className="absolute bottom-0 left-1/4 sm:left-40 h-20 sm:h-30 z-0" />
+          <img src="/clouds/2.webp" alt="" className="absolute bottom-0 right-1/4 h-20 sm:h-30 z-0" />
           <img
-            src="/clouds/3.png"
+            src="/clouds/3.webp"
             alt=""
             className="absolute bottom-0 right-0 h-20 sm:h-30 md:h-40 w-auto translate-x-1/4 z-0"
           />

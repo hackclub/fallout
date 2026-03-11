@@ -88,10 +88,10 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
 
       {/* Clouds — pinned to bottom of sky band, overflow hidden */}
       <div className="absolute top-0 left-0 right-0 h-[55%] overflow-hidden pointer-events-none">
-        <img src="/clouds/4.png" alt="" className="absolute bottom-0 left-0 h-20 md:h-36 -translate-x-1/3" />
-        <img src="/clouds/1.png" alt="" className="absolute bottom-0 left-40 h-20 md:h-32 translate-x-1/3" />
-        <img src="/clouds/2.png" alt="" className="absolute bottom-0 right-0 -translate-x-5/6 h-20 md:h-28" />
-        <img src="/clouds/3.png" alt="" className="absolute bottom-0 right-0 h-20 md:h-36 translate-x-1/3" />
+        <img src="/clouds/4.webp" alt="" className="absolute bottom-0 left-0 h-20 md:h-36 -translate-x-1/3" />
+        <img src="/clouds/1.webp" alt="" className="absolute bottom-0 left-40 h-20 md:h-32 translate-x-1/3" />
+        <img src="/clouds/2.webp" alt="" className="absolute bottom-0 right-0 -translate-x-5/6 h-20 md:h-28" />
+        <img src="/clouds/3.webp" alt="" className="absolute bottom-0 right-0 h-20 md:h-36 translate-x-1/3" />
       </div>
 
       {/* Grass */}

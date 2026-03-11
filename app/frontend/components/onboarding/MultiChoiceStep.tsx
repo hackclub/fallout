@@ -13,7 +13,7 @@ export default function MultiChoiceStep({ step, selected, onToggle }: MultiChoic
   return (
     <section className="relative z-1 w-full flex-1 pt-6 flex flex-col items-center lg:justify-center">
       <div className="flex items-center">
-        <img src="/onboarding/chinese_heidi.gif" className="w-28 lg:w-40 h-auto" />
+        <img src="/onboarding/chinese_heidi.webp" className="w-28 lg:w-40 h-auto" />
         <SpeechBubble dir="left" text={step.prompt} />
       </div>
       <p className="text-sm text-dark-brown/60 mb-1">select all that apply</p>

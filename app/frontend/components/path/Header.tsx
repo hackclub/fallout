@@ -61,7 +61,7 @@ export default function Header({ koiBalance, avatar, displayName }: Props) {
 
       <div className="flex space-x-8 items-center">
         <div className="flex items-center space-x-2">
-          <img src="/koifish.png" alt="koi" className="h-10" />
+          <img src="/koifish.webp" alt="koi" className="h-10" />
           <span className="text-coral text-4xl xl:text-5xl font-bold">{koiBalance}</span>
         </div>
         <button
@@ -74,7 +74,7 @@ export default function Header({ koiBalance, avatar, displayName }: Props) {
             visitModal('/mails')
           }}
         >
-          <img src="/envelope.png" alt="mail" className="h-10" />
+          <img src="/envelope.webp" alt="mail" className="h-10" />
           {shared.has_unread_mail && (
             <>
               <span className="absolute top-1 right-0 rounded-full size-3 bg-coral" />

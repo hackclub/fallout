@@ -13,7 +13,7 @@ export default function SingleChoiceStep({ step, selected, onSelect }: SingleCho
   return (
     <section className="relative z-1 w-full flex-1 pt-6 flex flex-col items-center lg:justify-center">
       <div className="flex items-center">
-        <img src="/onboarding/chinese_heidi.gif" className="w-28 lg:w-40 h-auto" />
+        <img src="/onboarding/chinese_heidi.webp" className="w-28 lg:w-40 h-auto" />
         <SpeechBubble dir="left" text={step.prompt} />
       </div>
       <ul className="flex flex-col gap-2 lg:gap-3 w-full lg:w-[40%] lg:min-w-80">

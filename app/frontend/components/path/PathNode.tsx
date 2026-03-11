@@ -6,7 +6,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Too
 import { notify } from '@/lib/notifications'
 import type { SharedProps } from '@/types'
 
-const BILLBOARD_IMAGES = ['/path/1.png', '/path/2.png', '/path/3.png']
+const BILLBOARD_IMAGES = ['/path/1.webp', '/path/2.webp', '/path/3.webp']
 
 export default function PathNode({
   index,
@@ -41,7 +41,7 @@ export default function PathNode({
 
   const starImage = (
     <img
-      src="/path/star.png"
+      src="/path/star.webp"
       fetchPriority="high"
       style={{ width: '100%', display: 'block', transform: 'translateY(20px)' }}
     />

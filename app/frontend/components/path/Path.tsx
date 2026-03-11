@@ -379,10 +379,10 @@ export default function Path({ nodes }: PathProps) {
             pointerEvents: 'none',
           }}
         >
-          <img src="/clouds/4.png" alt="" className="absolute bottom-0 left-0 h-30 md:h-50 -translate-x-1/3" />
-          <img src="/clouds/1.png" alt="" className="absolute bottom-0 left-40 h-30 translate-x-1/3" />
-          <img src="/clouds/2.png" alt="" className="absolute bottom-0 right-0 -translate-x-5/6 h-30" />
-          <img src="/clouds/3.png" alt="" className="absolute bottom-0 right-0 h-30 md:h-50 w-auto translate-x-1/3" />
+          <img src="/clouds/4.webp" alt="" className="absolute bottom-0 left-0 h-30 md:h-50 -translate-x-1/3" />
+          <img src="/clouds/1.webp" alt="" className="absolute bottom-0 left-40 h-30 translate-x-1/3" />
+          <img src="/clouds/2.webp" alt="" className="absolute bottom-0 right-0 -translate-x-5/6 h-30" />
+          <img src="/clouds/3.webp" alt="" className="absolute bottom-0 right-0 h-30 md:h-50 w-auto translate-x-1/3" />
         </div>
 
         {/* Back grass canvas */}
