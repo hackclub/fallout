@@ -106,6 +106,50 @@ module LapseService
     nil
   end
 
+  def my_published_timelapses(access_token, limit: 100)
+    raise ArgumentError, "access_token is required" if access_token.blank?
+
+    all_timelapses = []
+    cursor = nil
+
+    loop do
+      params = { limit: limit }
+      params[:cursor] = cursor if cursor
+
+      response = connection.get("/api/timelapse/myPublishedTimelapses") do |req|
+        req.headers["Authorization"] = "Bearer #{access_token}"
+        req.headers["Content-Type"] = "application/json"
+        req.headers["Accept"] = "application/json"
+        req.body = params.to_json
+      end
+
+      Rails.logger.debug("Lapse myPublishedTimelapses response: status=#{response.status} body=#{response.body.truncate(500)}")
+
+      raise Unauthorized, "Lapse token expired or invalid" if response.status == 401
+
+      unless response.success?
+        ErrorReporter.capture_message("Lapse published timelapses fetch failed", level: :warning, contexts: {
+          lapse: { status: response.status, body: response.body.truncate(500) }
+        })
+        return nil
+      end
+
+      data = JSON.parse(response.body)
+      timelapses = data.dig("data", "timelapses") || []
+      all_timelapses.concat(timelapses)
+
+      cursor = data.dig("data", "nextCursor")
+      break if cursor.nil?
+    end
+
+    all_timelapses
+  rescue Unauthorized
+    raise
+  rescue StandardError => e
+    ErrorReporter.capture_exception(e, contexts: { lapse: { action: "my_published_timelapses" } })
+    nil
+  end
+
   def fetch_timelapse(access_token, timelapse_id)
     raise ArgumentError, "timelapse_id is required" if timelapse_id.blank?
 

@@ -267,10 +267,7 @@ class User < ApplicationRecord
   def get_timelapses
     return [] if lapse_token.blank?
 
-    projects = LapseService.hackatime_projects(lapse_token) || []
-    projects.flat_map do |project|
-      LapseService.timelapses_for_project(lapse_token, project["name"]) || []
-    end
+    LapseService.my_published_timelapses(lapse_token) || []
   rescue LapseService::Unauthorized
     update!(lapse_token: nil)
     []
