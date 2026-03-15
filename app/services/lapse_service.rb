@@ -242,6 +242,9 @@ module LapseService
   end
 
   def connection
-    @connection ||= Faraday.new(url: host)
+    @connection ||= Faraday.new(url: host) do |f|
+      f.options.open_timeout = 5
+      f.options.timeout = 10
+    end
   end
 end
