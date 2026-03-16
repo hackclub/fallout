@@ -237,7 +237,7 @@ export default function LandingIndex() {
             </div>
             <div className="col-start-1 row-start-1 bg-black/60 w-full h-full border-2 border-green rounded-lg relative">
               {/* <img src="/fallout.svg" className="h-10 w-auto absolute top-4 left-1/2 -translate-x-1/2" /> */}
-              <span className="w-full max-w-[70%] text-beige text-3xl sm:text-4xl xl:text-7xl font-bold text-center absolute bottom-8 left-1/2 -translate-x-1/2">Build 60h of hardware... Go to Shenzhen! <span className="text-coral">This is Lorem</span></span>
+              <span className="w-full max-w-[70%] text-beige text-3xl sm:text-4xl xl:text-7xl font-bold text-center absolute bottom-8 left-1/2 -translate-x-1/2">It's one of a kind</span>
               <img src="/fallOut.png" className="sticker w-30 h-auto absolute top-1/2 -translate-y-1/2 -left-10 z-10" />
               <img src="/sz.png" className="sticker w-30 h-auto absolute bottom-60 -right-10" />
               <img src="/sticker.png" className="sticker w-50 h-auto absolute bottom-10 -right-20" />
@@ -285,7 +285,7 @@ export default function LandingIndex() {
           {/* <h3 className="text-3xl font-bold py-2 px-4 w-fit">VISIT</h3> */}
           
           <img src="/landing/shenzhen.svg" className="h-60 py-8 w-auto" />
-          <p className="max-w-200 w-full text-2xl leading-tight text-white">Lorem ipsum dolor sit, amet consectetur adipisicing elit. Excepturi libero at voluptas alias sapiente doloremque perspiciatis ratione adipisci velit distinctio dicta magni.</p>
+          {/* <p className="max-w-200 w-full text-2xl leading-tight text-white">Lorem ipsum dolor sit, amet consectetur adipisicing elit. Excepturi libero at voluptas alias sapiente doloremque perspiciatis ratione adipisci velit distinctio dicta magni.</p> */}
         </div>
         {/* <img src="/envelope.webp" className="w-40 h-auto relative z-10 cursor-pointer hover:scale-102 transtion-all" /> */}
         
