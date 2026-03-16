@@ -39,10 +39,10 @@ class ShipPolicy < ApplicationPolicy
   class Scope < ApplicationPolicy::Scope
     def resolve
       if user&.admin? || user&.reviewer?
-        scope.all
+        scope.all # admins and reviewers need visibility into all ships for review workflows
       else
         return scope.none unless user
-        scope.for_user(user).or(scope.where(reviewer: user))
+        scope.for_user(user).or(scope.where(reviewer: user)) # regular users see their own ships plus any they've been assigned to review
       end
     end
   end

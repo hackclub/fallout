@@ -2,7 +2,7 @@
 
 class LapseTimelapsePolicy < ApplicationPolicy
   def create?
-    user.present?
+    user.present? # any authenticated user — authorization is enforced at the parent resource level
   end
 
   def show?

@@ -6,7 +6,7 @@ class RsvpsController < ApplicationController
   def create
     email = params[:email].to_s.strip.downcase
 
-    if email.blank? || email.length > 254 || !email.match?(/\A[^\s@]+@[^\s@]+\.[^\s@]+\z/)
+    if email.blank? || email.length > 254 || !email.match?(URI::MailTo::EMAIL_REGEXP)
       redirect_to root_path, alert: "Please enter a valid email address."
       return
     end

@@ -6,7 +6,7 @@ class OnboardingResponsePolicy < ApplicationPolicy
   end
 
   def update?
-    owner?
+    owner? # only the user who created the onboarding response can update it
   end
 
   class Scope < ApplicationPolicy::Scope

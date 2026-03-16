@@ -22,6 +22,16 @@ class Rack::Attack
     req.ip if req.path == "/auth/signout" && req.delete?
   end
 
+  # RSVP — unauthenticated, makes external Airtable API call
+  throttle("rsvp/ip", limit: 5, period: 1.minute) do |req|
+    req.ip if req.path == "/rsvp" && req.post?
+  end
+
+  # YouTube video lookup — makes external API call
+  throttle("youtube_lookup/ip", limit: 10, period: 1.minute) do |req|
+    req.ip if req.path == "/you_tube_videos/lookup" && req.post?
+  end
+
   # Block suspicious requests
   blocklist("block suspicious requests") do |req|
     # Block requests with suspicious user agents
