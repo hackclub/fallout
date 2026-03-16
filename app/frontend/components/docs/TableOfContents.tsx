@@ -47,9 +47,7 @@ export default function TableOfContents({ contentRef }: { contentRef: RefObject<
     const el = contentRef.current
     if (!el || headings.length === 0) return
 
-    const headingEls = headings
-      .map((h) => document.getElementById(h.id))
-      .filter((el): el is HTMLElement => el !== null)
+    const headingEls = headings.map((h) => document.getElementById(h.id)).filter((el): el is HTMLElement => el !== null)
 
     if (headingEls.length === 0) return
 
@@ -87,12 +85,14 @@ export default function TableOfContents({ contentRef }: { contentRef: RefObject<
       onMouseLeave={() => setHovered(false)}
     >
       {/* Bars (default view) */}
-      <div className={`flex flex-col items-end gap-2.5 transition-opacity duration-150 ${hovered ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      <div
+        className={`flex flex-col items-end gap-2.5 transition-opacity duration-150 ${hovered ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      >
         {headings.map((heading) => (
           <div
             key={heading.id}
-            className={`h-0.5 rounded-full ${BAR_WIDTHS[heading.level] || 'w-3'} ${
-              activeId === heading.id ? 'bg-dark-brown active' : 'bg-dark-brown/20'
+            className={`toc-bar h-0.5 rounded-full ${BAR_WIDTHS[heading.level] || 'w-3'} ${
+              activeId === heading.id ? 'toc-bar-active' : ''
             }`}
           />
         ))}

@@ -303,17 +303,16 @@ textarea:focus {
   vertical-align: top;
 }
 
-
-
 .markdown-content hr {
   border: none;
   border-top: 1px solid rgba(97, 69, 58, 0.15);
   margin: 1.5rem 0;
 }
 
-.markdown-content img {
-  max-width: min(32rem, 100%);
-  max-height: 24rem;
+.markdown-content img,
+.markdown-content video {
+  /* max-width: min(32rem, 100%); */
+  max-height: 30rem;
   width: auto;
   height: auto;
   object-fit: contain;
@@ -356,7 +355,6 @@ textarea:focus {
 .markdown-content small {
   font-size: 0.8em;
 }
-
 
 .markdown-content sup {
   font-size: 0.75em;
@@ -421,6 +419,15 @@ textarea:focus {
 .markdown-content .callout-success {
   background-color: rgba(55, 181, 118, 0.08);
   border-color: var(--color-green);
+}
+
+/* TOC bar styles */
+.toc-bar {
+  background-color: rgba(97, 69, 58, 0.2);
+}
+
+.toc-bar-active {
+  background-color: var(--color-dark-brown);
 }
 
 /* Dark mode for docs pages */
@@ -523,17 +530,17 @@ textarea:focus {
     border-color: rgba(237, 209, 176, 0.15);
   }
 
-  .docs-page button[aria-label="Open navigation"] {
+  .docs-page button[aria-label='Open navigation'] {
     background-color: #1e1613;
     border-color: rgba(237, 209, 176, 0.2);
     color: #e8d5c4;
   }
 
-  .toc-sidebar button {
+  .toc-bar {
     background-color: rgba(237, 209, 176, 0.2);
   }
 
-  .toc-sidebar button.active {
+  .toc-bar-active {
     background-color: #e8d5c4;
   }
 
@@ -547,5 +554,13 @@ textarea:focus {
 
   .toc-sidebar .border-dark-brown\/15 {
     border-color: rgba(237, 209, 176, 0.15);
+  }
+
+  .toc-sidebar button[style*='color'] {
+    color: #6db8e0 !important;
+  }
+
+  .toc-sidebar button:hover {
+    background-color: rgba(237, 209, 176, 0.08);
   }
 }

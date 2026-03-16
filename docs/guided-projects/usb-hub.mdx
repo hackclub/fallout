@@ -1,0 +1,721 @@
+| title | USB Hub |
+| description | Guided Project by @Rudy |
+| unlisted | true |
+| --- | --- |
+
+# Make your own USB Hub
+
+<div class="-mt-4">
+  <small>_Made by @rudy_</small>
+</div>
+
+For this tutorial we're going to be using `EasyEDA Pro` , it's a free and online tool that we'll use to design our fancy USB hub!
+
+To get started head on over to [pro.easyeda.com](https://pro.easyeda.com/) and create an account and login.
+
+After you successfully login click on the `Use Online` button or just head over to [pro.easyeda.com/editor](https://pro.easyeda.com/editor). When the editor opens, you will be taken to the main dashboard which should look something like this.
+
+![Pasted%20image%2020260214134758](/docs-assets/guided-projects/usb-hub/img-20260214134758.webp)
+
+To create a project you go `File -> New -> Project` or you can just use the `Shift + N` shortcut. A new project dialog will pop up and here you can name your project and add a little description if you want.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214134815.webp)
+
+After you save it, the editor will automatically open that project and this is what it should look like.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214134843.webp)
+
+On the left sidebar you'll see your project name and then a `Schematic1` and `PCB` under it, these are the files which we will be working on and editing to create our USB Hub!
+
+Before we jump into making our USB Hub, I'll give you a quick rundown of the Schematic and PCB editors in EasyEDA.
+
+## Schematic Editor
+
+To open the schematic editor simply double click the `Schematic1` that's on the left sidebar. It should open the schematic editor which would look something like this:
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1847-11.9442387.mp4" autoplay muted loop playsinline></video>
+
+The schematic editor is where you design the circuit for your board. It visually represents how everything connects, using symbols instead of physical components. This is where you define the logic of your design. If someone understands your schematic, they understand how your circuit works, even without seeing the actual PCB.
+
+    If the PCB editor is building the house, the schematic editor is the blueprint. It defines what goes where and how everything is connected before you worry about the physical layout.
+
+At the top of the screen, you’ll see the toolbar. This is where all the tools you’ll need for building your schematic live. You’ll find options to add components, draw wires, place resistors, add net flags, and more.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1849-21.0176422.mp4" autoplay muted loop playsinline></video>
+
+It might look a little overwhelming at first. That’s totally normal. Let’s quickly go over the most important tools so you know what’s what. You’ll get more hands on practice with them in the next tutorial.
+
+**Components**  
+This tool lets you add symbols from the parts library. You can search for things like microcontrollers, connectors, regulators, and more, then place their symbols into your schematic.
+
+**Resistor**  
+This is a shortcut for quickly placing a resistor symbol. If you right click it, you’ll see options for other common passive components like capacitors, inductors, and diodes. These are used so often that they get their own quick access tool.
+
+**Wire**  
+Pretty self explanatory. This tool lets you draw wires to connect different components together.
+
+**Net Flag/Label**  
+Think of this as a cleaner way to connect things. Instead of drawing a long wire across your schematic, you can place net flags and give them the same name. If two net flags share a name, they’re electrically connected, even if there’s no visible wire between them. This helps keep your schematic neat and easy to read.
+
+Now on the right side you have the property sidebar, it basically shows you the property of whatever component is selected, by default if nothing is selected it shows you the properties of the page.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214134939.webp)
+
+## PCB Editor
+
+To open the PCB editor, simply click the `PCB1` on the left sidebar. That opens the PCB editor which looks something like this.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1850-03.7155826.mp4" autoplay muted loop playsinline></video>
+
+The PCB editor is where your design becomes real. This is where you define how your board will physically look and connect in real life. You’ll set the board shape, arrange components on the layout, and draw copper traces that connect everything together.
+
+    Unlike the schematic editor, which focuses on logic, the PCB editor is all about physical placement and routing. You’re thinking about spacing, trace paths, and how everything fits on the board.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1850-52.5533107.mp4" autoplay muted loop playsinline></video>
+
+Just like the schematic editor, the PCB editor also has a toolbar at the top with the tools you’ll use most often. Don’t worry if they look unfamiliar at first. Here’s a quick and simple rundown of the first five tools, without getting too technical:
+
+**Pad**  
+Pads are the copper landing points where component leads or pins get soldered. Every footprint is made up of pads, and you can also place custom pads if needed.
+
+**Via**  
+A via is a small hole that connects copper traces between different layers of the board. For example, it lets you route a trace from the top layer to the bottom layer.
+
+**Board Outline**  
+This defines the actual shape and size of your PCB. Whatever you draw here is what the manufacturer will cut out.
+
+**Copper Area**  
+This tool lets you create large copper regions, usually for things like ground planes or power planes. Instead of routing lots of individual traces, you can pour a copper area and connect it to a specific net.
+
+**Fill Region**  
+Similar to a copper area, but more general purpose. It fills a defined space with copper and is often used for shielding or custom copper shapes.
+
+On the right sidebar, you’ll see a long list of layers. At first glance, it can look a little intimidating. There are a lot of them, and the names might not immediately make sense.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214135110.webp)
+
+But don’t worry. For most beginner boards, you only really need to focus on five layers: the **Top Layer**, **Bottom Layer**, **Top Silkscreen**, **Bottom Silkscreen**, and the **Board Outline Layer**. And which you'll learn more about in the follow section which talks about the anatomy of a PCB
+
+### Anatomy of a PCB
+
+At its core, a standard 2 layer PCB is pretty simple. It’s made of two copper layers separated by a non conductive material called the substrate. The substrate is usually FR4, which gives the board its strength and structure while keeping the copper layers electrically isolated from each other.
+
+Now, we cannot just leave the copper exposed. Bare copper would oxidize over time and could easily short against other conductive surfaces. To protect it, manufacturers cover most of the copper with something called solder mask. This is a thin, non conductive protective coating. You can think of it like paint for your PCB. It protects the copper and helps prevent accidental solder bridges.
+
+On top of the solder mask, there is the silkscreen layer. This is where text and graphics are printed onto the board. Component names, reference designators like R1 or U2, polarity markings, and even logos all go here. It does not carry electricity. It is purely for labeling and clarity, which becomes extremely helpful when assembling, debugging, or modifying your board later.
+
+Here’s a quick illustration to help you picture how these layers are stacked together:
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214135131.webp)
+
+---
+
+Now that you understand the basics and feel comfortable navigating EasyEDA, it’s time to put that knowledge into practice.
+
+## Schematics
+
+As we talked about earlier, the schematic is the blueprint for your PCB. It tells the board editor what connects to what, so if the schematic is messy or wrong, your PCB will be too. That’s why it’s important to keep it clear, tidy, and easy for someone else to understand at a glance.
+
+Alright, let’s jump in. Open up the schematic editor and let’s get started.
+
+### Placing symbols
+
+For this USB hub, we’re going to use the **SL2.1S** from **CoreChips**. This tiny chip is where all the magic happens. You plug one USB connection into it, and it splits that single port into four usable USB ports.
+
+Since we’re having the board assembled by JLCPCB, the part number we’ll need is `C2684433`.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214135310.webp)
+
+Let’s add the chip to our schematic.
+
+Click the **Component** tool in the top toolbar, or just press `Shift + F`. In the search bar, type `C2684433` and hit Enter. You should see the **SL2.1S** pop up in the results.
+
+Click **Place**, move it onto your schematic, and left-click to drop it where you want. When you’re done, right-click to exit the placement tool. Just like that, the brain of your USB hub is now on the page.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1853-57.9253130.mp4" autoplay muted loop playsinline></video>
+
+Now that the main IC is on the schematic, let’s add the USB connectors, this is where you get to shape what your hub actually looks like.
+
+The chip supports **five total USB ports**:
+
+- **1 upstream** port, which connects to your computer
+- **4 downstream** ports, where you plug in your devices
+
+How you configure those ports is completely up to you. You could make everything USB Type C, everything USB Type A, or mix and match however you like. That’s part of the fun.
+
+For my design, I’m using:
+
+- 1 USB Type C for the upstream connection
+- 2 USB Type C for downstream
+- 2 USB Type A for downstream
+
+For the Type C connector, I’m using `TYPE-C 16PIN 2MD(073)` with part number `C2765186`.  
+For the Type A connector, I’m using `10.0 QHHTZB6.3` with part number `C668591`.
+
+Go ahead and place your connectors based on the configuration you want. Once they’re on the schematic, you’ll clearly see the structure of your 1 in, 4 out USB hub coming together.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1856-02.6137470.mp4" autoplay muted loop playsinline></video>
+
+Schematics are typically read from left to right, kind of like a flow of information. Inputs on the left, processing in the middle, outputs on the right. Laying things out this way makes your design much easier to understand at a glance.
+
+I’ll move my upstream USB Type C port to the top left, place the hub IC in the center, and arrange all the downstream ports along the right side. Now the data flow is visually clear: computer → hub chip → connected devices.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214135735.webp)
+
+For parts like USB Type C and Type A connectors, the symbol already makes it obvious what they are. We don’t need huge manufacturer part numbers cluttering up the page and making the schematic harder to read.
+
+To clean things up, hold `Ctrl` and select all of your USB connectors. Then, in the properties sidebar, untick the **Manufacturer Part** field. That hides the long part numbers from the schematic view without deleting any actual data.
+
+The goal here is readability. A clean schematic is much easier to debug, share, and come back to later without giving yourself a headache.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1858-08.6900930.mp4" autoplay muted loop playsinline></video>
+
+There, its so much cleaner now!
+
+### Putting it together
+
+Now that all the parts are on the page, it’s time to wire everything up.
+
+At this point you might be wondering how you’re supposed to know what connects to what. This is where datasheets become your best friend. Every manufacturer provides one, and inside you’ll find pin descriptions, example circuits, electrical specs, and usually even a reference design. The pin definitions section is what we care about right now. That’s your map.
+
+Let’s start with the upstream USB Type C port. If you search for USB C pin definitions, you’ll find plenty of diagrams explaining each signal in detail. When you look at the symbol in your schematic, you’ll notice something interesting: pins like DP1 and DP2, CC1 and CC2, and so on.
+
+That duplication exists because USB Type C is reversible. The connector has matching pins on both sides so it works no matter which way you plug the cable in. Electrically, they serve the same purpose, but they’re duplicated to support flipping the connector.
+
+Here’s a quick breakdown of the key USB Type C pins you’ll see on the schematic:
+
+- **DPx / DNx** – These are the data lines. They carry the actual information back and forth across the USB cable.
+
+- **CC1 / CC2** – Channel Configuration pins. They handle things like negotiating power delivery and other USB-C features, but for our hub project, we won’t worry too much about those extras.
+
+- **SBU1 / SBU2** – Sideband Use pins. These come into play for alternate modes like DisplayPort or can carry audio signals.
+
+- **VBUS** – This is the voltage supply, usually 5 V.
+
+- **GND** – Ground, your 0 V reference point.
+
+- **SH** – Shield. This is the metal casing around the connector that helps with grounding and protects against interference.
+
+Let’s start wiring with power, since it’s a bit special. Because we use it so often, schematics have dedicated symbols for ground and power to keep things tidy.
+
+Before we connect anything, I’ll rotate the USB-C symbol 180° by selecting it and pressing `Space` twice so the pins face the right way. This way, our wiring can flow neatly from left to right.
+
+To start, we’ll tie all the **VBUS** pins together using a **+5 V power flag**. Click on the tool in the top toolbar labeled **VCC**, choose **5 V**, and place it on the first VBUS pin. To keep the schematic clean, I like to move the flag slightly away from the pin so it’s readable. Repeat this step for all remaining VBUS pins on the connector.
+
+Now all your VBUS pins are connected to +5 V, giving your hub a proper power supply to work with.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1859-20.2875897.mp4" autoplay muted loop playsinline></video>
+
+Next up is **ground**. Just like we did with VBUS, we’ll connect all the **GND** pins using ground flags.
+
+Be careful to keep the wires and flags neat. Don’t let them overlap or cross unnecessarily. A messy tangle makes the schematic hard to read and can confuse anyone trying to follow your design later. Clean, spaced-out connections keep everything understandable and professional looking.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1904-15.3163576.mp4" autoplay muted loop playsinline></video>
+
+Now we’ll connect the **SH (shield)** pins to ground.
+
+Select the **Wire** tool and draw lines from each SH pin to a GND flag. This grounds the metal shielding on the connector, which helps reduce interference and keeps your hub electrically stable.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1906-34.0312758.mp4" autoplay muted loop playsinline></video>
+
+Next up are the **SBU1 and SBU2** pins. For our hub, we won’t be using them, but leaving pins completely floating is generally bad practice.
+
+To handle this, we’ll use a **No Connect (NC) flag**. Select it from the top toolbar and place it on both SBU1 and SBU2 pins. This clearly signals that these pins are intentionally unconnected, keeping your schematic clean and professional.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1907-23.1363482.mp4" autoplay muted loop playsinline></video>
+
+Now let’s handle the **CC1 and CC2** pins. These pins basically tell the host “hey, I’m a downstream port and I need some current.” To do this, we use **5.1 kΩ resistors** connected to ground, these are called **pull-down resistors** because they “pull” the voltage down to 0 V.
+
+Here’s how to add them:
+
+1. Select the **Resistor** tool from the top toolbar.
+
+2. Place two resistors pointing **down**, that’s the standard way to show a pull-down in schematics.
+
+3. Select each resistor and change its value to **5.1 kΩ**.
+
+4. Wire one end of each resistor to a CC pin and the other end to a GND flag.
+
+And just like that, your hub politely asks for power whenever a device is plugged in.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1908-34.5195255.mp4" autoplay muted loop playsinline></video>
+
+Now it’s time to handle the **data pins**. These need to connect to the **SL2.1S** chip, but since the IC is a bit far away on the schematic, we don’t want a spaghetti mess of wires. This is where **net labels** come in, they let you connect signals “virtually.” Any pins with the same net label are electrically connected, no matter where they are on the schematic.
+
+Here’s what we’ll do:
+
+1. Place a net label on **DP2** and double-click it to rename it **DP** (for Data Positive).
+
+2. Copy that label and paste it onto **DP1**.
+
+3. Do the same for **DN1** and **DN2**, renaming the label **DN** (for Data Negative).
+
+Make sure the labeling is correct: **DP** goes on both DP1 and DP2, and **DN** goes on both DN1 and DN2. Once that’s done, these signals can be “connected” to the hub IC cleanly, without any messy wires crossing the schematic.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1911-56.7148365.mp4" autoplay muted loop playsinline></video>
+
+Next, let’s tackle the **SL2.1S** itself. To figure out how to wire it up, the datasheet is your best friend, it tells you exactly what each pin does and how it should connect.
+
+A quick way to get there is to click on the IC symbol, then in the **Properties** tab click on the device link. This will take you to its LCSC page, where you can find and open the official datasheet. Once you have it open, you’ll be able to see all the pin assignments and recommended connections for your USB hub.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1913-23.1970679.mp4" autoplay muted loop playsinline></video>
+
+The original datasheet is partly in Chinese and partly in English, so if you can’t read it, a quick trick is to download the PDF and use Google Translate to get a full English version. For convenience, here’s a translated version you can use: [link].
+
+Scroll down to the **pin definition table**, this is the map we’ll use to figure out all the connections. Starting with power:
+
+- **VSS** – Ground (GND)
+
+- **VDD5** – 5 V input for the chip
+
+- **VDD33** – 3.3 V internal supply
+
+- **VDD18** – 1.8 V internal supply
+
+These pins make sure the IC gets the right voltages it needs to run.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214141502.webp)
+
+Let’s connect the power pins on the IC:
+
+- Tie **VSS** to **GND**.
+
+- Connect **VDD5** to the **+5 V** power flag.
+
+The **VDD33** (3.3 V) and **VDD18** (1.8 V) pins are generated internally by the IC, so for now we can leave them unconnected. They’ll take care of themselves once the chip powers up.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1915-38.5952988.mp4" autoplay muted loop playsinline></video>
+
+Next, let’s look at the **XOUT** and **XIN** pins, they’re for connecting an external crystal.
+
+Every chip needs precise timing to communicate and operate correctly, and that timing comes from a clock signal. An internal clock is usually good enough for simple tasks, but it can drift and cause errors. That’s where an **external crystal** comes in, it’s like a super-accurate metronome, giving the IC a stable, exact frequency so everything stays perfectly in sync. Without it, the chip could run a bit too fast or too slow, which would break USB communication.
+
+If we scroll down in the datasheet, it specifies a **12 MHz crystal oscillator**. That means we need a crystal with a **resonant frequency of 12 MHz** to hook up to XIN and XOUT.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214141709.webp)
+
+Normally, you’d add a crystal here, but this particular chip is known to work perfectly fine using its internal clock. That means we can skip adding the external crystal and let the IC handle timing on its own.
+
+To keep the schematic clean:
+
+- Tie **XIN** to **GND**.
+
+- Place a **No Connect (NC) flag** on **XOUT**.
+
+This clearly shows that the crystal isn’t used, while keeping your schematic neat and correct.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214141742.webp)
+
+Looking back at the pin definition table, you’ll notice **UDM** and **UDP**, these are the USB D– and D+ signals from the **upstream port**, the one that connects to the host computer.
+
+In other words, these pins are how your hub talks to the computer. Everything coming from or going to the host passes through **UDM** and **UDP**, so these are the signals we’ll connect to our net labels from the upstream USB-C port.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214141932.webp)
+
+Now it’s time to hook up the data lines from our upstream USB-C connector.
+
+You’ll notice a small naming difference: the connector has **DP** and **DN**, while the IC uses **DP** and **DM**. Don’t worry! **DN and DM are the same thing**; they both refer to the negative data line, while DP is the positive data line.
+
+To connect them, simply **copy the DP and DN net labels** you placed on the USB-C connector earlier and **paste them onto the corresponding DP and DM pins on the IC**. This way, the upstream port is properly wired without any messy wires running across the schematic.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1920-09.3263336.mp4" autoplay muted loop playsinline></video>
+
+Finally, let’s connect the **downstream data ports**.
+
+For each of the DPx/DMx pins on the IC, create **net labels** just like we did for the upstream port.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214142144.webp)
+
+Once that’s done, connect each net label to the data pins of one of your four downstream USB connectors. Remember: **each data pair goes to only one USB port!** don’t share a pair between multiple connectors.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214142305.webp)
+
+Next, finish wiring the remaining pins on your downstream USB connectors.
+
+- **VBUS / VCC** connects to **+5 V**.
+
+- **GND** and **SH** (shield) connect to **GND**.
+
+- For USB-C downstream ports, wire them the same way as the upstream port, **except** you’ll need to add **5.1 kΩ pull-up resistors on the CC pins** instead of pull-downs.
+
+For the USB-C downstream ports, the **CC pins** use **pull-up resistors** instead of pull-downs. The standard way to show a pull-up in a schematic is to have the resistor **pointing up** toward the voltage supply.
+
+So for each downstream USB-C port, place a **5.1 kΩ resistor** on the CC1 and CC2 pins, orient it pointing up, and wire the other end to **+5 V**.
+
+If you’ve followed all these steps, your schematic should now look clean and complete, with all power, data, and control signals properly connected.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214142839.webp)
+
+We’re almost done! The last little piece to add is **capacitors**, specifically **decoupling capacitors**.
+
+Capacitors do two main things: they **store energy** and they **let high-frequency signals pass through**. We use these properties to our advantage by placing them on power rails, they help smooth out tiny voltage dips and filter out electrical noise, keeping our USB hub stable.
+
+For this project, place **1 µF capacitors** between **VBUS** (or VCC) and **GND** on each USB connector. This ensures each port gets clean, steady power and keeps the hub running reliably.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214142859.webp)
+
+<video src="/docs-assets/guided-projects/usb-hub/20260214-1930-04.0631176.mp4" autoplay muted loop playsinline></video>
+
+Basically, each decoupling capacitor will have **one end connected to the power pin** and the **other end connected to ground**.
+
+A little schematic etiquette tip: **power flags should point up** and **ground flags should point down**. To keep things tidy, place your decoupling capacitors following this convention, power end toward the +5 V flag and ground end toward the GND flag. This makes the schematic easier to read and visually consistent.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214143138.webp)
+
+For the IC’s internal supply pins, **VDD33** (3.3 V) and **VDD18** (1.8 V), we’ll add **two capacitors each**: a **1 µF** and a **100 nF**. Both act as decoupling capacitors, but the smaller **100 nF capacitor reacts faster** to sudden voltage spikes, making it great for filtering high-frequency noise.
+
+We’ll do the same thing for the **VDD5** pin: a 1 µF and a 100 nF capacitor to ground. This keeps all the IC’s power rails clean and stable, ensuring reliable operation of the hub.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214143235.webp)
+
+Here’s roughly what your completed schematic should look like at the end: all power rails, ground connections, data lines, pull-up/pull-down resistors, and decoupling capacitors in place, with clean left-to-right flow from the upstream port through the IC to the downstream ports. Everything should be neatly labeled and easy to read, ready for the PCB stage.
+
+![img](/docs-assets/guided-projects/usb-hub/img-20260214143300.webp)
+
+And just like that, **schematics complete!** :D
+
+Don’t forget to **save your work** by pressing `Ctrl + S` so all your hard work is safe. Your USB hub is now fully laid out on paper, ready for the next step.
+
+---
+
+## PCB
+
+Now comes the fun part, at least for me. It’s time to design your PCB and start routing traces. This is where everything stops being abstract and turns into something real.
+
+To get started, head up to the top bar and click **Convert Schematic to PCB**. That will open the PCB editor. You’ll see a pop up asking you to confirm the import of changes. Just hit **Apply Changes**, and you’re ready to begin laying things out.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-0120-56.4242577.mp4" autoplay muted loop playsinline></video>
+
+When the PCB editor opens, you’re going to be greeted by what looks like total chaos. Components scattered everywhere like they were dropped from the sky.
+
+And then you’ll notice a bunch of thin blue lines crisscrossing the screen. Those are called ratlines. Think of them as little reminders saying, “Hey, this pad still needs to connect to that pad.” They don’t represent real copper yet. They’re just showing you the connections that exist in your schematic but haven’t been physically routed on the board.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260214202209.webp)
+
+Before you start dragging parts around, here’s a small tip that will make your life much easier.
+
+At the beginning of a design, it’s usually best to hide the ground ratlines. Ground connects to a lot of things, so those lines tend to clutter the screen and make everything look more overwhelming than it actually is. Since ground is often handled cleanly at the end, hiding it for now helps you focus on the more critical signal connections first.
+
+To do this, go to the left sidebar and open the **Net** tab. Expand the **Ratlines** section, find the **GND** net, and toggle its visibility off.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-0123-23.5098350.mp4" autoplay muted loop playsinline></video>
+
+---
+
+### Planning it out
+
+Now hold on. Before you start routing traces everywhere, you need to place your components properly.
+
+Good layout starts with intention. Take a moment and think about what you actually want this board to look like. Is it going to be a plain rectangle that quietly does its job? Sure, that works. But where’s the fun in that?
+
+This is your project. Give it some personality. Maybe it’s a fun shape. Maybe it’s something you can turn into a keychain. Maybe it’s completely ridiculous in the best possible way. I’m turning mine into a small keychain shaped board, but you’re absolutely encouraged to design something wild.
+
+If you want to go further and experiment with more advanced outlines, like silhouettes or detailed drawings, check out the little side guide on creating [custom board shapes](./Custom%20Shapes.md). You can get surprisingly creative with PCB outlines.
+
+Personally, I’m aiming for something that looks a bit like this…
+
+![](/docs-assets/guided-projects/usb-hub/img-20260214202856.webp)
+
+To make that happen, we need to define the shape of the board.
+
+Select the **Board Outline** tool and choose the **Polygon** option. Alternatively, you can click directly on the **Board Outline** layer and use the **Polyline** tool to draw your shape manually.
+
+From there, just start clicking to place points and sketch out your design. Think of it like connecting dots to carve out the silhouette of your board. Take your time and adjust the corners until the shape feels right. This outline is literally the boundary of your creation, so make it nice!
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-0131-57.5973164.mp4" autoplay muted loop playsinline></video>
+
+And don’t stress about getting it perfect on the first try.
+
+The board outline isn’t fixed. You can always come back later and tweak it, adjust curves, move corners, or completely reshape it if inspiration strikes. Think of it as a flexible frame rather than a final decision.
+
+### Layout
+
+Once your board outline is sketched out, it’s time to place components. This step matters more than anything else. Good placement is what separates a clean, professional board from a frustrating mess. When layout is done right, routing feels smooth and logical. When it’s done poorly, routing becomes a pain.
+
+Be intentional. Think in functional groups. The way components are connected in the schematic should guide how they sit on the PCB.
+
+Take the USB upstream connector as an example. In the schematic, it had a capacitor and two pull down resistors tied directly to it. That’s a small functional cluster. On the PCB, those passive parts should be placed close to the connector.
+
+Here’s a helpful workflow: go back to the schematic editor and select the entire USB C upstream port circuitry as a group. Then switch over to the PCB editor. You’ll see that those corresponding components are now highlighted. This makes it much easier to grab them, move them together, and place them on your board.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-0135-44.0773307.mp4" autoplay muted loop playsinline></video>
+
+Now that my USB-C circuitry is selected, I’m going to drag it over to roughly where I want it on the board. Don’t worry about getting it perfect just yet, we’re just finding a good place for this little cluster before fine-tuning placement.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-0138-12.5805731.mp4" autoplay muted loop playsinline></video>
+
+Next, I’ll position the USB-C connector so it sticks out slightly over the edge of the board. Then I’ll place the resistors and capacitor close to their respective pins.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1630-55.4421849.mp4" autoplay muted loop playsinline></video>
+
+Now I’ll tidy up the silkscreen designators, moving them so they’re nicely aligned and easy to read.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1641-03.9007279.mp4" autoplay muted loop playsinline></video>
+
+Here, you can use the **Align** tool to straighten things up and make everything look neat. Totally optional, but it gives your board a cleaner, more organized appearance.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1644-08.3633036.mp4" autoplay muted loop playsinline></video>
+
+Next, I’ll place the USB hub IC along with its supporting circuitry inside the board outline.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1645-53.0597721.mp4" autoplay muted loop playsinline></video>
+
+Now I’ll rotate the IC to figure out which orientation makes connecting a wire from the USB upstream connector easiest. Turning it 90 degrees works perfectly, letting the USB data pins run straight from the IC to the connector.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1653-29.2559362.mp4" autoplay muted loop playsinline></video>
+
+Next, I’ll place the decoupling capacitors for the USB hub IC. Keep in mind that proximity matters. A capacitor that’s too far from the chip pin won’t do much. Try to keep each one as close to its pin as possible, but don’t put it directly on the pin. Leave a little space so it connects properly.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1656-07.1748536.mp4" autoplay muted loop playsinline></video>
+
+Once again, make sure nothing is overlapping. Take a moment to adjust the silkscreen designators, and space the capacitors just a little away from the IC so there’s room to route traces later.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260215120020.webp)
+
+Now I’ll start placing the downstream ports. Be logical with their positions, keeping them where the ratlines stay mostly straight and don’t cross over other connectors’ ratlines.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1710-43.5538184.mp4" autoplay muted loop playsinline></video>
+
+Here’s an example. Right now my USB-A ports are laid out like this, and you can see the ratlines overlapping. If I swap the positions of these two connectors, the ratlines become much cleaner.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260215121419.webp)
+
+Notice how I’m running short on space and one of my USB connectors is hanging off the board. I can fix this by extending the board outline and making it a bit bigger. Like I mentioned earlier, the board outline isn’t fixed, and it’s normal to adjust it as the design progresses.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1715-00.4834708.mp4" autoplay muted loop playsinline></video>
+
+Now I’ll go back to the schematic and bring in the supporting pull down resistors and decoupling capacitors, placing them close to their respective connectors.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1721-29.6427212.mp4" autoplay muted loop playsinline></video>
+
+In the end, your board should look something like this. Every power pin should have a decoupling capacitor nearby, and the USB-C connectors should have the correct pull down or pull up resistors in place.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260215122404.webp)
+
+---
+
+### Routing
+
+Now we move on to the fun and satisfying part: routing! To start, you can use the **Routing** tool on the top bar or just hit **Alt + W**.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1725-13.2480438.mp4" autoplay muted loop playsinline></video>
+
+I’ll start by connecting all the passive components to their USB connector for now. This gives me something like this. I’m not worrying about the data pins or connecting all the 5V traces just yet.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260215122639.webp)
+
+Now let’s focus on routing the data pins. USB data pins are routed as a differential pair, which is basically two wires, one positive and one negative, running side by side. This setup lets the signals travel faster and resist noise better.
+
+To route them as a differential pair, go to **Route → Differential Pair** or just press **Alt + D**. Starting at the IC, I’ll select the **DP** pin. A pop-up will appear, and I’ll create the differential pair by selecting the **DN** pin as the negative net and then pressing **Process**.
+
+Once routed, you’ll see two wires running side by side as a differential pair. I’ll then wire this straight over to the USB-C connector.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1727-27.3497844.mp4" autoplay muted loop playsinline></video>
+
+Now I’ll exit differential routing and switch back to single routing by selecting the **Single Routing** tool or pressing **Alt + W**. Then I’ll go to the USB connector and wire the **DP** and **DN** pads together as shown below.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1728-39.3746789.mp4" autoplay muted loop playsinline></video>
+
+Now I’ll repeat this step for the rest of the USB connectors, wiring their differential data pins in the same way.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260215123419.webp)
+
+Now you might run into a situation with a USB-C connector where you can’t connect the data pins directly. Don’t worry. Our PCB has two layers, so we can switch to the back layer and then back up to the front layer to make the connection. This is done using a **via**, which you can place by pressing **Alt + V** while routing.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1736-06.5042659.mp4" autoplay muted loop playsinline></video>
+
+There we go, the connections are complete.
+
+Next, I’ll route all the remaining differential pairs, and we end up with something like this.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260215123655.webp)
+
+Now all that’s left is routing the 5V and ground lines. Before we start, let’s turn the GND ratlines back on.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1737-23.5850568.mp4" autoplay muted loop playsinline></video>
+
+Now for the 5V and ground connections, we’ll use a copper pour since there are lots of pads to connect. A copper pour basically fills an area of the board with copper for a specific net, which in this case will be 5V on the top layer and ground on the bottom layer.
+
+We’ll start with the 5V pour on the top layer. Select the **Copper Area** tool from the top bar and draw a rectangle covering the board. When you left-click to confirm the shape, a dialog will appear. Make sure the layer is set to **Top Layer** and the net is **+5V**, then click **Confirm**. The tool will automatically fill the area with copper connected to the 5V net.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1738-40.9458459.mp4" autoplay muted loop playsinline></video>
+
+Now we’ll do the same for the bottom layer. Switch to the bottom layer using the layer side panel, then follow the same steps as before. This time, make sure the layer is set to **Bottom Layer** and the net is **GND**. The area will fill with copper connected to ground.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1741-50.8380560.mp4" autoplay muted loop playsinline></video>
+
+We’re not done yet. Most of our ground pads are on the top layer, and we only poured copper on the bottom, so they aren’t connected.
+
+Go back to the top layer, route a trace from a ground pad, extend it a bit away from the pad, and press **Alt + V** to place a via connecting it down to the bottom layer.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1744-11.8806114.mp4" autoplay muted loop playsinline></video>
+
+Now just repeat this for all the ground pads on the top layer. Eventually, you’ll end up with something like this. Try to place one via per pad whenever possible, and avoid sharing the same via between multiple components.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260215124643.webp)
+
+For the USB-C connectors, you can simply connect the ground pads directly to the shield holes.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1747-11.2607435.mp4" autoplay muted loop playsinline></video>
+
+You’re almost done, but there’s one last step. Every time you add wires, vias, or make changes, you need to rebuild your copper zones to update them. Just press **Shift + B** to do this, and you’ll see the updated layout. This step is crucial, so don’t forget to rebuild zones after moving anything.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1748-37.6759420.mp4" autoplay muted loop playsinline></video>
+
+Now let’s jump into the 3D viewer and take a look at how our board is looking!
+
+<video src="/docs-assets/guided-projects/usb-hub/20260215-1749-26.3123437.mp4" autoplay muted loop playsinline></video>
+
+Looking pretty sick!
+
+At this point, you’re basically done and could go ahead and [order your board](./Ordering.md). But if you want to add some extra style, keep reading this guide.
+
+---
+
+### Adding a keychain slot
+
+At the beginning when I was planning out layout, I sketched a small hole in the PCB so it could double as a keychain. Now it’s time to actually add that slot to the board. If you are not into the keychain idea, you can still add mounting holes, which I highly recommend. If you ever decide to design an enclosure later, mounting holes make it much easier to screw the board into a case and keep everything secure.
+
+To add a slot, head to the top toolbar and choose the slot region tool. Draw a small rectangle where you want it, then tweak the position until it looks right.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260216-1813-24.8146150.mp4" autoplay muted loop playsinline></video>
+
+After that, just fine tune the size and make sure it is not too close to the edge or any components.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260216-1814-24.9924495.mp4" autoplay muted loop playsinline></video>
+
+Now if you open the 3D viewer again, you’ll see your updated PCB with the slot in place.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260216-1815-36.9776924.mp4" autoplay muted loop playsinline></video>
+
+If you are not into the keychain idea but think you might design a case later, I strongly recommend adding mounting holes. The process is almost the same, except this time you choose a circle instead of a slot from the same tool menu.
+
+When you place it, you will need to enter a radius. That value depends on the screw you plan to use, such as M2, M2.5, or M3. The M number refers to the screw’s diameter in millimeters, so an M2 screw has a 2 mm diameter. If you are using M2 screws for mounting, setting the radius to about 1.1 mm is a good choice.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260216-1816-58.7933093.mp4" autoplay muted loop playsinline></video>
+
+At a minimum, I suggest adding at least two mounting holes, but if you have the space, four is even better. For placement, spread them out and choose strategic positions. In my case, these spots would make the most sense if I were adding mounting holes.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260216132008.webp)
+
+---
+
+### Silkscreen
+
+Now what is a PCB without some funky, cool silkscreen on it? As mentioned earlier, silkscreen is the layer printed on top of the solder mask. It is used for reference designators like C1 and C2, along with all the yellow markings you see on the board.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260216132138.webp)
+
+But you can also add your own text and illustrations to give it a little personality.
+
+To do that, select the top silkscreen layer, choose the text tool, type in whatever you like, and place it on the board.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260216-1825-11.7230639.mp4" autoplay muted loop playsinline></video>
+
+Custom text is fun, but adding your own graphics is even better. To do that, go to File → Import → Image and select the image you want to use. Remember that silkscreen is a single color, so it is best to choose an image that is already black and white. If you import something with lots of color, the EDA tool will convert it to black and white automatically, which can sometimes create strange artifacts.
+
+I am going to place an image of Orpheus on the front. When inserting the image, start with a small size, around 20 mm wide or so. You can always resize it later, but starting smaller makes it easier to position and fine tune.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260216-1829-18.6244182.mp4" autoplay muted loop playsinline></video>
+
+Make sure your silkscreen does not overlap with any other silkscreen in the area, and you should be good to go.
+
+Open the 3D viewer to check out your new silkscreen design and see how it looks on the board.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260216-2355-39.0515505.mp4" autoplay muted loop playsinline></video>
+
+If you peek in the 3D viewer, you’ll notice the back side is basically empty with no graphics. Let’s fix that. Go back into the PCB editor, select the bottom silkscreen layer, and add some designs to it.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260216-2357-49.3142817.mp4" autoplay muted loop playsinline></video>
+
+You’ll notice that everything you add looks reversed. That’s because it’s the back side. To fix it, use the flip board tool on the top toolbar to turn the board around.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260216-2358-49.6524352.mp4" autoplay muted loop playsinline></video>
+
+Now I’ll follow the same steps I used for the top layer and add some designs to the bottom. Once I’m done, I end up with something pretty cool like this.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260216190933.webp)
+
+<video src="/docs-assets/guided-projects/usb-hub/20260217-0009-59.5174061.mp4" autoplay muted loop playsinline></video>
+
+---
+
+### Polishing
+
+Before we order our boards, there are a few small touches you can add to make them look more polished, like filleting the edges.
+
+Filleting rounds off the edges. By default, PCBs have sharp corners, which not only look harsh but can actually poke you.
+
+To fillet your board outline, select it, right-click, choose Add → Fillet, and set the radius to whatever you like. I’m going with 2 mm.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260217-0012-06.5848408.mp4" autoplay muted loop playsinline></video>
+
+I’ll also add some fillets to the slot on my board.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260217-0013-04.5421053.mp4" autoplay muted loop playsinline></video>
+
+Remember to always rebuild your zones by pressing Shift+B.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260217-0014-20.9411084.mp4" autoplay muted loop playsinline></video>
+
+Notice how much cleaner our board looks now!
+
+![](/docs-assets/guided-projects/usb-hub/img-20260216191609.webp)
+
+---
+
+## Ordering
+
+Now that our board is finished, it’s time to get it ordered! We’re going for PCBA, which stands for Printed Circuit Board Assembly, because we’re having the board assembled for us. This is perfect since we have some tiny, fine-pitch components that are hard to hand-solder, especially if you’re just starting out.
+
+But before we hit that order button, there’s one small but very important check we always run first: the DRC.
+
+### DRC
+
+The Design Rule Checker, or DRC for short, is a tool that scans your design for any issues that could cause problems during manufacturing. It checks things like whether different nets are accidentally connected or if something else might prevent your board from being made correctly. If everything passes, you’re good to go.
+
+Running the DRC is easy. Just click on DRC in the bottom bar, then hit Check DRC.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260218-2123-12.1039924.mp4" autoplay muted loop playsinline></video>
+
+You’ll probably see a Differential Pair Error pop up. This happens because differential pairs ideally need to be the same length for high-speed signals. Since we’re only making a USB 2.0 hub, the rules for equal lengths are pretty relaxed, so we can adjust the DRC settings.
+
+To fix it, go to Design in the top bar and click on Design Rules. A new tab will open. On the side, find Differential Pair, click it, and change the length tolerance to 10. Then hit Confirm, and you’re all set.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260218-2124-07.0257039.mp4" autoplay muted loop playsinline></video>
+
+After updating the tolerance, click Check DRC again. This time, you should see no more errors, which means your design is ready to go!
+
+<video src="/docs-assets/guided-projects/usb-hub/20260218-2124-56.2626131.mp4" autoplay muted loop playsinline></video>
+
+If you still see some DRC errors, try googling them to find a solution. If that doesn’t help, ask in forums or, if you’re in the Hack Club Slack, drop a question in the [`#electronics`](https://app.slack.com/client/E09V59WQY1E/C056AMWSFKJ) channel.
+
+### Ordering from JLCPCB
+
+To place your order, click the Order PCB button on the top bar. It will ask if you want to run the DRC one more time, so go ahead and check it just to be safe. Then click Confirm on the next dialog and you will be redirected to JLCPCB, where your PCB will be automatically uploaded.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260218-2131-45.1865201.mp4" autoplay muted loop playsinline></video>
+
+There are a lot of settings here, which can be a bit overwhelming, but the only ones you really need to worry about are PCB Color and Surface Finish.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260218163322.webp)
+
+PCB Color is pretty straightforward. It decides the color of your board. The default is green, which already looks great, but you can pick any color you like. In my opinion, green, black, and white look the coolest.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260218163850.webp)
+
+Surface Finish refers to how the exposed pads on your PCB are coated. HASL is the default and gives a silver finish. HASL Lead Free is the same but without lead, and ENIG gives a gold finish. For this project, I recommend using HASL, though you can choose the Lead Free option if you prefer.
+
+Next, scroll down and select the PCB Assembly option. In the configurations, make sure the PCBA Type is set to Economic and the PCBA Quantity is 2. You can leave the rest of the settings as they are.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260218-2139-57.9695767.mp4" autoplay muted loop playsinline></video>
+
+Now click Next, and then Next again. You’ll reach the BOM page. Make sure all the parts are selected, since some may be unchecked by default. After that, just continue through the rest of the steps.
+
+<video src="/docs-assets/guided-projects/usb-hub/20260218-2143-05.3479768.mp4" autoplay muted loop playsinline></video>
+
+You’ll reach the quote and order page. Here you just need to enter a product description. It doesn’t really matter what you put, so I chose DIY. Then click Save to Cart, and you’re done.
+
+![](/docs-assets/guided-projects/usb-hub/img-20260218164615.webp)
+
+Now you can go ahead and order your very own custom USB Hub!
