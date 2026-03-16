@@ -84,7 +84,7 @@ gem "pundit", "~> 2.4"
 gem "paper_trail", "~> 17.0"
 gem "mission_control-jobs", "~> 1.1"
 
-gem "skylight", "~> 7.0"
+gem "skylight", "~> 7.1"
 
 gem "sentry-ruby", "~> 5.28"
 gem "sentry-rails", "~> 5.28"
