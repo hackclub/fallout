@@ -218,83 +218,11 @@ export default function LandingIndex() {
           </Frame>
           <FlashMessages />
           <p className="text-white text-base -mt-4">For teenagers 13-18</p>
+          <a href={shared.sign_in_path} className="text-white text-sm underline -mt-2">Sign in with HCA</a>
 
         </div>
       </section>
 
-      <div className="bg-white">
-        <div className="py-12 px-4 md:px-10 lg:px-20 w-full z-20 flex items-center ">
-          <div className="w-full aspect-16/9 rounded-xl grid grid-cols-1 grid-rows-1">
-            <div className="col-start-1 row-start-1 w-full h-full overflow-hidden rounded-lg">
-              <video
-                className="w-full h-full object-cover"
-                src="/landing/video.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-              />
-            </div>
-            <div className="col-start-1 row-start-1 bg-black/60 w-full h-full border-2 border-green rounded-lg relative">
-              {/* <img src="/fallout.svg" className="h-10 w-auto absolute top-4 left-1/2 -translate-x-1/2" /> */}
-              <span className="w-full max-w-[70%] text-beige text-3xl sm:text-4xl xl:text-7xl font-bold text-center absolute bottom-8 left-1/2 -translate-x-1/2">It's one of a kind</span>
-              <img src="/fallOut.png" className="sticker w-30 h-auto absolute top-1/2 -translate-y-1/2 -left-10 z-10" />
-              <img src="/sz.png" className="sticker w-30 h-auto absolute bottom-60 -right-10" />
-              <img src="/sticker.png" className="sticker w-50 h-auto absolute bottom-10 -right-20" />
-              <img src="/koifish.webp" className="sticker w-50 h-auto absolute -bottom-8 -left-20" />
-            </div>
-          </div>
-        </div>
-      </div>
-      <div>
-
-      </div>
-      <section ref={howSectionRef} id="how" className="bg-white py-30 pt-60 px-4 md:px-10 lg:px-20 xl:px-40 2xl:px-60 flex flex-col sm:flex-row gap-10 px-8 text-white text-2xl 2xl:text-3xl leading-tight relative ">
-        {/* <img src="/arrow.png" className="absolute left-[33%] translate-x-1/2 -top-20 z-20" />
-        <img src="/arrow2.png" className="absolute left-[56%] translate-x-1/2 -bottom-20 z-20" /> */}
-
-        <div ref={card1Ref} onMouseEnter={() => animateHowCards(0, true)} onMouseLeave={() => animateHowCards(0, false)} className="relative w-full sm:w-[33%] bg-dark-brown min-h-60 aspect-5/6 rounded-lg p-4 bg-cover hover:border-8 border-green bg-center outline-2 outline-beige hover:shadow-sm group" style={{ backgroundImage: "url('/1.png')" }}>
-          <div className="-ml-4 pl-4 pb-2">
-            <span className="py-2 text-shadow-lg text-shadow-dark-brown">Design your project!</span>
-          </div>
-          <div className="absolute top-0 right-0 w-16 h-16 bg-green rounded-tr-lg group-hover:rounded-tr-none rounded-bl-2xl flex justify-center items-center">
-            <span className="text-4xl font-bold text-white">1</span>
-          </div>
-        </div>
-
-        <div ref={card2Ref} onMouseEnter={() => animateHowCards(1, true)} onMouseLeave={() => animateHowCards(1, false)} className="relative w-full sm:w-[33%] bg-dark-brown min-h-60 rounded-lg p-4 hover:border-8 border-green flex flex-col aspect-5/6 bg-cover bg-center outline-2 outline-beige hover:shadow-sm group" style={{ backgroundImage: "url('/2.png')" }}>
-          <span className="text-shadow-lg text-shadow-dark-brown pr-16">Buy the parts with your grant & Build your project!</span>
-
-             <div className="absolute top-0 right-0 w-16 h-16 bg-green rounded-tr-lg group-hover:rounded-tr-none rounded-bl-2xl flex justify-center items-center">
-            <span className="text-4xl font-bold text-white">2</span>
-          </div>
-        </div>
-
-        <div ref={card3Ref} onMouseEnter={() => animateHowCards(2, true)} onMouseLeave={() => animateHowCards(2, false)} className="hover:shadow-sm group relative w-full sm:w-[33%] min-h-60 rounded-lg flex flex-col hover:border-8 border-green aspect-5/6 bg-cover bg-center text-dark-brown outline-2 outline-beige" style={{ backgroundImage: "url('/3.png')" }}>
-          {/* <h1 className="text-5xl font-bold text-coral bg-dark-brown w-fit py-2 px-4 rounded-lg m-4">Share</h1> */}
-          <div className="absolute top-0 right-0 w-16 h-16 bg-green rounded-tr-lg rounded-bl-2xl group-hover:rounded-tr-none flex justify-center items-center">
-            <span className="text-4xl font-bold text-white">3</span>
-          </div>
-          <span className="mt-auto bg-[#fdf6e8] p-4 w-full rounded-lg">Post your project online and earn your <span className="text-coral font-bold">ticket to Fallout</span>!</span>
-
-        </div>
-      </section>
-
-      <section className="bg-blue pt-20 px-4 md:px-10 lg:px-20 xl:px-40 2xl:px-60 flex justify-between items-start relative">
-        <div className="relative z-10">
-          {/* <h3 className="text-3xl font-bold py-2 px-4 w-fit">VISIT</h3> */}
-          
-          <img src="/landing/shenzhen.svg" className="h-60 py-8 w-auto" />
-          {/* <p className="max-w-200 w-full text-2xl leading-tight text-white">Lorem ipsum dolor sit, amet consectetur adipisicing elit. Excepturi libero at voluptas alias sapiente doloremque perspiciatis ratione adipisci velit distinctio dicta magni.</p> */}
-        </div>
-        {/* <img src="/envelope.webp" className="w-40 h-auto relative z-10 cursor-pointer hover:scale-102 transtion-all" /> */}
-        
-        {/* <img src="/clouds/1.webp" className="absolute top-0 -left-8 w-80 h-auto opacity-70" />
-        <img src="/clouds/3.webp" className="absolute top-10 -right-20 w-100 h-auto opacity-70" />
-        <img src="/clouds/2.webp" className="absolute top-40 right-30 w-60 h-auto opacity-70" /> */}
-
-
-      </section>
 
       <div className="bg-blue  px-2 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-16 w-full h-auto">
 
