@@ -167,8 +167,6 @@ Rails.application.routes.draw do
   get "docs" => "markdown#show", as: :docs
   get "docs/*slug" => "markdown#show", as: :doc
 
-  get "sentry-test" => "sentry_test#show"
-
   namespace :api do
     namespace :v1 do
       resources :projects, only: [ :index, :show ]
