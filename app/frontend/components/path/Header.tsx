@@ -39,7 +39,11 @@ export default function Header({ koiBalance, avatar, displayName }: Props) {
             onClick={() => setIsOpen(!isOpen)}
             className={`h-10 xs:h-16 bg-light-brown pl-10 border-2 border-dark-brown text-dark-brown text-xl flex items-center rounded-r-full z-11 cursor-pointer transition-all duration-200 ${isOpen ? 'pr-5 min-w-40' : 'pr-3 min-w-0 xs:pr-5 xs:min-w-40'}`}
           >
-            <span className={`-mt-0.5 overflow-hidden whitespace-nowrap transition-all duration-200 xs:max-w-40 xs:opacity-100 ${isOpen ? 'max-w-40 opacity-100' : 'max-w-0 opacity-0'}`}>{displayName}</span>
+            <span
+              className={`-mt-0.5 overflow-hidden whitespace-nowrap transition-all duration-200 xs:max-w-40 xs:opacity-100 ${isOpen ? 'max-w-40 opacity-100' : 'max-w-0 opacity-0'}`}
+            >
+              {displayName}
+            </span>
           </button>
 
           <div

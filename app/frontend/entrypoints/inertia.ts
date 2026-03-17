@@ -9,11 +9,7 @@ import type { ReactNode } from 'react'
 
 Sentry.init({
   dsn: document.querySelector<HTMLMetaElement>('meta[name="sentry-dsn"]')?.content,
-  integrations: [
-    Sentry.browserTracingIntegration(),
-    Sentry.replayIntegration(),
-    Sentry.replayCanvasIntegration(),
-  ],
+  integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration(), Sentry.replayCanvasIntegration()],
   tracesSampleRate: 0.2,
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 1.0,
