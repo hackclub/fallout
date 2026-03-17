@@ -1,8 +1,0 @@
-name: sshkit
-
-services:
-  ssh_server:
-    build:
-      context: .docker
-    ports:
-      - "2122:22"

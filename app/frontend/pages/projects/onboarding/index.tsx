@@ -59,9 +59,7 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
   const content = (
     <form onSubmit={submit} className="w-full h-full mx-auto p-8">
       <Pagination className="flex flex-col h-full">
-        <PaginationPage>
-          {({ next }) => <IntroVideo onContinue={next} />}
-        </PaginationPage>
+        <PaginationPage>{({ next }) => <IntroVideo onContinue={next} />}</PaginationPage>
 
         <PaginationPage>
           {({ next, prev }) => (

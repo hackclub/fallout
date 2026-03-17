@@ -37,7 +37,8 @@ export default function LandingIndex() {
 
       const el = falloutRef.current
       const container = containerRef.current
-      gsap.timeline()
+      gsap
+        .timeline()
         .set(el, { y: -300, scaleX: 1, scaleY: 1 })
         .to(el, { y: 0, duration: 0.3, ease: 'power2.in' })
         .to(el, { scaleX: 1.1, scaleY: 0.6, duration: 0.1, ease: 'power1.out' })
@@ -55,8 +56,6 @@ export default function LandingIndex() {
         })
         .to(el, { scaleX: 0.85, scaleY: 1.2, duration: 0.15, ease: 'power2.out' })
         .to(el, { scaleX: 1, scaleY: 1, duration: 0.2, ease: 'elastic.out(1, 0.5)' })
-
-
     })
 
     // Sticker behavior: magnetic follow — element drifts toward cursor while hovered, springs back on leave
@@ -190,9 +189,15 @@ export default function LandingIndex() {
       />
       <meta property="og:site_name" content="Fallout" />
 
-      <section id="hero" className="bg-blue relative md:h-[120vh] flex flex-col items-center pt-4 md:p-5 gap-4 overflow-hidden rounded-xl">
+      <section
+        id="hero"
+        className="bg-blue relative w-full min-h-svh md:h-[120vh] flex flex-col items-center pt-4 md:p-5 gap-4 overflow-hidden"
+      >
         <img src="/landing/flag.svg" className="w-20 absolute top-4 -translate-x-1/2 left-1/2 z-20" />
-        <div ref={cloudsRef} className="w-full flex justify-center items-center lg:items-start h-full top-0 absolute gap-[10%]">
+        <div
+          ref={cloudsRef}
+          className="w-full flex justify-center items-center lg:items-start h-full top-0 absolute gap-[10%]"
+        >
           <img src="/landing/cloud_1.webp" alt="" className="h-auto lg:h-[80%] w-auto pointer-events-none" />
           <img src="/landing/cloud_2.webp" alt="" className=" h-auto lg:h-[80%] w-auto pointer-events-none" />
         </div>
@@ -203,13 +208,10 @@ export default function LandingIndex() {
           alt=""
           aria-hidden="true"
         />
-        <div className="flex h-8 gap-4 z-1">
-        </div>
+        <div className="flex h-8 gap-4 z-1"></div>
 
         <div className="z-1 flex flex-col items-center w-full px-4 md:px-0 mt-6 sm:mt-14 xl:mt-18 gap-3 sm:gap-4">
-          <div className="text-white text-lg md:text-xl lg:text-2xl tracking-[5%] text-center">
-            JULY 1-7, 2026
-          </div>
+          <div className="text-white text-lg md:text-xl lg:text-2xl tracking-[5%] text-center">JULY 1-7, 2026</div>
           <img ref={falloutRef} className="sticker w-auto h-full" src="/fallout.svg" alt="fallout" />
           <h1 className="shake text-white text-center tracking-[5%] text-shadow-md text-shadow-blue text-4xl">
             {/* Build 60h of hardware projects, Go to ShenZhen! */}
@@ -283,171 +285,182 @@ export default function LandingIndex() {
 
       
       <div className="bg-[#41D2FF] px-2 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-16 w-full h-auto">
-
-      <Frame className="w-full h-[80vh] h-full">
-      <div className="w-full h-full flex flex-col sm:flex-row justify-between text-brown px-4 lg:px-8 py-4 lg:py-8">
-        <div className="flex flex-col">
-        <div
-          role="tablist"
-          className="w-full flex flex-row sm:flex-col flex-wrap items-start justify-start whitespace-nowrap gap-2 md:gap-6 min-w-[230px] mt-1"
-        >
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              role="tab"
-              aria-selected={currentSection === section.id}
-              aria-controls={`panel-${section.id}`}
-              id={`tab-${section.id}`}
-              onClick={() => setCurrentSection(section.id)}
-              className={`text-base md:text-2xl cursor-pointer 
+        <Frame className="w-full h-[80vh] h-full">
+          <div className="w-full h-full flex flex-col sm:flex-row justify-between text-brown px-4 lg:px-8 py-4 lg:py-8">
+            <div className="flex flex-col">
+              <div
+                role="tablist"
+                className="w-full flex flex-row sm:flex-col flex-wrap items-start justify-start whitespace-nowrap gap-2 md:gap-6 min-w-[230px] mt-1"
+              >
+                {sections.map((section) => (
+                  <button
+                    key={section.id}
+                    role="tab"
+                    aria-selected={currentSection === section.id}
+                    aria-controls={`panel-${section.id}`}
+                    id={`tab-${section.id}`}
+                    onClick={() => setCurrentSection(section.id)}
+                    className={`text-base md:text-2xl cursor-pointer 
             ${currentSection === section.id ? 'font-bold text-light-brown bg-brown py-2 px-4 rounded-lg' : 'hover:ml-4 transition-all ease-in-out'}`}
-            >
-              {section.label}
-            </button>
-          ))}
-          <p className="my-2 sm:mt-20 mt-auto bg-brown border-2 border-dark-brown shadow-md text-beige rounded-lg px-4 py-2 ">Read more on <a className="underline font-medium" href="https://fallout.hackclub.com/docs" target="_self">our Docs</a></p>
-        </div>
-
-        </div>
-
-        <div ref={faqPanelContainerRef} className="w-full text-left" style={{ display: 'grid' }}>
-          {sections.map((section) => (
-            <div
-              key={section.id}
-              role="tabpanel"
-              id={`panel-${section.id}`}
-              aria-labelledby={`tab-${section.id}`}
-              aria-hidden={currentSection !== section.id}
-              className={`px-2 md:px-6 py-6 text-lg md:text-2xl space-y-3 rounded-lg bg-beige${currentSection !== section.id ? ' invisible pointer-events-none' : ''}`}
-              style={{ gridArea: '1 / 1' }}
-            >
-              {section.id === 'overview' && (
-                <>
-                  <p>Welcome to Fallout!</p>
-                  <p>Imagine kicking off summer in Shenzhen, the hardware capital of the world.</p>
-                  <p>Never tried hardware before? This is your chance to start.</p>
-                  <p>
-                    <strong>Build any hardware project you want. We'll fund the parts.</strong> Level up your hardware
-                    skills. Join us for a 7-day hardware hackathon in Shenzhen.
-                  </p>
-                  <p>
-                    (← click on the tabs <span className="hidden md:inline">on the left</span>
-                    <span className="inline md:hidden">up top</span> to learn more!)
-                  </p>
-                </>
-              )}
-              {section.id === 'qualifying' && (
-                <>
-                  <p>Spend 60h designing and building hardware projects to get invited to Fallout!</p>
-                  <p>The premise is simple:</p>
-                  <ol className="list-decimal list-outside ml-7 space-y-1">
-                    <li>Design your hardware project digitally</li>
-                    <li>Track your time through timelapses/screen recordings & journals</li>
-                    <li>Ship it! We'll fund up to $5 per hour you work to buy parts</li>
-                    <li>Build your project IRL</li>
-                    <li>Repeat!</li>
-                  </ol>
-                </>
-              )}
-              {section.id === 'requirements' && (
-                <>
-                  <p>
-                    Build a hardware project you've always wanted to make. We value effort more than technical ability.
-                    It can be really simple, but the end result should feel closer to a product than a demo, a
-                    breadboarded project doesn't count.
-                  </p>
-                  <p>
-                    We're not here to fund you to build a PC. Your goal is to design something really cool from the
-                    ground up, and not to assemble expensive parts others have made.
-                  </p>
-                  <p>
-                    Don't know what to build, or what counts? You'll be part of a greater community where you can ask
-                    for help!
-                  </p>
-                </>
-              )}
-              {section.id === 'shipping' && (
-                <>
-                  <p>
-                    Shipping is making your project <em>real</em>. Putting it out into the world and making it
-                    re-creatable for someone else. For Fallout, you need to:
-                  </p>
-                  <ol className="list-decimal pl-7">
-                    <li>Document what your project is and its story</li>
-                    <li>Make a one page poster for the Fallout magazine</li>
-                    <li>Publish all files so it's easily accessible & organized</li>
-                  </ol>
-                  <p>
-                    When you make your repository nothing but a dump of files and 2 sentences for a README — it's hard
-                    for people to recognize your work or learn from it. It only lives in your head.
-                  </p>
-                </>
-              )}
-              {section.id === 'travel' && (
-                <>
-                  <p>
-                    We're running Fallout at the center of the world's tech manufacturing, ShenZhen China. For the week
-                    of July 1-7, you'll be able to browse the world's largest hardware and electronics market,
-                    Huaqiangbei, to build whatever creation you dream up, with friends you meet along the way.
-                  </p>
-                  <p>
-                    We'll be releasing more information about the logistics and schedule of the event closer to July.
-                  </p>
-                </>
-              )}
-              {section.id === 'parents' && (
-                <>
-                  <p>
-                    We understand that letting your teen travel to a foreign country can be intimidating. You probably
-                    have a lot of questions, and are wondering if this is a good idea. We'll be releasing a parent's
-                    guide closer to the event.
-                  </p>
-                  <p>
-                    We completely understand your worries, and we want to do everything we can to help you feel more
-                    comfortable. We have experience running programs very similar to this, and would be happy to answer
-                    any questions over a Zoom call!
-                  </p>
-                  <p>
-                    Hack Club operates on the principle of radical transparency and we promise to communicate with you
-                    frequently and transparently.
-                  </p>
-                  <p>
-                    If you have any questions or concerns, please do not hesitate to reach out to us at{' '}
-                    <a href="mailto:fallout@hackclub.com" className="underline">
-                      fallout@hackclub.com
-                    </a>
-                    .
-                  </p>
-                </>
-              )}
+                  >
+                    {section.label}
+                  </button>
+                ))}
+                <p className="my-2 sm:mt-20 mt-auto bg-brown border-2 border-dark-brown shadow-md text-beige rounded-lg px-4 py-2 ">
+                  Read more on{' '}
+                  <a className="underline font-medium" href="https://fallout.hackclub.com/docs" target="_self">
+                    our Docs
+                  </a>
+                </p>
+              </div>
             </div>
-          ))}
-        </div>
-        </div>
-      </Frame>
+
+            <div ref={faqPanelContainerRef} className="w-full text-left" style={{ display: 'grid' }}>
+              {sections.map((section) => (
+                <div
+                  key={section.id}
+                  role="tabpanel"
+                  id={`panel-${section.id}`}
+                  aria-labelledby={`tab-${section.id}`}
+                  aria-hidden={currentSection !== section.id}
+                  className={`px-2 md:px-6 py-6 text-lg md:text-2xl space-y-3 rounded-lg bg-beige${currentSection !== section.id ? ' invisible pointer-events-none' : ''}`}
+                  style={{ gridArea: '1 / 1' }}
+                >
+                  {section.id === 'overview' && (
+                    <>
+                      <p>Welcome to Fallout!</p>
+                      <p>Imagine kicking off summer in Shenzhen, the hardware capital of the world.</p>
+                      <p>Never tried hardware before? This is your chance to start.</p>
+                      <p>
+                        <strong>Build any hardware project you want. We'll fund the parts.</strong> Level up your
+                        hardware skills. Join us for a 7-day hardware hackathon in Shenzhen.
+                      </p>
+                      <p>
+                        (← click on the tabs <span className="hidden md:inline">on the left</span>
+                        <span className="inline md:hidden">up top</span> to learn more!)
+                      </p>
+                    </>
+                  )}
+                  {section.id === 'qualifying' && (
+                    <>
+                      <p>Spend 60h designing and building hardware projects to get invited to Fallout!</p>
+                      <p>The premise is simple:</p>
+                      <ol className="list-decimal list-outside ml-7 space-y-1">
+                        <li>Design your hardware project digitally</li>
+                        <li>Track your time through timelapses/screen recordings & journals</li>
+                        <li>Ship it! We'll fund up to $5 per hour you work to buy parts</li>
+                        <li>Build your project IRL</li>
+                        <li>Repeat!</li>
+                      </ol>
+                    </>
+                  )}
+                  {section.id === 'requirements' && (
+                    <>
+                      <p>
+                        Build a hardware project you've always wanted to make. We value effort more than technical
+                        ability. It can be really simple, but the end result should feel closer to a product than a
+                        demo, a breadboarded project doesn't count.
+                      </p>
+                      <p>
+                        We're not here to fund you to build a PC. Your goal is to design something really cool from the
+                        ground up, and not to assemble expensive parts others have made.
+                      </p>
+                      <p>
+                        Don't know what to build, or what counts? You'll be part of a greater community where you can
+                        ask for help!
+                      </p>
+                    </>
+                  )}
+                  {section.id === 'shipping' && (
+                    <>
+                      <p>
+                        Shipping is making your project <em>real</em>. Putting it out into the world and making it
+                        re-creatable for someone else. For Fallout, you need to:
+                      </p>
+                      <ol className="list-decimal pl-7">
+                        <li>Document what your project is and its story</li>
+                        <li>Make a one page poster for the Fallout magazine</li>
+                        <li>Publish all files so it's easily accessible & organized</li>
+                      </ol>
+                      <p>
+                        When you make your repository nothing but a dump of files and 2 sentences for a README — it's
+                        hard for people to recognize your work or learn from it. It only lives in your head.
+                      </p>
+                    </>
+                  )}
+                  {section.id === 'travel' && (
+                    <>
+                      <p>
+                        We're running Fallout at the center of the world's tech manufacturing, ShenZhen China. For the
+                        week of July 1-7, you'll be able to browse the world's largest hardware and electronics market,
+                        Huaqiangbei, to build whatever creation you dream up, with friends you meet along the way.
+                      </p>
+                      <p>
+                        We'll be releasing more information about the logistics and schedule of the event closer to
+                        July.
+                      </p>
+                    </>
+                  )}
+                  {section.id === 'parents' && (
+                    <>
+                      <p>
+                        We understand that letting your teen travel to a foreign country can be intimidating. You
+                        probably have a lot of questions, and are wondering if this is a good idea. We'll be releasing a
+                        parent's guide closer to the event.
+                      </p>
+                      <p>
+                        We completely understand your worries, and we want to do everything we can to help you feel more
+                        comfortable. We have experience running programs very similar to this, and would be happy to
+                        answer any questions over a Zoom call!
+                      </p>
+                      <p>
+                        Hack Club operates on the principle of radical transparency and we promise to communicate with
+                        you frequently and transparently.
+                      </p>
+                      <p>
+                        If you have any questions or concerns, please do not hesitate to reach out to us at{' '}
+                        <a href="mailto:fallout@hackclub.com" className="underline">
+                          fallout@hackclub.com
+                        </a>
+                        .
+                      </p>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Frame>
       </div>
       <div className="bg-[#41D2FF] relative z-10 px-2 md:px-8 lg:px-18 xl:px-36 2xl:px-54  bg-red flex items-end p-4">
-      {/* <div className="text-blue text-4xl bg-light-blue/40 py-2 px-4 w-fit rounded-xl font-semibold mt-auto group cursor-default transition-all flex ">
-        <span className="">春</span>
-        <span className="">天</span>
-      </div> */}
-      <p></p>
+        <div className="text-blue text-4xl bg-light-blue/40 py-2 px-4 w-fit rounded-xl font-semibold mt-auto group cursor-default transition-all flex ">
+          <span className="">春</span>
+          <span className="">天</span>
+        </div>
+        <p></p>
         <div className="w-60 lg:w-80 -mb-10 ml-auto flex flex-col items-center justify-center text-center">
-            <div className={`relative bg-beige h-auto w-auto p-3 sm:px-6 sm:py-4 rounded-2xl `}>
-              <span className="relative z-1 text-base lg:text-lg text-brown text-center font-medium">Don’t see your question? Ask in <a href="https://hackclub.enterprise.slack.com/archives/C0ACJ290090" target="_blank" rel="noreferrer" className="underline">#fallout-help</a></span>
-           
-                <svg className="absolute -bottom-4 left-1/2 -translate-x-1/2" width="24" height="16" viewBox="0 0 24 16">
-                  <polygon points="0,0 24,0 12,16" className="fill-white" strokeWidth="2" />
-                  <polygon points="1,0 23,0 12,14" className="fill-white" />
-                </svg>
-              
-            </div>
+          <div className={`relative bg-beige h-auto w-auto p-3 sm:px-6 sm:py-4 rounded-2xl `}>
+            <span className="relative z-1 text-base lg:text-lg text-brown text-center font-medium">
+              Don’t see your question? Ask in{' '}
+              <a
+                href="https://hackclub.enterprise.slack.com/archives/C0ACJ290090"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                #fallout-help
+              </a>
+            </span>
+
+            <svg className="absolute -bottom-4 left-1/2 -translate-x-1/2" width="24" height="16" viewBox="0 0 24 16">
+              <polygon points="0,0 24,0 12,16" className="fill-white" strokeWidth="2" />
+              <polygon points="1,0 23,0 12,14" className="fill-white" />
+            </svg>
+          </div>
           <img src="/chineseHeidi.gif" className="w-40 h-auto  z-20" />
         </div>
-         
-        </div>
+      </div>
       <footer className="px-2 md:px-8 lg:px-18 xl:px-36 2xl:px-54 bg-dark-brown text-beige py-4 relative flex justify-between items-end">
-        
         <div className="">
           <p className="text-xl font-medium mt-2">Fallout is made with ♡ by teenagers, for teenagers</p>
           <div className="space-x-4">
@@ -457,9 +470,11 @@ export default function LandingIndex() {
             <a href="https://hackclub.com/slack" target="_blank" rel="noreferrer" className="underline text-xl">
               Join Our Slack
             </a>
-          </div>      
+          </div>
         </div>
-        <a href="#hero" className="underline">back to top</a>
+        <a href="#hero" className="underline">
+          back to top
+        </a>
       </footer>
     </div>
     <div className="fixed bottom-10 right-10 w-100 h-auto rounded-lg overflow-hidden bg-[#37B576] z-50 flex flex-col border-2 border-beige">

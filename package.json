@@ -14,6 +14,8 @@
     "@inertiajs/react": "^2.3.15",
     "@inertiaui/modal-react": "file:packages/inertiaui-modal-react",
     "@rails/activestorage": "^8.1.200",
+    "@sentry/react": "^10.43.0",
+    "@sentry/vite-plugin": "^5.1.1",
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.18",

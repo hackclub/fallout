@@ -22,6 +22,7 @@
     <%= vite_stylesheet_tag "application" %>
     <%= vite_typescript_tag "inertia" %>
     <%= inertia_ssr_head %>
+    <meta name="sentry-dsn" content="<%= ENV["SENTRY_DSN"] %>">
     <%= Sentry.get_trace_propagation_meta.html_safe %>
   </head>
 

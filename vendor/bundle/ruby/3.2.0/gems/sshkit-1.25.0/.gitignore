@@ -1,7 +1,0 @@
-*.gem
-*.swp
-bin/rake
-.bundle
-.yardoc
-test/tmp
-Gemfile.lock

@@ -1,9 +1,0 @@
-<div class="tabs is-boxed">
-  <ul>
-    <% navigation_sections.each do |key, (label, url)| %>
-      <li class="<%= "is-active" if key == current_section %>">
-        <%= link_to label, url %>
-      </li>
-    <% end %>
-  </ul>
-</div>

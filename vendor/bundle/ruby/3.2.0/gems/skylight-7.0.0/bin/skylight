@@ -1,3 +1,0 @@
-#!/usr/bin/env ruby
-require "skylight/cli"
-Skylight::CLI::Base.start(ARGV)
