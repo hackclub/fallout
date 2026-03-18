@@ -202,7 +202,7 @@ GEM
       actionview (>= 7.0.0)
       activesupport (>= 7.0.0)
     jmespath (1.6.2)
-    json (2.18.1)
+    json (2.19.1)
     kamal (2.10.1)
       activesupport (>= 7.0)
       base64 (~> 0.2)
@@ -284,8 +284,9 @@ GEM
     nokogiri (1.19.0-x86_64-linux-musl)
       racc (~> 1.4)
     ostruct (0.6.3)
-    pagy (43.2.9)
+    pagy (43.4.0)
       json
+      uri
       yaml
     paper_trail (17.0.0)
       activerecord (>= 7.1)
@@ -544,7 +545,7 @@ DEPENDENCIES
   kamal
   letter_opener
   mission_control-jobs (~> 1.1)
-  pagy (~> 43.2)
+  pagy (~> 43.4)
   paper_trail (~> 17.0)
   pg (~> 1.5)
   pg_search (~> 2.3)
