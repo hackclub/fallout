@@ -259,7 +259,7 @@ class User < ApplicationRecord
     return nil if country.blank?
     return country if country.length == 2
 
-    ISO3166::Country.find_country_by_name(country)&.alpha2
+    ISO3166::Country.find_all_by(:unofficial_names, country).keys.first
   end
 
   def self.airtable_sync_table_id
