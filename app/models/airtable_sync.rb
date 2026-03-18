@@ -18,6 +18,7 @@ require "csv"
 
 class AirtableSync < ApplicationRecord
   MAX_AIRTABLE_BATCH_SIZE = 10_000
+  SYNC_THREAD_COUNT = 10
 
   def self.needs_sync?(record)
     identifier = build_identifier(record)
@@ -54,14 +55,16 @@ class AirtableSync < ApplicationRecord
     total = records.size
     Rails.logger.info("Airtable batch sync: Building CSV for #{total} records...")
 
+    Rails.logger.info("Airtable batch sync: Building fields for #{total} records in parallel...")
+    rows = parallel_map(records) { |record| build_airtable_fields(record, mappings) }
+
     csv_string = CSV.generate do |csv|
       csv << mappings.keys
 
-      records.each_with_index do |record, index|
+      rows.each_with_index do |fields, index|
         if (index + 1) % 500 == 0 || index + 1 == total
           Rails.logger.info("Airtable batch sync: Processing row (#{index + 1}/#{total})")
         end
-        fields = build_airtable_fields(record, mappings)
         csv << fields.values.map { |v| v.is_a?(Array) ? v.join(",") : v }
       end
     end
@@ -197,16 +200,14 @@ class AirtableSync < ApplicationRecord
     end
 
     def perform_individual_sync!(ctx, records, log_prefix:)
-      airtable_ids = []
       total = records.size
+      Rails.logger.info("#{log_prefix}: Processing #{total} #{ctx[:klass].name} records in parallel...")
 
-      records.each_with_index do |record, index|
-        if (index + 1) % 100 == 0 || index + 1 == total
-          Rails.logger.info("#{log_prefix}: Processing #{ctx[:klass].name} (#{index + 1}/#{total})")
-        end
-        airtable_ids << individual_sync!(ctx[:table_id], record, ctx[:mappings], nil, base_id: ctx[:base_id])
+      airtable_ids = parallel_map(records) do |record|
+        individual_sync!(ctx[:table_id], record, ctx[:mappings], nil, base_id: ctx[:base_id])
       end
 
+      Rails.logger.info("#{log_prefix}: Finished #{ctx[:klass].name} (#{total} records)")
       airtable_ids
     end
 
@@ -246,6 +247,15 @@ class AirtableSync < ApplicationRecord
       records_query = klass.joins(join_sql).where(where_sql)
       records_query = records_query.limit(limit) if limit.present?
       records_query.to_a
+    end
+
+    def parallel_map(items, threads: SYNC_THREAD_COUNT, &)
+      return items.map(&) if threads <= 1 || items.size <= 1
+
+      slice_size = [ (items.size.to_f / threads).ceil, 1 ].max
+      items.each_slice(slice_size)
+           .map { |slice| Thread.new { ActiveRecord::Base.connection_pool.with_connection { slice.map(&) } } }
+           .flat_map(&:value)
     end
 
     def build_airtable_fields(record, field_mappings)
