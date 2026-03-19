@@ -96,7 +96,7 @@ gem "aws-sdk-s3", require: false
 gem "pagy", "~> 43.2"
 gem "pg_search", "~> 2.3"
 
-gem "inertia_rails", "~> 3.10"
+gem "inertia_rails", "~> 3.18"
 
 gem "vite_rails", "~> 3.0"
 
