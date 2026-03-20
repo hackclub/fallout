@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Updates @collapse/react and @collapse/shared from the hackclub/collapse GitHub repo.
+# Uses the GitHub API to download only the needed subdirectories (no full clone).
+# Builds each package after downloading since dist/ is not committed to the repo.
+#
+# Usage:
+#   bin/update-collapse          # install pinned version (v0.0.3)
+#   bin/update-collapse v0.0.4   # install specific version tag
+#   bin/update-collapse main     # install from branch (for development)
+
+REPO="hackclub/collapse"
+PINNED_VERSION="v0.0.8"
+REF="${1:-$PINNED_VERSION}"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PACKAGES_DIR="$ROOT_DIR/packages"
+TARBALL=$(mktemp)
+
+echo "Fetching @collapse packages from $REPO@$REF..."
+curl -sL "https://api.github.com/repos/$REPO/tarball/$REF" -o "$TARBALL"
+
+# Extract the monorepo's base tsconfig (needed to build packages)
+COLLAPSE_BUILD_DIR=$(mktemp -d)
+tar -xzf "$TARBALL" --strip-components=1 -C "$COLLAPSE_BUILD_DIR" "*/tsconfig.base.json" 2>/dev/null || true
+
+# Download shared first (react depends on it)
+for mapping in "packages/shared:collapse-shared" "clients/react:collapse-react"; do
+  src="${mapping%%:*}"
+  dest="${mapping##*:}"
+  dest_dir="$PACKAGES_DIR/$dest"
+
+  echo "  $src -> packages/$dest"
+  rm -rf "$dest_dir"
+  mkdir -p "$dest_dir"
+
+  tar -xzf "$TARBALL" --strip-components=$(($(echo "$src" | tr '/' '\n' | wc -l) + 1)) -C "$dest_dir" "*/$src/"
+
+  # Build the package if dist/ is missing
+  if [ ! -d "$dest_dir/dist" ] && [ -f "$dest_dir/package.json" ]; then
+    echo "  Building $dest..."
+    cd "$dest_dir"
+
+    # Place monorepo tsconfig.base.json where the extends path expects it (../../tsconfig.base.json)
+    if [ -f "$COLLAPSE_BUILD_DIR/tsconfig.base.json" ]; then
+      cp "$COLLAPSE_BUILD_DIR/tsconfig.base.json" "$ROOT_DIR/tsconfig.base.json" 2>/dev/null || true
+    fi
+
+    # Point @collapse/shared to the local build so npm doesn't try the registry
+    if [ "$dest" = "collapse-react" ] && [ -d "$PACKAGES_DIR/collapse-shared" ]; then
+      node -e "
+        const pkg = require('./package.json');
+        if (pkg.dependencies?.['@collapse/shared']) {
+          pkg.dependencies['@collapse/shared'] = 'file:../collapse-shared';
+          require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+        }
+      "
+    fi
+
+    npm install --ignore-scripts
+    npm run build
+    cd "$ROOT_DIR"
+  fi
+done
+
+# Clean up
+rm -f "$TARBALL"
+rm -rf "$COLLAPSE_BUILD_DIR"
+rm -f "$ROOT_DIR/tsconfig.base.json"
+
+echo "Running npm install..."
+npm install
+
+echo "Installed @collapse packages at $REF"

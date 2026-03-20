@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react'
-import { Deferred as InertiaDeferred, router } from '@inertiajs/react'
+import { Deferred as InertiaDeferred, router, usePage } from '@inertiajs/react'
 import { Deferred as ModalDeferred, Modal } from '@inertiaui/modal-react'
 import BookLayout from '@/components/shared/BookLayout'
 import Button from '@/components/shared/Button'
 import Input from '@/components/shared/Input'
 import MarkdownEditor from '@/components/shared/MarkdownEditor'
+import type { SharedProps } from '@/types'
 
 const MIN_IMAGES = 1
 const MIN_CHARS = 100
@@ -28,6 +29,15 @@ type YouTubeVideo = {
   duration_seconds: number
   was_live: boolean
   claimed: boolean
+}
+
+type CollapseRecording = {
+  id: number
+  name: string | null
+  status: string
+  tracked_seconds: number | null
+  thumbnail_url: string | null
+  created_at: string
 }
 
 function countMarkdownChars(md: string): number {
@@ -82,6 +92,7 @@ function NewJournal({
   lapse_connected,
   is_modal,
   direct_upload_url,
+  collapse_timelapses,
   timelapses,
 }: {
   projects: Project[]
@@ -89,8 +100,11 @@ function NewJournal({
   lapse_connected: boolean
   is_modal: boolean
   direct_upload_url: string
+  collapse_timelapses: CollapseRecording[] | null
   timelapses: Timelapse[] | null
 }) {
+  const { features } = usePage<SharedProps>().props
+  const collapseEnabled = !!(features as Record<string, boolean> | undefined)?.collapse
   const initialProject = selected_project_id
     ? (projects.find((p) => p.id === selected_project_id) ?? null)
     : projects.length === 1
@@ -98,7 +112,7 @@ function NewJournal({
       : null
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(initialProject)
-  const [rightTab, setRightTab] = useState<'lapse' | 'youtube'>('lapse')
+  const [rightTab, setRightTab] = useState<'lapse' | 'youtube' | 'collapse'>('lapse')
   const [selectedTimelapses, setSelectedTimelapses] = useState<Set<string>>(new Set())
   const [youtubeVideos, setYoutubeVideos] = useState<YouTubeVideo[]>([])
   const [youtubeUrl, setYoutubeUrl] = useState('')
@@ -108,6 +122,7 @@ function NewJournal({
   const [submitting, setSubmitting] = useState(false)
   const [draftStatus, setDraftStatus] = useState<string | null>(null)
   const modalRef = useRef<{ close: () => void }>(null)
+  const [selectedCollapseIds, setSelectedCollapseIds] = useState<Set<number>>(new Set())
 
   const draftKey = selectedProject ? `journal-draft-${selectedProject.id}` : null
   const [markdown, setMarkdown] = useState(() => {
@@ -156,7 +171,7 @@ function NewJournal({
   const markdownImageCount = (markdown.match(/!\[[^\]]*\]\([^)]*\)/g) || []).length
   const hasEnoughImages = markdownImageCount >= MIN_IMAGES
   const hasEnoughChars = charCount >= MIN_CHARS
-  const recordingCount = selectedTimelapses.size + youtubeVideos.length
+  const recordingCount = selectedTimelapses.size + youtubeVideos.length + selectedCollapseIds.size
   const hasRecording = recordingCount > 0
   const canSubmit = selectedProject && hasRecording && hasEnoughImages && hasEnoughChars
 
@@ -235,6 +250,7 @@ function NewJournal({
     const data: Record<string, unknown> = {
       timelapse_ids: Array.from(selectedTimelapses),
       youtube_video_ids: youtubeVideos.map((v) => v.id),
+      collapse_timelapse_ids: Array.from(selectedCollapseIds),
       content: markdown,
       images: blobSignedIds,
     }
@@ -251,9 +267,10 @@ function NewJournal({
     })
   }
 
-  const ribbonTabs: { label: string; tab: 'lapse' | 'youtube' }[] = [
+  const ribbonTabs: { label: string; tab: 'lapse' | 'youtube' | 'collapse' }[] = [
     { label: 'Lapse', tab: 'lapse' },
     { label: 'YouTube', tab: 'youtube' },
+    ...(collapseEnabled ? [{ label: 'Collapse', tab: 'collapse' as const }] : []),
   ]
 
   const content = (
@@ -451,6 +468,35 @@ function NewJournal({
             </div>
           )}
         </div>
+
+        {collapseEnabled && (
+          <div className={rightTab === 'collapse' ? 'flex flex-col min-h-0 flex-1' : 'hidden'}>
+            <h2 className="text-center font-bold text-2xl uppercase tracking-wide">Collapse</h2>
+            <p className="text-center text-sm text-dark-brown mt-1 mb-4">
+              Record your screen directly from the browser or desktop app.
+              <br />
+              Select completed recordings below to attach to your journal.
+            </p>
+
+            <div className="flex-1 min-h-0 overflow-y-auto p-1 -m-1">
+              <Deferred data="collapse_timelapses" fallback={<CollapseTimelapseSkeleton />}>
+                <CollapseTimelapseBrowser
+                  recordings={collapse_timelapses ?? []}
+                  selectedIds={selectedCollapseIds}
+                  onToggle={(id) => {
+                    setSelectedCollapseIds((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(id)) next.delete(id)
+                      else next.add(id)
+                      return next
+                    })
+                  }}
+                  selectedProject={selectedProject}
+                />
+              </Deferred>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -567,6 +613,110 @@ function TimelapseBrowser({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+function CollapseTimelapseBrowser({
+  recordings,
+  selectedIds,
+  onToggle,
+  selectedProject,
+}: {
+  recordings: CollapseRecording[]
+  selectedIds: Set<number>
+  onToggle: (id: number) => void
+  selectedProject: Project | null
+}) {
+  if (recordings.length === 0) {
+    return (
+      <div className="p-6 flex flex-col items-center gap-3">
+        <p className="text-dark-brown">No recordings found</p>
+        {selectedProject && (
+          <a
+            href="/collapse_sessions/new"
+            className="py-1.5 px-4 border-2 font-bold uppercase cursor-pointer bg-brown text-light-brown border-dark-brown"
+          >
+            Record New Timelapse
+          </a>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {selectedProject && (
+        <div className="flex justify-center">
+          <a
+            href="/collapse_sessions/new"
+            className="py-1.5 px-4 border-2 font-bold uppercase cursor-pointer bg-brown text-light-brown border-dark-brown text-sm"
+          >
+            Record New Timelapse
+          </a>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-4">
+        {recordings.map((recording) => {
+          const selected = selectedIds.has(recording.id)
+          const date = new Date(recording.created_at).toLocaleDateString('en-CA').replace(/-/g, '/')
+          return (
+            <button
+              key={recording.id}
+              type="button"
+              onClick={() => onToggle(recording.id)}
+              className={`relative text-left rounded p-2 bg-brown transition-all cursor-pointer min-w-0 ${selected ? 'ring-2 ring-dark-brown shadow-lg' : 'opacity-60 hover:opacity-80 hover:ring-1 hover:ring-dark-brown'}`}
+            >
+              {selected && (
+                <div className="absolute top-3 right-3 w-6 h-6 bg-dark-brown rounded-full flex items-center justify-center z-10">
+                  <svg
+                    className="w-4 h-4 text-light-brown"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+              <div
+                className="aspect-video rounded overflow-hidden bg-light-brown bg-center bg-contain bg-no-repeat"
+                style={recording.thumbnail_url ? { backgroundImage: `url(${recording.thumbnail_url})` } : undefined}
+              />
+              <div className="mt-1.5">
+                <p className="font-bold text-sm truncate text-white">{recording.name || 'Collapse Recording'}</p>
+                <div className="flex justify-between text-xs text-light-brown">
+                  <span>{formatDuration(recording.tracked_seconds ?? 0)}</span>
+                  <span>{date}</span>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+const SKELETON_COLLAPSE: CollapseRecording[] = Array.from({ length: 4 }, (_, i) => ({
+  id: -(i + 1),
+  name: '\u00A0',
+  status: 'complete',
+  tracked_seconds: 0,
+  thumbnail_url: null,
+  created_at: new Date().toISOString(),
+}))
+
+function CollapseTimelapseSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <CollapseTimelapseBrowser
+        recordings={SKELETON_COLLAPSE}
+        selectedIds={new Set()}
+        onToggle={() => {}}
+        selectedProject={null}
+      />
     </div>
   )
 }

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_17_021049) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_20_142206) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -94,6 +94,63 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_17_021049) do
     t.string "synced_attributes_hash"
     t.datetime "updated_at", null: false
     t.index ["record_identifier"], name: "index_airtable_syncs_on_record_identifier", unique: true
+  end
+
+  create_table "collaboration_invites", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "invitee_id", null: false
+    t.bigint "inviter_id", null: false
+    t.bigint "project_id", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["invitee_id"], name: "index_collaboration_invites_on_invitee_id"
+    t.index ["inviter_id"], name: "index_collaboration_invites_on_inviter_id"
+    t.index ["project_id", "invitee_id", "status"], name: "index_collaboration_invites_on_project_invitee_status"
+    t.index ["project_id"], name: "index_collaboration_invites_on_project_id"
+  end
+
+  create_table "collaborators", force: :cascade do |t|
+    t.bigint "collaboratable_id", null: false
+    t.string "collaboratable_type", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["collaboratable_type", "collaboratable_id"], name: "index_collaborators_on_collaboratable"
+    t.index ["user_id", "collaboratable_type", "collaboratable_id"], name: "index_collaborators_uniqueness", unique: true
+    t.index ["user_id"], name: "index_collaborators_on_user_id"
+  end
+
+  create_table "collapse_timelapses", force: :cascade do |t|
+    t.string "collapse_session_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "last_refreshed_at"
+    t.string "name"
+    t.integer "screenshot_count"
+    t.text "session_token", null: false
+    t.string "status"
+    t.string "thumbnail_url"
+    t.integer "tracked_seconds"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.string "video_url"
+    t.index ["collapse_session_id"], name: "index_collapse_timelapses_on_collapse_session_id", unique: true
+    t.index ["user_id"], name: "index_collapse_timelapses_on_user_id"
+  end
+
+  create_table "flipper_features", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "key", null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_flipper_features_on_key", unique: true
+  end
+
+  create_table "flipper_gates", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "feature_key", null: false
+    t.string "key", null: false
+    t.datetime "updated_at", null: false
+    t.text "value"
+    t.index ["feature_key", "key", "value"], name: "index_flipper_gates_on_feature_key_and_key_and_value", unique: true
   end
 
   create_table "journal_entries", force: :cascade do |t|
@@ -398,6 +455,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_17_021049) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "collaboration_invites", "projects"
+  add_foreign_key "collaboration_invites", "users", column: "invitee_id"
+  add_foreign_key "collaboration_invites", "users", column: "inviter_id"
+  add_foreign_key "collaborators", "users"
+  add_foreign_key "collapse_timelapses", "users"
   add_foreign_key "journal_entries", "projects"
   add_foreign_key "journal_entries", "users"
   add_foreign_key "lapse_timelapses", "users"

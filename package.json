@@ -10,6 +10,8 @@
   "dependencies": {
     "@headlessui/react": "^2.1.0",
     "@heroicons/react": "^2.2.0",
+    "@collapse/react": "file:packages/collapse-react",
+    "@collapse/shared": "file:packages/collapse-shared",
     "@inertiajs/core": "^2.3.17",
     "@inertiajs/react": "^2.3.15",
     "@inertiaui/modal-react": "file:packages/inertiaui-modal-react",

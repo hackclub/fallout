@@ -40,7 +40,10 @@ class ApplicationController < ActionController::Base
   inertia_share rsvp_path: -> { rsvp_path }
   inertia_share features: -> { # Feature flags for the frontend
     next {} unless current_user && !current_user.trial?
-    { collaborators: Flipper.enabled?(:collaborators, current_user) }
+    {
+      collaborators: Flipper.enabled?(:collaborators, current_user),
+      collapse: Flipper.enabled?(:"03_18_collapse", current_user)
+    }
   }
   inertia_share has_unread_mail: -> { # Drives the envelope badge on the path page
     next false unless current_user && !current_user.trial?

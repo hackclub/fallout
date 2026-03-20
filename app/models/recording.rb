@@ -24,7 +24,7 @@
 class Recording < ApplicationRecord
   # Destroying a Recording (e.g., on journal discard) must NOT destroy the underlying
   # LapseTimelapse/YouTubeVideo — they are cached data that persists independently.
-  delegated_type :recordable, types: %w[LapseTimelapse YouTubeVideo]
+  delegated_type :recordable, types: %w[LapseTimelapse YouTubeVideo CollapseTimelapse]
 
   belongs_to :journal_entry
   belongs_to :user

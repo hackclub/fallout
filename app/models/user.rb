@@ -47,6 +47,7 @@ class User < ApplicationRecord
   has_many :onboarding_responses, dependent: :destroy
   has_many :journal_entries, dependent: :destroy
   has_many :lapse_timelapses, dependent: :destroy
+  has_many :collapse_timelapses, dependent: :destroy
   has_many :mail_messages, dependent: :destroy
   has_many :authored_mail_messages, class_name: "MailMessage", foreign_key: :author_id, dependent: :nullify, inverse_of: :author
   has_many :mail_interactions, dependent: :destroy

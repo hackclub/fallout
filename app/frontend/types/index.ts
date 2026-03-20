@@ -15,6 +15,7 @@ export type FlashData = Record<string, string>
 
 export interface Features {
   collaborators?: boolean
+  collapse?: boolean
 }
 
 export interface SharedProps {
