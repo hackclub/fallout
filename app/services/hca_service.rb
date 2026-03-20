@@ -26,19 +26,23 @@ module HcaService
     end
   end
 
-  def authorize_url(redirect_uri, state, login_hint: nil)
-    oauth_params = {
+  def authorize_url(redirect_uri, state, login_hint: nil, signup: false)
+    params = {
       client_id: ENV.fetch("HCA_CLIENT_ID", nil),
       redirect_uri: redirect_uri,
       response_type: "code",
       scope: scopes,
       state: state
     }
-    signup_params = {
-      return_to: "/oauth/authorize?#{oauth_params.to_query}"
-    }
-    signup_params[:email] = login_hint if login_hint.present?
-    "#{host}/signup?#{signup_params.to_query}"
+
+    if signup
+      signup_params = { return_to: "/oauth/authorize?#{params.to_query}" }
+      signup_params[:email] = login_hint if login_hint.present?
+      "#{host}/signup?#{signup_params.to_query}"
+    else
+      params[:login_hint] = login_hint if login_hint.present?
+      "#{host}/oauth/authorize?#{params.to_query}"
+    end
   end
 
   def exchange_code_for_token(code, redirect_uri)

@@ -36,7 +36,7 @@ module Authentication
   end
 
   def authenticate_verified_user!
-    redirect_to signin_path(login_hint: current_user.email), alert: "Please verify your account to access this." if current_user&.trial?
+    redirect_to signin_path(login_hint: current_user.email, signup: true), alert: "Please verify your account to access this." if current_user&.trial?
   end
 
   def user_signed_in?
@@ -69,7 +69,7 @@ module Authentication
 
     if is_trial
       cookies.delete(:trial_device_token)
-      redirect_to signin_path(login_hint: email), notice: "Your trial session has expired. Please sign in to continue."
+      redirect_to signin_path(login_hint: email, signup: true), notice: "Your trial session has expired. Please sign in to continue."
     else
       redirect_to root_path, notice: "Your account is no longer active."
     end

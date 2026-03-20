@@ -34,7 +34,7 @@ class ApplicationController < ActionController::Base
     }
   }
   inertia_share flash: -> { flash.to_hash }
-  inertia_share sign_in_path: -> { signin_path(login_hint: current_user&.trial? ? current_user.email : nil) } # Prefill HCA email for trial users upgrading to full accounts
+  inertia_share sign_in_path: -> { signin_path(login_hint: current_user&.trial? ? current_user.email : nil, signup: current_user&.trial? ? true : nil) } # Trial users go through /signup to verify; others use /oauth/authorize
   inertia_share sign_out_path: -> { signout_path }
   inertia_share trial_session_path: -> { trial_session_path }
   inertia_share rsvp_path: -> { rsvp_path }

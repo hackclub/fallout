@@ -11,7 +11,7 @@ class AuthController < ApplicationController
     state = SecureRandom.hex(24)
     session[:state] = state
 
-    redirect_to HcaService.authorize_url(hca_callback_url, state, login_hint: params[:login_hint]), allow_other_host: true
+    redirect_to HcaService.authorize_url(hca_callback_url, state, login_hint: params[:login_hint], signup: params[:signup].present?), allow_other_host: true
   end
 
   def create
