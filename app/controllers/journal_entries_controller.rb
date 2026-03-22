@@ -23,34 +23,15 @@ class JournalEntriesController < ApplicationController
       direct_upload_url: rails_direct_uploads_url,
       collapse_timelapses: InertiaRails.defer {
         if Flipper.enabled?(:"03_18_collapse", current_user)
-          claimed_ids = Recording.where(recordable_type: "CollapseTimelapse").pluck(:recordable_id).to_set
-          unclaimed = current_user.collapse_timelapses.where.not(id: claimed_ids)
-
-          # Batch-refresh all unclaimed sessions from Collapse API so status/metadata stays current
-          tokens = unclaimed.pluck(:session_token)
+          tokens = current_user.pending_collapse_tokens
           if tokens.any?
-            sessions = CollapseService.batch_sessions(tokens)
-            if sessions.present?
-              sessions_by_token = sessions.index_by { |s| s["token"] }
-              unclaimed.find_each do |c|
-                data = sessions_by_token[c.session_token]
-                next unless data
-                c.update(
-                  name: data["name"].presence || c.name,
-                  status: data["status"],
-                  tracked_seconds: data["trackedSeconds"],
-                  screenshot_count: data["screenshotCount"],
-                  video_url: data["videoUrl"],
-                  thumbnail_url: data["thumbnailUrl"],
-                  last_refreshed_at: Time.current
-                )
-              end
-            end
+            sessions = CollapseService.batch_sessions(tokens) || []
+            sessions
+              .select { |s| %w[complete stopped].include?(s["status"]) }
+              .map { |s| { token: s["token"], name: s["name"], status: s["status"], duration: s["trackedSeconds"], thumbnail_url: s["thumbnailUrl"], created_at: s["createdAt"] } }
+          else
+            []
           end
-
-          unclaimed.where(status: %w[complete stopped])
-            .order(created_at: :desc)
-            .map { |c| { id: c.id, name: c.name, status: c.status, tracked_seconds: c.tracked_seconds, thumbnail_url: c.thumbnail_url, created_at: c.created_at.iso8601 } }
         else
           []
         end
@@ -83,7 +64,7 @@ class JournalEntriesController < ApplicationController
 
     timelapse_ids = Array(params[:timelapse_ids]).map(&:to_s).uniq
     youtube_video_ids = Array(params[:youtube_video_ids]).map(&:to_i).uniq
-    collapse_timelapse_ids = Array(params[:collapse_timelapse_ids]).map(&:to_i).uniq
+    collapse_tokens = Array(params[:collapse_tokens]).map(&:to_s).uniq
 
     ActiveRecord::Base.transaction do
       @journal_entry.save!
@@ -101,10 +82,14 @@ class JournalEntriesController < ApplicationController
         @journal_entry.recordings.create!(recordable: video, user: current_user)
       end
 
-      collapse_timelapse_ids.each do |cid|
-        collapse = current_user.collapse_timelapses.find(cid)
-        collapse.refetch_data! # Fetches from Collapse API to verify and populate cached fields
+      collapse_tokens.each do |token|
+        raise ActiveRecord::RecordNotFound, "Token not in pending list" unless current_user.pending_collapse_tokens.include?(token)
+
+        collapse = current_user.collapse_timelapses.create!(session_token: token)
+        collapse.refetch_data!
         @journal_entry.recordings.create!(recordable: collapse, user: current_user)
+
+        current_user.update!(pending_collapse_tokens: current_user.pending_collapse_tokens - [token])
       end
     end
 

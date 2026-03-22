@@ -32,10 +32,10 @@ type YouTubeVideo = {
 }
 
 type CollapseRecording = {
-  id: number
+  token: string
   name: string | null
   status: string
-  tracked_seconds: number | null
+  duration: number | null
   thumbnail_url: string | null
   created_at: string
 }
@@ -122,7 +122,7 @@ function NewJournal({
   const [submitting, setSubmitting] = useState(false)
   const [draftStatus, setDraftStatus] = useState<string | null>(null)
   const modalRef = useRef<{ close: () => void }>(null)
-  const [selectedCollapseIds, setSelectedCollapseIds] = useState<Set<number>>(new Set())
+  const [selectedCollapseTokens, setSelectedCollapseTokens] = useState<Set<string>>(new Set())
 
   const draftKey = selectedProject ? `journal-draft-${selectedProject.id}` : null
   const [markdown, setMarkdown] = useState(() => {
@@ -171,7 +171,7 @@ function NewJournal({
   const markdownImageCount = (markdown.match(/!\[[^\]]*\]\([^)]*\)/g) || []).length
   const hasEnoughImages = markdownImageCount >= MIN_IMAGES
   const hasEnoughChars = charCount >= MIN_CHARS
-  const recordingCount = selectedTimelapses.size + youtubeVideos.length + selectedCollapseIds.size
+  const recordingCount = selectedTimelapses.size + youtubeVideos.length + selectedCollapseTokens.size
   const hasRecording = recordingCount > 0
   const canSubmit = selectedProject && hasRecording && hasEnoughImages && hasEnoughChars
 
@@ -250,7 +250,7 @@ function NewJournal({
     const data: Record<string, unknown> = {
       timelapse_ids: Array.from(selectedTimelapses),
       youtube_video_ids: youtubeVideos.map((v) => v.id),
-      collapse_timelapse_ids: Array.from(selectedCollapseIds),
+      collapse_tokens: Array.from(selectedCollapseTokens),
       content: markdown,
       images: blobSignedIds,
     }
@@ -482,9 +482,9 @@ function NewJournal({
               <Deferred data="collapse_timelapses" fallback={<CollapseTimelapseSkeleton />}>
                 <CollapseTimelapseBrowser
                   recordings={collapse_timelapses ?? []}
-                  selectedIds={selectedCollapseIds}
+                  selectedIds={selectedCollapseTokens}
                   onToggle={(id) => {
-                    setSelectedCollapseIds((prev) => {
+                    setSelectedCollapseTokens((prev) => {
                       const next = new Set(prev)
                       if (next.has(id)) next.delete(id)
                       else next.add(id)
@@ -624,8 +624,8 @@ function CollapseTimelapseBrowser({
   selectedProject,
 }: {
   recordings: CollapseRecording[]
-  selectedIds: Set<number>
-  onToggle: (id: number) => void
+  selectedIds: Set<string>
+  onToggle: (token: string) => void
   selectedProject: Project | null
 }) {
   if (recordings.length === 0) {
@@ -658,13 +658,13 @@ function CollapseTimelapseBrowser({
       )}
       <div className="grid grid-cols-2 gap-4">
         {recordings.map((recording) => {
-          const selected = selectedIds.has(recording.id)
+          const selected = selectedIds.has(recording.token)
           const date = new Date(recording.created_at).toLocaleDateString('en-CA').replace(/-/g, '/')
           return (
             <button
-              key={recording.id}
+              key={recording.token}
               type="button"
-              onClick={() => onToggle(recording.id)}
+              onClick={() => onToggle(recording.token)}
               className={`relative text-left rounded p-2 bg-brown transition-all cursor-pointer min-w-0 ${selected ? 'ring-2 ring-dark-brown shadow-lg' : 'opacity-60 hover:opacity-80 hover:ring-1 hover:ring-dark-brown'}`}
             >
               {selected && (
@@ -687,7 +687,7 @@ function CollapseTimelapseBrowser({
               <div className="mt-1.5">
                 <p className="font-bold text-sm truncate text-white">{recording.name || 'Collapse Recording'}</p>
                 <div className="flex justify-between text-xs text-light-brown">
-                  <span>{formatDuration(recording.tracked_seconds ?? 0)}</span>
+                  <span>{formatDuration(recording.duration ?? 0)}</span>
                   <span>{date}</span>
                 </div>
               </div>
@@ -700,10 +700,10 @@ function CollapseTimelapseBrowser({
 }
 
 const SKELETON_COLLAPSE: CollapseRecording[] = Array.from({ length: 4 }, (_, i) => ({
-  id: -(i + 1),
+  token: `skeleton-${i}`,
   name: '\u00A0',
   status: 'complete',
-  tracked_seconds: 0,
+  duration: 0,
   thumbnail_url: null,
   created_at: new Date().toISOString(),
 }))

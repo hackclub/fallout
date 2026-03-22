@@ -6,7 +6,6 @@ import Button from '@/components/shared/Button'
 import Input from '@/components/shared/Input'
 
 type CollapseSessionProps = {
-  id: number
   token: string
   status: string
 }
@@ -41,15 +40,32 @@ function CollapseSessionShow({
   return_to: string | null
 }) {
   const endedStatuses = ['stopped', 'compiling', 'complete', 'failed']
-  const [mode, setMode] = useState<'choose' | 'browser' | 'camera' | 'desktop'>(() => {
-    log(
-      'session',
-      `loaded session id=${collapse_session.id}, status=${collapse_session.status}, api=${collapse_api_url}`,
-    )
-    // Skip mode selection if session already ended — go straight to result view
+  const continuableStatuses = ['active', 'paused']
+  const validModes = ['browser', 'camera', 'desktop'] as const
+  type Mode = 'choose' | (typeof validModes)[number]
+
+  const [mode, setMode] = useState<Mode>(() => {
+    log('session', `loaded session status=${collapse_session.status}, api=${collapse_api_url}`)
     if (endedStatuses.includes(collapse_session.status)) return 'browser'
+
+    const savedMode = new URLSearchParams(window.location.search).get('mode')
+    if (
+      savedMode &&
+      (validModes as readonly string[]).includes(savedMode) &&
+      continuableStatuses.includes(collapse_session.status)
+    ) {
+      return savedMode as Mode
+    }
+
     return 'choose'
   })
+
+  function selectMode(next: 'browser' | 'camera' | 'desktop') {
+    const url = new URL(window.location.href)
+    url.searchParams.set('mode', next)
+    window.history.replaceState(null, '', url.toString())
+    setMode(next)
+  }
 
   return (
     <div className="min-h-screen bg-light-brown flex items-center justify-center p-6">
@@ -58,10 +74,7 @@ function CollapseSessionShow({
           <>
             <div className="p-6 border-b border-dark-brown flex items-center justify-between">
               <h1 className="font-bold text-2xl uppercase tracking-wide text-dark-brown">Collapse Recording</h1>
-              <a
-                href={return_to || '/path'}
-                className="text-dark-brown text-sm underline hover:no-underline"
-              >
+              <a href={return_to || '/path'} className="text-dark-brown text-sm underline hover:no-underline">
                 Back to Path
               </a>
             </div>
@@ -72,7 +85,7 @@ function CollapseSessionShow({
                   type="button"
                   onClick={() => {
                     log('session', 'mode: browser')
-                    setMode('browser')
+                    selectMode('browser')
                   }}
                   className="flex flex-col items-center gap-3 p-6 border-2 border-dark-brown rounded-lg cursor-pointer hover:bg-light-brown transition-colors"
                 >
@@ -96,7 +109,7 @@ function CollapseSessionShow({
                   type="button"
                   onClick={() => {
                     log('session', 'mode: camera')
-                    setMode('camera')
+                    selectMode('camera')
                   }}
                   className="flex flex-col items-center gap-3 p-6 border-2 border-dark-brown rounded-lg cursor-pointer hover:bg-light-brown transition-colors"
                 >
@@ -121,7 +134,7 @@ function CollapseSessionShow({
                   onClick={() => {
                     log('session', 'mode: desktop, opening collapse:// deep link')
                     window.location.href = `collapse://session?token=${collapse_session.token}`
-                    setMode('desktop')
+                    selectMode('desktop')
                   }}
                   className="flex flex-col items-center gap-3 p-6 border-2 border-dark-brown rounded-lg cursor-pointer hover:bg-light-brown transition-colors"
                 >
@@ -153,11 +166,17 @@ function CollapseSessionShow({
             callbacks={collapseCallbacks}
             capture={mode === 'camera' ? { mode: 'camera' } : undefined}
           >
-            <BrowserRecorderUI collapseSessionId={collapse_session.id} returnTo={return_to} />
+            <BrowserRecorderUI returnTo={return_to} />
           </CollapseProvider>
         )}
 
-        {mode === 'desktop' && <DesktopModeUI token={collapse_session.token} returnTo={return_to} />}
+        {mode === 'desktop' && (
+          <DesktopModeUI
+            token={collapse_session.token}
+            apiBaseUrl={collapse_api_url ?? ''}
+            onSessionEnded={() => setMode('browser')}
+          />
+        )}
       </div>
     </div>
   )
@@ -204,7 +223,7 @@ function StatusBar({ displaySeconds, screenshotCount }: { displaySeconds: number
   )
 }
 
-function BrowserRecorderUI({ collapseSessionId, returnTo }: { collapseSessionId: number; returnTo: string | null }) {
+function BrowserRecorderUI({ returnTo }: { returnTo: string | null }) {
   const { state, actions } = useCollapse()
   const [finished, setFinished] = useState(false)
   const [stopping, setStopping] = useState(false)
@@ -257,23 +276,12 @@ function BrowserRecorderUI({ collapseSessionId, returnTo }: { collapseSessionId:
     }
   }, [captureFailed, state.status, state.isRecording, state.displaySeconds])
 
-  // Sync status to Rails when recording ends
   useEffect(() => {
     if (state.status === 'complete') setFinished(true)
     if (state.status === 'complete' || state.status === 'stopped') {
       setStopping(false)
-      const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content
-      fetch(`/collapse_sessions/${collapseSessionId}`, {
-        method: 'PATCH',
-        headers: {
-          Accept: 'application/json',
-          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-        },
-      })
-        .then(() => log('session', 'status synced to Rails'))
-        .catch((e) => log('session', 'sync to Rails FAILED:', e))
     }
-  }, [state.status, collapseSessionId])
+  }, [state.status])
 
   async function handleStop() {
     const n = name.trim() || undefined
@@ -301,6 +309,23 @@ function BrowserRecorderUI({ collapseSessionId, returnTo }: { collapseSessionId:
           <p className="text-dark-brown text-sm">Everything before the failure was saved. Try reloading the page.</p>
           <Button onClick={() => window.location.reload()} className="py-2 px-6 mt-2">
             Reload
+          </Button>
+        </div>
+      </>
+    )
+  }
+
+  if (state.status === 'failed') {
+    return (
+      <>
+        <RecordingHeader status={state.status} isRecording={false} returnTo={returnTo} />
+        <div className="flex flex-col items-center gap-4 p-12">
+          <p className="text-red-700 font-bold text-xl">Compilation failed</p>
+          <p className="text-dark-brown text-sm">
+            Something went wrong while compiling your timelapse. Your screenshots were saved.
+          </p>
+          <Button onClick={() => router.visit(returnTo || '/path')} className="py-2 px-6 mt-2">
+            Back to Path
           </Button>
         </div>
       </>
@@ -489,14 +514,39 @@ function CameraPreviewVideo({ stream }: { stream: MediaStream }) {
   )
 }
 
-function DesktopModeUI({ token, returnTo }: { token: string; returnTo: string | null }) {
+function DesktopModeUI({
+  token,
+  apiBaseUrl,
+  onSessionEnded,
+}: {
+  token: string
+  apiBaseUrl: string
+  onSessionEnded: () => void
+}) {
+  const deepLink = `collapse://session?token=${token}`
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/sessions/${token}/status`)
+        if (!res.ok) return
+        const data = await res.json()
+        log('desktop', `poll status: ${data.status}`)
+        if (['stopped', 'compiling', 'complete', 'failed'].includes(data.status)) {
+          clearInterval(interval)
+          onSessionEnded()
+        }
+      } catch {
+        log('desktop', 'poll failed')
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [token, apiBaseUrl, onSessionEnded])
+
   return (
     <>
-      <div className="p-6 border-b border-dark-brown flex items-center justify-between">
+      <div className="p-6 border-b border-dark-brown">
         <h1 className="font-bold text-2xl uppercase tracking-wide text-dark-brown">Desktop Recording</h1>
-        <a href={returnTo || '/path'} className="text-dark-brown text-sm underline hover:no-underline">
-          Back to Path
-        </a>
       </div>
       <div className="flex flex-col items-center gap-4 p-12">
         <p className="text-dark-brown font-bold text-lg">Recording in Desktop App</p>
@@ -505,16 +555,17 @@ function DesktopModeUI({ token, returnTo }: { token: string; returnTo: string | 
           <br />
           then come back here when you're done.
         </p>
-        <div className="flex gap-3 mt-2">
-          <a
-            href={`collapse://session?token=${token}`}
-            className="py-2 px-6 border-2 font-bold uppercase cursor-pointer bg-brown text-light-brown border-dark-brown text-sm"
-          >
-            Re-open Desktop App
-          </a>
-          <Button onClick={() => router.visit(returnTo || '/path')} className="py-2 px-6">
-            Back to Path
-          </Button>
+        <a
+          href={deepLink}
+          className="py-2 px-6 border-2 font-bold uppercase cursor-pointer bg-brown text-light-brown border-dark-brown text-sm mt-2"
+        >
+          Re-open Desktop App
+        </a>
+        <div className="text-center">
+          <p className="text-dark-brown text-sm">Not working? Paste the following into the app:</p>
+          <code className="bg-light-brown px-1.5 py-0.5 rounded border border-dark-brown text-xs font-mono select-all mt-1 inline-block">
+            {deepLink}
+          </code>
         </div>
       </div>
     </>
