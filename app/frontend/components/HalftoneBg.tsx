@@ -175,11 +175,24 @@ type Props = {
 }
 
 export const HalftoneBg = forwardRef<HTMLCanvasElement, Props>(
-  ({ src, pixelSize = 4, dotSize = 0.7, halftoneOpacity = 1.0, objectFit = 'cover', background = 'bg-blue', className, bleed = 0, mouseEffect = false }, ref) => {
+  (
+    {
+      src,
+      pixelSize = 4,
+      dotSize = 0.7,
+      halftoneOpacity = 1.0,
+      objectFit = 'cover',
+      background = 'bg-blue',
+      className,
+      bleed = 0,
+      mouseEffect = false,
+    },
+    ref,
+  ) => {
     const innerRef = useRef<HTMLCanvasElement>(null)
 
     const setRef = (el: HTMLCanvasElement | null) => {
-      (innerRef as React.MutableRefObject<HTMLCanvasElement | null>).current = el
+      ;(innerRef as React.MutableRefObject<HTMLCanvasElement | null>).current = el
       if (typeof ref === 'function') ref(el)
       else if (ref) (ref as React.MutableRefObject<HTMLCanvasElement | null>).current = el
     }
@@ -206,28 +219,28 @@ export const HalftoneBg = forwardRef<HTMLCanvasElement, Props>(
       gl.bindBuffer(gl.ARRAY_BUFFER, quad)
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
 
-      const aPos   = gl.getAttribLocation(program, 'aPosition')
-      const uTex   = gl.getUniformLocation(program, 'uTexture')
-      const uRes   = gl.getUniformLocation(program, 'uResolution')
+      const aPos = gl.getAttribLocation(program, 'aPosition')
+      const uTex = gl.getUniformLocation(program, 'uTexture')
+      const uRes = gl.getUniformLocation(program, 'uResolution')
       const uImgAR = gl.getUniformLocation(program, 'uImageAspect')
-      const uPx    = gl.getUniformLocation(program, 'uPixelSize')
-      const uDot   = gl.getUniformLocation(program, 'uDotSize')
-      const uHOp     = gl.getUniformLocation(program, 'uHalftoneOpacity')
+      const uPx = gl.getUniformLocation(program, 'uPixelSize')
+      const uDot = gl.getUniformLocation(program, 'uDotSize')
+      const uHOp = gl.getUniformLocation(program, 'uHalftoneOpacity')
       const uBleedLoc = gl.getUniformLocation(program, 'uBleed')
-      const uMouse    = gl.getUniformLocation(program, 'uMouse')
+      const uMouse = gl.getUniformLocation(program, 'uMouse')
       const uMouseStrengthLoc = gl.getUniformLocation(program, 'uMouseStrength')
       const uContain = gl.getUniformLocation(program, 'uContain')
 
       gl.enable(gl.BLEND)
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-      let mouseX = 0, mouseY = 0
+      let mouseX = 0,
+        mouseY = 0
       const onMouseMove = (e: MouseEvent) => {
         mouseX = (e.clientX / window.innerWidth) * 2 - 1
         mouseY = (e.clientY / window.innerHeight) * 2 - 1
       }
       window.addEventListener('mousemove', onMouseMove)
-
 
       let animId: number | null = null
 
@@ -263,9 +276,12 @@ export const HalftoneBg = forwardRef<HTMLCanvasElement, Props>(
       }
       if (mouseEffect) loop()
 
-      const io = new IntersectionObserver((entries) => {
-        visible = entries[0].isIntersecting
-      }, { threshold: 0 })
+      const io = new IntersectionObserver(
+        (entries) => {
+          visible = entries[0].isIntersecting
+        },
+        { threshold: 0 },
+      )
       io.observe(canvas)
 
       const img = new Image()
@@ -302,7 +318,7 @@ export const HalftoneBg = forwardRef<HTMLCanvasElement, Props>(
     }, [src, pixelSize, dotSize, halftoneOpacity, objectFit, bleed, mouseEffect])
 
     return <canvas ref={setRef} className={`${background} ${className ?? ''}`} />
-  }
+  },
 )
 
 HalftoneBg.displayName = 'HalftoneBg'

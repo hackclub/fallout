@@ -89,7 +89,7 @@ class JournalEntriesController < ApplicationController
         lookout.refetch_data!
         @journal_entry.recordings.create!(recordable: lookout, user: current_user)
 
-        current_user.update!(pending_lookout_tokens: current_user.pending_lookout_tokens - [token])
+        current_user.update!(pending_lookout_tokens: current_user.pending_lookout_tokens - [ token ])
       end
     end
 

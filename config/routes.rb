@@ -10,6 +10,7 @@
 #                                          PATCH  /admin/reviews/:id(.:format)                                                                  admin/ships#update
 #                                          PUT    /admin/reviews/:id(.:format)                                                                  admin/ships#update
 #                     mission_control_jobs        /jobs                                                                                         MissionControl::Jobs::Engine
+#                                                 /flipper                                                                                      Flipper::UI
 #                           admin_projects GET    /admin/projects(.:format)                                                                     admin/projects#index
 #                            admin_project GET    /admin/projects/:id(.:format)                                                                 admin/projects#show
 #                              admin_users GET    /admin/users(.:format)                                                                        admin/users#index
@@ -45,6 +46,8 @@
 #                        new_journal_entry GET    /journal_entries/new(.:format)                                                                journal_entries#new
 #                    preview_journal_entry POST   /journal_entries/preview(.:format)                                                            journal_entries#preview
 #                    lookup_you_tube_video POST   /you_tube_videos/lookup(.:format)                                                             you_tube_videos#lookup
+#                  record_lookout_sessions GET    /lookout_sessions/record(.:format)                                                            lookout_sessions#record
+#                      new_lookout_session GET    /lookout_sessions/new(.:format)                                                               lookout_sessions#new
 #                                      faq GET    /faq(.:format)                                                                                redirect(301, /docs/faq)
 #                                     info GET    /info(.:format)                                                                               redirect(301, /docs)
 #                                    about GET    /about(.:format)                                                                              redirect(301, /docs)

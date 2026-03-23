@@ -12,7 +12,7 @@ class LookoutSessionsController < ApplicationController
     end
 
     token = session_data["token"]
-    current_user.update!(pending_lookout_tokens: current_user.pending_lookout_tokens + [token])
+    current_user.update!(pending_lookout_tokens: current_user.pending_lookout_tokens + [ token ])
 
     redirect_to record_lookout_sessions_path(token: token)
   end
