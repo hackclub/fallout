@@ -1,4 +1,7 @@
-<img src="public/fallout.svg" width="400px" height="auto">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/fallout.svg">
+  <img src="public/fallout-black.svg" width="400px" height="auto" alt="Fallout">
+</picture>
 
 ## Build 60h of hardware projects and qualify for a hardware hackathon in Shenzhen, China from July 1-7th.
 [Start building now!
