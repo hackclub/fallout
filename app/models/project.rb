@@ -59,7 +59,8 @@ class Project < ApplicationRecord
       "Name" => :name,
       "Description" => :description,
       "Repo Link" => :repo_link,
-      "Created At" => ->(p) { p.created_at&.iso8601 }
+      "Created At" => ->(p) { p.created_at&.iso8601 },
+      "Author" => ->(p) { p.user&.id }
     }
   end
 
