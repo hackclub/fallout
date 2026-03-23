@@ -379,7 +379,7 @@ export default function LandingIndex() {
           />
 
           <div className="relative flex flex-col items-center w-full px-4 md:px-0 mt-20 md:mt-40 gap-3 sm:gap-4">
-            {/* <div className="text-lg md:text-xl lg:text-2xl tracking-[5%] text-center">JULY 1-7, 2026</div> */}
+          <div className="text-lg md:text-xl lg:text-2xl tracking-[5%] text-center">Start now to joins us in Shenzhen, July 1-7</div>
 
             <h1 className="shake text-center tracking-[5%] text-shadow-md text-shadow-blue font-outfit text-3xl md:text-6xl font-semibold max-w-5xl">
               Build hardware projects for 60h, Visit Shenzhen, China!
