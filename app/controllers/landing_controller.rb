@@ -6,6 +6,7 @@ class LandingController < ApplicationController
   skip_after_action :verify_policy_scoped, only: %i[index] # No scoped collection
 
   def index
-    redirect_to path_path if user_signed_in?
+    return redirect_to path_path if user_signed_in?
+    render inertia: "landing/index"
   end
 end

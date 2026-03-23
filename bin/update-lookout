@@ -11,7 +11,7 @@ set -euo pipefail
 #   bin/update-lookout main     # install from branch (for development)
 
 REPO="hackclub/lookout"
-PINNED_VERSION="v0.0.26"
+PINNED_VERSION="main"
 REF="${1:-$PINNED_VERSION}"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGES_DIR="$ROOT_DIR/packages"

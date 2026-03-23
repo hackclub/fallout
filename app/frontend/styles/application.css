@@ -7,6 +7,8 @@
 /* @plugin '@tailwindcss/forms'; */
 
 @theme {
+  --font-sans: 'Google Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-google: 'Google Sans', sans-serif;
   --font-outfit: 'Outfit', sans-serif;
   --font-bells: 'Hells Bells', sans-serif;
   --font-comico: 'Comico', sans-serif;
@@ -59,7 +61,9 @@
 }
 
 :root {
-  @apply font-outfit bg-light-brown text-dark-brown overscroll-none;
+  @apply bg-light-brown text-dark-brown overscroll-none;
+  /* Override lookout-react theme.ts which injects SF Pro on :root */
+  font-family: var(--font-sans) !important;
   scroll-behavior: smooth;
 }
 
