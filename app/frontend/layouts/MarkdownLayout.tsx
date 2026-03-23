@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { Link, usePage } from '@inertiajs/react'
 import Frame from '@/components/shared/Frame'
 import FlashMessages from '@/components/FlashMessages'
+import DocProgressBar from '@/components/docs/DocProgressBar'
 
 interface MenuLink {
   type: 'link'
@@ -147,6 +148,7 @@ export default function MarkdownLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="docs-page relative min-h-screen">
+      <DocProgressBar />
       {/* Mobile hamburger */}
       <button
         onClick={() => setMobileOpen(true)}

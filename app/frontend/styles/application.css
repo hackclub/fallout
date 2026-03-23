@@ -8,19 +8,22 @@
 
 @theme {
   --font-outfit: 'Outfit', sans-serif;
+  --font-bells: 'Hells Bells', sans-serif;
+  --font-comico: 'Comico', sans-serif;
   --color-dark-blue:#007BDA;
 
   --breakpoint-2xs: 320px;
   --breakpoint-xs: 480px;
 
-  --color-blue: #41D2FF;
+  --color-blue: #38C9FF;
   --color-light-blue:#C3EFFF;
   --color-dark-brown: #61453a;
+  --color-black: #61453a;
   --color-brown: #9f715d;
   --color-light-brown: #edd1b0;
-  --color-beige: #FFFCF5;
+  --color-beige: #FCF1E5;
 
-  --color-light-green: #c8e6d8;
+  --color-light-green: #C8E6D8;
   --color-green: #37B576;
   /* --color-light-blue: #c3efff; */
   --color-yellow: #ffebad;
@@ -30,6 +33,29 @@
   --color-gray: #777777;
 
   --color-background: rgba(65, 88, 97, 0.5);
+}
+@font-face {
+  font-family: 'Hells Bells';
+  src: url('/fonts/Hells-Bells.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Comico';
+  src: url('/fonts/Comico-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-bells {
+  font-family: 'Hells Bells', sans-serif;
+}
+
+.font-comico {
+  font-family: 'Comico', sans-serif;
 }
 
 :root {
@@ -436,6 +462,11 @@ textarea:focus {
 
 .toc-bar-active {
   background-color: var(--color-dark-brown);
+}
+
+.cursor-none,
+.cursor-none * {
+  cursor: none !important;
 }
 
 /* Dark mode for docs pages */

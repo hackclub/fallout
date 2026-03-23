@@ -2,7 +2,6 @@ import { type ReactNode, useEffect, useRef } from 'react'
 import { Head } from '@inertiajs/react'
 import { router } from '@inertiajs/react'
 import MarkdownLayout from '@/layouts/MarkdownLayout'
-import TableOfContents from '@/components/docs/TableOfContents'
 
 function MarkdownShow({ content_html, page_title }: { content_html: string; page_title: string }) {
   const contentRef = useRef<HTMLDivElement>(null)
@@ -42,7 +41,6 @@ function MarkdownShow({ content_html, page_title }: { content_html: string; page
         <style>{`:root { background-color: #fffcf5; } @media (prefers-color-scheme: dark) { :root { background-color: #1a1412; } }`}</style>
       </Head>
       <div ref={contentRef} className="markdown-content" dangerouslySetInnerHTML={{ __html: content_html }} />
-      <TableOfContents contentRef={contentRef} />
     </>
   )
 }
