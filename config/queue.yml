@@ -13,7 +13,7 @@ default: &default
     - queues: [active_storage]
       threads: 2
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 2) %>
-    - queues: [*]
+    - queues: ["*"]
       threads: 1
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 2) %>
 
