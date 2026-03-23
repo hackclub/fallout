@@ -112,7 +112,7 @@ function NewJournal({
       : null
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(initialProject)
-  const [rightTab, setRightTab] = useState<'lapse' | 'youtube' | 'lookout'>('lapse')
+  const [rightTab, setRightTab] = useState<'lapse' | 'youtube' | 'lookout'>(lookoutEnabled ? 'lookout' : 'lapse')
   const [selectedTimelapses, setSelectedTimelapses] = useState<Set<string>>(new Set())
   const [youtubeVideos, setYoutubeVideos] = useState<YouTubeVideo[]>([])
   const [youtubeUrl, setYoutubeUrl] = useState('')
@@ -267,29 +267,37 @@ function NewJournal({
     })
   }
 
-  const ribbonTabs: { label: string; tab: 'lapse' | 'youtube' | 'lookout' }[] = [
-    { label: 'Lapse', tab: 'lapse' },
+  const ribbonTabs: { label: string; tab: 'lapse' | 'youtube' | 'lookout'; badge?: string }[] = [
+    ...(lookoutEnabled ? [{ label: 'Lookout', tab: 'lookout' as const, badge: 'NEW' }] : []),
     { label: 'YouTube', tab: 'youtube' },
-    ...(lookoutEnabled ? [{ label: 'Lookout', tab: 'lookout' as const }] : []),
+    { label: 'Lapse', tab: 'lapse' },
   ]
 
   const content = (
     <div className="relative flex h-full">
-      {ribbonTabs.map(({ label, tab }, i) => (
-        <button
+      {ribbonTabs.map(({ label, tab, badge }, i) => (
+        <div
           key={tab}
-          type="button"
+          className={`absolute right-0 translate-x-full z-10 origin-left cursor-pointer motion-safe:hover:scale-105 motion-safe:transition-transform ${rightTab === tab ? 'scale-105' : ''}`}
+          style={{ top: `${3 + i * 5}rem` }}
           onClick={() => setRightTab(tab)}
-          className={`absolute right-0 translate-x-full w-42 h-16 z-10 flex cursor-pointer motion-safe:hover:scale-105 origin-left motion-safe:transition-transform ${rightTab === tab ? 'bg-brown scale-105' : 'bg-dark-brown'}`}
-          style={{
-            top: `${3 + i * 5}rem`,
-            clipPath: 'polygon(0 0, 100% 0, calc(100% - 1rem) 50%, 100% 100%, 0 100%)',
-          }}
         >
-          <p className="uppercase text-light-brown text-2xl font-medium border-y-2 my-auto border-light-brown text-center w-full pr-3 py-1">
-            {label}
-          </p>
-        </button>
+          {badge && (
+            <span className="absolute -top-3 right-2 text-[0.6rem] rotate-7 font-bold bg-light-brown text-dark-brown px-1.5 py-0.5 rounded-full z-20">
+              {badge}
+            </span>
+          )}
+          <div
+            className={`w-42 h-16 flex ${rightTab === tab ? 'bg-brown' : 'bg-dark-brown'}`}
+            style={{
+              clipPath: 'polygon(0 0, 100% 0, calc(100% - 1rem) 50%, 100% 100%, 0 100%)',
+            }}
+          >
+            <p className="uppercase text-light-brown text-2xl font-medium border-y-2 my-auto border-light-brown text-center w-full pr-3 py-1">
+              {label}
+            </p>
+          </div>
+        </div>
       ))}
       {/* Left page */}
       <div className="flex-1 min-w-0 flex flex-col p-6 overflow-hidden">
@@ -406,7 +414,7 @@ function NewJournal({
         <div className={rightTab === 'youtube' ? '' : 'hidden'}>
           <h2 className="text-center font-bold text-2xl uppercase tracking-wide">YouTube</h2>
           <p className="text-center text-sm text-dark-brown mt-1 mb-4">
-            Screen recordings need to be real time and show the system clock.
+            Recordings should be real time and show a clock.
             <br />
             Live streams need to have DVR enabled.
           </p>
@@ -473,9 +481,9 @@ function NewJournal({
           <div className={rightTab === 'lookout' ? 'flex flex-col min-h-0 flex-1' : 'hidden'}>
             <h2 className="text-center font-bold text-2xl uppercase tracking-wide">Lookout</h2>
             <p className="text-center text-sm text-dark-brown mt-1 mb-4">
-              Record your screen directly from the browser or desktop app.
+              New! Record your screen or camera directly from the browser.
               <br />
-              Select completed recordings below to attach to your journal.
+              Alternatively, download our desktop app.
             </p>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-1 -m-1">
