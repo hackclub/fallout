@@ -27,7 +27,9 @@ class AuthController < ApplicationController
     begin
       user = User.exchange_hca_token(params[:code], hca_callback_url)
 
-      if current_user&.trial?
+      trial_conversion = current_user&.trial?
+
+      if trial_conversion
         if current_user.email != user.email
           redirect_to path_path, alert: "This email already has an account! Please sign out and log in with HCA."
           return
@@ -45,6 +47,23 @@ class AuthController < ApplicationController
       end
 
       TrialUser.kept.where(email: user.email).update_all(discarded_at: Time.current)
+
+      if trial_conversion && user.slack_id.present?
+        welcome_message = <<~MSG.strip
+          Hey #{user.display_name}!
+
+          Thanks for signing up. I'd added you the Fallout slack channels.
+          Have fun exploring the platform :D
+
+          We have a kickoff call this Friday @ 9PM EST / 6PM PST: https://luma.com/fallout
+          You should come!
+
+          Cheers-
+          Soup
+        MSG
+        SlackMsgJob.perform_later(user.slack_id, welcome_message)
+        SlackChannelInviteJob.perform_later(user.slack_id, User::SLACK_WELCOME_CHANNELS)
+      end
 
       terminate_session
       session[:user_id] = user.id

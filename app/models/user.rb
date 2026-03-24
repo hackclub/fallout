@@ -64,6 +64,7 @@ class User < ApplicationRecord
   validates :slack_id, presence: true, unless: :trial?
   validates :hca_id, presence: true, unless: :trial?
   VALID_ROLES = %w[user admin reviewer].freeze
+  SLACK_WELCOME_CHANNELS = %w[C037157AL30 C0ACG0XQWGN C0ACJ290090].freeze
 
   validates :roles, presence: true, unless: :trial?
   validate :roles_must_be_valid, unless: :trial?

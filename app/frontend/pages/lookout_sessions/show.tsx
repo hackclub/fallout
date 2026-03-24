@@ -236,7 +236,7 @@ function BrowserRecorderUI({ returnTo }: { returnTo: string | null }) {
   // Auto-start camera preview whenever we need the user to confirm before recording
   useEffect(() => {
     if (isCamera && !state.isPreviewing && !state.isSharing) {
-      actions.startPreview()
+      actions.startPreview().catch(() => setCaptureFailed(true))
     }
   }, [isCamera, state.status, state.isPreviewing, state.isSharing])
 
@@ -282,6 +282,10 @@ function BrowserRecorderUI({ returnTo }: { returnTo: string | null }) {
       setStopping(false)
     }
   }, [state.status])
+
+  function handleStartSharing() {
+    actions.startSharing().catch(() => setCaptureFailed(true))
+  }
 
   async function handleStop() {
     const n = name.trim() || undefined
@@ -353,7 +357,12 @@ function BrowserRecorderUI({ returnTo }: { returnTo: string | null }) {
         <div className="flex flex-col items-center gap-4 p-8">
           <p className="text-dark-brown font-bold text-xl">Recording complete</p>
           {state.videoUrl && (
-            <video src={state.videoUrl} controls className="w-full max-w-lg rounded border border-dark-brown" />
+            <video
+              src={state.videoUrl}
+              controls
+              className="w-full max-w-lg rounded border border-dark-brown"
+              onError={() => {}}
+            />
           )}
           <Button onClick={() => router.visit(returnTo || '/path')} className="py-2 px-6 text-lg mt-2">
             Back to Path
@@ -446,7 +455,7 @@ function BrowserRecorderUI({ returnTo }: { returnTo: string | null }) {
             {isCamera ? (
               <>
                 {state.isPreviewing && !state.isRecording && (
-                  <Button onClick={actions.startSharing} className="py-2 px-6">
+                  <Button onClick={handleStartSharing} className="py-2 px-6">
                     Start Recording
                   </Button>
                 )}
@@ -454,12 +463,12 @@ function BrowserRecorderUI({ returnTo }: { returnTo: string | null }) {
             ) : (
               <>
                 {!state.isSharing && state.status === 'pending' && (
-                  <Button onClick={actions.startSharing} className="py-2 px-6">
+                  <Button onClick={handleStartSharing} className="py-2 px-6">
                     Share & Start
                   </Button>
                 )}
                 {!state.isSharing && (state.status === 'active' || state.status === 'paused') && (
-                  <Button onClick={actions.startSharing} className="py-2 px-6">
+                  <Button onClick={handleStartSharing} className="py-2 px-6">
                     Share & Resume
                   </Button>
                 )}
@@ -495,8 +504,16 @@ function CameraPreviewVideo({ stream }: { stream: MediaStream }) {
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream
+    const video = videoRef.current
+    if (video) {
+      video.srcObject = stream
+      video.play().catch(() => {})
+    }
+    return () => {
+      if (video) {
+        video.pause()
+        video.srcObject = null
+      }
     }
   }, [stream])
 
@@ -504,7 +521,6 @@ function CameraPreviewVideo({ stream }: { stream: MediaStream }) {
     <div className="relative aspect-video rounded-lg overflow-hidden bg-light-brown border border-dark-brown">
       <video
         ref={videoRef}
-        autoPlay
         playsInline
         muted
         className="w-full h-full object-cover"
