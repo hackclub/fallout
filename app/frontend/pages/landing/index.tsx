@@ -21,6 +21,14 @@ export default function LandingIndex() {
   const preloaderRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if ('ontouchstart' in window) return
+    const style = document.createElement('style')
+    style.textContent = '*, *::before, *::after { cursor: none !important; }'
+    document.head.appendChild(style)
+    return () => document.head.removeChild(style)
+  }, [])
+
+  useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
 
     const ctx = gsap.context(() => {
@@ -223,6 +231,22 @@ export default function LandingIndex() {
       window.addEventListener('mousemove', onCursorMove)
       stickerCleanups.push(() => window.removeEventListener('mousemove', onCursorMove))
 
+      const onDocumentLeave = (e: MouseEvent) => {
+        const { clientX, clientY } = e
+        const { innerWidth, innerHeight } = window
+        const dLeft = clientX, dRight = innerWidth - clientX, dTop = clientY, dBottom = innerHeight - clientY
+        const min = Math.min(dLeft, dRight, dTop, dBottom)
+        let tx = clientX - 8, ty = clientY - 6
+        if (min === dLeft) tx = -40
+        else if (min === dRight) tx = innerWidth + 8
+        else if (min === dTop) ty = -52
+        else ty = innerHeight + 6
+        gsap.to(customCursor, { x: tx, y: ty, duration: 0.3, ease: 'power2.in' })
+        if (pointerCursor) gsap.to(pointerCursor, { x: tx - 7, y: ty + 7, duration: 0.3, ease: 'power2.in' })
+      }
+      document.addEventListener('mouseleave', onDocumentLeave)
+      stickerCleanups.push(() => document.removeEventListener('mouseleave', onDocumentLeave))
+
       // Hide cursor when mouse enters iframe (window loses focus); it reappears on next mousemove
       const onWindowBlur = () => {
         cursorVisible = false
@@ -320,7 +344,6 @@ export default function LandingIndex() {
 
   return (
     <>
-      <style>{`html, html * { cursor: none !important; }`}</style>
       <div ref={preloaderRef} className="fixed inset-0 bg-blue z-50 pointer-events-none" />
       <nav className="absolute top-3 px-3 w-full grid grid-cols-3 items-center z-30 text-white">
         <img src="/landing/flag.svg" className="w-20 sm:w-30" />
@@ -379,15 +402,15 @@ export default function LandingIndex() {
           />
 
           <div className="relative flex flex-col items-center w-full px-4 md:px-0 gap-3 sm:gap-4 pt-20">
-            <a href="https://luma.com/fallout" target="_self" className="w-fit py-2 px-6 bg-green font-medium rounded-xs hover:bg-beige hover:text-dark-brown transition-all underline">RSVP for our kickoff call -  Friday, March 27th at 9PM EDT!</a>
-            <div className="text-lg md:text-xl lg:text-2xl tracking-[5%] text-center  md:mt-6">
+            <a href="https://luma.com/fallout" target="_self" className="w-fit py-2 px-6 bg-green font-medium rounded-xs hover:bg-beige hover:text-dark-brown transition-all underline text-center">RSVP for our kickoff call -  Friday, March 27th at 9PM EDT!</a>
+            <div className="text-sm md:text-xl lg:text-2xl tracking-[5%] text-center  md:mt-6">
               Start now to join us in Shenzhen, July 1-7
             </div>
 
-            <h1 className="shake text-center tracking-[5%] text-shadow-md text-shadow-blue font-outfit text-3xl md:text-6xl font-semibold max-w-5xl">
+            <h1 className="shake text-center tracking-[5%] text-shadow-md text-shadow-blue font-outfit text-2xl md:text-6xl font-semibold max-w-5xl">
               Build hardware projects for 60h, Visit Shenzhen, China!
             </h1>
-            <p className="text-xl tracking-[5%] text-center ">Beginner-friendly, for teens 13-18.</p>
+            <p className="text-base md:text-2xl tracking-[5%] text-center ">Beginner-friendly, for teens 13-18.</p>
             <Frame className="w-full max-w-[calc(100%-1rem)] sm:max-w-160 ml-1">
               <form
                 className="w-full h-full flex px-2 sm:px-4 py-1 text-xl items-center justify-between gap-2"
