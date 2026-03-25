@@ -8,6 +8,10 @@ This is the platform for a grant/hackathon program for students called Fallout, 
 
 Keep changes low impact, responses concise. No summaries, no testing. Reference the existing codebase for style consistency. Read all context carefully before making changes — code may be manually modified between messages; do not suggest code that has been deleted or is no longer relevant. If asked to change feature requirements, update all previous implementations to match. Always ask questions when needed.
 
+# Architecture Documentation
+
+Detailed architecture docs live in Claude Code's memory system. Before working on an unfamiliar area, check memory for relevant docs — they contain gotchas, patterns, and implementation details that prevent common mistakes. When you make changes that affect documented architecture (new controllers, models, policies, services, access control changes, new shared props, etc.), update the corresponding memory doc to keep it accurate.
+
 # Stack
 
 Ruby 3.4.4, Rails 8.1.2, React 19, Tailwind 4.1.18 via inertia-rails. Only suggest changes applicable to these versions. Prefer CLI-generated boilerplate over manual file creation — you can always modify generated output.
