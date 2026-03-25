@@ -43,6 +43,8 @@ export default function PathIndex() {
 
   const { visitModal, stack } = useModalStack()
 
+  const [showBanner, setShowBanner] = useState(() => localStorage.getItem('kickoff_banner_dismissed') !== 'true')
+
   const [autoOpenModal, setAutoOpenModal] = useState(() => {
     if (typeof window === 'undefined') return false
     const params = new URLSearchParams(window.location.search)
@@ -92,12 +94,20 @@ export default function PathIndex() {
   return (
     <>
       <FlashMessages />
-      <div className="fixed z-20 top-2 left-2 right-2 xs:top-6 xs:left-6 xs:right-6">
+      <div className="fixed z-20 top-2 left-2 right-2 xs:p-6 flex flex-col gap-2">
         <Header koiBalance={user.koi} avatar={user.avatar} displayName={user.display_name} />
+        {showBanner && (
+          <div className="bg-brown text-beige  py-2 px-3 lg:px-6  text-sm sm:text-lg w-full xs:w-fit flex gap-x-6 mx-auto hover:bg-light-brown border border-0 border-dark-brown hover:border-2 rounded-xs hover:text-dark-brown transition-all ">
+            <a href="https://luma.com/fallout" target="_self" className="text-center font-medium rounded-xs underline">RSVP for our kickoff call - this Friday at 9PM EDT!</a>
+            <span className="cursor-pointer" onClick={() => { localStorage.setItem('kickoff_banner_dismissed', 'true'); setShowBanner(false) }}>-</span>
+          </div>
+        )}
+        
       </div>
+      
 
-      <div className="fixed top-2 bottom-2 right-2 xs:top-6 xs:bottom-6 xs:right-6 z-10 flex items-end pt-[10%]">
-        <div className="flex flex-col items-center justify-center xs:justify-end w-full h-full space-y-6">
+      <div className="fixed h-full z-10 flex justify-end items-end p-8 w-full">
+        <div className="flex flex-col items-center justify-center sm:justify-end w-full sm:w-fit h-full space-y-6">
           {authUser?.is_trial && <SignUpCta signInPath={sign_in_path} />}
           {/* <Leaderboard /> */}
           <div className="hidden xs:block">

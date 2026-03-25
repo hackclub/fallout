@@ -69,7 +69,7 @@ export default function Header({ koiBalance, avatar, displayName }: Props) {
           <img src="/koifish.webp" alt="koi" className="h-10" />
           <span className="text-coral text-4xl xl:text-5xl font-bold">{koiBalance}</span>
         </div>
-        <button
+        {/* <button
           type="button"
           className="relative cursor-pointer"
           onClick={() => {
@@ -86,7 +86,7 @@ export default function Header({ koiBalance, avatar, displayName }: Props) {
               <span className="absolute top-1 right-0 rounded-full size-3 bg-coral animate-ping" />
             </>
           )}
-        </button>
+        </button> */}
       </div>
     </header>
   )

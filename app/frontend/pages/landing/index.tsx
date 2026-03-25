@@ -378,8 +378,9 @@ export default function LandingIndex() {
             bleed={0.08}
           />
 
-          <div className="relative flex flex-col items-center w-full px-4 md:px-0 mt-20 md:mt-40 gap-3 sm:gap-4">
-            <div className="text-lg md:text-xl lg:text-2xl tracking-[5%] text-center">
+          <div className="relative flex flex-col items-center w-full px-4 md:px-0 gap-3 sm:gap-4 pt-20">
+            <a href="https://luma.com/fallout" target="_self" className="w-fit py-2 px-6 bg-green font-medium rounded-xs hover:bg-beige hover:text-dark-brown transition-all underline">RSVP for our kickoff call -  Friday, March 27th at 9PM EDT!</a>
+            <div className="text-lg md:text-xl lg:text-2xl tracking-[5%] text-center  md:mt-6">
               Start now to join us in Shenzhen, July 1-7
             </div>
 
