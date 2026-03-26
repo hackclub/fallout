@@ -97,6 +97,11 @@ class Project < ApplicationRecord
       .where(journal_entries: { project_id: id, discarded_at: nil })
       .sum(:duration_seconds).to_i
 
-    lapse + youtube
+    lookout = LookoutTimelapse
+      .joins(recording: :journal_entry)
+      .where(journal_entries: { project_id: id, discarded_at: nil })
+      .sum(:duration).to_i
+
+    lapse + youtube + lookout
   end
 end
