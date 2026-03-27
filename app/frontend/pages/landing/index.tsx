@@ -417,7 +417,7 @@ export default function LandingIndex() {
                 onSubmit={handleSubmit}
               >
                 <input
-                  className="flex-1 min-w-0 py-2 md:py-3 text-lg sm:text-xl md:text-3xl placeholder-brown outline-none bg-transparent"
+                  className="flex-1 min-w-0 py-2 md:py-3 text-lg sm:text-xl md:text-3xl placeholder-brown outline-none bg-transparent text-brown"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
