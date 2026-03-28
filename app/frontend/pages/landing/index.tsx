@@ -234,7 +234,10 @@ export default function LandingIndex() {
       const onDocumentLeave = (e: MouseEvent) => {
         const { clientX, clientY } = e
         const { innerWidth, innerHeight } = window
-        const dLeft = clientX, dRight = innerWidth - clientX, dTop = clientY, dBottom = innerHeight - clientY
+        const dLeft = clientX,
+          dRight = innerWidth - clientX,
+          dTop = clientY,
+          dBottom = innerHeight - clientY
         const min = Math.min(dLeft, dRight, dTop, dBottom)
         let tx = clientX - 8, ty = clientY - 5
         if (min === dLeft) tx = -40
@@ -411,7 +414,6 @@ export default function LandingIndex() {
           />
 
           <div className="relative flex flex-col items-center w-full px-4 md:px-0 gap-3 sm:gap-4 pt-20">
-            <a href="https://luma.com/fallout" target="_self" className="w-fit py-2 px-6 bg-green font-medium rounded-xs hover:bg-beige hover:text-dark-brown transition-all underline text-center">RSVP for our kickoff call -  Friday, March 27th at 9PM EDT!</a>
             <div className="text-sm md:text-xl lg:text-2xl tracking-[5%] text-center  md:mt-6">
               Start now to join us in Shenzhen, July 1-7
             </div>

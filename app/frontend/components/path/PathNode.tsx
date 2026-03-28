@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useContext } from 'react'
-import { usePage } from '@inertiajs/react'
+import { usePage, router } from '@inertiajs/react'
 // @ts-expect-error useModalStack lacks type declarations in this beta package
 import { ModalLink, useModalStack } from '@inertiaui/modal-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
@@ -16,14 +16,22 @@ export default function PathNode({
   hasProjects = false,
   journalEntryCount = 0,
   critterVariant,
+<<<<<<< HEAD
   readDocsNudge = false,
+=======
+  journalEntryId,
+>>>>>>> d795b4bf (changes)
 }: {
   index: number
   interactive?: boolean
   hasProjects?: boolean
   journalEntryCount?: number
   critterVariant?: string
+<<<<<<< HEAD
   readDocsNudge?: boolean
+=======
+  journalEntryId?: number
+>>>>>>> d795b4bf (changes)
 }) {
   const activeIndex = hasProjects ? journalEntryCount + 1 : 0
   const state: 'completed' | 'active' | 'locked' =
@@ -117,11 +125,16 @@ export default function PathNode({
             {billboardImage}
           </ModalLink>
         )
+<<<<<<< HEAD
       ) : readDocsNudge && interactive ? (
         <button
           onClick={() => notify('alert', 'Check out the docs & resources (backpack icon to the left)')}
           className="outline-0"
         >
+          {billboardImage}
+        </button>
+      ) : state === 'completed' && interactive && journalEntryId ? (
+        <button onClick={() => router.post('/spin/roll', { journal_entry_id: journalEntryId })} className="outline-0">
           {billboardImage}
         </button>
       ) : (
@@ -144,10 +157,13 @@ export default function PathNode({
   }
 
   if (state === 'completed') {
+    if (index === 0 || critterVariant) {
+      return content
+    }
     return (
       <Tooltip side="top" gap={12} trackScroll>
         <TooltipTrigger>{content}</TooltipTrigger>
-        <TooltipContent>Completed</TooltipContent>
+        <TooltipContent>Claim critter!</TooltipContent>
       </Tooltip>
     )
   }

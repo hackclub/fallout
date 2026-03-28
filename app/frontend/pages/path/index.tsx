@@ -26,6 +26,7 @@ type PageProps = {
   has_projects: boolean
   journal_entry_count: number
   critter_variants: (string | null)[]
+  journal_entry_ids: number[]
 }
 
 export default function PathIndex() {
@@ -34,6 +35,7 @@ export default function PathIndex() {
     has_projects,
     journal_entry_count,
     critter_variants,
+    journal_entry_ids,
     has_unread_mail,
     auth: { user: authUser },
     sign_in_path,
@@ -42,8 +44,6 @@ export default function PathIndex() {
   const [loggedIn] = useState(false)
 
   const { visitModal, stack } = useModalStack()
-
-  const [showBanner, setShowBanner] = useState(() => localStorage.getItem('kickoff_banner_dismissed') !== 'true')
 
   const modalOpen = stack.length > 0
 
@@ -66,6 +66,7 @@ export default function PathIndex() {
     return () => clearTimeout(timer)
   }, [readDocsNudge])
 
+
   const [autoOpenModal, setAutoOpenModal] = useState(() => {
     if (typeof window === 'undefined') return false
     const params = new URLSearchParams(window.location.search)
@@ -80,11 +81,12 @@ export default function PathIndex() {
           index={i}
           hasProjects={has_projects}
           journalEntryCount={journal_entry_count}
-          critterVariant={i >= 1 ? critter_variants[i - 1] ?? undefined : undefined}
+          critterVariant={i >= 1 ? (critter_variants[i - 1] ?? undefined) : undefined}
           readDocsNudge={readDocsNudge}
+          journalEntryId={i >= 1 ? journal_entry_ids[i - 1] : undefined}
         />
       )),
-    [has_projects, journal_entry_count, critter_variants, readDocsNudge],
+    [has_projects, journal_entry_count, critter_variants, journal_entry_ids, readDocsNudge],
   )
 
   useEffect(() => {
@@ -118,15 +120,7 @@ export default function PathIndex() {
       <FlashMessages />
       <div className="fixed z-20 top-2 left-2 right-2 xs:p-6 flex flex-col gap-2">
         <Header koiBalance={user.koi} avatar={user.avatar} displayName={user.display_name} />
-        {showBanner && (
-          <div className="bg-brown text-beige  py-2 px-3 lg:px-6  text-sm sm:text-lg w-full xs:w-fit flex gap-x-6 mx-auto hover:bg-light-brown border border-0 border-dark-brown hover:border-2 rounded-xs hover:text-dark-brown transition-all ">
-            <a href="https://luma.com/fallout" target="_self" className="text-center font-medium rounded-xs underline">RSVP for our kickoff call - this Friday at 9PM EDT!</a>
-            <span className="cursor-pointer" onClick={() => { localStorage.setItem('kickoff_banner_dismissed', 'true'); setShowBanner(false) }}>-</span>
-          </div>
-        )}
-        
       </div>
-      
 
       <div className="fixed h-full z-10 flex justify-end items-end p-8 w-full pointer-events-none">
         <div className="flex flex-col items-center justify-center sm:justify-end w-full sm:w-fit h-fit space-y-6 pointer-events-auto ">
