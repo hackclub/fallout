@@ -46,10 +46,10 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
                   We've made a really cool video showing how Fallout works. Give it a watch!
                 </p>
               </div>
-              <div className="grow min-h-0 flex items-center justify-center">
+              <div className="grow min-h-0 flex items-center justify-center overflow-hidden">
                 <iframe
                   src="https://www.youtube-nocookie.com/embed/SrP2ZeNHm6s?autoplay=1"
-                  className="w-full aspect-video rounded-lg"
+                  className="w-full h-full rounded-lg"
                   allow="autoplay; encrypted-media"
                   allowFullScreen
                 />
