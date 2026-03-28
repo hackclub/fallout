@@ -25,9 +25,7 @@ export default function LandingIndex() {
     const style = document.createElement('style')
     style.textContent = '*, *::before, *::after { cursor: none !important; }'
     document.head.appendChild(style)
-    return () => {
-      document.head.removeChild(style)
-    }
+    return () => document.head.removeChild(style)
   }, [])
 
   useEffect(() => {
@@ -241,8 +239,7 @@ export default function LandingIndex() {
           dTop = clientY,
           dBottom = innerHeight - clientY
         const min = Math.min(dLeft, dRight, dTop, dBottom)
-        let tx = clientX - 8,
-          ty = clientY - 5
+        let tx = clientX - 8, ty = clientY - 5
         if (min === dLeft) tx = -40
         else if (min === dRight) tx = innerWidth + 8
         else if (min === dTop) ty = -52
@@ -361,9 +358,7 @@ export default function LandingIndex() {
       >
         <span className="relative overflow-hidden block leading-none">
           <span className="block transition-transform duration-300 group-hover:translate-y-full">LOG IN</span>
-          <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">
-            LOG IN
-          </span>
+          <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">LOG IN</span>
         </span>
       </a>
       <div
@@ -407,9 +402,7 @@ export default function LandingIndex() {
             >
               <span className="relative overflow-hidden block leading-none">
                 <span className="block transition-transform duration-300 group-hover:translate-y-full">LOG IN</span>
-                <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">
-                  LOG IN
-                </span>
+                <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">LOG IN</span>
               </span>
             </a>
           </nav>
@@ -448,12 +441,8 @@ export default function LandingIndex() {
                   disabled={submitting}
                 >
                   <span className="relative overflow-hidden block leading-none">
-                    <span className="block transition-transform duration-300 group-hover:translate-y-full">
-                      {submitting ? '...' : 'START NOW'}
-                    </span>
-                    <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">
-                      {submitting ? '...' : 'START NOW'}
-                    </span>
+                    <span className="block transition-transform duration-300 group-hover:translate-y-full">{submitting ? '...' : 'START NOW'}</span>
+                    <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">{submitting ? '...' : 'START NOW'}</span>
                   </span>
                 </button>
               </form>
@@ -539,6 +528,31 @@ export default function LandingIndex() {
                   </a>
                 </p>
               </div>
+              {/* <div className="fixed bottom-10 right-10 w-[80%] xs:w-100 h-auto rounded-xs overflow-hidden bg-beige z-50 flex flex-col border-2 border-black cursor-pointer">
+                <div className="w-full flex justify-between items-center px-4 py-2 cursor-pointer" onClick={() => {
+                  setVideoOpen((v) => {
+                    const next = !v
+                    const msg = next ? 'playVideo' : 'pauseVideo'
+                    iframeRef.current?.contentWindow?.postMessage(`{"event":"command","func":"${msg}","args":""}`, '*')
+                    return next
+                  })
+                }}>
+                  <span className="font-medium text-black text-2xl">{videoOpen ? 'Close Video' : 'Open Video'}</span>
+                  <img src="/arrow.svg" className={`h-5 w-auto transition-transform duration-300 ${videoOpen ? 'rotate-180' : 'rotate-0'}`} />
+                </div>
+                <div className={`aspect-16/9 w-full h-auto p-3  pt-0${videoOpen ? '' : ' hidden'}`}>
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    className="rounded-lg border-beige border-2"
+                    ref={iframeRef}
+                    src="https://www.youtube.com/embed/SrP2ZeNHm6s?si=orljJtYrC7EGSNzi&controls=1&modestbranding=1&rel=0&enablejsapi=1"
+                    title="YouTube video player"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen>
+                  </iframe>
+                </div>
+              </div> */}
             </section>
 
             <div className="md:pt-40 md:qualify-outer">
@@ -608,37 +622,6 @@ export default function LandingIndex() {
               <h2 className="text-8xl lg:text-9xl lg:text-[10rem] font-semibold font-outfit whitespace-nowrap">深圳</h2>
               {/* <h4>China</h4> */}
             </div>
-          </section>
-          <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-20 bg-beige text-dark-brown text-2xl">
-            <div className="w-full bg-white border-2 border-black p-6 my-2 rounded-sm">
-              <span className="font-semibold text-2xl">Hack Club is recognized by:</span>
-              <ul className="flex gap-2 md:gap-4 w-full items-center justify-center py-6 px-4 flex-wrap lg:flex-nowrap">
-                <li>
-                  <img src="/landing/logos/gwc.webp" className="h-10 md:h-18 object-contain" alt="Girls Who Code" />
-                </li>
-                <li>
-                  <img src="/landing/logos/github.webp" className="h-12 md:h-22 object-contain" alt="GitHub" />
-                </li>
-                <li>
-                  <img
-                    src="/landing/logos/mit.webp"
-                    className="h-14 md:h-24 object-contain"
-                    alt="MIT School of Engineering"
-                  />
-                </li>
-                <li>
-                  <img
-                    src="/landing/logos/cac.webp"
-                    className="h-10 md:h-16 object-contain"
-                    alt="Congressional App Challenge"
-                  />
-                </li>
-                <li>
-                  <img src="/landing/logos/amd.webp" className="h-10 md:h-16 object-contain" alt="AMD" />
-                </li>
-              </ul>
-            </div>
-            <span className="text-2xl">Upon the completion of 60h, we will issue you a certificate.</span>
           </section>
           <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-20 bg-beige text-dark-brown">
             <h2 className="text-6xl font-semibold mb-10 font-outfit">FAQ</h2>
@@ -807,22 +790,16 @@ export default function LandingIndex() {
         </div>
       </div>
       <div className="fixed bottom-10 right-10 w-[80%] xs:w-100 h-auto rounded-sm overflow-hidden bg-white z-50 flex flex-col border-2 border-dark-brown [transform:translateZ(0)]">
-        <div
-          className="w-full flex justify-between items-center px-4 py-2 cursor-pointer"
-          onClick={() => {
-            setVideoOpen((v) => {
-              const next = !v
-              const msg = next ? 'playVideo' : 'pauseVideo'
-              iframeRef.current?.contentWindow?.postMessage(`{"event":"command","func":"${msg}","args":""}`, '*')
-              return next
-            })
-          }}
-        >
+        <div className="w-full flex justify-between items-center px-4 py-2 cursor-pointer" onClick={() => {
+          setVideoOpen((v) => {
+            const next = !v
+            const msg = next ? 'playVideo' : 'pauseVideo'
+            iframeRef.current?.contentWindow?.postMessage(`{"event":"command","func":"${msg}","args":""}`, '*')
+            return next
+          })
+        }}>
           <span className="font-medium text-dark-brown text-2xl">{videoOpen ? 'Close Video' : 'Open Video'}</span>
-          <img
-            src="/arrow.svg"
-            className={`h-5 w-auto transition-transform duration-300 ${videoOpen ? 'rotate-180' : 'rotate-0'}`}
-          />
+          <img src="/arrow.svg" className={`h-5 w-auto transition-transform duration-300 ${videoOpen ? 'rotate-180' : 'rotate-0'}`} />
         </div>
         <div className={`aspect-16/9 w-full h-auto p-3 pt-0 ${videoOpen ? '' : ' hidden'}`}>
           <iframe

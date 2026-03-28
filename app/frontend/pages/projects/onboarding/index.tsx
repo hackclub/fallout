@@ -6,13 +6,18 @@ import Button from '@/components/shared/Button'
 import Input from '@/components/shared/Input'
 import TextArea from '@/components/shared/TextArea'
 import { Pagination, PaginationPage } from '@/components/shared/Pagination'
-import { Label } from '@headlessui/react'
+
+function ValidationError({ message, show }: { message: string; show: boolean }) {
+  if (!show) return null
+  return <p className="text-red-700 text-sm mt-1 font-medium">{message}</p>
+}
 
 function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
-  const videoRef = useRef<HTMLVideoElement>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [processing, setProcessing] = useState(false)
+  const [descriptionError, setDescriptionError] = useState(false)
+  const [nameError, setNameError] = useState(false)
   const modalRef = useRef<{ close: () => void }>(null)
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -41,14 +46,12 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
                   We've made a really cool video showing how Fallout works. Give it a watch!
                 </p>
               </div>
-              <div className="grow min-h-0 flex items-center justify-center">
-                <video
-                  ref={videoRef}
-                  src="/intro.mp4"
-                  className="max-w-full max-h-full rounded-lg"
-                  autoPlay
-                  playsInline
-                  controls
+              <div className="grow min-h-0 flex items-center justify-center overflow-hidden">
+                <iframe
+                  src="https://www.youtube-nocookie.com/embed/SrP2ZeNHm6s?autoplay=1"
+                  className="w-full h-full rounded-lg"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
                 />
               </div>
               <Button type="button" onClick={next} className="ml-auto">
@@ -90,15 +93,23 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
                 </label>
                 <TextArea
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => {
+                    setDescription(e.target.value)
+                    setDescriptionError(false)
+                  }}
                   className="w-full h-full resize-y px-3 py-2 text-base"
                 />
+                <ValidationError message="Please describe your project before continuing" show={descriptionError} />
               </div>
               <div className="flex justify-between">
                 <Button variant="link" type="button" onClick={prev}>
                   Back
                 </Button>
-                <Button type="button" onClick={next} disabled={!description.trim()}>
+                <Button
+                  type="button"
+                  visuallyDisabled={!description.trim()}
+                  onClick={() => (description.trim() ? next() : setDescriptionError(true))}
+                >
                   Continue
                 </Button>
               </div>
@@ -143,16 +154,35 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
                 <Input
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="text-base px-3 py-2"
-                  placeholder=""
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    setNameError(false)
+                  }}
+                  placeholder="My awesome project"
+                  autoFocus
+                  className={nameError ? 'border-red-700' : ''}
                 />
+                <ValidationError message="Give your project a name" show={nameError} />
               </div>
               <div className="flex justify-between">
                 <Button variant="link" type="button" onClick={prev}>
                   Back
                 </Button>
-                <Button type="submit" disabled={!name.trim() || processing}>
+                <Button
+                  type="button"
+                  visuallyDisabled={!name.trim()}
+                  disabled={processing}
+                  onClick={() => {
+                    if (!name.trim()) {
+                      setNameError(true)
+                      return
+                    }
+                    if (!processing) {
+                      const form = document.querySelector('form') as HTMLFormElement | null
+                      form?.requestSubmit()
+                    }
+                  }}
+                >
                   {processing ? 'Creating...' : "Let's start!"}
                 </Button>
               </div>
