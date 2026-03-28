@@ -79,10 +79,14 @@ export default function CritterShow({ critter, clearing_path }: PageProps) {
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <div
-            style={{ transitionProperty: 'opacity', transitionDuration: revealed ? '1500ms' : '0ms' }}
+            style={{ transitionProperty: 'opacity', transitionDuration: revealed ? '800ms' : '0ms' }}
             className={`flex flex-col items-center gap-4 ${revealed ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           >
-            <img src={critter.image_path} alt="Critter" className="w-64 max-w-[70vw] xs:w-80 sm:w-96 object-contain" />
+            <img
+              src={critter.image_path}
+              alt="Critter"
+              className={`w-64 max-w-[70vw] xs:w-80 sm:w-96 object-contain transition-[filter] ${revealed ? 'critter-reveal' : ''}`}
+            />
             <div className="flex gap-4 mt-2">
               <Button onClick={replay}>Replay</Button>
               <Link href={clearing_path}>
