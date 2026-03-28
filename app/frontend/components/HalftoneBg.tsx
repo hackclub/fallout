@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useRef, useState } from 'react'
 
 const VERT = `#version 300 es
 in vec2 aPosition;
@@ -190,6 +190,7 @@ export const HalftoneBg = forwardRef<HTMLCanvasElement, Props>(
     ref,
   ) => {
     const innerRef = useRef<HTMLCanvasElement>(null)
+    const [webglFailed, setWebglFailed] = useState(false)
 
     const setRef = (el: HTMLCanvasElement | null) => {
       ;(innerRef as React.MutableRefObject<HTMLCanvasElement | null>).current = el
@@ -202,7 +203,10 @@ export const HalftoneBg = forwardRef<HTMLCanvasElement, Props>(
       if (!canvas) return
 
       const gl = canvas.getContext('webgl2')
-      if (!gl) return
+      if (!gl) {
+        setWebglFailed(true)
+        return
+      }
 
       let program: WebGLProgram
       let texture: WebGLTexture | null = null
@@ -316,6 +320,10 @@ export const HalftoneBg = forwardRef<HTMLCanvasElement, Props>(
         if (texture) gl.deleteTexture(texture)
       }
     }, [src, pixelSize, dotSize, halftoneOpacity, objectFit, bleed, mouseEffect])
+
+    if (webglFailed) {
+      return <img src={src} className={`object-cover ${className ?? ''}`} />
+    }
 
     return <canvas ref={setRef} className={`${background} ${className ?? ''}`} />
   },
