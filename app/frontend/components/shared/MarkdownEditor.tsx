@@ -1,5 +1,7 @@
-import { useState, useRef, useCallback, useEffect, type RefObject } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { DirectUpload } from '@rails/activestorage'
+import { EditorView } from '@codemirror/view'
+import CodeMirrorEditor, { type CodeMirrorHandle } from './CodeMirrorEditor'
 
 type MarkdownEditorProps = {
   value: string
@@ -430,27 +432,22 @@ function ToolbarButton({
   )
 }
 
-// --- Apply helper to textarea ---
+// --- Apply helper for CodeMirror ---
 
-function applyToTextarea(
-  textareaRef: RefObject<HTMLTextAreaElement | null>,
-  value: string,
-  onChange: (v: string) => void,
+function applyToEditor(
+  cmRef: React.RefObject<CodeMirrorHandle | null>,
   fn: (value: string, start: number, end: number) => InsertResult,
 ) {
-  const ta = textareaRef.current
-  if (!ta) return
-  const { selectionStart, selectionEnd } = ta
-  const result = fn(value, selectionStart, selectionEnd)
-
-  // Use execCommand to preserve browser-native undo stack
-  ta.focus()
-  ta.setSelectionRange(0, value.length)
-  document.execCommand('insertText', false, result.newValue)
-
-  requestAnimationFrame(() => {
-    ta.setSelectionRange(result.cursorStart, result.cursorEnd)
+  const view = cmRef.current?.getView()
+  if (!view) return
+  const { from, to } = view.state.selection.main
+  const value = view.state.doc.toString()
+  const result = fn(value, from, to)
+  view.dispatch({
+    changes: { from: 0, to: value.length, insert: result.newValue },
+    selection: { anchor: result.cursorStart, head: result.cursorEnd },
   })
+  view.focus()
 }
 
 // --- Main Component ---
@@ -472,9 +469,8 @@ export default function MarkdownEditor({
   const [blobSignedIds, setBlobSignedIds] = useState<string[]>([])
   const [previewHtml, setPreviewHtml] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const cmRef = useRef<CodeMirrorHandle>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  // Use a ref for the latest value so upload callbacks always see current state
   const valueRef = useRef(value)
   valueRef.current = value
 
@@ -541,18 +537,9 @@ export default function MarkdownEditor({
         const placeholderPrefix = `<!-- Uploading ${file.name} (${sizeStr})...`
         const placeholderFull = `${placeholderPrefix} -->\n`
 
-        // Insert placeholder at end of content without moving cursor
-        const ta = textareaRef.current
-        const cursorPos = ta ? ta.selectionStart : 0
-        const insertPos = valueRef.current.length
         const sep = valueRef.current.length > 0 && !valueRef.current.endsWith('\n') ? '\n' : ''
         const newVal = valueRef.current + sep + placeholderFull
         onChange(newVal)
-        if (ta) {
-          requestAnimationFrame(() => {
-            ta.setSelectionRange(cursorPos, cursorPos)
-          })
-        }
 
         const upload = new DirectUpload(file, directUploadUrl, {
           directUploadWillStoreFileWithXHR(request: XMLHttpRequest) {
@@ -583,44 +570,61 @@ export default function MarkdownEditor({
     fileInputRef.current?.click()
   }, [])
 
-  const apply = useCallback(
-    (fn: (value: string, start: number, end: number) => InsertResult) => {
-      applyToTextarea(textareaRef, value, onChange, fn)
-    },
-    [value, onChange],
-  )
+  const apply = useCallback((fn: (value: string, start: number, end: number) => InsertResult) => {
+    applyToEditor(cmRef, fn)
+  }, [])
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      const mod = e.metaKey || e.ctrlKey
-
-      if (mod && e.key === 'b') {
-        e.preventDefault()
-        apply((v, s, end) => wrapSelection(v, s, end, '**', '**'))
-      } else if (mod && e.key === 'i') {
-        e.preventDefault()
-        apply((v, s, end) => wrapSelection(v, s, end, '_', '_'))
-      } else if (mod && e.key === 'e') {
-        e.preventDefault()
-        apply(insertCodeBlock)
-      } else if (mod && e.key === 'k') {
-        e.preventDefault()
-        apply(insertLink)
-      } else if (e.key === 'Tab') {
-        e.preventDefault()
-        apply((v, s, end) => handleTab(v, s, end, e.shiftKey))
-      }
-    },
-    [apply],
+  const extraKeys = useMemo(
+    () => [
+      {
+        key: 'Mod-b',
+        run: (view: EditorView) => {
+          applyToEditor(cmRef, (v, s, e) => wrapSelection(v, s, e, '**', '**'))
+          return true
+        },
+      },
+      {
+        key: 'Mod-i',
+        run: (view: EditorView) => {
+          applyToEditor(cmRef, (v, s, e) => wrapSelection(v, s, e, '_', '_'))
+          return true
+        },
+      },
+      {
+        key: 'Mod-e',
+        run: (view: EditorView) => {
+          applyToEditor(cmRef, insertCodeBlock)
+          return true
+        },
+      },
+      {
+        key: 'Mod-k',
+        run: (view: EditorView) => {
+          applyToEditor(cmRef, insertLink)
+          return true
+        },
+      },
+      {
+        key: 'Tab',
+        run: (view: EditorView) => {
+          applyToEditor(cmRef, (v, s, e) => handleTab(v, s, e, false))
+          return true
+        },
+      },
+      {
+        key: 'Shift-Tab',
+        run: (view: EditorView) => {
+          applyToEditor(cmRef, (v, s, e) => handleTab(v, s, e, true))
+          return true
+        },
+      },
+    ],
+    [],
   )
 
   const handlePaste = useCallback(
-    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      const ta = textareaRef.current
-      if (!ta) return
-
-      // Check for image files in clipboard
-      const items = Array.from(e.clipboardData.items)
+    (e: ClipboardEvent, view: EditorView): boolean => {
+      const items = Array.from(e.clipboardData?.items ?? [])
       const imageFiles = items
         .filter((item) => item.type.startsWith('image/'))
         .map((item) => item.getAsFile())
@@ -629,31 +633,31 @@ export default function MarkdownEditor({
       if (imageFiles.length > 0) {
         e.preventDefault()
         uploadFiles(imageFiles)
-        return
+        return true
       }
 
-      // Check for URL paste on selection — use execCommand for undo support
-      const text = e.clipboardData.getData('text/plain')
-      if (ta.selectionStart !== ta.selectionEnd && /^https?:\/\//.test(text)) {
+      const text = e.clipboardData?.getData('text/plain') ?? ''
+      const { from, to } = view.state.selection.main
+      if (from !== to && /^https?:\/\//.test(text)) {
         e.preventDefault()
-        const start = ta.selectionStart
-        const end = ta.selectionEnd
-        const selected = value.slice(start, end)
+        const selected = view.state.sliceDoc(from, to)
         const replacement = `[${selected}](${text})`
-        document.execCommand('insertText', false, replacement)
-        // Keep original text selected within the markdown link
-        requestAnimationFrame(() => {
-          ta.setSelectionRange(start + 1, start + 1 + selected.length)
+        view.dispatch({
+          changes: { from, to, insert: replacement },
+          selection: { anchor: from + 1, head: from + 1 + selected.length },
         })
+        return true
       }
+
+      return false
     },
-    [value, onChange, uploadFiles],
+    [uploadFiles],
   )
 
   const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLTextAreaElement>) => {
+    (e: DragEvent, view: EditorView): boolean => {
       e.preventDefault()
-      const allFiles = Array.from(e.dataTransfer.files)
+      const allFiles = Array.from(e.dataTransfer?.files ?? [])
       const imageFiles = allFiles.filter((f) => f.type.startsWith('image/'))
       const unsupportedFiles = allFiles.filter((f) => !f.type.startsWith('image/'))
 
@@ -661,21 +665,14 @@ export default function MarkdownEditor({
 
       if (unsupportedFiles.length > 0) {
         const comments = unsupportedFiles.map((f) => `<!-- ${f.name} is not a supported file -->`).join('\n')
-        const ta = textareaRef.current
-        if (ta) {
-          ta.focus()
-          document.execCommand('insertText', false, comments)
-        } else {
-          onChange(value + comments)
-        }
+        const pos = view.state.selection.main.head
+        view.dispatch({ changes: { from: pos, insert: comments } })
       }
-    },
-    [uploadFiles, value, onChange],
-  )
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLTextAreaElement>) => {
-    e.preventDefault()
-  }, [])
+      return true
+    },
+    [uploadFiles],
+  )
 
   const charCount = value.length
   const imageCount = (value.match(/!\[[^\]]*\]\([^)]*\)/g) || []).length
@@ -745,19 +742,18 @@ export default function MarkdownEditor({
         {/* Editor / Preview area */}
         <div className="flex-1 min-h-0 flex flex-col">
           {tab === 'write' ? (
-            <textarea
-              ref={textareaRef}
+            <CodeMirrorEditor
+              ref={cmRef}
               value={value}
-              onChange={(e) => onChange(e.target.value)}
-              onKeyDown={handleKeyDown}
+              onChange={onChange}
               onPaste={handlePaste}
               onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              placeholder={
+              extraKeys={extraKeys}
+              placeholderText={
                 placeholder ??
                 'Write a few sentences about what you did...\nHow you did it...\nWhat went well, etc...\n\nInclude some images of your work!\n\nTip: Markdown is supported and you can drag and drop images.'
               }
-              className="w-full flex-1 min-h-32 p-4 resize-none bg-transparent text-dark-brown placeholder:text-dark-brown/30 focus:outline-none text-sm"
+              className="flex-1 min-h-32 text-dark-brown"
             />
           ) : (
             <div className="p-4 flex-1 min-h-0 overflow-y-auto">
