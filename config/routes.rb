@@ -150,7 +150,9 @@ Rails.application.routes.draw do
 
   get "path" => "path#index", as: :path
 
-  resources :critters, only: [ :show, :update ], path: "spin" # Gacha spin reveal page
+  resources :critters, only: [ :show, :update ], path: "spin" do
+    post :roll, on: :collection # Retroactive critter roll for pre-critter journal entries
+  end
   get "clearing" => "clearing#index", as: :clearing
 
   resources :mails, only: [ :index, :show ], controller: "mails" do

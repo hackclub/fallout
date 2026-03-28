@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { Link, usePage } from '@inertiajs/react'
 import type { SharedProps } from '@/types'
+// @ts-expect-error useModalStack lacks type declarations in this beta package
 import { useModalStack, ModalLink } from '@inertiaui/modal-react'
 import Shop from '@/components/Shop'
 import Projects from '@/components/Projects'
@@ -25,6 +26,7 @@ type PageProps = {
   has_projects: boolean
   journal_entry_count: number
   critter_variants: (string | null)[]
+  journal_entry_ids: number[]
 }
 
 export default function PathIndex() {
@@ -33,6 +35,7 @@ export default function PathIndex() {
     has_projects,
     journal_entry_count,
     critter_variants,
+    journal_entry_ids,
     has_unread_mail,
     auth: { user: authUser },
     sign_in_path,
@@ -63,6 +66,7 @@ export default function PathIndex() {
     return () => clearTimeout(timer)
   }, [readDocsNudge])
 
+
   const [autoOpenModal, setAutoOpenModal] = useState(() => {
     if (typeof window === 'undefined') return false
     const params = new URLSearchParams(window.location.search)
@@ -79,9 +83,10 @@ export default function PathIndex() {
           journalEntryCount={journal_entry_count}
           critterVariant={i >= 1 ? (critter_variants[i - 1] ?? undefined) : undefined}
           readDocsNudge={readDocsNudge}
+          journalEntryId={i >= 1 ? journal_entry_ids[i - 1] : undefined}
         />
       )),
-    [has_projects, journal_entry_count, critter_variants, readDocsNudge],
+    [has_projects, journal_entry_count, critter_variants, journal_entry_ids, readDocsNudge],
   )
 
   useEffect(() => {

@@ -25,7 +25,9 @@ class PathController < ApplicationController
       has_projects: current_user.projects.kept.exists? || (collaborators_enabled? && Collaborator.kept.where(user: current_user, collaboratable_type: "Project").exists?),
       journal_entry_count: journal_entries.size,
       # Critter variant per journal entry (by creation order), nil if no critter was awarded
-      critter_variants: journal_entries.map { |je| je.critters.find { |c| c.user_id == current_user.id }&.variant }
+critter_variants: journal_entries.map { |je| je.critters.find { |c| c.user_id == current_user.id }&.variant },
+      # Journal entry IDs for retroactive critter rolls on completed path nodes
+      journal_entry_ids: journal_entries.map(&:id)
     }
   end
 end
