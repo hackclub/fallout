@@ -1,4 +1,6 @@
 class AuthController < ApplicationController
+  include OauthState
+
   allow_unauthenticated_access only: %i[new create] # OAuth flow must work without a session
   allow_trial_access only: %i[new create destroy] # Trial users can upgrade to HCA or sign out
   skip_onboarding_redirect only: %i[new create destroy] # Auth flow must complete before onboarding can run
@@ -9,17 +11,24 @@ class AuthController < ApplicationController
 
   def new
     state = SecureRandom.hex(24)
-    session[:state] = state
+    # Store OAuth state in a dedicated cookie instead of the session so it survives
+    # cross-site redirects (browser privacy features can drop session cookies) and
+    # isn't wiped by terminate_session/reset_session during the flow.
+    # Multiple states are kept so concurrent tabs don't overwrite each other.
+    existing = Array(cookies.encrypted[:oauth_state]).last(4)
+    set_oauth_cookie(:oauth_state, existing + [ state ])
 
     redirect_to HcaService.authorize_url(hca_callback_url, state, login_hint: params[:login_hint]), allow_other_host: true
   end
 
   def create
-    if params[:state] != session[:state]
+    valid_states = Array(cookies.encrypted[:oauth_state])
+    delete_oauth_cookie(:oauth_state)
+
+    unless valid_states.include?(params[:state])
       ErrorReporter.capture_message("Authentication CSRF validation failed", level: :error, contexts: {
-        authentication: { expected_state: session[:state], received_state: params[:state] }
+        authentication: { had_states: valid_states.any?, received_state: params[:state] }
       })
-      session[:state] = nil
       redirect_to root_path, alert: "Authentication failed due to CSRF token mismatch"
       return
     end

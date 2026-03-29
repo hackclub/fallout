@@ -1,4 +1,6 @@
 class LapseAuthController < ApplicationController
+  include OauthState
+
   skip_onboarding_redirect only: %i[start callback] # OAuth flow must complete regardless of onboarding state
   skip_after_action :verify_authorized # No authorizable resource on any action
   skip_after_action :verify_policy_scoped # No index action; no policy-scoped queries
@@ -9,8 +11,10 @@ class LapseAuthController < ApplicationController
     code_verifier = SecureRandom.hex(32)
     code_challenge = Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier), padding: false)
 
-    session[:lapse_state] = state
-    session[:lapse_code_verifier] = code_verifier
+    # Store state-to-verifier pairs in a single cookie so concurrent tabs each
+    # keep their own PKCE verifier (same multi-state pattern as AuthController).
+    existing = Hash(cookies.encrypted[:lapse_oauth]).to_a.last(4)
+    set_oauth_cookie(:lapse_oauth, existing.to_h.merge(state => code_verifier))
     if params[:return_to].present?
       session[:lapse_return_to] = params[:return_to]
       session[:lapse_return_project_id] = params[:project_id] if params[:project_id].present?
@@ -20,17 +24,17 @@ class LapseAuthController < ApplicationController
   end
 
   def callback
-    if params[:state] != session[:lapse_state]
+    oauth_pairs = Hash(cookies.encrypted[:lapse_oauth])
+    code_verifier = oauth_pairs[params[:state]]
+    delete_oauth_cookie(:lapse_oauth)
+
+    unless code_verifier
       ErrorReporter.capture_message("Lapse CSRF validation failed", level: :error, contexts: {
-        lapse_auth: { expected_state: session[:lapse_state], received_state: params[:state] }
+        lapse_auth: { had_states: oauth_pairs.any?, received_state: params[:state] }
       })
-      session[:lapse_state] = nil
       redirect_to root_path, alert: "Lapse authentication failed due to CSRF token mismatch"
       return
     end
-
-    session[:lapse_state] = nil
-    code_verifier = session.delete(:lapse_code_verifier)
 
     token_data = LapseService.exchange_code_for_token(params[:code], lapse_callback_url, code_verifier: code_verifier)
     unless token_data&.dig("access_token")
