@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useContext } from 'react'
-import { usePage } from '@inertiajs/react'
+import { usePage, router } from '@inertiajs/react'
 // @ts-expect-error useModalStack lacks type declarations in this beta package
 import { ModalLink, useModalStack } from '@inertiaui/modal-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
@@ -17,6 +17,7 @@ export default function PathNode({
   journalEntryCount = 0,
   critterVariant,
   readDocsNudge = false,
+  journalEntryId,
 }: {
   index: number
   interactive?: boolean
@@ -24,6 +25,7 @@ export default function PathNode({
   journalEntryCount?: number
   critterVariant?: string
   readDocsNudge?: boolean
+  journalEntryId?: number
 }) {
   const activeIndex = hasProjects ? journalEntryCount + 1 : 0
   const state: 'completed' | 'active' | 'locked' =
@@ -129,6 +131,10 @@ export default function PathNode({
         >
           {billboardImage}
         </button>
+      ) : state === 'completed' && interactive && journalEntryId ? (
+        <button onClick={() => router.post('/spin/roll', { journal_entry_id: journalEntryId })} className="outline-0">
+          {billboardImage}
+        </button>
       ) : (
         billboardImage
       )}
@@ -156,10 +162,13 @@ export default function PathNode({
   }
 
   if (state === 'completed') {
+    if (index === 0 || critterVariant) {
+      return content
+    }
     return (
       <Tooltip side="top" gap={12} trackScroll>
         <TooltipTrigger>{content}</TooltipTrigger>
-        <TooltipContent>Completed</TooltipContent>
+        <TooltipContent>Claim critter!</TooltipContent>
       </Tooltip>
     )
   }

@@ -24,4 +24,12 @@ class CrittersController < ApplicationController
     @critter.mark_spun!
     redirect_to critter_path(@critter)
   end
+
+  # Retroactive critter roll for journal entries created before critters existed
+  def roll
+    journal_entry = current_user.journal_entries.kept.find(params[:journal_entry_id])
+    authorize journal_entry, :show? # User must own the journal entry
+    critter = journal_entry.critters.find_by(user: current_user) || current_user.critters.create!(variant: Critter::VARIANTS.sample, journal_entry: journal_entry)
+    redirect_to critter_path(critter)
+  end
 end

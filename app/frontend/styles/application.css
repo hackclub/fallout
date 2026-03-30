@@ -7,26 +7,28 @@
 /* @plugin '@tailwindcss/forms'; */
 
 @theme {
-  --font-sans: 'Google Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-sans:
+    'Google Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
   --font-google: 'Google Sans', sans-serif;
   --font-outfit: 'Outfit', sans-serif;
   --font-bells: 'Hells Bells', sans-serif;
   --font-comico: 'Comico', sans-serif;
-  --color-dark-blue:#007BDA;
+  --color-dark-blue: #007bda;
 
   --breakpoint-2xs: 320px;
   --breakpoint-xs: 480px;
 
-  --color-blue: #38C9FF;
-  --color-light-blue:#C3EFFF;
+  --color-blue: #38c9ff;
+  --color-light-blue: #c3efff;
   --color-dark-brown: #61453a;
   --color-black: #61453a;
   --color-brown: #9f715d;
   --color-light-brown: #edd1b0;
-  --color-beige: #FCF1E5;
+  --color-beige: #fcf1e5;
 
-  --color-light-green: #C8E6D8;
-  --color-green: #37B576;
+  --color-light-green: #c8e6d8;
+  --color-green: #37b576;
   /* --color-light-blue: #c3efff; */
   --color-yellow: #ffebad;
   --color-pink: #fc90d2;
@@ -608,4 +610,21 @@ textarea:focus {
   .toc-sidebar button:hover {
     background-color: rgba(237, 209, 176, 0.08);
   }
+}
+
+@keyframes critter-flash {
+  0% {
+    filter: brightness(10) saturate(0) sepia(1) hue-rotate(10deg) drop-shadow(0 0 40px #ffe600)
+      drop-shadow(0 0 80px #ffe600);
+  }
+  40% {
+    filter: brightness(2) saturate(1.5) drop-shadow(0 0 20px #ffe600);
+  }
+  100% {
+    filter: brightness(1) saturate(1) drop-shadow(0 0 0px transparent);
+  }
+}
+
+.critter-reveal {
+  animation: critter-flash 1400ms ease-out forwards;
 }
