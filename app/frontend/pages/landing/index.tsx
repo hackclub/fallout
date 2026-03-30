@@ -602,10 +602,40 @@ export default function LandingIndex() {
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-beige px-4">
                 <img src="/landing/flag.svg" alt="Hack Club" className="h-12 object-contain" />
               </div>
-              <h3 className="text-3xl md:text-5xl font-bold tracking-wide text-brown mb-4 uppercase text-center mt-2">
-                EARN A CERTIFICATE
+              <h3 className="w-full font-bold text-brown mb-4 uppercase mt-2">
+                {/* Mobile version (two lines, equal width) */}
+                <div className="md:hidden w-[85%] mx-auto flex flex-col items-center">
+                  <svg viewBox="0 0 100 24" className="w-full h-auto overflow-visible fill-current">
+                    <text
+                      x="50%"
+                      y="22"
+                      textAnchor="middle"
+                      fontSize="26"
+                      fontWeight="bold"
+                      textLength="100"
+                      lengthAdjust="spacing"
+                    >
+                      EARN A
+                    </text>
+                  </svg>
+                  <svg viewBox="0 0 100 14" className="w-full h-auto overflow-visible fill-current mt-1">
+                    <text
+                      x="50%"
+                      y="12"
+                      textAnchor="middle"
+                      fontSize="15"
+                      fontWeight="bold"
+                      textLength="100"
+                      lengthAdjust="spacing"
+                    >
+                      CERTIFICATE
+                    </text>
+                  </svg>
+                </div>
+                {/* Desktop version (single line) */}
+                <div className="hidden md:block text-center text-3xl md:text-5xl tracking-wide">EARN A CERTIFICATE</div>
               </h3>
-              <p className="text-xl md:text-2xl text-center text-brown mb-8 max-w-2xl">
+              <p className="text-xl md:text-2xl text-center text-brown mb-8 max-w-2xl mt-4 md:mt-0">
                 Upon the completion of 60 hours for Fallout,
                 <br />
                 get a certificate recognized by
