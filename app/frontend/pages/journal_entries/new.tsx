@@ -276,11 +276,11 @@ function NewJournal({
   ]
 
   const content = (
-    <div className="relative flex h-full">
+    <div className="relative flex flex-col xl:flex-row h-full overflow-y-auto xl:overflow-visible bg-light-brown xl:bg-transparent">
       {ribbonTabs.map(({ label, tab, badge }, i) => (
         <div
           key={tab}
-          className={`absolute right-0 translate-x-full z-10 origin-left cursor-pointer motion-safe:hover:scale-105 motion-safe:transition-transform ${rightTab === tab ? 'scale-105' : ''}`}
+          className={`hidden xl:block absolute right-0 translate-x-full z-10 origin-left cursor-pointer motion-safe:hover:scale-105 motion-safe:transition-transform ${rightTab === tab ? 'scale-105' : ''}`}
           style={{ top: `${3 + i * 5}rem` }}
           onClick={() => setRightTab(tab)}
         >
@@ -302,7 +302,7 @@ function NewJournal({
         </div>
       ))}
       {/* Left page */}
-      <div className="flex-1 min-w-0 flex flex-col p-6 overflow-hidden">
+      <div className="xl:flex-1 max-xl:w-full min-w-0 max-xl:shrink-0 flex flex-col p-4 xl:p-6 xl:overflow-hidden">
         <p className="italic text-lg mb-2">Journaling for</p>
         <div className="relative">
           {projects.length > 1 ? (
@@ -368,7 +368,9 @@ function NewJournal({
         )}
 
         <p className="font-bold italic text-lg mt-6 mb-2">Write about what you did</p>
-        <div className={`relative flex-1 min-h-0 flex flex-col ${!selectedProject ? 'pointer-events-none' : ''}`}>
+        <div
+          className={`relative xl:flex-1 min-h-[350px] xl:min-h-0 flex flex-col ${!selectedProject ? 'pointer-events-none' : ''}`}
+        >
           {!selectedProject && <DisabledOverlay />}
           <MarkdownEditor
             value={markdown}
@@ -392,8 +394,20 @@ function NewJournal({
             </div>
           </div>
         )}
-        <div className="mt-auto pt-4 flex justify-start">
-          <Button onClick={handleSubmit} disabled={submitting || !canSubmit} className="py-2 px-6 text-lg">
+        <div className="mt-8 xl:mt-auto pt-4 flex gap-4 justify-between xl:justify-start">
+          {is_modal && (
+            <button
+              onClick={() => modalRef.current?.close()}
+              className="xl:hidden py-2 px-6 text-lg border-2 font-bold uppercase cursor-pointer bg-transparent text-dark-brown border-dark-brown"
+            >
+              Back
+            </button>
+          )}
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || !canSubmit}
+            className="py-2 px-6 text-lg flex-1 xl:flex-none"
+          >
             {submitting
               ? 'Loading...'
               : `Log Journal${recordingCount > 0 ? ` (${recordingCount} recording${recordingCount !== 1 ? 's' : ''})` : ''}`}
@@ -401,11 +415,26 @@ function NewJournal({
         </div>
       </div>
 
-      <div className="w-px bg-dark-brown" />
+      <div className="h-px max-xl:w-full xl:w-px xl:h-full bg-dark-brown max-xl:shrink-0" />
 
       {/* Right page */}
-      <div className="flex-1 min-w-0 flex flex-col p-6 overflow-x-hidden">
-        <div className={rightTab === 'lapse' ? 'flex flex-col min-h-0 flex-1' : 'hidden'}>
+      <div className="xl:flex-1 max-xl:w-full min-w-0 max-xl:shrink-0 flex flex-col p-4 xl:p-6 xl:overflow-x-hidden max-xl:mt-8">
+        {/* Mobile Tabs */}
+        <div className="flex xl:hidden gap-2 mb-6">
+          {ribbonTabs.map(({ label, tab }) => (
+            <button
+              key={tab}
+              onClick={() => setRightTab(tab)}
+              className={`flex-1 py-1.5 px-2 text-center uppercase text-sm font-bold border-2 border-dark-brown truncate ${
+                rightTab === tab ? 'bg-brown text-light-brown' : 'bg-transparent text-dark-brown'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className={rightTab === 'lapse' ? 'flex flex-col min-h-[300px] xl:min-h-0 flex-1' : 'hidden'}>
           <h2 className="text-center font-bold text-2xl uppercase tracking-wide">Lapse</h2>
           <p className="text-center text-sm text-dark-brown mt-1 mb-4">
             Remember to publish the timelapse! Unlisted is okay!
@@ -517,7 +546,7 @@ function NewJournal({
             Alternatively, download our desktop app.
           </p>
 
-          <div className="flex-1 min-h-0 overflow-y-auto p-1 -m-1">
+          <div className="flex-1 min-h-[300px] xl:min-h-0 overflow-y-auto p-1 -m-1">
             <Deferred data="lookout_timelapses" fallback={<LookoutTimelapseSkeleton />}>
               <LookoutTimelapseBrowser
                 recordings={lookout_timelapses ?? []}
@@ -561,8 +590,14 @@ function NewJournal({
 
   if (is_modal) {
     return (
-      <Modal ref={modalRef} panelClasses="h-full" paddingClasses="max-w-5xl mx-auto" closeButton={false} maxWidth="7xl">
-        <BookLayout className="max-h-[40em]">{content}</BookLayout>
+      <Modal
+        ref={modalRef}
+        panelClasses="h-full max-xl:w-full max-xl:max-w-none max-xl:bg-light-brown max-xl:max-h-full max-xl:overflow-hidden"
+        paddingClasses="p-0 xl:max-w-5xl xl:mx-auto"
+        closeButton={false}
+        maxWidth="7xl"
+      >
+        <BookLayout className="max-h-none xl:max-h-[40em]">{content}</BookLayout>
         {fullscreenModal}
       </Modal>
     )

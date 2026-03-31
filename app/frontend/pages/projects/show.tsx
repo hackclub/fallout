@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { router } from '@inertiajs/react'
 import { Modal, ModalLink } from '@inertiaui/modal-react'
 import { BookOpenIcon, ClockIcon } from '@heroicons/react/16/solid'
@@ -80,6 +80,7 @@ export default function ProjectsShow({
   }
   is_modal?: boolean
 }) {
+  const modalRef = useRef<{ close: () => void }>(null)
   const [rightTab, setRightTab] = useState<'timeline' | 'journal'>('timeline')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
@@ -166,11 +167,11 @@ export default function ProjectsShow({
   ]
 
   const content = (
-    <div className="relative flex h-full">
+    <div className="relative flex flex-col xl:flex-row h-full overflow-y-auto xl:overflow-visible bg-light-brown xl:bg-transparent">
       {ribbonTabs.map(({ label, tab }, i) => (
         <div
           key={tab}
-          className={`absolute right-0 translate-x-full z-10 origin-left cursor-pointer motion-safe:hover:scale-105 motion-safe:transition-transform ${rightTab === tab ? 'scale-105' : ''}`}
+          className={`hidden xl:block absolute right-0 translate-x-full z-10 origin-left cursor-pointer motion-safe:hover:scale-105 motion-safe:transition-transform ${rightTab === tab ? 'scale-105' : ''}`}
           style={{ top: `${3 + i * 5}rem` }}
           onClick={() => setRightTab(tab)}
         >
@@ -188,7 +189,7 @@ export default function ProjectsShow({
       ))}
 
       {/* Left page */}
-      <div className="flex-1 min-w-0 flex flex-col p-6 overflow-y-auto">
+      <div className="xl:flex-1 max-xl:w-full min-w-0 max-xl:shrink-0 flex flex-col p-4 xl:p-6 overflow-y-auto">
         <h1 className="font-bold text-4xl text-dark-brown mb-2">{project.name}</h1>
 
         {project.description && <p className="text-dark-brown mb-4">{project.description}</p>}
@@ -227,29 +228,53 @@ export default function ProjectsShow({
           </div>
         )}
 
-        <div className="flex gap-4 mt-auto pt-6">
+        <div className="flex gap-4 mt-auto pt-6 flex-wrap">
+          {is_modal && (
+            <button
+              onClick={() => modalRef.current?.close()}
+              className="xl:hidden py-2 px-6 text-sm border-2 font-bold uppercase cursor-pointer bg-transparent text-dark-brown border-dark-brown"
+            >
+              Back
+            </button>
+          )}
           {can.update && (
             <ModalLink
               href={`/projects/${project.id}/edit`}
               replace
-              className="bg-brown text-light-brown border-2 border-dark-brown px-6 py-2 font-bold uppercase hover:opacity-80"
+              className="bg-brown text-light-brown border-2 border-dark-brown px-6 py-2 font-bold uppercase hover:opacity-80 flex items-center justify-center text-sm"
             >
               Edit
             </ModalLink>
           )}
           {can.ship && (
-            <Button onClick={() => router.visit(`/projects/${project.id}/ship`)} className="px-6 py-2">
+            <Button onClick={() => router.visit(`/projects/${project.id}/ship`)} className="px-6 py-2 text-sm flex-1 xl:flex-none">
               Submit
             </Button>
           )}
         </div>
       </div>
 
-      <div className="w-px bg-dark-brown" />
+      <div className="h-px max-xl:w-full xl:w-px xl:h-full bg-dark-brown max-xl:shrink-0" />
 
       {/* Right page */}
-      <div className="flex-1 min-w-0 flex flex-col p-6 overflow-hidden">
-        <div className={rightTab === 'timeline' ? 'flex flex-col min-h-0 flex-1' : 'hidden'}>
+      <div className="xl:flex-1 max-xl:w-full min-w-0 max-xl:shrink-0 flex flex-col p-4 xl:p-6 overflow-hidden max-xl:mt-8">
+        
+        {/* Mobile Tabs */}
+        <div className="flex xl:hidden gap-2 mb-6 shrink-0">
+          {ribbonTabs.map(({ label, tab }) => (
+            <button
+              key={tab}
+              onClick={() => setRightTab(tab)}
+              className={`flex-1 py-1.5 px-2 text-center uppercase text-sm font-bold border-2 border-dark-brown truncate ${
+                rightTab === tab ? 'bg-brown text-light-brown' : 'bg-transparent text-dark-brown'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className={rightTab === 'timeline' ? 'flex flex-col min-h-[300px] xl:min-h-0 flex-1' : 'hidden'}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-2xl text-dark-brown">Timeline</h2>
             {can.create_journal_entry && (
@@ -322,7 +347,7 @@ export default function ProjectsShow({
           </div>
         </div>
 
-        <div className={rightTab === 'journal' ? 'flex flex-col min-h-0 flex-1' : 'hidden'}>
+        <div className={rightTab === 'journal' ? 'flex flex-col min-h-[300px] xl:min-h-0 flex-1' : 'hidden'}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-2xl text-dark-brown">Journal</h2>
             {can.create_journal_entry && (
@@ -364,8 +389,14 @@ export default function ProjectsShow({
 
   if (is_modal) {
     return (
-      <Modal panelClasses="h-full" paddingClasses="max-w-5xl mx-auto" closeButton={false} maxWidth="7xl">
-        <BookLayout className="max-h-[40em]" showJoint={false}>
+      <Modal 
+        ref={modalRef}
+        panelClasses="h-full max-xl:w-full max-xl:max-w-none max-xl:bg-light-brown max-xl:max-h-full max-xl:overflow-hidden" 
+        paddingClasses="p-0 xl:max-w-5xl xl:mx-auto" 
+        closeButton={false} 
+        maxWidth="7xl"
+      >
+        <BookLayout className="max-h-none xl:max-h-[40em]" showJoint={false}>
           {content}
         </BookLayout>
       </Modal>

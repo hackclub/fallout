@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { router } from '@inertiajs/react'
 import { Modal, ModalLink } from '@inertiaui/modal-react'
 import { MagnifyingGlassIcon, BookOpenIcon, ClockIcon, FilmIcon } from '@heroicons/react/16/solid'
+import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/20/solid'
 import Frame from '@/components/shared/Frame'
 import Button from '@/components/shared/Button'
 import Input from '@/components/shared/Input'
@@ -27,6 +28,7 @@ export default function ProjectsIndex({
   query: string
   is_modal: boolean
 }) {
+  const modalRef = useRef<{ close: () => void }>(null)
   const [searchQuery, setSearchQuery] = useState(query)
 
   function search(e: React.FormEvent) {
@@ -35,11 +37,27 @@ export default function ProjectsIndex({
   }
 
   const content = (
-    <div className="w-full mx-auto p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-bold text-4xl text-dark-brown">My Projects</h1>
+    <div className="w-full mx-auto p-4 md:p-8">
+      <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+        <div className="flex items-center gap-4">
+          {is_modal && (
+            <button
+              onClick={() => modalRef.current?.close()}
+              className="md:hidden cursor-pointer text-dark-brown hover:opacity-80 shrink-0"
+              aria-label="Back"
+            >
+              <ArrowLeftIcon className="w-8 h-8" />
+            </button>
+          )}
+          <h1 className="font-bold text-3xl md:text-4xl text-dark-brown">My Projects</h1>
+        </div>
         <ModalLink href="/projects/new">
-          <Button>New Project</Button>
+          <button 
+            className="bg-dark-brown text-light-brown rounded-full w-12 h-12 flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer shadow-md" 
+            aria-label="New Project"
+          >
+            <PlusIcon className="w-10 h-10" />
+          </button>
         </ModalLink>
       </div>
 
@@ -61,7 +79,7 @@ export default function ProjectsIndex({
 
       {projects.length > 0 ? (
         <>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {projects.map((project) => (
               <ModalLink
                 key={project.id}
@@ -122,7 +140,13 @@ export default function ProjectsIndex({
 
   if (is_modal) {
     return (
-      <Modal panelClasses="h-full" paddingClasses="max-w-5xl mx-auto" closeButton={false} maxWidth="7xl">
+      <Modal
+        ref={modalRef}
+        panelClasses="h-full max-h-none md:max-h-full max-md:w-full max-md:max-w-none max-md:bg-light-brown max-md:overflow-hidden"
+        paddingClasses="p-0 md:max-w-5xl md:mx-auto"
+        closeButton={false}
+        maxWidth="7xl"
+      >
         <Frame className="h-full">{content}</Frame>
       </Modal>
     )
