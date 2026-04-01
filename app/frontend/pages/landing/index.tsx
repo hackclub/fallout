@@ -9,6 +9,16 @@ import { notify } from '@/lib/notifications'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
+const PROJECTS = [
+  { image: '/landing/projects/cyberpad.webp', description: 'A sleek, cyberpunk inspired macropad', credit: 'By Kai, a 17-year-old from Canada' },
+  { image: '/landing/projects/glowpad.webp', description: 'A glowing macropad', credit: 'By Raygen, a 17-year-old from the US' },
+  { image: '/landing/projects/angel.webp', description: 'A biblically accurate angel, as a macropad', credit: 'By Alex, a 15-year-old from the US' },
+  { image: '/landing/projects/meko.webp', description: 'A high definition music player', credit: 'By Marcell, a 17-year-old from Romania' },
+  { image: '/landing/projects/bitlace.webp', description: 'A cool looking retro accessory with an 8x8 monochrome screen', credit: 'By Vladislav, a 17-year-old from Russia' },
+  { image: '/landing/projects/3dpmotherboard.webp', description: 'A powerful, yet affordable 3D printer motherboard', credit: 'By Kai, a 17-year-old from Canada' },
+  { image: '/landing/projects/twoswap.webp', description: 'An epic wearable TV head', credit: 'By Nick, an 18-year-old from the US' },
+]
+
 export default function LandingIndex() {
   const shared = usePage<SharedProps>().props
   const containerRef = useRef<HTMLDivElement>(null)
@@ -295,6 +305,49 @@ export default function LandingIndex() {
   const highlight1Ref = useRef<HTMLSpanElement>(null)
   const highlight2Ref = useRef<HTMLSpanElement>(null)
   const highlight3Ref = useRef<HTMLSpanElement>(null)
+  const carouselSectionRef = useRef<HTMLElement>(null)
+  const carouselTrackRef = useRef<HTMLUListElement>(null)
+  const carouselOffsetRef = useRef(0)
+  const carouselDirectionRef = useRef(-1)
+  const carouselSpeedRef = useRef(0)
+  const carouselTargetSpeedRef = useRef(2)
+
+  useEffect(() => {
+    const BASE_SPEED = 1.5
+    carouselTargetSpeedRef.current = BASE_SPEED
+    let rafId: number
+
+    const animate = () => {
+      const track = carouselTrackRef.current
+      if (track) {
+        carouselSpeedRef.current += (carouselTargetSpeedRef.current - carouselSpeedRef.current) * 0.08
+        carouselOffsetRef.current += carouselDirectionRef.current * carouselSpeedRef.current
+        const singleSetWidth = track.scrollWidth / 2
+        if (carouselOffsetRef.current <= -singleSetWidth) carouselOffsetRef.current += singleSetWidth
+        if (carouselOffsetRef.current >= 0) carouselOffsetRef.current -= singleSetWidth
+        track.style.transform = `translateX(${carouselOffsetRef.current}px)`
+      }
+      rafId = requestAnimationFrame(animate)
+    }
+
+    rafId = requestAnimationFrame(animate)
+
+    const onWheel = (e: WheelEvent) => { carouselDirectionRef.current = e.deltaY > 0 ? 1 : -1 }
+    const onEnter = () => { carouselTargetSpeedRef.current = 0 }
+    const onLeave = () => { carouselTargetSpeedRef.current = BASE_SPEED }
+    const section = carouselSectionRef.current
+
+    section?.addEventListener('wheel', onWheel, { passive: true })
+    section?.addEventListener('mouseenter', onEnter)
+    section?.addEventListener('mouseleave', onLeave)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      section?.removeEventListener('wheel', onWheel)
+      section?.removeEventListener('mouseenter', onEnter)
+      section?.removeEventListener('mouseleave', onLeave)
+    }
+  }, [])
 
   function handleFalloutClick() {
     if (falloutFallenRef.current) return
@@ -581,8 +634,21 @@ export default function LandingIndex() {
               </section>
             </div>
           </div>
-
-          <section className="-mt-40 px-6 lg:px-30 xl:px-50 flex flex-col md:flex-row justify-center items-center w-full">
+          <section ref={carouselSectionRef} className="w-full h-120 lg:pt-30 py-20 overflow-hidden">
+            <ul ref={carouselTrackRef} className="w-max h-full flex gap-4 text-base leading-tight will-change-transform">
+              {[...PROJECTS, ...PROJECTS].map((project, i) => (
+                <li key={i} className="border-2 border-dark-brown h-full aspect-3/4 bg-light-brown rounded-xs text-dark-brown font-bold p-2 flex flex-col transition-transform duration-300 hover:scale-110 hover:-rotate-3 hover:z-10">
+                  <div
+                    className="w-full h-[70%] bg-beige rounded-xs bg-center bg-cover opacity-90 border-beige border-6"
+                    style={{ backgroundImage: `url(${project.image})` }}
+                  />
+                  <p className="py-2">{project.description}</p>
+                  <p className="mt-auto text-center text-xs font-light">{project.credit}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section className="px-6 lg:px-30 xl:px-50 flex flex-col md:flex-row justify-center items-center w-full">
             <h2 className="text-8xl lg:text-9xl lg:text-[10rem] font-semibold font-outfit">60H</h2>
             <HalftoneBg
               src="/landing/person.webp"
@@ -592,9 +658,7 @@ export default function LandingIndex() {
               className="w-full max-w-200 -mx-4 md:-mx-20 aspect-[637/576]"
             />
             <div className="flex flex-col text-center text-4xl">
-              {/* <h4>shen zhen</h4> */}
               <h2 className="text-8xl lg:text-9xl lg:text-[10rem] font-semibold font-outfit whitespace-nowrap">深圳</h2>
-              {/* <h4>China</h4> */}
             </div>
           </section>
           <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-20 bg-beige text-dark-brown">
@@ -747,6 +811,13 @@ export default function LandingIndex() {
                   </div>
                 </div>
               </div>
+            </div>
+          </section>
+          <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-20 bg-beige text-dark-brown flex flex-col items-center gap-6 font-bold">
+            <span className="text-2xl text-brown">My parents are worried!</span>
+            <div className="space-y-4 sm:space-x-10 text-beige flex flex-col sm:flex-row items-center text-center">
+              <a href="https://hack.club/renran" className="inline-block bg-brown w-60 py-4 text-xl rounded-xs hover:bg-dark-brown transition-all">Book a call with us</a>
+              <a href="https://docs.google.com/document/d/1dXDIBm7SWui5rbK3zh7188UmLC0cv_dsMj7ynr3POho/edit?tab=t.q4hvz46um9np" className="inline-block bg-brown w-60 py-4 text-xl rounded-xs hover:bg-dark-brown transition-all">Parent Guide</a>
             </div>
           </section>
           <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-20 bg-beige text-dark-brown">
