@@ -22,8 +22,8 @@ function MailsIndex({ mails, is_modal }: PageProps) {
   const hasUnread = mails.some((m) => !m.is_read)
 
   const content = (
-    <div className="w-full h-full overflow-y-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="w-full h-full flex flex-col p-0 md:p-2 min-h-0">
+      <div className="flex items-center justify-between mb-4 shrink-0 px-4 pt-4 md:px-4 md:pt-4">
         <h1 className="font-bold text-2xl text-dark-brown">Your Mail</h1>
         {hasUnread && (
           <Button variant="link" onClick={handleReadAll} className="text-sm">
@@ -31,6 +31,8 @@ function MailsIndex({ mails, is_modal }: PageProps) {
           </Button>
         )}
       </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 md:px-4 md:pb-4">
 
       {mails.length === 0 ? (
         <p className="text-brown text-center py-12">You don't have any mail yet! Check back later!</p>
@@ -106,13 +108,16 @@ function MailsIndex({ mails, is_modal }: PageProps) {
           })}
         </div>
       )}
+      </div>
     </div>
   )
 
   if (is_modal) {
     return (
       <Modal panelClasses="h-full" paddingClasses="max-w-2xl mx-auto" closeButton={false} maxWidth="3xl">
-        <Frame className="h-full">{content}</Frame>
+        <Frame className="h-full" showBorderOnMobile>
+          {content}
+        </Frame>
       </Modal>
     )
   }

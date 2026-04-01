@@ -166,7 +166,9 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
   if (is_modal) {
     return (
       <Modal ref={modalRef} panelClasses="h-full" paddingClasses="max-w-5xl mx-auto" closeButton={false} maxWidth="7xl">
-        <Frame className="h-full">{content}</Frame>
+        <Frame className="h-full" showBorderOnMobile>
+          {content}
+        </Frame>
       </Modal>
     )
   }

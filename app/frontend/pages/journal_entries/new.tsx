@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react'
 import { Deferred as InertiaDeferred, router } from '@inertiajs/react'
-import { Deferred as ModalDeferred, Modal } from '@inertiaui/modal-react'
+// @ts-expect-error useModal lacks type declarations in this beta package
+import { Deferred as ModalDeferred, Modal, useModal } from '@inertiaui/modal-react'
 import BookLayout from '@/components/shared/BookLayout'
 import Button from '@/components/shared/Button'
 import Input from '@/components/shared/Input'
@@ -109,6 +110,7 @@ function NewJournal({
       ? projects[0]
       : null
 
+  const modal = useModal()
   const [selectedProject, setSelectedProject] = useState<Project | null>(initialProject)
   const [rightTab, setRightTab] = useState<'lapse' | 'youtube' | 'lookout'>('lookout')
   const [selectedTimelapses, setSelectedTimelapses] = useState<Set<string>>(new Set())
@@ -175,6 +177,20 @@ function NewJournal({
   const recordingCount = selectedTimelapses.size + youtubeVideos.length + selectedLookoutTokens.size
   const hasRecording = recordingCount > 0
   const canSubmit = selectedProject && hasRecording && hasEnoughImages && hasEnoughChars
+
+  function handleBack() {
+    if (modal?.canGoBack) {
+      modal.goBack()
+      return
+    }
+
+    if (modal) {
+      modal.close()
+      return
+    }
+
+    modalRef.current?.close()
+  }
 
   function toggleTimelapse(id: string) {
     setSelectedTimelapses((prev) => {
@@ -397,8 +413,8 @@ function NewJournal({
         <div className="mt-8 xl:mt-auto pt-4 flex gap-4 justify-between xl:justify-start">
           {is_modal && (
             <button
-              onClick={() => modalRef.current?.close()}
-              className="xl:hidden py-2 px-6 text-lg border-2 font-bold uppercase cursor-pointer bg-transparent text-dark-brown border-dark-brown"
+              onClick={handleBack}
+              className="py-2 px-6 text-lg border-2 font-bold uppercase cursor-pointer bg-transparent text-dark-brown border-dark-brown"
             >
               Back
             </button>
@@ -592,12 +608,14 @@ function NewJournal({
     return (
       <Modal
         ref={modalRef}
-        panelClasses="h-full max-xl:w-full max-xl:max-w-none max-xl:bg-light-brown max-xl:max-h-full max-xl:overflow-hidden"
+        panelClasses="h-full max-xl:w-full max-xl:max-w-none max-xl:max-h-full max-xl:overflow-hidden"
         paddingClasses="p-0 xl:max-w-5xl xl:mx-auto"
         closeButton={false}
         maxWidth="7xl"
       >
-        <BookLayout className="max-h-none xl:max-h-[40em]">{content}</BookLayout>
+        <BookLayout className="max-h-none xl:max-h-[40em]" showBorderOnMobile>
+          {content}
+        </BookLayout>
         {fullscreenModal}
       </Modal>
     )
@@ -613,8 +631,8 @@ function NewJournal({
 
 function DisabledOverlay() {
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-brown/30 rounded cursor-default">
-      <p className="text-lg font-bold text-dark-brown">Select a project at the top left first!</p>
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/20 backdrop-blur-[2px] rounded cursor-default">
+      <p className="text-lg font-bold text-dark-brown drop-shadow-md">Select a project at the top left first!</p>
     </div>
   )
 }

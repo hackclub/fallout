@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { ReactNode } from 'react'
-import { Link, usePage } from '@inertiajs/react'
+import { Link, router, usePage } from '@inertiajs/react'
 import type { SharedProps } from '@/types'
 import { useModalStack, ModalLink } from '@inertiaui/modal-react'
 import Shop from '@/components/Shop'
@@ -110,6 +110,10 @@ export default function PathIndex() {
     }
   }, [])
 
+  function reloadPathProgress() {
+    router.reload({ only: ['has_projects', 'journal_entry_count', 'critter_variants'] })
+  }
+
   return (
     <>
       <FlashMessages />
@@ -139,7 +143,7 @@ export default function PathIndex() {
         <Tooltip>
           <TooltipTrigger>
             {has_projects && !authUser?.is_trial ? (
-              <ModalLink href="/projects" className="outline-0">
+              <ModalLink href="/projects" onProjectDeleted={reloadPathProgress} className="outline-0">
                 <img src="/icon/project.webp" alt="Projects" className="cursor-pointer w-25" />
               </ModalLink>
             ) : (

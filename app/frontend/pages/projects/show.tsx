@@ -1,11 +1,13 @@
 import { useState, useMemo, useRef } from 'react'
 import { router } from '@inertiajs/react'
-import { Modal, ModalLink } from '@inertiaui/modal-react'
+// @ts-expect-error useModal lacks type declarations in this beta package
+import { Modal, ModalLink, useModal } from '@inertiaui/modal-react'
 import { BookOpenIcon, ClockIcon } from '@heroicons/react/16/solid'
 import BookLayout from '@/components/shared/BookLayout'
 import Button from '@/components/shared/Button'
 import InlineUser from '@/components/shared/InlineUser'
 import Input from '@/components/shared/Input'
+import { performModalMutation } from '@/lib/modalMutation'
 import { notify } from '@/lib/notifications'
 import TimeAgo from '@/components/shared/TimeAgo'
 import Timeline from '@/components/shared/Timeline'
@@ -66,6 +68,7 @@ export default function ProjectsShow({
   ships,
   can,
   is_modal,
+  onModalEvent,
 }: {
   project: ProjectDetail
   journal_entries: JournalEntryCard[]
@@ -79,12 +82,71 @@ export default function ProjectsShow({
     create_journal_entry: boolean
   }
   is_modal?: boolean
+  onModalEvent?: (event: string, ...args: any[]) => void
 }) {
   const modalRef = useRef<{ close: () => void }>(null)
+  const modal = useModal()
   const [rightTab, setRightTab] = useState<'timeline' | 'journal'>('timeline')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const detailProps = ['project', 'journal_entries', 'collaborators', 'ships', 'can']
+
+  function handleBack() {
+    if (modal?.canGoBack) {
+      modal.goBack()
+      return
+    }
+
+    if (modal) {
+      modal.close()
+      return
+    }
+
+    modalRef.current?.close()
+  }
+
+  function reloadProjectDetails() {
+    if (modal) {
+      modal.reload({ only: detailProps })
+      return
+    }
+
+    router.reload({ only: detailProps })
+  }
+
+  function handleProjectSaved() {
+    reloadProjectDetails()
+    onModalEvent?.('projectSaved')
+  }
+
+  function deleteProject() {
+    if (deleting || !confirm('Delete this project? This will remove it and its journal entries from normal views.'))
+      return
+
+    if (!is_modal) {
+      router.delete(`/projects/${project.id}`, {
+        onStart: () => setDeleting(true),
+        onFinish: () => setDeleting(false),
+        onError: () => notify('alert', 'Failed to delete project.'),
+      })
+      return
+    }
+
+    setDeleting(true)
+    void performModalMutation({
+      url: `/projects/${project.id}`,
+      method: 'delete',
+      modal,
+      modalRef,
+      successMessage: 'Project deleted.',
+      errorMessage: 'Failed to delete project.',
+      successEvent: 'projectDeleted',
+      onModalEvent,
+      onFinish: () => setDeleting(false),
+    })
+  }
 
   function sendInvite(e: React.FormEvent) {
     e.preventDefault()
@@ -231,8 +293,8 @@ export default function ProjectsShow({
         <div className="flex gap-4 mt-auto pt-6 flex-wrap">
           {is_modal && (
             <button
-              onClick={() => modalRef.current?.close()}
-              className="xl:hidden py-2 px-6 text-sm border-2 font-bold uppercase cursor-pointer bg-transparent text-dark-brown border-dark-brown"
+              onClick={handleBack}
+              className="py-2 px-6 text-sm border-2 font-bold uppercase cursor-pointer bg-transparent text-dark-brown border-dark-brown"
             >
               Back
             </button>
@@ -240,14 +302,26 @@ export default function ProjectsShow({
           {can.update && (
             <ModalLink
               href={`/projects/${project.id}/edit`}
-              replace
+              onProjectSaved={handleProjectSaved}
               className="bg-brown text-light-brown border-2 border-dark-brown px-6 py-2 font-bold uppercase hover:opacity-80 flex items-center justify-center text-sm"
             >
               Edit
             </ModalLink>
           )}
+          {can.destroy && (
+            <Button
+              onClick={deleteProject}
+              disabled={deleting}
+              className="bg-coral px-6 py-2 text-sm flex-1 xl:flex-none"
+            >
+              {deleting ? 'Deleting...' : 'Delete Project'}
+            </Button>
+          )}
           {can.ship && (
-            <Button onClick={() => router.visit(`/projects/${project.id}/ship`)} className="px-6 py-2 text-sm flex-1 xl:flex-none">
+            <Button
+              onClick={() => router.visit(`/projects/${project.id}/ship`)}
+              className="px-6 py-2 text-sm flex-1 xl:flex-none"
+            >
               Submit
             </Button>
           )}
@@ -258,7 +332,6 @@ export default function ProjectsShow({
 
       {/* Right page */}
       <div className="xl:flex-1 max-xl:w-full min-w-0 max-xl:shrink-0 flex flex-col p-4 xl:p-6 overflow-hidden max-xl:mt-8">
-        
         {/* Mobile Tabs */}
         <div className="flex xl:hidden gap-2 mb-6 shrink-0">
           {ribbonTabs.map(({ label, tab }) => (
@@ -280,7 +353,6 @@ export default function ProjectsShow({
             {can.create_journal_entry && (
               <ModalLink
                 href={`/projects/${project.id}/journal_entries/new`}
-                replace
                 className="bg-brown text-light-brown border-2 border-dark-brown px-4 py-2 font-bold uppercase text-sm hover:opacity-80"
               >
                 New Journal Entry
@@ -353,7 +425,6 @@ export default function ProjectsShow({
             {can.create_journal_entry && (
               <ModalLink
                 href={`/projects/${project.id}/journal_entries/new`}
-                replace
                 className="bg-brown text-light-brown border-2 border-dark-brown px-4 py-2 font-bold uppercase text-sm hover:opacity-80"
               >
                 New Journal Entry
@@ -389,14 +460,14 @@ export default function ProjectsShow({
 
   if (is_modal) {
     return (
-      <Modal 
+      <Modal
         ref={modalRef}
-        panelClasses="h-full max-xl:w-full max-xl:max-w-none max-xl:bg-light-brown max-xl:max-h-full max-xl:overflow-hidden" 
-        paddingClasses="p-0 xl:max-w-5xl xl:mx-auto" 
-        closeButton={false} 
+        panelClasses="h-full max-xl:w-full max-xl:max-w-none max-xl:max-h-full max-xl:overflow-hidden"
+        paddingClasses="p-0 xl:max-w-5xl xl:mx-auto"
+        closeButton={false}
         maxWidth="7xl"
       >
-        <BookLayout className="max-h-none xl:max-h-[40em]" showJoint={false}>
+        <BookLayout className="max-h-none xl:max-h-[40em]" showJoint={false} showBorderOnMobile>
           {content}
         </BookLayout>
       </Modal>
