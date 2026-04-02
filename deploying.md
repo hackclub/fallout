@@ -41,6 +41,33 @@ This builds with `Dockerfile` and runs Thruster + Rails server.
 
 The worker builds with `Dockerfile.worker` and runs Solid Queue (`bin/jobs`) to process background jobs.
 
+## 3b. Create the Heavy Worker Application (Server B)
+
+The heavy worker handles CPU/IO-intensive jobs (image/video processing) on a separate server with more compute capacity.
+
+1. Add **Server B** as a server in your Coolify instance
+2. Click **New Resource** > **Application** on Server B
+3. Select the **same** GitHub repository and branch
+4. Set **Build Pack** to **Dockerfile**
+5. Set **Dockerfile Location** to `Dockerfile.heavy_worker`
+6. **Do not** expose a port — the heavy worker doesn't serve HTTP
+7. **Disable** the health check (background process, not a web server)
+
+The heavy worker builds with `Dockerfile.heavy_worker` (which includes FFmpeg and ImageMagick) and runs Solid Queue processing only the `heavy` queue.
+
+### Environment Variables
+
+The heavy worker uses the **same** environment variables as the main and worker apps (see step 4), with one key difference:
+
+- `DATABASE_URL` and `REDIS_URL` must point to **Server A's public endpoints** (not internal Docker hostnames) since the heavy worker runs on a different server
+- Use SSL for both connections (e.g. `postgresql://user:pass@server-a-ip:5432/fallout_production?sslmode=require`)
+
+### Network Security
+
+- **Firewall** Server A's PostgreSQL (5432) and Redis (6379) ports to allow only Server B's IP
+- Use **strong passwords** (32+ characters) for database credentials
+- Optionally create a **dedicated PostgreSQL user** for Server B with limited permissions
+
 ## 4. Configure Environment Variables
 
 Add the following environment variables to **both** the main and worker applications. Refer to `.env.production.example` for the full list.

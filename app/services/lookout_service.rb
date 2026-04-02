@@ -97,6 +97,33 @@ module LookoutService
     nil
   end
 
+  def download_video(token)
+    raise ArgumentError, "token is required" if token.blank?
+
+    video_data = get_video_url(token)
+    return nil unless video_data&.dig("videoUrl")
+
+    tempfile = Tempfile.new([ "lookout_video_", ".mp4" ])
+    tempfile.binmode
+
+    response = Faraday.get(video_data["videoUrl"]) do |req|
+      req.options.timeout = 120
+      req.options.open_timeout = 10
+    end
+
+    unless response.success?
+      tempfile.close!
+      return nil
+    end
+
+    tempfile.write(response.body)
+    tempfile.rewind
+    tempfile
+  rescue StandardError => e
+    ErrorReporter.capture_exception(e, contexts: { lookout: { action: "download_video" } })
+    nil
+  end
+
   def public_connection
     @public_connection ||= Faraday.new(url: host) do |f|
       f.options.open_timeout = 5

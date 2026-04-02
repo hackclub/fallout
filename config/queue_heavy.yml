@@ -1,0 +1,10 @@
+# Queue configuration for the heavy worker (Server B).
+# Only processes the `heavy` queue for CPU/IO-intensive jobs.
+# Run with: bin/jobs --config-file config/queue_heavy.yml
+
+production:
+  workers:
+    - queues: [heavy]
+      threads: 4
+      processes: <%= ENV.fetch("JOB_CONCURRENCY", 4) %>
+      polling_interval: 0.5

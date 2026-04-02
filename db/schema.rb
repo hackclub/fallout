@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_31_202812) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_02_152104) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -203,8 +203,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_31_202812) do
   end
 
   create_table "lookout_timelapses", force: :cascade do |t|
+    t.datetime "activity_checked_at"
     t.datetime "created_at", null: false
     t.float "duration"
+    t.integer "inactive_frame_count"
+    t.float "inactive_percentage"
+    t.jsonb "inactive_segments", default: []
     t.datetime "last_refreshed_at"
     t.string "name"
     t.string "playback_url"
