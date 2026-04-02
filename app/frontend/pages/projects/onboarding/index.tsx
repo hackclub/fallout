@@ -108,7 +108,7 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
 
         <PaginationPage>
           {({ prev }) => (
-            <div className="space-y-5 text-xl flex flex-col h-full">
+            <div className="space-y-5 text-xl flex flex-col h-full overflow-scroll">
               <h2 className="font-outfit text-3xl font-semibold">Here's how it'll work</h2>
               <div className="space-y-4">
                 <p>We need to make sure the time you're spending is real.</p>
@@ -136,7 +136,7 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
                   </div>
                 </div>
               </div>
-              <div className="grow min-h-0 flex flex-col">
+              <div className="grow h-full flex flex-col">
                 <label className="text-lg mb-2">
                   <span className="font-bold">Give your project a fun name.</span> You'll be able to edit this later.
                 </label>
