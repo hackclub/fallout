@@ -252,6 +252,18 @@ export interface ShipForm {
   user_display_name: string
 }
 
+export interface ReviewerNote {
+  id: number
+  body: string
+  ship_id: number | null
+  review_stage: string | null
+  author_display_name: string
+  author_avatar: string
+  author_id: number
+  created_at: string
+  updated_at: string
+}
+
 export interface ReviewRow {
   id: number
   ship_id: number

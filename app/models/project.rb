@@ -49,6 +49,7 @@ class Project < ApplicationRecord
   has_many :collaborators, -> { kept }, as: :collaboratable, dependent: :destroy
   has_many :collaborator_users, through: :collaborators, source: :user
   has_many :collaboration_invites, -> { kept }, dependent: :destroy
+  has_many :reviewer_notes, dependent: :destroy
 
   def discard
     transaction do

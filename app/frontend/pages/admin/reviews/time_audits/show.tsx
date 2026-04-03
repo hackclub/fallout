@@ -29,7 +29,9 @@ import {
   GaugeIcon,
   CrosshairIcon,
   SparklesIcon,
+  MessageSquareTextIcon,
 } from 'lucide-react'
+import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import type {
   TimeAuditReviewDetail,
   TimeAuditAnnotations,
@@ -37,6 +39,7 @@ import type {
   ReviewJournalEntry,
   ReviewRecording,
   ReviewProjectContext,
+  ReviewerNote,
   SiblingStatuses,
 } from '@/types'
 
@@ -92,8 +95,10 @@ function ReviewTopBar({
   totalDuration,
   submitting,
   allReviewed,
+  notesCount,
   onSkip,
   onSubmit,
+  onToggleNotes,
 }: {
   project: ReviewProjectContext
   totalEntries: number
@@ -101,11 +106,13 @@ function ReviewTopBar({
   totalDuration: number
   submitting: boolean
   allReviewed: boolean
+  notesCount: number
   onSkip: () => void
   onSubmit: () => void
+  onToggleNotes: () => void
 }) {
   return (
-    <div className="sticky top-0 z-50 bg-background border-b border-border px-4 py-2 flex items-center gap-3 shrink-0">
+    <div className="z-50 bg-background border-b border-border px-4 py-2 flex items-center gap-3 shrink-0">
       <Button variant="outline" size="sm" asChild>
         <Link href="/admin/reviews/time_audits">End Session</Link>
       </Button>
@@ -115,14 +122,25 @@ function ReviewTopBar({
 
       <Separator orientation="vertical" className="h-6" />
 
-      <a href={`/admin/projects/${project.id}`} target="_blank" rel="noopener noreferrer" className="font-semibold truncate hover:underline">
+      <a
+        href={`/admin/projects/${project.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-semibold truncate hover:underline"
+      >
         {project.name}
       </a>
-      <a href={`/admin/projects/${project.id}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground text-sm hover:underline">
+      <a
+        href={`/admin/projects/${project.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-muted-foreground text-sm hover:underline"
+      >
         (#{project.id})
       </a>
       <span className="text-sm text-muted-foreground">
-        {totalEntries} {totalEntries === 1 ? 'entry' : 'entries'} to review ({formatDuration(approvedSeconds)} / {formatDuration(totalDuration)})
+        {totalEntries} {totalEntries === 1 ? 'entry' : 'entries'} to review ({formatDuration(approvedSeconds)} /{' '}
+        {formatDuration(totalDuration)})
       </span>
 
       <div className="flex items-center gap-2 ml-auto">
@@ -140,6 +158,11 @@ function ReviewTopBar({
             </a>
           </Button>
         )}
+
+        <Button variant="outline" size="sm" onClick={onToggleNotes}>
+          <MessageSquareTextIcon data-icon="inline-start" />
+          Project Notes{notesCount > 0 && ` (${notesCount})`}
+        </Button>
 
         <Separator orientation="vertical" className="h-6" />
 
@@ -974,7 +997,7 @@ function EntrySection({
   }, [allSaved, isLast])
 
   return (
-    <div className="flex flex-col" style={expanded ? { height: 'calc(100vh - 45px)' } : undefined}>
+    <div className="flex flex-col snap-start" style={expanded ? { height: 'calc(100vh - 45px)' } : undefined}>
       {/* Entry header */}
       <button
         onClick={() => setExpanded((e) => !e)}
@@ -1074,6 +1097,8 @@ interface PageProps {
   new_entries: ReviewJournalEntry[]
   previous_entries: ReviewJournalEntry[]
   sibling_statuses: SiblingStatuses
+  reviewer_notes?: ReviewerNote[]
+  reviewer_notes_path: string
   can: { update: boolean }
   skip: string | null
   heartbeat_path: string
@@ -1086,6 +1111,8 @@ export default function TimeAuditsShow({
   project,
   new_entries,
   previous_entries,
+  reviewer_notes,
+  reviewer_notes_path,
   skip,
   heartbeat_path,
   next_path,
@@ -1119,6 +1146,7 @@ export default function TimeAuditsShow({
   })
   const [savingRecording, setSavingRecording] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
 
   // totalDuration = sum of API times (real tracked seconds, source of truth)
   const totalDuration = useMemo(() => new_entries.reduce((sum, e) => sum + e.total_duration, 0), [new_entries])
@@ -1292,7 +1320,7 @@ export default function TimeAuditsShow({
   }, [review.id, approvedSeconds, skip])
 
   return (
-    <>
+    <div className="h-screen flex flex-col overflow-hidden">
       <ReviewTopBar
         project={project}
         totalEntries={new_entries.length}
@@ -1300,27 +1328,41 @@ export default function TimeAuditsShow({
         totalDuration={totalDuration}
         submitting={submitting}
         allReviewed={allReviewed}
+        notesCount={reviewer_notes?.length ?? 0}
         onSkip={handleSkip}
         onSubmit={handleSubmit}
+        onToggleNotes={() => setNotesOpen((v) => !v)}
       />
 
-      {allEntries.map((entry, i) => (
-        <EntrySection
-          key={entry.id}
-          entry={entry}
-          index={i}
-          isNew={entry.isNew}
-          isLast={i === allEntries.length - 1}
-          annotations={annotations}
-          savedRecordings={savedRecordings}
-          onDescriptionChange={handleDescriptionChange}
-          onSegmentAdd={handleSegmentAdd}
-          onSegmentRemove={handleSegmentRemove}
-          onSave={handleSaveRecording}
-          savingRecording={savingRecording}
+      {notesOpen && reviewer_notes && (
+        <ProjectNotesWindow
+          notes={reviewer_notes}
+          notesPath={reviewer_notes_path}
+          shipId={review.ship_id}
+          reviewStage="time_audit"
+          onClose={() => setNotesOpen(false)}
         />
-      ))}
-    </>
+      )}
+
+      <div className="flex-1 min-h-0 overflow-y-auto snap-y snap-mandatory">
+        {allEntries.map((entry, i) => (
+          <EntrySection
+            key={entry.id}
+            entry={entry}
+            index={i}
+            isNew={entry.isNew}
+            isLast={i === allEntries.length - 1}
+            annotations={annotations}
+            savedRecordings={savedRecordings}
+            onDescriptionChange={handleDescriptionChange}
+            onSegmentAdd={handleSegmentAdd}
+            onSegmentRemove={handleSegmentRemove}
+            onSave={handleSaveRecording}
+            savingRecording={savingRecording}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_03_195424) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_03_211207) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -356,6 +356,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_03_195424) do
     t.index ["status"], name: "index_requirements_check_reviews_on_status"
   end
 
+  create_table "reviewer_notes", force: :cascade do |t|
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.bigint "project_id", null: false
+    t.string "review_stage"
+    t.bigint "ship_id"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["project_id"], name: "index_reviewer_notes_on_project_id"
+    t.index ["ship_id"], name: "index_reviewer_notes_on_ship_id"
+    t.index ["user_id"], name: "index_reviewer_notes_on_user_id"
+  end
+
   create_table "ships", force: :cascade do |t|
     t.integer "approved_seconds"
     t.datetime "created_at", null: false
@@ -606,6 +619,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_03_195424) do
   add_foreign_key "recordings", "users"
   add_foreign_key "requirements_check_reviews", "ships"
   add_foreign_key "requirements_check_reviews", "users", column: "reviewer_id"
+  add_foreign_key "reviewer_notes", "projects"
+  add_foreign_key "reviewer_notes", "ships"
+  add_foreign_key "reviewer_notes", "users"
   add_foreign_key "ships", "preflight_runs"
   add_foreign_key "ships", "projects"
   add_foreign_key "ships", "users", column: "reviewer_id"

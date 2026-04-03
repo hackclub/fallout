@@ -36,6 +36,8 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
       new_entries: new_entries.map { |je| serialize_journal_entry(je) },
       previous_entries: previous_entries.map { |je| serialize_journal_entry(je) },
       sibling_statuses: serialize_sibling_statuses(ship),
+      reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
+      reviewer_notes_path: admin_project_reviewer_notes_path(project),
       can: { update: policy(@review).update? },
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_time_audit_path(@review),

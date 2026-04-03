@@ -74,6 +74,7 @@ class User < ApplicationRecord
   has_many :collaborated_projects, through: :collaborations, source: :collaboratable, source_type: "Project"
   has_many :received_collaboration_invites, -> { kept }, class_name: "CollaborationInvite", foreign_key: :invitee_id, dependent: :destroy, inverse_of: :invitee
   has_many :sent_collaboration_invites, -> { kept }, class_name: "CollaborationInvite", foreign_key: :inviter_id, dependent: :destroy, inverse_of: :inviter
+  has_many :reviewer_notes
 
   encrypts :hca_token
   encrypts :lapse_token

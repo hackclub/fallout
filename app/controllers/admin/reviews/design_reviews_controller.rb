@@ -14,9 +14,12 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
 
   def show
     authorize @review
+    project = @review.ship.project
 
     render inertia: {
       review: serialize_review_detail(@review),
+      reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
+      reviewer_notes_path: admin_project_reviewer_notes_path(project),
       can: { update: policy(@review).update? },
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_design_review_path(@review),
