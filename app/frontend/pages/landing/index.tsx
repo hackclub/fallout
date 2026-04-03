@@ -61,7 +61,8 @@ export default function LandingIndex() {
   useEffect(() => {
     if ('ontouchstart' in window) return
     const style = document.createElement('style')
-    style.textContent = '*, *::before, *::after { cursor: none !important; } iframe { cursor: auto !important; }'
+    style.textContent =
+      '*:not(iframe), *::before, *::after { cursor: none !important; } iframe { cursor: auto !important; }'
     document.head.appendChild(style)
     return () => {
       document.head.removeChild(style)
@@ -275,24 +276,18 @@ export default function LandingIndex() {
       document.addEventListener('mouseleave', onDocumentLeave)
       stickerCleanups.push(() => document.removeEventListener('mouseleave', onDocumentLeave))
 
-      const onWindowBlur = () => {
+      // Hide custom cursors when mouse enters an iframe or window loses focus
+      const hideCursors = () => {
         cursorVisible = false
         gsap.set(customCursor, { opacity: 0 })
         if (pointerCursor) gsap.set(pointerCursor, { opacity: 0 })
       }
-      window.addEventListener('blur', onWindowBlur)
-      stickerCleanups.push(() => window.removeEventListener('blur', onWindowBlur))
-
-      // iframes capture mouse events so mousemove stops firing over them; hide custom cursor there
-      const iframe = iframeRef.current
-      if (iframe) {
-        const onIframeEnter = () => {
-          gsap.set(customCursor, { opacity: 0 })
-          if (pointerCursor) gsap.set(pointerCursor, { opacity: 0 })
-        }
-        iframe.addEventListener('mouseenter', onIframeEnter)
-        stickerCleanups.push(() => iframe.removeEventListener('mouseenter', onIframeEnter))
-      }
+      window.addEventListener('blur', hideCursors)
+      stickerCleanups.push(() => window.removeEventListener('blur', hideCursors))
+      document.querySelectorAll('iframe').forEach((iframe) => {
+        iframe.addEventListener('mouseenter', hideCursors)
+        stickerCleanups.push(() => iframe.removeEventListener('mouseenter', hideCursors))
+      })
     }
 
     const hero = document.getElementById('hero')!
@@ -968,7 +963,11 @@ export default function LandingIndex() {
                       <a href="https://hackclub.enterprise.slack.com/archives/C0ACJ290090" className="font-bold">
                         #fallout-help
                       </a>{' '}
-                      on the <a href="http://slack.hackclub.com/">Hack Club Slack</a>, or email us at{' '}
+                      on the{' '}
+                      <a href="http://slack.hackclub.com/" className="underline" target="_self">
+                        Hack Club Slack
+                      </a>
+                      , or email us at{' '}
                       <a href="mailto:fallout@hackclub.com" className="underline">
                         fallout@hackclub.com
                       </a>
@@ -1000,16 +999,143 @@ export default function LandingIndex() {
               ))}
             </div>
           </section>
-          <footer className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 bg-beige text-dark-brown pb-8 relative flex items-end gap-4">
-            <div className="space-y-2 text-xl xl:text-2xl">
-              <p className="font-medium mt-2 leading-6 ">Fallout is made with ♡ by teenagers, for teenagers</p>
-              <div className="space-x-4">
-                <a href="https://hackclub.com" target="_blank" rel="noreferrer" className="underline">
+          <footer className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 bg-beige text-dark-brown pb-8 relative">
+            <div className="max-w-6xl mx-auto">
+              <p className="mb-4 text-lg md:text-xl font-rc-full">
+                A project by{' '}
+                <a
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline transition-colors text-bp-warning"
+                  href="https://hackclub.com?utm_source=fallout"
+                >
                   Hack Club
+                </a>{' '}
+                built by the <span style={{ fontFamily: 'Hells Bells' }}>FALLOUT</span> Team
+              </p>
+              <p className="max-w-3xl text-dark-brown/75 text-sm md:text-base mb-8">
+                Hack Club is a 501(c)(3) nonprofit and network of 60k+ technical high schoolers. We believe you learn
+                best by building so we're creating community and providing grants so you can make awesome projects. In
+                the past few years, we've{' '}
+                <a
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-bp-warning transition-colors"
+                  href="https://summer.hackclub.com/"
+                >
+                  partnered with GitHub to run Summer of Making
                 </a>
-                <a href="https://hackclub.com/slack" target="_blank" rel="noreferrer" className="underline">
-                  Join Our Slack
+                ,{' '}
+                <a
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-bp-warning transition-colors"
+                  href="https://github.com/hackclub/the-hacker-zephyr"
+                >
+                  hosted the world's longest hackathon on land
                 </a>
+                , and{' '}
+                <a
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-bp-warning transition-colors"
+                  href="https://www.youtube.com/watch?v=QvCoISXfcE8"
+                >
+                  ran Canada's largest high school hackathon
+                </a>
+                .<br />
+                <br />
+                At Hack Club, students aren't just learning, they're shipping.
+              </p>
+              <div className="flex flex-wrap gap-x-16 gap-y-8">
+                <div className="flex flex-col">
+                  <p className="mb-3 text-base md:text-lg font-rc-full font-bold">Hack Club</p>
+                  <div className="text-sm md:text-base space-y-1">
+                    <a
+                      className="block hover:text-bp-warning transition-colors"
+                      href="https://hackclub.com/philosophy/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Philosophy
+                    </a>
+                    <a
+                      className="block hover:text-bp-warning transition-colors"
+                      href="https://hackclub.com/team/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Our Team &amp; Board
+                    </a>
+                    <a
+                      className="block hover:text-bp-warning transition-colors"
+                      href="https://hackclub.com/brand/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Branding
+                    </a>
+                    <a
+                      className="block hover:text-bp-warning transition-colors"
+                      href="https://hackclub.com/philanthropy/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Donate
+                    </a>
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <p className="mb-3 text-base md:text-lg font-rc-full font-bold">Fallout</p>
+                  <div className="text-sm md:text-base space-y-1">
+                    <a href="/docs/where-to-start" className="block hover:text-bp-warning transition-colors">
+                      Where do I start?
+                    </a>
+                    <a href="/docs" className="block hover:text-bp-warning transition-colors">
+                      Docs
+                    </a>
+                    <a href="https://lookout.hackclub.com" className="block hover:text-bp-warning transition-colors">
+                      Lookout
+                    </a>
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <p className="mb-3 text-base md:text-lg font-rc-full font-bold">Resources</p>
+                  <div className="text-sm md:text-base space-y-1">
+                    <a
+                      className="block hover:text-bp-warning transition-colors"
+                      href="https://events.hackclub.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Community Events
+                    </a>
+                    <a
+                      className="block hover:text-bp-warning transition-colors"
+                      href="https://jams.hackclub.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Jams
+                    </a>
+                    <a
+                      className="block hover:text-bp-warning transition-colors"
+                      href="https://workshops.hackclub.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Workshops
+                    </a>
+                    <a
+                      className="block hover:text-bp-warning transition-colors"
+                      href="https://hackclub.com/conduct/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Code of Conduct
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </footer>
