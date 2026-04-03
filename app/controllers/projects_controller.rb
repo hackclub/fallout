@@ -78,8 +78,15 @@ class ProjectsController < ApplicationController
       if request.headers["X-InertiaUI-Modal"].present? && params[:return_to] != "path"
         head :no_content
       else
-        # Onboarding modal sends return_to=path so the redirect closes the modal and updates tooltips
-        destination = params[:return_to] == "path" ? path_path : projects_path
+        # Onboarding flows use return_to to land on /path autoopen the projects modal
+        destination = case params[:return_to]
+        when "path"
+          path_path
+        when "path_projects"
+          path_path(open: "projects", nudge: "read_docs")
+        else
+          projects_path
+        end
         redirect_to destination, notice: "Project created."
       end
     else

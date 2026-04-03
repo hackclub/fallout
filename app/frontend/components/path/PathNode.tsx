@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useContext } from 'react'
-import { usePage } from '@inertiajs/react'
+import { Link, usePage } from '@inertiajs/react'
 // @ts-expect-error useModalStack lacks type declarations in this beta package
 import { ModalLink, useModalStack } from '@inertiaui/modal-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
@@ -82,9 +82,9 @@ export default function PathNode({
     <div style={{ pointerEvents: 'auto' }} className="cursor-pointer">
       {index === 0 ? (
         state === 'active' && interactive ? (
-          <ModalLink href="/projects/onboarding" className="outline-0">
+          <Link href="/projects/onboarding" className="outline-0">
             {starImage}
-          </ModalLink>
+          </Link>
         ) : state === 'completed' && interactive ? (
           <button
             onClick={() =>

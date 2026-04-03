@@ -1,8 +1,9 @@
 import { type ReactNode, useState } from 'react'
-import { router } from '@inertiajs/react'
+import { Link, router } from '@inertiajs/react'
 import DialogueStep from '../../components/onboarding/DialogueStep'
 import SingleChoiceStep from '../../components/onboarding/SingleChoiceStep'
 import MultiChoiceStep from '../../components/onboarding/MultiChoiceStep'
+import Button from '@/components/shared/Button'
 
 interface OnboardingStep {
   key: string

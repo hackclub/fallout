@@ -176,7 +176,7 @@ export default function BgmPlayer({ hasProjects = false }: { hasProjects?: boole
   const track = TRACKS[trackIndex]
 
   return (
-    <Frame>
+    <Frame showBorderOnMobile>
       <div className="flex flex-col w-60 gap-1 p-4">
         <div>
           <p className="text-lg font-medium text-dark-brown truncate text-center">{track.title}</p>

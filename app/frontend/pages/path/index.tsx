@@ -66,7 +66,8 @@ export default function PathIndex() {
   const [autoOpenModal, setAutoOpenModal] = useState(() => {
     if (typeof window === 'undefined') return false
     const params = new URLSearchParams(window.location.search)
-    return params.get('open') === 'journal'
+    const open = params.get('open')
+    return open === 'journal' || open === 'projects'
   })
 
   const pathNodes = useMemo(
@@ -98,16 +99,34 @@ export default function PathIndex() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    const open = params.get('open')
+    const projectId = params.get('project_id')
+    const shouldNudgeDocs = params.get('nudge') === 'read_docs'
 
-    if (params.get('open') === 'journal') {
-      const projectId = params.get('project_id')
+    if (shouldNudgeDocs) {
+      setReadDocsNudge(true)
+    }
+
+    if (open === 'journal' || open === 'projects' || shouldNudgeDocs) {
       params.delete('open')
       params.delete('project_id')
+      params.delete('nudge')
       const newUrl = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname
       window.history.replaceState({}, '', newUrl)
-      const modalUrl = projectId ? `/projects/${projectId}/journal_entries/new` : '/journal_entries/new'
-      visitModal(modalUrl, { config: { duration: 0 } }).then(() => setAutoOpenModal(false))
     }
+
+    if (open === 'journal') {
+      const modalUrl = projectId ? `/projects/${projectId}/journal_entries/new` : '/journal_entries/new'
+      visitModal(modalUrl, { config: { duration: 0 } }).finally(() => setAutoOpenModal(false))
+      return
+    }
+
+    if (open === 'projects') {
+      visitModal('/projects').finally(() => setAutoOpenModal(false))
+      return
+    }
+
+    setAutoOpenModal(false)
   }, [])
 
   function reloadPathProgress() {
