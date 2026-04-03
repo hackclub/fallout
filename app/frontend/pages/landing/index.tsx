@@ -828,6 +828,14 @@ export default function LandingIndex() {
                   ),
                 },
                 {
+                  q: "Can I work in teams?",
+                  a: (
+                    <>
+                      Yes! After creating a new project, you can invite your teammates! 
+                    </>
+                  ),
+                },
+                {
                   q: 'Am I eligible?',
                   a: (
                     <>
