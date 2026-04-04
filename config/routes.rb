@@ -136,6 +136,8 @@ Rails.application.routes.draw do
         end
       end
 
+      resources :project_flags, only: [ :index, :create ]
+
       resources :projects, only: [] do
         resources :reviewer_notes, only: [ :create, :update, :destroy ]
       end

@@ -67,3 +67,47 @@
 
   color-scheme: dark;
 }
+
+.admin.dark .markdown-content {
+  color: oklch(0.9 0 0);
+}
+
+.admin.dark .markdown-content a {
+  color: #6db8e0;
+}
+
+.admin.dark .markdown-content a:hover {
+  background: rgba(109, 184, 224, 0.1);
+}
+
+.admin.dark .markdown-content code {
+  background-color: oklch(0.3 0 0);
+  color: oklch(0.9 0 0);
+}
+
+.admin.dark .markdown-content pre {
+  background-color: oklch(0.25 0 0);
+  color: oklch(0.9 0 0);
+}
+
+.admin.dark .markdown-content blockquote {
+  background: oklch(0.25 0 0);
+}
+
+.admin.dark .markdown-content h1,
+.admin.dark .markdown-content h2 {
+  border-bottom-color: oklch(0.4 0 0);
+}
+
+.admin.dark .markdown-content th {
+  border-bottom-color: oklch(0.4 0 0);
+}
+
+.admin.dark .markdown-content hr {
+  border-top-color: oklch(0.4 0 0);
+}
+
+.admin.dark .markdown-content aside {
+  background-color: oklch(0.25 0 0);
+  color: oklch(0.9 0 0);
+}

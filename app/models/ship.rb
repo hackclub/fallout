@@ -45,6 +45,7 @@ class Ship < ApplicationRecord
   has_one :design_review
   has_one :build_review
   has_many :reviewer_notes, dependent: :nullify
+  has_many :project_flags, dependent: :nullify
 
   enum :status, { pending: 0, approved: 1, returned: 2, rejected: 3 }
   enum :ship_type, { design: 0, build: 1 }, prefix: true

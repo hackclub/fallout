@@ -50,6 +50,7 @@ class Project < ApplicationRecord
   has_many :collaborator_users, through: :collaborators, source: :user
   has_many :collaboration_invites, -> { kept }, dependent: :destroy
   has_many :reviewer_notes, dependent: :destroy
+  has_many :project_flags, dependent: :destroy
 
   def discard
     transaction do
@@ -68,6 +69,10 @@ class Project < ApplicationRecord
   def owner_or_collaborator?(user)
     return false unless user
     user_id == user.id || collaborator?(user)
+  end
+
+  def flagged?
+    project_flags.exists?
   end
 
   validates :name, presence: true

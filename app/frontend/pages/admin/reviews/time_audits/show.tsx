@@ -14,6 +14,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/admin/ui/dropdown-menu'
 import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/admin/ui/alert-dialog'
+import {
   UserIcon,
   GitBranchIcon,
   ClockIcon,
@@ -30,6 +41,7 @@ import {
   CrosshairIcon,
   SparklesIcon,
   MessageSquareTextIcon,
+  FlagIcon,
 } from 'lucide-react'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import type {
@@ -96,9 +108,12 @@ function ReviewTopBar({
   submitting,
   allReviewed,
   notesCount,
+  projectFlagged,
+  flagging,
   onSkip,
   onSubmit,
   onToggleNotes,
+  onFlag,
 }: {
   project: ReviewProjectContext
   totalEntries: number
@@ -107,10 +122,15 @@ function ReviewTopBar({
   submitting: boolean
   allReviewed: boolean
   notesCount: number
+  projectFlagged: boolean
+  flagging: boolean
   onSkip: () => void
   onSubmit: () => void
   onToggleNotes: () => void
+  onFlag: (reason: string) => void
 }) {
+  const [flagReason, setFlagReason] = useState('')
+
   return (
     <div className="z-50 bg-background border-b border-border px-4 py-2 flex items-center gap-3 shrink-0">
       <Button variant="outline" size="sm" asChild>
@@ -163,6 +183,44 @@ function ReviewTopBar({
           <MessageSquareTextIcon data-icon="inline-start" />
           Project Notes{notesCount > 0 && ` (${notesCount})`}
         </Button>
+
+        {projectFlagged ? (
+          <Badge variant="destructive">Flagged</Badge>
+        ) : (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm">
+                <FlagIcon data-icon="inline-start" />
+                Flag Project
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Flag Project for Fraud</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove the project from all review queues. The user will not be notified — the project will
+                  still appear as pending to them.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Textarea
+                placeholder="Reason for flagging..."
+                value={flagReason}
+                onChange={(e) => setFlagReason(e.target.value)}
+                className="min-h-20"
+              />
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  disabled={!flagReason.trim() || flagging}
+                  onClick={() => onFlag(flagReason.trim())}
+                >
+                  Flag Project
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
 
         <Separator orientation="vertical" className="h-6" />
 
@@ -550,46 +608,56 @@ function SegmentEditor({
           Approved: <span className="font-medium text-foreground">{formatDuration(Math.round(approvedSec))}</span>
         </span>
         {removedRealSec > 0 && (
-          <span className="text-red-600">−{formatDuration(Math.round(removedRealSec))} removed</span>
+          <span className="text-red-600 dark:text-red-400">−{formatDuration(Math.round(removedRealSec))} removed</span>
         )}
         {deflatedRealSec > 0 && (
-          <span className="text-amber-600">−{formatDuration(Math.round(deflatedRealSec))} deflated</span>
+          <span className="text-amber-600 dark:text-amber-400">
+            −{formatDuration(Math.round(deflatedRealSec))} deflated
+          </span>
         )}
       </div>
 
-      {/* Existing segments */}
+      {/* Existing segments — sorted by timeline position */}
       {segments.length > 0 && (
         <div className="space-y-1">
-          {segments.map((seg, i) => {
-            const videoRange = seg.end_seconds - seg.start_seconds
-            const rangeMin = Math.round(videoRange * 10) / 10 // 1 video sec ≈ 1 real min
-            const deflatedToMin =
-              seg.type === 'deflated' && seg.deflated_percent
-                ? Math.round(((rangeMin * (100 - seg.deflated_percent)) / 100) * 10) / 10
-                : null
-            return (
-              <div
-                key={i}
-                className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded ${
-                  seg.type === 'removed' ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'
-                }`}
-              >
-                <span className="font-medium capitalize">{seg.type}</span>
-                <span className="text-muted-foreground">
-                  {formatTimestamp(seg.start_seconds)} – {formatTimestamp(seg.end_seconds)}
-                </span>
-                <span className="flex-1 truncate">{seg.reason}</span>
-                {deflatedToMin !== null && (
-                  <span className="font-medium shrink-0">
-                    {rangeMin}m → {deflatedToMin}m
+          {[...segments.map((seg, i) => ({ seg, origIndex: i }))]
+            .sort((a, b) => a.seg.start_seconds - b.seg.start_seconds)
+            .map(({ seg, origIndex: i }) => {
+              const videoRange = seg.end_seconds - seg.start_seconds
+              const rangeMin = Math.round(videoRange * 10) / 10 // 1 video sec ≈ 1 real min
+              const deflatedToMin =
+                seg.type === 'deflated' && seg.deflated_percent
+                  ? Math.round(((rangeMin * (100 - seg.deflated_percent)) / 100) * 10) / 10
+                  : null
+              return (
+                <div
+                  key={i}
+                  className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded ${
+                    seg.type === 'removed'
+                      ? 'bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200'
+                      : 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+                  }`}
+                >
+                  <span className="font-medium capitalize">{seg.type}</span>
+                  <span className="text-muted-foreground">
+                    {formatTimestamp(seg.start_seconds)} – {formatTimestamp(seg.end_seconds)}
                   </span>
-                )}
-                <button onClick={() => onRemove(i)} className="text-muted-foreground hover:text-foreground">
-                  <Trash2Icon className="size-3" />
-                </button>
-              </div>
-            )
-          })}
+                  <span className="flex-1 truncate">{seg.reason}</span>
+                  {seg.type === 'removed' ? (
+                    <span className="font-medium shrink-0">−{rangeMin}m</span>
+                  ) : (
+                    deflatedToMin !== null && (
+                      <span className="font-medium shrink-0">
+                        {rangeMin}m → {deflatedToMin}m
+                      </span>
+                    )
+                  )}
+                  <button onClick={() => onRemove(i)} className="text-muted-foreground hover:text-foreground">
+                    <Trash2Icon className="size-3" />
+                  </button>
+                </div>
+              )
+            })}
         </div>
       )}
 
@@ -714,7 +782,9 @@ function SegmentEditor({
           )}
 
           {/* Overlap error */}
-          {overlapError && <p className="text-xs text-red-600">This range overlaps with an existing segment.</p>}
+          {overlapError && (
+            <p className="text-xs text-red-600 dark:text-red-400">This range overlaps with an existing segment.</p>
+          )}
 
           {/* Actions */}
           <div className="flex gap-2">
@@ -847,10 +917,10 @@ function RecordingBlock({
         <Badge
           className={`text-xs ${
             recording.type === 'LookoutTimelapse'
-              ? 'bg-blue-100 text-blue-700 border-blue-200'
+              ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800'
               : recording.type === 'LapseTimelapse'
-                ? 'bg-purple-100 text-purple-700 border-purple-200'
-                : 'bg-red-100 text-red-700 border-red-200'
+                ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800'
+                : 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800'
           }`}
           variant="outline"
         >
@@ -1070,7 +1140,8 @@ function EntrySection({
           {/* Right — journal */}
           <div className="w-1/2 overflow-y-auto p-4 text-xs">
             <div
-              className="markdown-content prose prose-xs max-w-none"
+              className="markdown-content max-w-none"
+              style={{ zoom: 0.75 }}
               dangerouslySetInnerHTML={{ __html: entry.content_html }}
             />
             {entry.images.length > 0 && (
@@ -1099,6 +1170,7 @@ interface PageProps {
   sibling_statuses: SiblingStatuses
   reviewer_notes?: ReviewerNote[]
   reviewer_notes_path: string
+  project_flagged: boolean
   can: { update: boolean }
   skip: string | null
   heartbeat_path: string
@@ -1113,6 +1185,7 @@ export default function TimeAuditsShow({
   previous_entries,
   reviewer_notes,
   reviewer_notes_path,
+  project_flagged,
   skip,
   heartbeat_path,
   next_path,
@@ -1133,6 +1206,39 @@ export default function TimeAuditsShow({
     router.visit(`${next_path}?skip=${skipIds.join(',')}`)
   }, [skip, review.id, next_path])
 
+  const handleFlag = useCallback(
+    async (reason: string) => {
+      setFlagging(true)
+      try {
+        const res = await fetch('/admin/project_flags', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-Token': csrfToken(),
+          },
+          body: JSON.stringify({
+            project_flag: {
+              project_id: project.id,
+              ship_id: review.ship_id,
+              review_stage: 'time_audit',
+              reason,
+            },
+          }),
+        })
+        if (res.ok) {
+          setIsFlagged(true)
+          const skipIds = skip ? skip.split(',') : []
+          skipIds.push(String(review.id))
+          router.visit(`${next_path}?skip=${skipIds.join(',')}`)
+        }
+      } finally {
+        setFlagging(false)
+      }
+    },
+    [project.id, review.ship_id, review.id, skip, next_path],
+  )
+
   const [annotations, setAnnotations] = useState<TimeAuditAnnotations>(review.annotations ?? { recordings: {} })
   const [savedRecordings, setSavedRecordings] = useState<Set<string>>(() => {
     const saved = new Set<string>()
@@ -1147,6 +1253,8 @@ export default function TimeAuditsShow({
   const [savingRecording, setSavingRecording] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
+  const [flagging, setFlagging] = useState(false)
+  const [isFlagged, setIsFlagged] = useState(project_flagged)
 
   // totalDuration = sum of API times (real tracked seconds, source of truth)
   const totalDuration = useMemo(() => new_entries.reduce((sum, e) => sum + e.total_duration, 0), [new_entries])
@@ -1329,9 +1437,12 @@ export default function TimeAuditsShow({
         submitting={submitting}
         allReviewed={allReviewed}
         notesCount={reviewer_notes?.length ?? 0}
+        projectFlagged={isFlagged}
+        flagging={flagging}
         onSkip={handleSkip}
         onSubmit={handleSubmit}
         onToggleNotes={() => setNotesOpen((v) => !v)}
+        onFlag={handleFlag}
       />
 
       {notesOpen && reviewer_notes && (

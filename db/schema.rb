@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_03_211207) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_03_221156) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -309,6 +309,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_03_211207) do
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["project_id"], name: "index_preflight_runs_on_project_id"
+  end
+
+  create_table "project_flags", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "project_id", null: false
+    t.text "reason", null: false
+    t.string "review_stage"
+    t.bigint "ship_id"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["project_id"], name: "index_project_flags_on_project_id"
+    t.index ["ship_id"], name: "index_project_flags_on_ship_id"
+    t.index ["user_id"], name: "index_project_flags_on_user_id"
   end
 
   create_table "projects", force: :cascade do |t|
@@ -614,6 +627,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_03_211207) do
   add_foreign_key "mail_messages", "users", column: "author_id"
   add_foreign_key "onboarding_responses", "users"
   add_foreign_key "preflight_runs", "projects"
+  add_foreign_key "project_flags", "projects"
+  add_foreign_key "project_flags", "ships"
+  add_foreign_key "project_flags", "users"
   add_foreign_key "projects", "users"
   add_foreign_key "recordings", "journal_entries"
   add_foreign_key "recordings", "users"

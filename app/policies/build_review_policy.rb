@@ -30,7 +30,8 @@ class BuildReviewPolicy < ApplicationPolicy
   class Scope < ApplicationPolicy::Scope
     def resolve
       if user&.admin? || user&.reviewer?
-        scope.all # admins and reviewers need visibility into all reviews
+        # Exclude reviews for flagged projects — they move to the admin flagged queue
+        scope.where.not(ship_id: Ship.where(project_id: ProjectFlag.select(:project_id)).select(:id))
       else
         scope.none
       end

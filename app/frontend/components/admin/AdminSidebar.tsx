@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link, usePage } from '@inertiajs/react'
 import type { SharedProps } from '@/types'
+import { useAdminDark } from '@/hooks/useAdminDark'
 import {
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
@@ -19,6 +20,7 @@ import {
   Activity,
   SlidersHorizontal,
   BriefcaseBusiness,
+  Flag,
 } from 'lucide-react'
 
 interface AdminStats {
@@ -29,6 +31,7 @@ interface AdminStats {
   pending_requirements_checks_count: number
   pending_design_reviews_count: number
   pending_build_reviews_count: number
+  flagged_projects_count: number
 }
 
 type NavItem = {
@@ -72,6 +75,13 @@ const navSections: { items: NavItem[]; adminOnly?: boolean }[] = [
     items: [
       { label: 'Projects', href: '/admin/projects', icon: FolderOpen, statKey: 'projects_count', adminOnly: true },
       { label: 'Users', href: '/admin/users', icon: Users, statKey: 'users_count', adminOnly: true },
+      {
+        label: 'Flagged',
+        href: '/admin/project_flags',
+        icon: Flag,
+        statKey: 'flagged_projects_count',
+        adminOnly: true,
+      },
     ],
   },
   {
@@ -88,22 +98,6 @@ const navSections: { items: NavItem[]; adminOnly?: boolean }[] = [
     ],
   },
 ]
-
-function useAdminDark() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('admin-dark') === 'true'
-  })
-
-  useEffect(() => {
-    const root = document.querySelector('.admin')
-    if (!root) return
-    root.classList.toggle('dark', dark)
-    localStorage.setItem('admin-dark', String(dark))
-  }, [dark])
-
-  return [dark, () => setDark((d) => !d)] as const
-}
 
 function renderNavItem(item: NavItem, pathname: string, collapsed: boolean, admin_stats?: AdminStats) {
   const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href))

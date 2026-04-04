@@ -38,6 +38,7 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
       sibling_statuses: serialize_sibling_statuses(ship),
       reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
       reviewer_notes_path: admin_project_reviewer_notes_path(project),
+      project_flagged: project.flagged?,
       can: { update: policy(@review).update? },
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_time_audit_path(@review),

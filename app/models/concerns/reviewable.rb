@@ -20,6 +20,8 @@ module Reviewable
       pending.where(
         "claim_expires_at IS NULL OR claim_expires_at <= :now OR reviewer_id = :uid",
         now: Time.current, uid: user.id
+      ).where.not(
+        ship_id: Ship.where(project_id: ProjectFlag.select(:project_id)).select(:id)
       )
     }
 

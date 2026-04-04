@@ -12,7 +12,8 @@ class Admin::ApplicationController < ApplicationController
           pending_time_audits_count: TimeAuditReview.pending.count,
           pending_requirements_checks_count: RequirementsCheckReview.pending.count,
           pending_design_reviews_count: DesignReview.pending.count,
-          pending_build_reviews_count: BuildReview.pending.count
+          pending_build_reviews_count: BuildReview.pending.count,
+          flagged_projects_count: ProjectFlag.select(:project_id).distinct.count
         }
       end
     }

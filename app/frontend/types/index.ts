@@ -264,6 +264,19 @@ export interface ReviewerNote {
   updated_at: string
 }
 
+export interface ProjectFlag {
+  id: number
+  project_id: number
+  project_name: string
+  user_display_name: string
+  flagged_by_display_name: string
+  flagged_by_avatar: string
+  ship_id: number | null
+  review_stage: string | null
+  reason: string
+  created_at: string
+}
+
 export interface ReviewRow {
   id: number
   ship_id: number
