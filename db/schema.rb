@@ -143,23 +143,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_174922) do
     t.index ["user_id"], name: "index_collaborators_on_user_id"
   end
 
-  create_table "collapse_timelapses", force: :cascade do |t|
-    t.string "collapse_session_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "last_refreshed_at"
-    t.string "name"
-    t.integer "screenshot_count"
-    t.text "session_token", null: false
-    t.string "status"
-    t.string "thumbnail_url"
-    t.integer "tracked_seconds"
-    t.datetime "updated_at", null: false
-    t.bigint "user_id", null: false
-    t.string "video_url"
-    t.index ["collapse_session_id"], name: "index_collapse_timelapses_on_collapse_session_id", unique: true
-    t.index ["user_id"], name: "index_collapse_timelapses_on_user_id"
-  end
-
   create_table "critters", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "journal_entry_id", null: false
@@ -219,6 +202,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_174922) do
     t.index ["project_id"], name: "index_journal_entries_on_project_id"
     t.index ["ship_id"], name: "index_journal_entries_on_ship_id"
     t.index ["user_id"], name: "index_journal_entries_on_user_id"
+  end
+
+  create_table "koi_transactions", force: :cascade do |t|
+    t.bigint "actor_id", null: false
+    t.integer "amount", null: false
+    t.datetime "created_at", null: false
+    t.text "description", null: false
+    t.string "reason", null: false
+    t.bigint "user_id", null: false
+    t.index ["actor_id"], name: "index_koi_transactions_on_actor_id"
+    t.index ["user_id", "created_at"], name: "index_koi_transactions_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_koi_transactions_on_user_id"
   end
 
   create_table "lapse_timelapses", force: :cascade do |t|
@@ -410,6 +405,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_174922) do
     t.index ["reviewer_id"], name: "index_ships_on_reviewer_id"
     t.index ["ship_type"], name: "index_ships_on_ship_type"
     t.index ["status"], name: "index_ships_on_status"
+  end
+
+  create_table "shop_items", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.boolean "featured", default: false, null: false
+    t.string "image_url"
+    t.string "name"
+    t.integer "price"
+    t.string "status", default: "available", null: false
+    t.boolean "ticket", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["status"], name: "index_shop_items_on_status"
+  end
+
+  create_table "shop_orders", force: :cascade do |t|
+    t.text "address"
+    t.text "admin_note"
+    t.datetime "created_at", null: false
+    t.integer "frozen_price", null: false
+    t.string "phone"
+    t.integer "quantity", default: 1, null: false
+    t.bigint "shop_item_id", null: false
+    t.string "state", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["shop_item_id"], name: "index_shop_orders_on_shop_item_id"
+    t.index ["state"], name: "index_shop_orders_on_state"
+    t.index ["user_id"], name: "index_shop_orders_on_user_id"
   end
 
   create_table "solid_queue_blocked_executions", force: :cascade do |t|
@@ -621,7 +645,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_174922) do
   add_foreign_key "collaboration_invites", "users", column: "invitee_id"
   add_foreign_key "collaboration_invites", "users", column: "inviter_id"
   add_foreign_key "collaborators", "users"
-  add_foreign_key "collapse_timelapses", "users"
   add_foreign_key "critters", "journal_entries"
   add_foreign_key "critters", "users"
   add_foreign_key "design_reviews", "ships"
@@ -629,6 +652,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_174922) do
   add_foreign_key "journal_entries", "projects"
   add_foreign_key "journal_entries", "ships"
   add_foreign_key "journal_entries", "users"
+  add_foreign_key "koi_transactions", "users"
+  add_foreign_key "koi_transactions", "users", column: "actor_id"
   add_foreign_key "lapse_timelapses", "users"
   add_foreign_key "lookout_timelapses", "users"
   add_foreign_key "mail_interactions", "mail_messages"
@@ -651,6 +676,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_174922) do
   add_foreign_key "ships", "preflight_runs"
   add_foreign_key "ships", "projects"
   add_foreign_key "ships", "users", column: "reviewer_id"
+  add_foreign_key "shop_orders", "shop_items"
+  add_foreign_key "shop_orders", "users"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

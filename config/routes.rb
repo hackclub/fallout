@@ -161,6 +161,9 @@ Rails.application.routes.draw do
         end
       end
       resources :activity_checks, only: [ :new, :create ]
+      resources :shop_items, only: [ :index, :create, :update, :destroy ] # Admin shop item management
+      resources :shop_orders, only: [ :index, :show, :update ] # Admin order management
+      resources :koi_transactions, only: [ :index, :new, :create ] # Admin koi adjustments
     end
   end
 
@@ -220,6 +223,10 @@ Rails.application.routes.draw do
   post "you_tube_videos/lookup" => "you_tube_videos#lookup", as: :lookup_you_tube_video
   resources :lookout_sessions, only: %i[new] do
     get :record, on: :collection # Token-based recording page: /lookout_sessions/record?token=...
+  end
+
+  resources :shop_items, path: "shop" do # Koi shop
+    resources :shop_orders, only: [ :new, :create, :show ], path: "orders" # Purchase flow
   end
 
   get "faq" => redirect("/docs/faq") # Shortcut to FAQ docs page

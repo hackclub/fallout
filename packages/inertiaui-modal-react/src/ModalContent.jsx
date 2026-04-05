@@ -8,7 +8,7 @@ const ModalContent = ({ modalContext, config, children }) => {
   const scopeClass = 'im-dur-' + useId().replace(/:/g, '')
 
   return (
-    <div className="im-modal-container fixed inset-0 z-40 overflow-y-auto p-4">
+    <div className="im-modal-container fixed inset-0 z-40 overflow-y-auto">
       {config.duration !== 300 && (
         <style>{`.${scopeClass} { transition-duration: ${config.duration}ms !important; }`}</style>
       )}

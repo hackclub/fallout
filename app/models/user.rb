@@ -70,6 +70,9 @@ class User < ApplicationRecord
   has_many :authored_mail_messages, class_name: "MailMessage", foreign_key: :author_id, dependent: :nullify, inverse_of: :author
   has_many :mail_interactions, dependent: :destroy
   has_many :critters, dependent: :destroy
+  has_many :koi_transactions, dependent: :destroy
+  has_many :acting_koi_transactions, class_name: "KoiTransaction", foreign_key: :actor_id, dependent: :nullify, inverse_of: :actor
+  has_many :shop_orders, dependent: :destroy
   has_many :collaborations, -> { kept }, class_name: "Collaborator", dependent: :destroy
   has_many :collaborated_projects, through: :collaborations, source: :collaboratable, source_type: "Project"
   has_many :received_collaboration_invites, -> { kept }, class_name: "CollaborationInvite", foreign_key: :invitee_id, dependent: :destroy, inverse_of: :invitee
@@ -303,8 +306,25 @@ class User < ApplicationRecord
     earliest_visit_with_ref&.utm_source
   end
 
+  def total_time_logged_seconds
+    project_ids = projects.kept.pluck(:id)
+    return 0 if project_ids.empty?
+
+    lapse = LapseTimelapse.joins(recording: :journal_entry)
+      .where(journal_entries: { project_id: project_ids, discarded_at: nil }).sum(:duration).to_i
+    youtube = YouTubeVideo.joins(recording: :journal_entry)
+      .where(journal_entries: { project_id: project_ids, discarded_at: nil }).sum(:duration_seconds).to_i
+    lookout = LookoutTimelapse.joins(recording: :journal_entry)
+      .where(journal_entries: { project_id: project_ids, discarded_at: nil }).sum(:duration).to_i
+
+    lapse + youtube + lookout
+  end
+
   def koi
-    0
+    return 0 if trial? # Trial users cannot earn or spend koi
+
+    koi_transactions.sum(:amount) -
+      shop_orders.where.not(state: :rejected).sum("frozen_price * quantity")
   end
 
   def self.normalize_country_code(country)

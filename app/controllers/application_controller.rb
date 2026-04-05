@@ -42,7 +42,8 @@ class ApplicationController < ActionController::Base
   inertia_share features: -> { # Feature flags for the frontend
     next {} unless current_user && !current_user.trial?
     {
-      collaborators: Flipper.enabled?(:collaborators, current_user)
+      collaborators: Flipper.enabled?(:collaborators, current_user),
+      shop: Flipper.enabled?(:shop, current_user)
     }
   }
   inertia_share has_unread_mail: -> { # Drives the envelope badge on the path page
