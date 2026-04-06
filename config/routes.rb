@@ -123,7 +123,10 @@ Rails.application.routes.draw do
           collection { get :next }
         end
         resources :requirements_checks, only: [ :index, :show, :update ] do
-          member { post :heartbeat }
+          member do
+            post :heartbeat
+            post :refresh_tree
+          end
           collection { get :next }
         end
         resources :design_reviews, only: [ :index, :show, :update ] do
@@ -136,7 +139,7 @@ Rails.application.routes.draw do
         end
       end
 
-      resources :project_flags, only: [ :index, :create ]
+      resources :project_flags, only: [ :index, :create, :destroy ]
 
       resources :projects, only: [] do
         resources :reviewer_notes, only: [ :create, :update, :destroy ]

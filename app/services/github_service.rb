@@ -38,6 +38,21 @@ module GithubService
     get("users/#{username}/repos", params)
   end
 
+  def repo_tree(owner, repo, branch = nil)
+    meta = self.repo(owner, repo)
+    branch ||= meta.dig("default_branch") || "main"
+    data = get("repos/#{owner}/#{repo}/git/trees/#{branch}", recursive: 1)
+    tree = data["tree"]&.map { |f| { path: f["path"], type: f["type"], size: f["size"] } }
+    {
+      entries: tree,
+      default_branch: branch,
+      pushed_at: meta["pushed_at"],
+      created_at: meta["created_at"]
+    }
+  rescue Error
+    nil
+  end
+
   def handle_response(response)
     case response.status
     when 200..299

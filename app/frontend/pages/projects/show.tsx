@@ -410,6 +410,35 @@ export default function ProjectsShow({
                   }
                   if (event.type === 'ship') {
                     const ship = event.ship
+                    const isReturned = ship.status === 'returned'
+
+                    if (isReturned && ship.feedback) {
+                      return (
+                        <Timeline.DetailItem
+                          key={`ship-${ship.id}`}
+                          isLast={isLast}
+                          header={
+                            <>
+                              <InlineUser avatar={project.user_avatar} display_name={project.user_display_name} />{' '}
+                              {shipStatusLabel(ship.status)} <TimeAgo datetime={event.iso} />.
+                            </>
+                          }
+                        >
+                          <div className="space-y-3">
+                            <p className="text-sm text-dark-brown whitespace-pre-wrap">{ship.feedback}</p>
+                            {can.ship && (
+                              <Button
+                                onClick={() => router.visit(`/projects/${project.id}/ship`)}
+                                className="px-4 py-1.5 text-sm"
+                              >
+                                Resubmit
+                              </Button>
+                            )}
+                          </div>
+                        </Timeline.DetailItem>
+                      )
+                    }
+
                     return (
                       <Timeline.SimpleItem
                         key={`ship-${ship.id}`}

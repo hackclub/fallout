@@ -7,6 +7,7 @@
 #  feedback         :text
 #  internal_reason  :text
 #  lock_version     :integer          default(0), not null
+#  repo_tree        :jsonb
 #  status           :integer          default("pending"), not null
 #  created_at       :datetime         not null
 #  updated_at       :datetime         not null
@@ -27,4 +28,12 @@
 #
 class RequirementsCheckReview < ApplicationRecord
   include Reviewable
+
+  after_create_commit :fetch_repo_tree
+
+  private
+
+  def fetch_repo_tree
+    FetchRepoTreeJob.perform_later(id)
+  end
 end

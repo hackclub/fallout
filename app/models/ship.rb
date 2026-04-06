@@ -40,10 +40,10 @@ class Ship < ApplicationRecord
   belongs_to :reviewer, class_name: "User", optional: true
   belongs_to :preflight_run, optional: true # Older ships predate PreflightRun tracking
 
-  has_one :time_audit_review
-  has_one :requirements_check_review
-  has_one :design_review
-  has_one :build_review
+  has_one :time_audit_review, dependent: :destroy
+  has_one :requirements_check_review, dependent: :destroy
+  has_one :design_review, dependent: :destroy
+  has_one :build_review, dependent: :destroy
   has_many :reviewer_notes, dependent: :nullify
   has_many :project_flags, dependent: :nullify
 
@@ -54,6 +54,7 @@ class Ship < ApplicationRecord
   encrypts :frozen_hca_data
 
   validates :status, presence: true
+  validate :status_transition_allowed, if: :status_changed?
 
   delegate :user, to: :project
 
@@ -62,7 +63,7 @@ class Ship < ApplicationRecord
     includes(:time_audit_review, :requirements_check_review, :design_review, :build_review)
   }
 
-  after_create_commit :create_initial_reviews!
+  after_create :create_initial_reviews! # after_create (not after_commit) so reviews are created in the same transaction — partial creation rolls back the ship
   after_update_commit :notify_status_change, if: :saved_change_to_status?
 
   def review_status
@@ -103,11 +104,34 @@ class Ship < ApplicationRecord
 
   def recompute_status!
     new_status = derive_status
-    update!(status: new_status) if status != new_status
+    sync_approved_seconds_from_ta!
+    if status != new_status
+      attrs = { status: new_status }
+      # Aggregate reviewer feedback onto the ship so MailDeliveryService includes it in notifications
+      attrs[:feedback] = aggregate_return_feedback if new_status == "returned"
+      update!(attrs)
+    end
     cancel_pending_reviews! if returned? || rejected?
   end
 
+  # Keep ship.approved_seconds in sync with the TA review's approved_seconds
+  def sync_approved_seconds_from_ta!
+    ta = time_audit_review
+    return unless ta&.approved? && ta.approved_seconds.present?
+    return if approved_seconds == ta.approved_seconds
+    update_columns(approved_seconds: ta.approved_seconds)
+  end
+
   private
+
+  TERMINAL_STATUSES = %w[approved returned rejected].freeze
+
+  # Prevent admin from bypassing the review pipeline by directly changing a terminal ship status
+  def status_transition_allowed
+    return if new_record?
+    return unless TERMINAL_STATUSES.include?(status_was)
+    errors.add(:status, "cannot transition from #{status_was}")
+  end
 
   def derive_status
     reviews = [ time_audit_review, requirements_check_review, phase_two_review ].compact
@@ -124,16 +148,79 @@ class Ship < ApplicationRecord
 
   def cancel_pending_reviews!
     [ time_audit_review, requirements_check_review, design_review, build_review ].compact.each do |review|
-      review.update!(status: :cancelled) if review.pending?
+      next unless review.pending?
+      review.skip_ship_recompute = true # Ship status is already set by the caller — skip redundant recomputations
+      review.update!(status: :cancelled)
     end
   end
 
   def create_initial_reviews!
-    TimeAuditReview.create!(ship: self)
+    ta = TimeAuditReview.create!(ship: self)
     RequirementsCheckReview.create!(ship: self)
+    carry_forward_ta_annotations!(ta)
+  end
+
+  def carry_forward_ta_annotations!(ta)
+    prev_ship = project.ships.where.not(id: id).order(created_at: :desc).first
+    prev_ta = prev_ship&.time_audit_review
+    return unless prev_ta&.approved? && prev_ta.annotations&.dig("recordings")&.any?
+
+    reviewed_ids = prev_ta.annotations["recordings"].keys.to_set
+    current_ids = new_journal_entries
+      .joins(:recordings)
+      .pluck("recordings.id").map(&:to_s).to_set
+
+    carried = prev_ta.annotations.deep_dup
+    carried["recordings"].select! { |id, _| current_ids.include?(id) }
+
+    new_recordings = current_ids - reviewed_ids
+
+    if new_recordings.empty?
+      # All current recordings already reviewed — auto-approve with recomputed time
+      ta.update!(
+        status: :approved,
+        annotations: carried,
+        approved_seconds: compute_approved_seconds(carried)
+      )
+    elsif carried["recordings"].any?
+      # New recordings need review; carry forward existing annotations
+      ta.update_columns(annotations: carried, updated_at: Time.current)
+    end
+  end
+
+  def compute_approved_seconds(annotations)
+    total = 0
+    new_journal_entries.includes(recordings: :recordable).each do |entry|
+      entry.recordings.each do |rec|
+        duration =
+          case rec.recordable
+          when LookoutTimelapse, LapseTimelapse then rec.recordable.duration.to_i
+          when YouTubeVideo then rec.recordable.duration_seconds.to_i
+          else 0
+          end
+        total += duration
+        segments = annotations.dig("recordings", rec.id.to_s, "segments") || []
+        segments.each do |seg|
+          video_range = seg["end_seconds"].to_f - seg["start_seconds"].to_f
+          real_range = video_range * 60
+          case seg["type"]
+          when "removed" then total -= real_range
+          when "deflated" then total -= real_range * (seg["deflated_percent"].to_f / 100)
+          end
+        end
+      end
+    end
+    [ total.round, 0 ].max
+  end
+
+  def aggregate_return_feedback
+    [ time_audit_review, requirements_check_review, design_review, build_review ]
+      .compact.select(&:returned?).filter_map(&:feedback).join("\n\n---\n\n")
   end
 
   def notify_status_change
     MailDeliveryService.ship_status_changed(self)
+  rescue => e
+    Rails.logger.error("Ship##{id} status notification failed: #{e.message}")
   end
 end

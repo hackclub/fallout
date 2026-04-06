@@ -10,7 +10,7 @@ class DesignReviewPolicy < ApplicationPolicy
   end
 
   def update?
-    admin? || active_claimer?
+    record.pending? && (admin? || active_claimer?) # Only pending reviews can be modified
   end
 
   def heartbeat?

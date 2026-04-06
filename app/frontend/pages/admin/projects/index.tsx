@@ -61,7 +61,7 @@ const columns: ColumnDef<AdminProjectRow>[] = [
     accessorKey: 'repo_link',
     header: 'Repo Link',
     cell: ({ row }) =>
-      row.original.repo_link ? (
+      row.original.repo_link && /^https?:\/\//i.test(row.original.repo_link) ? (
         <a
           href={row.original.repo_link}
           target="_blank"

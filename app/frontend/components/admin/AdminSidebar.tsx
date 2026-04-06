@@ -160,7 +160,7 @@ export default function AdminSidebar() {
 
   return (
     <aside
-      className={`shrink-0 overflow-hidden border-r border-border bg-sidebar text-sidebar-foreground flex flex-col transition-[width] duration-200 ease-in-out ${collapsed ? 'w-12' : 'w-56'}`}
+      className={`shrink-0 overflow-hidden border-r border-border bg-sidebar text-sidebar-foreground flex flex-col transition-[width] duration-200 ease-in-out sticky top-0 h-screen ${collapsed ? 'w-12' : 'w-56'}`}
     >
       {/* Header sits outside the fixed-width wrapper so the collapse button
           tracks the aside's actual width and stays visible when collapsed. */}

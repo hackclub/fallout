@@ -79,8 +79,12 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
   end
 
   def review_params
-    permitted = params.require(:time_audit_review).permit(:status, :feedback, :approved_seconds)
-    permitted[:annotations] = params[:time_audit_review][:annotations]&.to_unsafe_h if params.dig(:time_audit_review, :annotations)
+    permitted = params.require(:time_audit_review).permit(:status, :feedback, :approved_seconds, :lock_version)
+    if params.dig(:time_audit_review, :annotations)
+      raw = params[:time_audit_review][:annotations]&.to_unsafe_h
+      # Only allow the expected { "recordings" => { "<id>" => { ... } } } structure
+      permitted[:annotations] = raw.is_a?(Hash) ? raw.slice("recordings") : nil
+    end
     permitted
   end
 
@@ -92,6 +96,7 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
       feedback: review.feedback,
       approved_seconds: review.approved_seconds,
       annotations: review.annotations,
+      lock_version: review.lock_version,
       reviewer_display_name: review.reviewer&.display_name,
       created_at: review.created_at.strftime("%B %d, %Y")
     }
@@ -159,22 +164,5 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
     else
       base
     end
-  end
-
-  def recording_duration(recording)
-    case recording.recordable
-    when LookoutTimelapse, LapseTimelapse then recording.recordable.duration.to_i
-    when YouTubeVideo then recording.recordable.duration_seconds.to_i
-    else 0
-    end
-  end
-
-  def serialize_sibling_statuses(ship)
-    {
-      time_audit: ship.time_audit_review&.status,
-      requirements_check: ship.requirements_check_review&.status,
-      design_review: ship.design_review&.status,
-      build_review: ship.build_review&.status
-    }
   end
 end

@@ -10,7 +10,7 @@ class TimeAuditReviewPolicy < ApplicationPolicy
   end
 
   def update?
-    admin? || active_claimer?
+    record.pending? && (admin? || active_claimer?) # Only pending reviews can be modified
   end
 
   # Heartbeat extends the claim — only the active claimer (or admin) can call it

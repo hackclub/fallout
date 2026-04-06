@@ -15,7 +15,7 @@ class ShipPolicy < ApplicationPolicy
   end
 
   def update?
-    admin? || staff_reviewer? || assigned_reviewer?
+    admin? # Only admins can directly edit ships — reviewers use the review pipeline
   end
 
   def destroy?
@@ -38,11 +38,13 @@ class ShipPolicy < ApplicationPolicy
 
   class Scope < ApplicationPolicy::Scope
     def resolve
-      if user&.admin? || user&.reviewer?
-        scope.all # admins and reviewers need visibility into all ships for review workflows
+      if user&.admin?
+        scope.all
+      elsif user&.reviewer?
+        scope.where.not(project_id: ProjectFlag.select(:project_id)) # reviewers cannot see flagged-project ships, consistent with review queue scopes
       else
         return scope.none unless user
-        scope.for_user(user).or(scope.where(reviewer: user)) # regular users see their own ships plus any they've been assigned to review
+        scope.for_user(user).or(scope.where(reviewer: user))
       end
     end
   end

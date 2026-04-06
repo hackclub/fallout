@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/react'
 import type { ColumnDef } from '@tanstack/react-table'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
+import { Button } from '@/components/admin/ui/button'
 import { DataTable } from '@/components/admin/DataTable'
 import type { ReviewRow, PagyProps } from '@/types'
 
@@ -14,7 +15,41 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'ou
   cancelled: 'outline',
 }
 
-const columns: ColumnDef<ReviewRow>[] = [
+const pendingColumns: ColumnDef<ReviewRow>[] = [
+  {
+    accessorKey: 'project_name',
+    header: 'Project',
+    cell: ({ row }) => (
+      <Link href={`/admin/reviews/design_reviews/${row.original.id}`} className="font-medium hover:underline">
+        {row.original.project_name}
+      </Link>
+    ),
+  },
+  {
+    accessorKey: 'user_display_name',
+    header: 'Owner',
+  },
+  {
+    accessorKey: 'reviewer_display_name',
+    header: 'Reviewer',
+    cell: ({ row }) => {
+      if (row.original.is_claimed) {
+        return (
+          <Badge variant="outline" className="text-xs">
+            Claimed by {row.original.claimed_by_display_name}
+          </Badge>
+        )
+      }
+      return row.original.reviewer_display_name ?? <span className="text-muted-foreground">Unassigned</span>
+    },
+  },
+  {
+    accessorKey: 'created_at',
+    header: 'Waiting Since',
+  },
+]
+
+const allColumns: ColumnDef<ReviewRow>[] = [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -44,8 +79,8 @@ const columns: ColumnDef<ReviewRow>[] = [
   },
   {
     accessorKey: 'reviewer_display_name',
-    header: 'Reviewer',
-    cell: ({ row }) => row.original.reviewer_display_name ?? <span className="text-muted-foreground">Unassigned</span>,
+    header: 'Reviewed By',
+    cell: ({ row }) => row.original.reviewer_display_name ?? <span className="text-muted-foreground">—</span>,
   },
   {
     accessorKey: 'created_at',
@@ -53,11 +88,42 @@ const columns: ColumnDef<ReviewRow>[] = [
   },
 ]
 
-export default function DesignReviewsIndex({ reviews, pagy }: { reviews: ReviewRow[]; pagy: PagyProps }) {
+export default function DesignReviewsIndex({
+  pending_reviews,
+  all_reviews,
+  pagy,
+  start_reviewing_path,
+}: {
+  pending_reviews: ReviewRow[]
+  all_reviews: ReviewRow[]
+  pagy: PagyProps
+  start_reviewing_path: string
+}) {
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight mb-4">Design Review</h1>
-      <DataTable columns={columns} data={reviews} pagy={pagy} noun="reviews" />
+    <div className="space-y-8">
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Pending Design Reviews
+            {pending_reviews.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {pending_reviews.length}
+              </Badge>
+            )}
+          </h2>
+          {pending_reviews.length > 0 && (
+            <Button asChild size="sm">
+              <Link href={start_reviewing_path}>Start Reviewing</Link>
+            </Button>
+          )}
+        </div>
+        <DataTable columns={pendingColumns} data={pending_reviews} noun="pending reviews" />
+      </div>
+
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight mb-3">All Design Reviews</h2>
+        <DataTable columns={allColumns} data={all_reviews} pagy={pagy} noun="reviews" />
+      </div>
     </div>
   )
 }

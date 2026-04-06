@@ -110,6 +110,7 @@ function ReviewTopBar({
   notesCount,
   projectFlagged,
   flagging,
+  reviewStatus,
   onSkip,
   onSubmit,
   onToggleNotes,
@@ -124,11 +125,13 @@ function ReviewTopBar({
   notesCount: number
   projectFlagged: boolean
   flagging: boolean
+  reviewStatus: string
   onSkip: () => void
   onSubmit: () => void
   onToggleNotes: () => void
   onFlag: (reason: string) => void
 }) {
+  const isTerminal = reviewStatus !== 'pending'
   const [flagReason, setFlagReason] = useState('')
 
   return (
@@ -136,9 +139,11 @@ function ReviewTopBar({
       <Button variant="outline" size="sm" asChild>
         <Link href="/admin/reviews/time_audits">End Session</Link>
       </Button>
-      <Button variant="ghost" size="sm" onClick={onSkip}>
-        Skip
-      </Button>
+      {!isTerminal && (
+        <Button variant="ghost" size="sm" onClick={onSkip}>
+          Skip
+        </Button>
+      )}
 
       <Separator orientation="vertical" className="h-6" />
 
@@ -184,55 +189,71 @@ function ReviewTopBar({
           Project Notes{notesCount > 0 && ` (${notesCount})`}
         </Button>
 
-        {projectFlagged ? (
-          <Badge variant="destructive">Flagged</Badge>
+        {isTerminal ? (
+          <Badge
+            className={
+              reviewStatus === 'approved'
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                : reviewStatus === 'cancelled'
+                  ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                  : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
+            }
+          >
+            {reviewStatus}
+          </Badge>
         ) : (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
-                <FlagIcon data-icon="inline-start" />
-                Flag Project
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Flag Project for Fraud</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will remove the project from all review queues. The user will not be notified — the project will
-                  still appear as pending to them.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <Textarea
-                placeholder="Reason for flagging..."
-                value={flagReason}
-                onChange={(e) => setFlagReason(e.target.value)}
-                className="min-h-20"
-              />
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  disabled={!flagReason.trim() || flagging}
-                  onClick={() => onFlag(flagReason.trim())}
-                >
-                  Flag Project
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <>
+            {projectFlagged ? (
+              <Badge variant="destructive">Flagged</Badge>
+            ) : (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <FlagIcon data-icon="inline-start" />
+                    Flag Project
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Flag Project for Fraud</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will remove the project from all review queues. The user will not be notified — the project
+                      will still appear as pending to them.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <Textarea
+                    placeholder="Reason for flagging..."
+                    value={flagReason}
+                    onChange={(e) => setFlagReason(e.target.value)}
+                    className="min-h-20"
+                  />
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      disabled={!flagReason.trim() || flagging}
+                      onClick={() => onFlag(flagReason.trim())}
+                    >
+                      Flag Project
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
+            <Separator orientation="vertical" className="h-6" />
+
+            <Button
+              size="sm"
+              disabled={submitting || !allReviewed}
+              onClick={onSubmit}
+              title={!allReviewed ? 'Review all entries before submitting' : undefined}
+            >
+              <CheckIcon data-icon="inline-start" />
+              Submit
+            </Button>
+          </>
         )}
-
-        <Separator orientation="vertical" className="h-6" />
-
-        <Button
-          size="sm"
-          disabled={submitting || !allReviewed}
-          onClick={onSubmit}
-          title={!allReviewed ? 'Review all entries before submitting' : undefined}
-        >
-          <CheckIcon data-icon="inline-start" />
-          Submit
-        </Button>
       </div>
     </div>
   )
@@ -817,6 +838,7 @@ function RecordingBlock({
   description,
   segments,
   saved,
+  readOnly,
   onDescriptionChange,
   onSegmentAdd,
   onSegmentRemove,
@@ -827,6 +849,7 @@ function RecordingBlock({
   description: string
   segments: TimeAuditSegment[]
   saved: boolean
+  readOnly?: boolean
   onDescriptionChange: (description: string) => void
   onSegmentAdd: (seg: TimeAuditSegment) => void
   onSegmentRemove: (index: number) => void
@@ -959,42 +982,50 @@ function RecordingBlock({
       />
 
       {/* Segment editor — operates in video time, multiplier converts to API time */}
-      <SegmentEditor
-        recording={{ ...recording, duration: timelineDuration }}
-        segments={segments}
-        onAdd={onSegmentAdd}
-        onRemove={onSegmentRemove}
-        currentTime={currentTime}
-        snapPoints={snapPoints}
-        onPreviewChange={setPreview}
-      />
+      {!readOnly && (
+        <SegmentEditor
+          recording={{ ...recording, duration: timelineDuration }}
+          segments={segments}
+          onAdd={onSegmentAdd}
+          onRemove={onSegmentRemove}
+          currentTime={currentTime}
+          snapPoints={snapPoints}
+          onPreviewChange={setPreview}
+        />
+      )}
 
       {/* Description + save */}
       <div className="space-y-2">
-        <Textarea
-          value={description}
-          onChange={(e) => onDescriptionChange(e.target.value)}
-          placeholder="1-2 line summary for downstream reviewers"
-          className="h-14 text-sm resize-none"
-        />
-        <Button variant={saved ? 'outline' : 'default'} className="w-full" disabled={saving} onClick={onSave}>
-          {saving ? (
-            <>
-              <LoaderIcon className="size-4 animate-spin mr-1" />
-              Saving...
-            </>
-          ) : saved ? (
-            <>
-              <CheckIcon className="size-4 mr-1" />
-              Saved
-            </>
-          ) : (
-            <>
-              <SaveIcon className="size-4 mr-1" />
-              Save
-            </>
-          )}
-        </Button>
+        {readOnly ? (
+          description && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{description}</p>
+        ) : (
+          <>
+            <Textarea
+              value={description}
+              onChange={(e) => onDescriptionChange(e.target.value)}
+              placeholder="1-2 line summary for downstream reviewers"
+              className="h-14 text-sm resize-none"
+            />
+            <Button variant={saved ? 'outline' : 'default'} className="w-full" disabled={saving} onClick={onSave}>
+              {saving ? (
+                <>
+                  <LoaderIcon className="size-4 animate-spin mr-1" />
+                  Saving...
+                </>
+              ) : saved ? (
+                <>
+                  <CheckIcon className="size-4 mr-1" />
+                  Saved
+                </>
+              ) : (
+                <>
+                  <SaveIcon className="size-4 mr-1" />
+                  Save
+                </>
+              )}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   )
@@ -1009,6 +1040,7 @@ function EntrySection({
   isLast,
   annotations,
   savedRecordings,
+  readOnly,
   onDescriptionChange,
   onSegmentAdd,
   onSegmentRemove,
@@ -1021,6 +1053,7 @@ function EntrySection({
   isLast: boolean
   annotations: TimeAuditAnnotations
   savedRecordings: Set<string>
+  readOnly?: boolean
   onDescriptionChange: (recordingId: number, description: string) => void
   onSegmentAdd: (recordingId: number, seg: TimeAuditSegment) => void
   onSegmentRemove: (recordingId: number, index: number) => void
@@ -1123,6 +1156,7 @@ function EntrySection({
                   description={recAnnotation?.description ?? ''}
                   segments={recAnnotation?.segments ?? []}
                   saved={savedRecordings.has(recId)}
+                  readOnly={readOnly}
                   onDescriptionChange={(d) => onDescriptionChange(rec.id, d)}
                   onSegmentAdd={(seg) => onSegmentAdd(rec.id, seg)}
                   onSegmentRemove={(i) => onSegmentRemove(rec.id, i)}
@@ -1190,6 +1224,8 @@ export default function TimeAuditsShow({
   heartbeat_path,
   next_path,
 }: PageProps) {
+  const isTerminal = review.status !== 'pending'
+
   const allEntries = useMemo(
     () => [
       ...new_entries.map((e) => ({ ...e, isNew: true })),
@@ -1419,6 +1455,7 @@ export default function TimeAuditsShow({
           status: 'approved',
           annotations: annotationsRef.current,
           approved_seconds: approvedSeconds,
+          lock_version: review.lock_version,
         } as any,
       },
       {
@@ -1428,7 +1465,7 @@ export default function TimeAuditsShow({
   }, [review.id, approvedSeconds, skip])
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden border-t-3 border-blue-500">
       <ReviewTopBar
         project={project}
         totalEntries={new_entries.length}
@@ -1439,6 +1476,7 @@ export default function TimeAuditsShow({
         notesCount={reviewer_notes?.length ?? 0}
         projectFlagged={isFlagged}
         flagging={flagging}
+        reviewStatus={review.status}
         onSkip={handleSkip}
         onSubmit={handleSubmit}
         onToggleNotes={() => setNotesOpen((v) => !v)}
@@ -1465,6 +1503,7 @@ export default function TimeAuditsShow({
             isLast={i === allEntries.length - 1}
             annotations={annotations}
             savedRecordings={savedRecordings}
+            readOnly={isTerminal}
             onDescriptionChange={handleDescriptionChange}
             onSegmentAdd={handleSegmentAdd}
             onSegmentRemove={handleSegmentRemove}

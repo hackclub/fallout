@@ -106,6 +106,8 @@ export default function ProjectNotesWindow({
         const note: ReviewerNote = await res.json()
         setNotes((prev) => [note, ...prev])
         setNewBody('')
+      } else {
+        alert('Failed to create note. Please try again.')
       }
     } finally {
       setPosting(false)
@@ -129,9 +131,11 @@ export default function ProjectNotesWindow({
         setNotes((prev) => prev.map((n) => (n.id === id ? updated : n)))
         setEditingId(null)
         setEditBody('')
+      } else {
+        alert('Failed to update note. Please try again.')
       }
     } catch {
-      // Silently fail — user can retry
+      alert('Failed to update note. Please try again.')
     }
   }
 
@@ -143,9 +147,11 @@ export default function ProjectNotesWindow({
       })
       if (res.ok) {
         setNotes((prev) => prev.filter((n) => n.id !== id))
+      } else {
+        alert('Failed to delete note. Please try again.')
       }
     } catch {
-      // Silently fail
+      alert('Failed to delete note. Please try again.')
     }
   }
 

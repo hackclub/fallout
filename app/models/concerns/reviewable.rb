@@ -14,6 +14,7 @@ module Reviewable
 
     validates :status, presence: true
     validates :ship_id, uniqueness: true
+    validate :status_transition_allowed, if: :status_changed?
 
     scope :actively_claimed, -> { where("claim_expires_at > ?", Time.current) }
     scope :available_for, ->(user) {
@@ -27,6 +28,9 @@ module Reviewable
 
     # Update Ship's cached status in the SAME transaction (not after_commit) to prevent drift
     after_save :recompute_ship_status!, if: :saved_change_to_status?
+
+    # Set to true to skip recompute_ship_status! (e.g. during bulk cancellation where the caller recomputes once)
+    attr_accessor :skip_ship_recompute
   end
 
   # -- Claim instance methods (use update_columns to bypass callbacks) --
@@ -93,7 +97,17 @@ module Reviewable
 
   private
 
+  TERMINAL_STATUSES = %w[approved returned rejected cancelled].freeze
+
+  # Prevent modifications once a review reaches a terminal state (approved/returned/rejected/cancelled)
+  def status_transition_allowed
+    return if new_record?
+    return unless TERMINAL_STATUSES.include?(status_was)
+    errors.add(:status, "cannot transition from #{status_was}")
+  end
+
   def recompute_ship_status!
+    return if skip_ship_recompute
     ship.with_lock do
       ship.ensure_phase_two_review!
       ship.recompute_status!

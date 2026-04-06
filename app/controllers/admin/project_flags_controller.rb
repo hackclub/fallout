@@ -1,5 +1,6 @@
 class Admin::ProjectFlagsController < Admin::ApplicationController
-  before_action :require_admin!, only: [ :index ] # Only admins can view the flagged projects queue
+  before_action :require_admin! # Blanket admin requirement — staff create is explicitly relaxed below
+  skip_before_action :require_admin!, only: [ :create ] # Reviewers can flag projects from the review UI
 
   def index
     flags = policy_scope(ProjectFlag)
@@ -11,6 +12,13 @@ class Admin::ProjectFlagsController < Admin::ApplicationController
       flags: @flags.map { |f| serialize_flag(f) },
       pagy: pagy_props(@pagy)
     }
+  end
+
+  def destroy
+    @flag = ProjectFlag.find(params[:id])
+    authorize @flag
+    @flag.destroy!
+    redirect_to admin_project_flags_path, notice: "Flag removed."
   end
 
   def create

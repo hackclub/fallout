@@ -9,6 +9,10 @@ class ProjectFlagPolicy < ApplicationPolicy
     admin?
   end
 
+  def destroy?
+    admin? # Only admins can unflag projects
+  end
+
   private
 
   def staff_reviewer?

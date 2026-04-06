@@ -3,6 +3,9 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   skip_after_action :verify_authorized
   skip_after_action :verify_policy_scoped
 
+  # Optimistic locking: concurrent updates to the same review raise StaleObjectError
+  rescue_from ActiveRecord::StaleObjectError, with: :handle_stale_review
+
   before_action :set_review, only: %i[ show update heartbeat ]
   before_action :release_all_review_claims, only: %i[ index ]
   before_action :claim_review!, only: %i[ show ]
@@ -90,6 +93,10 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     (params[:skip] || "").split(",").filter_map { |id| id.to_i if id.present? }
   end
 
+  def handle_stale_review
+    redirect_to review_index_path, alert: "This review was modified by another reviewer. Your changes were not saved."
+  end
+
   def redirect_to_next_or_index(notice:)
     # Clear claim expiry but keep reviewer_id as audit trail on the completed review
     @review.update_columns(claim_expires_at: nil)
@@ -141,5 +148,95 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       is_claimed: review.claimed?,
       claimed_by_display_name: review.claimed? ? review.reviewer&.display_name : nil
     }
+  end
+
+  def serialize_project_context(project, ship)
+    total_hours = (project.time_logged / 3600.0).round(1)
+    entry_count = project.kept_journal_entries.size
+    approved_hours = ship.approved_seconds ? (ship.approved_seconds / 3600.0).round(1) : nil
+    first_ship = project.ships.order(:created_at).first
+    {
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      repo_link: project.repo_link,
+      demo_link: project.demo_link,
+      tags: project.tags,
+      created_at: project.created_at.strftime("%b %d, %Y"),
+      user_id: project.user_id,
+      user_display_name: project.user.display_name,
+      user_avatar: project.user.avatar,
+      total_hours: total_hours,
+      approved_hours: approved_hours,
+      entry_count: entry_count,
+      ship_type: ship.ship_type,
+      frozen_repo_link: ship.frozen_repo_link,
+      frozen_demo_link: ship.frozen_demo_link,
+      waiting_since: ship.created_at.iso8601,
+      first_submitted_at: first_ship&.created_at&.iso8601
+    }
+  end
+
+  def serialize_sibling_statuses(ship)
+    {
+      time_audit: ship.time_audit_review&.status,
+      requirements_check: ship.requirements_check_review&.status,
+      design_review: ship.design_review&.status,
+      build_review: ship.build_review&.status
+    }
+  end
+
+  def serialize_journal_entry(journal_entry, time_audit)
+    annotations = time_audit&.annotations || {}
+    recording_annotations = annotations["recordings"] || {}
+
+    recordings_summary = journal_entry.recordings.map do |r|
+      rec_id = r.id.to_s
+      rec_data = recording_annotations[rec_id] || {}
+      duration = recording_duration(r)
+      segments = rec_data["segments"] || []
+
+      removed_seconds = segments.sum do |seg|
+        video_range = seg["end_seconds"].to_f - seg["start_seconds"].to_f
+        real_range = video_range * 60
+        case seg["type"]
+        when "removed" then real_range
+        when "deflated" then real_range * (seg["deflated_percent"].to_f / 100)
+        else 0
+        end
+      end
+
+      {
+        id: r.id,
+        name: r.recordable.try(:name) || r.recordable.try(:title) || "Recording",
+        type: r.recordable_type,
+        duration: duration,
+        description: rec_data["description"],
+        removed_seconds: removed_seconds.round
+      }
+    end
+
+    total_duration = journal_entry.recordings.sum { |r| recording_duration(r) }
+    approved_duration = recordings_summary.sum { |r| [ 0, r[:duration] - r[:removed_seconds] ].max }
+
+    {
+      id: journal_entry.id,
+      content_html: helpers.render_user_markdown(journal_entry.content.to_s),
+      images: journal_entry.images.map { |img| url_for(img) },
+      author_display_name: journal_entry.user.display_name,
+      author_avatar: journal_entry.user.avatar,
+      created_at: journal_entry.created_at.strftime("%b %d, %Y"),
+      total_duration: total_duration,
+      approved_duration: approved_duration,
+      recordings: recordings_summary
+    }
+  end
+
+  def recording_duration(recording)
+    case recording.recordable
+    when LookoutTimelapse, LapseTimelapse then recording.recordable.duration.to_i
+    when YouTubeVideo then recording.recordable.duration_seconds.to_i
+    else 0
+    end
   end
 end

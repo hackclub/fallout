@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_03_221156) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_06_174255) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -359,6 +359,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_03_221156) do
     t.text "feedback"
     t.text "internal_reason"
     t.integer "lock_version", default: 0, null: false
+    t.jsonb "repo_tree"
     t.bigint "reviewer_id"
     t.bigint "ship_id", null: false
     t.integer "status", default: 0, null: false
