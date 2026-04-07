@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Deferred, router, Link } from '@inertiajs/react'
+import { Deferred, router, Link, usePage } from '@inertiajs/react'
 import type { ColumnDef } from '@tanstack/react-table'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
@@ -349,6 +349,9 @@ export default function AdminUsersShow({
   hide_unlisted,
   with_journals,
 }: PageProps) {
+  const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
+  const isAdmin = admin_permissions?.is_admin ?? false
+
   return (
     <div>
       <button
@@ -371,7 +374,7 @@ export default function AdminUsersShow({
                 </Badge>
               )}
             </h1>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
+            {user.email && <p className="text-sm text-muted-foreground">{user.email}</p>}
           </div>
         </div>
 
@@ -410,9 +413,11 @@ export default function AdminUsersShow({
         </CardContent>
       </Card>
 
-      <div className="mb-6">
-        <RolesEditor user={user} validRoles={valid_roles} isSelf={is_self} />
-      </div>
+      {valid_roles.length > 0 && (
+        <div className="mb-6">
+          <RolesEditor user={user} validRoles={valid_roles} isSelf={is_self} />
+        </div>
+      )}
 
       <Deferred data="project_data" fallback={<ProjectsLoading />}>
         <ProjectsSection
@@ -425,11 +430,13 @@ export default function AdminUsersShow({
         />
       </Deferred>
 
-      <div className="mt-8">
-        <Deferred data="audit_log" fallback={<AuditLogLoading />}>
-          <AuditLog entries={audit_log!} />
-        </Deferred>
-      </div>
+      {isAdmin && audit_log !== undefined && (
+        <div className="mt-8">
+          <Deferred data="audit_log" fallback={<AuditLogLoading />}>
+            <AuditLog entries={audit_log!} />
+          </Deferred>
+        </div>
+      )}
     </div>
   )
 }

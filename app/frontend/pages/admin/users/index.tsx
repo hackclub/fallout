@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { router, Link } from '@inertiajs/react'
+import { router, Link, usePage } from '@inertiajs/react'
 import type { ColumnDef } from '@tanstack/react-table'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
@@ -16,7 +16,7 @@ import { DataTable } from '@/components/admin/DataTable'
 import { SearchIcon, SlidersHorizontalIcon } from 'lucide-react'
 import type { AdminUserRow, PagyProps } from '@/types'
 
-const columns: ColumnDef<AdminUserRow>[] = [
+const baseColumns: ColumnDef<AdminUserRow>[] = [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -37,10 +37,6 @@ const columns: ColumnDef<AdminUserRow>[] = [
         )}
       </div>
     ),
-  },
-  {
-    accessorKey: 'email',
-    header: 'Email',
   },
   {
     accessorKey: 'slack_id',
@@ -71,6 +67,11 @@ const columns: ColumnDef<AdminUserRow>[] = [
   },
 ]
 
+const emailColumn: ColumnDef<AdminUserRow> = {
+  accessorKey: 'email',
+  header: 'Email',
+}
+
 interface PageProps {
   users: AdminUserRow[]
   pagy: PagyProps
@@ -80,7 +81,23 @@ interface PageProps {
   total_count: number
 }
 
-export default function AdminUsersIndex({ users, pagy, query, include_trial, include_deleted, total_count }: PageProps) {
+export default function AdminUsersIndex({
+  users,
+  pagy,
+  query,
+  include_trial,
+  include_deleted,
+  total_count,
+}: PageProps) {
+  const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
+  const isAdmin = admin_permissions?.is_admin ?? false
+  const columns = useMemo(() => {
+    if (!isAdmin) return baseColumns
+    // Insert email column after display_name
+    const cols = [...baseColumns]
+    cols.splice(2, 0, emailColumn)
+    return cols
+  }, [isAdmin])
   const [searchQuery, setSearchQuery] = useState(query)
   const [includeTrial, setIncludeTrial] = useState(include_trial)
   const [includeDeleted, setIncludeDeleted] = useState(include_deleted)

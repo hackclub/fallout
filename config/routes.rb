@@ -141,9 +141,10 @@ Rails.application.routes.draw do
 
       resources :project_flags, only: [ :index, :create, :destroy ]
 
-      resources :projects, only: [] do
+      resources :projects, only: [ :index, :show ] do
         resources :reviewer_notes, only: [ :create, :update, :destroy ]
       end
+      resources :users, only: [ :index, :show ]
 
       resources :ships, only: [ :index, :show ], path: "reviews"
     end
@@ -154,8 +155,7 @@ Rails.application.routes.draw do
     mount Flipper::UI.app(Flipper), at: "/flipper" # Feature flag dashboard — admin-only
 
     namespace :admin do
-      resources :projects, only: [ :index, :show ]
-      resources :users, only: [ :index, :show ] do
+      resources :users, only: [] do
         member do
           patch :update_roles
         end

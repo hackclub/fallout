@@ -419,11 +419,13 @@ export default function AdminProjectsShow({
         <p className="text-sm text-muted-foreground">No journal entries.</p>
       )}
 
-      <div className="mt-8">
-        <Deferred data="audit_log" fallback={<AuditLogLoading />}>
-          <AuditLog entries={audit_log!} />
-        </Deferred>
-      </div>
+      {audit_log !== undefined && (
+        <div className="mt-8">
+          <Deferred data="audit_log" fallback={<AuditLogLoading />}>
+            <AuditLog entries={audit_log!} />
+          </Deferred>
+        </div>
+      )}
     </div>
   )
 }

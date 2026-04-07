@@ -1,5 +1,5 @@
 class Admin::UsersController < Admin::ApplicationController
-  before_action :require_admin!
+  before_action :require_admin!, except: [ :index, :show ] # index/show open to all staff; policy_scope and authorize gate access
 
   def index
     base_scope = policy_scope(User)
@@ -25,9 +25,9 @@ class Admin::UsersController < Admin::ApplicationController
     authorize @user
     @projects_count = @user.projects.kept.count
 
-    render inertia: {
+    props = {
       user: serialize_user_detail(@user),
-      valid_roles: User::VALID_ROLES,
+      valid_roles: current_user.admin? ? User::VALID_ROLES : [], # Only admins can edit roles
       is_self: @user == current_user,
       project_data: InertiaRails.defer {
         base_scope = @user.projects
@@ -48,12 +48,13 @@ class Admin::UsersController < Admin::ApplicationController
           total_count: base_scope.count
         }
       },
-      audit_log: InertiaRails.defer { serialize_audit_log(@user) },
       query: params[:query].to_s,
       include_deleted: params[:include_deleted] == "1",
       hide_unlisted: params[:hide_unlisted] == "1",
       with_journals: params[:with_journals] == "1"
     }
+    props[:audit_log] = InertiaRails.defer { serialize_audit_log(@user) } if current_user.admin? # Audit log — admin-only
+    render inertia: props
   end
 
   def update_roles
@@ -78,23 +79,23 @@ class Admin::UsersController < Admin::ApplicationController
   private
 
   def serialize_user_row(user)
-    {
+    row = {
       id: user.id,
       display_name: user.display_name,
-      email: user.email,
       slack_id: user.slack_id,
       roles: user.roles,
       projects_count: @projects_counts[user.id] || 0,
       is_discarded: user.discarded?,
       created_at: user.created_at.strftime("%b %d, %Y")
     }
+    row[:email] = user.email if current_user.admin? # PII — admin-only
+    row
   end
 
   def serialize_user_detail(user)
-    {
+    detail = {
       id: user.id,
       display_name: user.display_name,
-      email: user.email,
       avatar: user.avatar,
       slack_id: user.slack_id,
       roles: user.roles,
@@ -105,6 +106,8 @@ class Admin::UsersController < Admin::ApplicationController
       discarded_at: user.discarded_at&.strftime("%b %d, %Y"),
       created_at: user.created_at.strftime("%b %d, %Y")
     }
+    detail[:email] = user.email if current_user.admin? # PII — admin-only
+    detail
   end
 
   def serialize_project_row(project)

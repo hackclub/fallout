@@ -1,6 +1,4 @@
 class Admin::ProjectsController < Admin::ApplicationController
-  before_action :require_admin!
-
   def index
     base_scope = policy_scope(Project).includes(:user)
     base_scope = base_scope.kept unless params[:include_deleted] == "1"
@@ -42,14 +40,15 @@ class Admin::ProjectsController < Admin::ApplicationController
     )
     @ta_annotations = preload_ta_annotations(@entries)
 
-    render inertia: {
+    props = {
       project: serialize_project_detail(@project),
       ships: @ships.map { |s| serialize_ship_row(s) },
       pagy_ships: pagy_props(@pagy_ships),
       journal_entries: @entries.map { |je| serialize_journal_entry(je, @ta_annotations) },
-      pagy_entries: pagy_props(@pagy_entries),
-      audit_log: InertiaRails.defer { serialize_audit_log(@project) }
+      pagy_entries: pagy_props(@pagy_entries)
     }
+    props[:audit_log] = InertiaRails.defer { serialize_audit_log(@project) } if current_user.admin? # Audit log — admin-only
+    render inertia: props
   end
 
   private

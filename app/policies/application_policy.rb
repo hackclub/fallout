@@ -42,6 +42,10 @@ class ApplicationPolicy
     user&.admin?
   end
 
+  def staff?
+    user&.staff?
+  end
+
   def owner?
     record.respond_to?(:user) && record.user == user
   end

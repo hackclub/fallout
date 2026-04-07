@@ -11,7 +11,7 @@ class ProjectPolicy < ApplicationPolicy
 
   def show?
     return false if record.discarded? && !admin?
-    admin? || !record.is_unlisted || owner? || (collaborators_enabled? && record.collaborator?(user)) # Collaborators can see unlisted projects they're on (flag-gated)
+    staff? || !record.is_unlisted || owner? || (collaborators_enabled? && record.collaborator?(user)) # Collaborators can see unlisted projects they're on (flag-gated)
   end
 
   def create?
@@ -44,7 +44,7 @@ class ProjectPolicy < ApplicationPolicy
 
   class Scope < ApplicationPolicy::Scope
     def resolve
-      if user&.admin?
+      if user&.staff?
         scope.all
       else
         base = scope.kept.listed.or(scope.kept.where(user: user))

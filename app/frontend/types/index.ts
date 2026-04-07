@@ -146,7 +146,7 @@ export interface ProjectForm {
 export interface AdminUserRow {
   id: number
   display_name: string
-  email: string
+  email?: string
   slack_id: string | null
   roles: string[]
   projects_count: number
@@ -157,7 +157,7 @@ export interface AdminUserRow {
 export interface AdminUserDetail {
   id: number
   display_name: string
-  email: string
+  email?: string
   avatar: string
   slack_id: string | null
   roles: string[]

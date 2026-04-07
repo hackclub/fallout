@@ -99,9 +99,8 @@ function buildNavSections(): { items: NavItem[] }[] {
           href: '/admin/projects',
           icon: FolderOpen,
           statKey: 'projects_count',
-          requirePermission: 'is_admin',
         },
-        { label: 'Users', href: '/admin/users', icon: Users, statKey: 'users_count', requirePermission: 'is_admin' },
+        { label: 'Users', href: '/admin/users', icon: Users, statKey: 'users_count' },
         {
           label: 'Flagged',
           href: '/admin/project_flags',
