@@ -669,6 +669,7 @@ textarea:focus {
 
   /* Docs layout dark mode */
   .docs-page {
+    background-color: #120d0b;
     color: #e8d5c4;
   }
 
