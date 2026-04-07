@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import { router } from '@inertiajs/react'
+import { router, usePage } from '@inertiajs/react'
 // @ts-expect-error useModal lacks type declarations in this beta package
 import { Modal, ModalLink, useModal } from '@inertiaui/modal-react'
 import { BookOpenIcon, ClockIcon } from '@heroicons/react/16/solid'
@@ -11,7 +11,7 @@ import { performModalMutation } from '@/lib/modalMutation'
 import { notify } from '@/lib/notifications'
 import TimeAgo from '@/components/shared/TimeAgo'
 import Timeline from '@/components/shared/Timeline'
-import type { ProjectDetail, JournalEntryCard, CollaboratorInfo, ShipEvent } from '@/types'
+import type { ProjectDetail, JournalEntryCard, CollaboratorInfo, ShipEvent, SharedProps } from '@/types'
 
 function formatTime(seconds: number): string {
   if (seconds === 0) return '0min'
@@ -86,6 +86,10 @@ export default function ProjectsShow({
 }) {
   const modalRef = useRef<{ close: () => void }>(null)
   const modal = useModal()
+  const {
+    auth: { user: authUser },
+  } = usePage<SharedProps>().props
+  const isTrial = authUser?.is_trial ?? false
   const [rightTab, setRightTab] = useState<'timeline' | 'journal'>('timeline')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
@@ -228,6 +232,31 @@ export default function ProjectsShow({
     { label: 'Journal', tab: 'journal' },
   ]
 
+  function renderNewJournalEntryButton() {
+    if (isTrial) {
+      return (
+        <button
+          type="button"
+          onClick={() => notify('alert', 'This is locked. Verify your account to continue!')}
+          className="bg-brown text-light-brown border-2 border-dark-brown px-4 py-2 font-bold uppercase text-sm hover:opacity-80 cursor-pointer"
+        >
+          New Journal Entry
+        </button>
+      )
+    }
+
+    if (!can.create_journal_entry) return null
+
+    return (
+      <ModalLink
+        href={`/projects/${project.id}/journal_entries/new`}
+        className="bg-brown text-light-brown border-2 border-dark-brown px-4 py-2 font-bold uppercase text-sm hover:opacity-80"
+      >
+        New Journal Entry
+      </ModalLink>
+    )
+  }
+
   const content = (
     <div className="relative flex flex-col xl:flex-row h-full overflow-y-auto xl:overflow-visible bg-light-brown xl:bg-transparent">
       {ribbonTabs.map(({ label, tab }, i) => (
@@ -350,14 +379,7 @@ export default function ProjectsShow({
         <div className={rightTab === 'timeline' ? 'flex flex-col min-h-[300px] xl:min-h-0 flex-1' : 'hidden'}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-2xl text-dark-brown">Timeline</h2>
-            {can.create_journal_entry && (
-              <ModalLink
-                href={`/projects/${project.id}/journal_entries/new`}
-                className="bg-brown text-light-brown border-2 border-dark-brown px-4 py-2 font-bold uppercase text-sm hover:opacity-80"
-              >
-                New Journal Entry
-              </ModalLink>
-            )}
+            {renderNewJournalEntryButton()}
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {timelineEvents.length > 0 ? (
@@ -422,14 +444,7 @@ export default function ProjectsShow({
         <div className={rightTab === 'journal' ? 'flex flex-col min-h-[300px] xl:min-h-0 flex-1' : 'hidden'}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-2xl text-dark-brown">Journal</h2>
-            {can.create_journal_entry && (
-              <ModalLink
-                href={`/projects/${project.id}/journal_entries/new`}
-                className="bg-brown text-light-brown border-2 border-dark-brown px-4 py-2 font-bold uppercase text-sm hover:opacity-80"
-              >
-                New Journal Entry
-              </ModalLink>
-            )}
+            {renderNewJournalEntryButton()}
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {journalByDate.length > 0 ? (
