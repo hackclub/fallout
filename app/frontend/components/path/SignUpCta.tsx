@@ -6,7 +6,7 @@ type Props = {
 
 export default function SignUpCta({ signInPath }: Props) {
   return (
-    <Frame>
+    <Frame showBorderOnMobile>
       <div className="flex flex-col items-center text-center space-y-4 py-4 mx-4">
         <div className="space-y-1">
           <h3 className="font-bold text-xl">
