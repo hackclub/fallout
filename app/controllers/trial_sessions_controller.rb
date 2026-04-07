@@ -43,6 +43,6 @@ class TrialSessionsController < ApplicationController
     }
 
     session[:user_id] = trial_user.id
-    redirect_to path_path, notice: "Welcome!"
+    redirect_to path_path
   end
 end

@@ -161,21 +161,12 @@ export default function PathIndex() {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger>
-            {has_projects && !authUser?.is_trial ? (
+            {has_projects ? (
               <ModalLink href="/projects" onProjectDeleted={reloadPathProgress} className="outline-0">
                 <img src="/icon/project.webp" alt="Projects" className="cursor-pointer w-25" />
               </ModalLink>
             ) : (
-              <button
-                onClick={() =>
-                  notify(
-                    'alert',
-                    has_projects
-                      ? 'You need to verify your account before continuing!'
-                      : 'This is locked! Click on the star',
-                  )
-                }
-              >
+              <button onClick={() => notify('alert', 'This is locked! Click on the star')}>
                 <img src="/icon/project.webp" alt="Projects" className="cursor-pointer w-25" />
               </button>
             )}
