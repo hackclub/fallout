@@ -121,18 +121,47 @@ export default function RepoTree({
   repoLink,
   refreshing,
   onRefresh,
+  bare,
 }: {
   data: RepoTreeData
   repoLink: string
   refreshing?: boolean
   onRefresh?: () => void
+  bare?: boolean
 }) {
   const tree = useMemo(() => buildTree(data.entries), [data.entries])
-  const githubBase = repoLink.replace(/\/+$/, '')
+  const githubBase = repoLink.replace(/\/+$/, '').replace(/\/tree\/[^/]+$/, '')
   const branch = data.default_branch || 'main'
   const nwo = githubBase.match(/github\.com\/([^/]+\/[^/]+)/)?.[1] ?? 'Repository'
   const updatedStr = formatRepoDate(data.pushed_at)
   const createdStr = formatRepoDate(data.created_at)
+
+  const treeContent = (
+    <div className="p-2 text-xs max-h-80 overflow-y-auto">
+      {tree.map((node) =>
+        node.type === 'tree' ? (
+          <TreeFolder key={node.path} node={node} githubBase={githubBase} branch={branch} depth={0} />
+        ) : (
+          <a
+            key={node.path}
+            href={`${githubBase}/blob/${branch}/${node.path}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 py-0.5 hover:bg-muted/50 rounded transition-colors text-foreground hover:text-foreground"
+            style={{ paddingLeft: '16px' }}
+          >
+            <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
+            <span className="truncate flex-1">{node.name}</span>
+            {node.size != null && (
+              <span className="text-muted-foreground shrink-0 ml-1">{formatFileSize(node.size)}</span>
+            )}
+          </a>
+        ),
+      )}
+    </div>
+  )
+
+  if (bare) return treeContent
 
   return (
     <div className="rounded-md border border-border overflow-hidden">
@@ -151,7 +180,7 @@ export default function RepoTree({
         {(updatedStr || createdStr) && (
           <span className="text-xs text-muted-foreground flex items-center gap-1 flex-1">
             {updatedStr && <span>Updated: {updatedStr}</span>}
-            {updatedStr && createdStr && <span>·</span>}
+            {updatedStr && createdStr && <span>|</span>}
             {createdStr && <span>Created: {createdStr}</span>}
           </span>
         )}
@@ -167,28 +196,7 @@ export default function RepoTree({
           </button>
         )}
       </div>
-      <div className="p-2 text-xs max-h-80 overflow-y-auto border-t border-border">
-        {tree.map((node) =>
-          node.type === 'tree' ? (
-            <TreeFolder key={node.path} node={node} githubBase={githubBase} branch={branch} depth={0} />
-          ) : (
-            <a
-              key={node.path}
-              href={`${githubBase}/blob/${branch}/${node.path}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 py-0.5 hover:bg-muted/50 rounded transition-colors text-foreground hover:text-foreground"
-              style={{ paddingLeft: '16px' }}
-            >
-              <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate flex-1">{node.name}</span>
-              {node.size != null && (
-                <span className="text-muted-foreground shrink-0 ml-1">{formatFileSize(node.size)}</span>
-              )}
-            </a>
-          ),
-        )}
-      </div>
+      <div className="border-t border-border">{treeContent}</div>
     </div>
   )
 }

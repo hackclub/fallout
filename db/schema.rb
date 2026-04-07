@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_06_174255) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_07_005034) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -208,10 +208,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_06_174255) do
     t.datetime "created_at", null: false
     t.datetime "discarded_at"
     t.bigint "project_id", null: false
+    t.bigint "ship_id"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["discarded_at"], name: "index_journal_entries_on_discarded_at"
     t.index ["project_id"], name: "index_journal_entries_on_project_id"
+    t.index ["ship_id"], name: "index_journal_entries_on_ship_id"
     t.index ["user_id"], name: "index_journal_entries_on_user_id"
   end
 
@@ -619,6 +621,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_06_174255) do
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
   add_foreign_key "journal_entries", "projects"
+  add_foreign_key "journal_entries", "ships"
   add_foreign_key "journal_entries", "users"
   add_foreign_key "lapse_timelapses", "users"
   add_foreign_key "lookout_timelapses", "users"

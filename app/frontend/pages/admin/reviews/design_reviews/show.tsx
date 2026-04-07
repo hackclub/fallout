@@ -30,6 +30,7 @@ import {
   MessageSquareTextIcon,
   LoaderIcon,
   GlobeIcon,
+  ChevronDownIcon,
 } from 'lucide-react'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import RepoTree from '@/components/admin/RepoTree'
@@ -100,6 +101,63 @@ function WaitingLabel({ waitingSince, firstSubmittedAt }: { waitingSince: string
   return <span>Waiting {recent}</span>
 }
 
+// --- Collapsible Card ---
+
+function CollapsibleCard({
+  title,
+  summary,
+  defaultOpen = false,
+  storageKey,
+  borderClass,
+  children,
+  trailing,
+}: {
+  title: string
+  summary?: React.ReactNode
+  defaultOpen?: boolean
+  storageKey?: string
+  borderClass?: string
+  children: React.ReactNode
+  trailing?: React.ReactNode
+}) {
+  const [open, setOpen] = useState(() => {
+    if (storageKey) {
+      try {
+        const saved = localStorage.getItem(`collapsible:${storageKey}`)
+        if (saved !== null) return saved === '1'
+      } catch {}
+    }
+    return defaultOpen
+  })
+  const toggle = () =>
+    setOpen((v) => {
+      const next = !v
+      if (storageKey) {
+        try {
+          localStorage.setItem(`collapsible:${storageKey}`, next ? '1' : '0')
+        } catch {}
+      }
+      return next
+    })
+  return (
+    <div className={`rounded-md border overflow-hidden ${borderClass || 'border-border'}`}>
+      <button
+        onClick={toggle}
+        className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer text-left"
+      >
+        <span className="text-sm font-semibold shrink-0">{title}</span>
+        {summary && <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate">{summary}</span>}
+        {!summary && <span className="flex-1" />}
+        {trailing}
+        <ChevronDownIcon
+          className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`}
+        />
+      </button>
+      {open && children}
+    </div>
+  )
+}
+
 // --- Preflight Results ---
 
 function PreflightResults({ checks }: { checks: PreflightCheck[] }) {
@@ -111,75 +169,94 @@ function PreflightResults({ checks }: { checks: PreflightCheck[] }) {
   const passed = checks.filter((c) => c.status === 'passed')
 
   const issueCount = failed.length + warned.length + skipped.length
+  const worstLevel = failed.length > 0 ? 'Fail' : warned.length > 0 ? 'Warn' : skipped.length > 0 ? 'Skip' : 'Pass'
+  const levelColor =
+    worstLevel === 'Fail'
+      ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
+      : worstLevel === 'Warn'
+        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+        : worstLevel === 'Skip'
+          ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+
+  const summaryNode = (
+    <span className="flex items-center gap-1.5">
+      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${levelColor}`}>{worstLevel}</span>
+      <span>
+        <span className="text-red-500 dark:text-red-400">{failed.length}</span>/
+        <span className="text-amber-500 dark:text-amber-400">{warned.length}</span>/
+        <span className="text-zinc-400 dark:text-zinc-500">{skipped.length}</span>/
+        <span className="text-emerald-600 dark:text-emerald-400">{passed.length}</span>
+      </span>
+    </span>
+  )
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold">Preflight Checks</h3>
-        <span className="text-xs text-muted-foreground">
-          <span className="text-red-500 dark:text-red-400">{failed.length}</span>/
-          <span className="text-amber-500 dark:text-amber-400">{warned.length}</span>/
-          <span className="text-zinc-400 dark:text-zinc-500">{skipped.length}</span>/
-          <span className="text-emerald-600 dark:text-emerald-400">{passed.length}</span>
-        </span>
+    <CollapsibleCard
+      title="Preflight Checks"
+      summary={summaryNode}
+      defaultOpen={issueCount > 0}
+      storageKey="design-preflight"
+      borderClass={issueCount > 0 ? 'border-amber-300 dark:border-amber-800' : 'border-border'}
+    >
+      <div className="p-3 space-y-2">
+        {issueCount > 0 && (
+          <div className="space-y-1">
+            {failed.map((c) => (
+              <div key={c.key} className="flex items-start gap-1.5 text-xs">
+                <XCircleIcon className="size-3.5 shrink-0 text-red-500 dark:text-red-400 mt-0.5" />
+                <span>
+                  <strong className="text-foreground">{c.label}</strong>
+                  {c.message && <span className="text-muted-foreground"> — {c.message}</span>}
+                </span>
+              </div>
+            ))}
+            {warned.map((c) => (
+              <div key={c.key} className="flex items-start gap-1.5 text-xs">
+                <AlertTriangleIcon className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400 mt-0.5" />
+                <span>
+                  <strong className="text-foreground">{c.label}</strong>
+                  {c.message && <span className="text-muted-foreground"> — {c.message}</span>}
+                </span>
+              </div>
+            ))}
+            {skipped.map((c) => (
+              <div key={c.key} className="flex items-start gap-1.5 text-xs">
+                <MinusCircleIcon className="size-3.5 shrink-0 text-zinc-400 dark:text-zinc-500 mt-0.5" />
+                <span>
+                  <strong className="text-muted-foreground">{c.label}</strong>
+                  {c.message && <span className="text-muted-foreground"> — {c.message}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {passed.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowPassed((v) => !v)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              {showPassed ? 'Hide' : 'Show'} passed ({passed.length})
+            </button>
+            {showPassed && (
+              <div className="mt-1 space-y-0.5">
+                {passed.map((c) => (
+                  <div key={c.key} className="flex items-start gap-1.5 text-xs">
+                    <CheckIcon className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                    <span>
+                      <strong className="text-muted-foreground">{c.label}</strong>
+                      {c.message && <span className="text-muted-foreground"> — {c.message}</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
-
-      {issueCount > 0 && (
-        <div className="space-y-1">
-          {failed.map((c) => (
-            <div key={c.key} className="flex items-start gap-1.5 text-xs">
-              <XCircleIcon className="size-3.5 shrink-0 text-red-500 dark:text-red-400 mt-0.5" />
-              <span>
-                <strong className="text-foreground">{c.label}</strong>
-                {c.message && <span className="text-muted-foreground"> — {c.message}</span>}
-              </span>
-            </div>
-          ))}
-          {warned.map((c) => (
-            <div key={c.key} className="flex items-start gap-1.5 text-xs">
-              <AlertTriangleIcon className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400 mt-0.5" />
-              <span>
-                <strong className="text-foreground">{c.label}</strong>
-                {c.message && <span className="text-muted-foreground"> — {c.message}</span>}
-              </span>
-            </div>
-          ))}
-          {skipped.map((c) => (
-            <div key={c.key} className="flex items-start gap-1.5 text-xs">
-              <MinusCircleIcon className="size-3.5 shrink-0 text-zinc-400 dark:text-zinc-500 mt-0.5" />
-              <span>
-                <strong className="text-muted-foreground">{c.label}</strong>
-                {c.message && <span className="text-muted-foreground"> — {c.message}</span>}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {passed.length > 0 && (
-        <div>
-          <button
-            onClick={() => setShowPassed((v) => !v)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            {showPassed ? 'Hide' : 'Show'} passed ({passed.length})
-          </button>
-          {showPassed && (
-            <div className="mt-1 space-y-0.5">
-              {passed.map((c) => (
-                <div key={c.key} className="flex items-start gap-1.5 text-xs">
-                  <CheckIcon className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
-                  <span>
-                    <strong className="text-muted-foreground">{c.label}</strong>
-                    {c.message && <span className="text-muted-foreground"> — {c.message}</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    </CollapsibleCard>
   )
 }
 
@@ -344,11 +421,6 @@ export default function DesignReviewsShow({
     return results
   }, [review.preflight_results])
 
-  const hasIssues = useMemo(
-    () => preflight.some((c) => c.status === 'failed' || c.status === 'warn' || c.status === 'skipped'),
-    [preflight],
-  )
-
   const allEntries = useMemo(
     () => [
       ...new_entries.map((e) => ({ ...e, isNew: true })),
@@ -463,15 +535,15 @@ export default function DesignReviewsShow({
               <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                 <img src={project.user_avatar} alt="" className="size-4 rounded-full" />
                 <span className="text-foreground">{project.user_display_name}</span>
-                <span>·</span>
+                <span>|</span>
                 <span>{project.created_at}</span>
                 {project.tags.length > 0 && (
                   <>
-                    <span>·</span>
+                    <span>|</span>
                     <span className="text-foreground">{project.tags.join(', ')}</span>
                   </>
                 )}
-                <span>·</span>
+                <span>|</span>
                 <WaitingLabel waitingSince={project.waiting_since} firstSubmittedAt={project.first_submitted_at} />
               </div>
             </div>
@@ -549,40 +621,48 @@ export default function DesignReviewsShow({
           </div>
 
           {/* Preflight checks */}
-          {preflight.length > 0 && (
-            <div
-              className={`rounded-md border p-3 ${hasIssues ? 'border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20' : 'border-border'}`}
-            >
-              <PreflightResults checks={preflight} />
-            </div>
-          )}
+          {preflight.length > 0 && <PreflightResults checks={preflight} />}
 
           {/* Repo tree — GitHub projects only */}
           {repo_tree && repo_tree.entries?.length > 0 && project.repo_link && (
-            <RepoTree data={repo_tree} repoLink={project.repo_link} />
+            <CollapsibleCard
+              title="Repository"
+              storageKey="design-repo"
+              summary={
+                repo_tree.entries.filter((e) => e.type === 'tree').length +
+                ' dirs | ' +
+                repo_tree.entries.filter((e) => e.type === 'blob').length +
+                ' files'
+              }
+            >
+              <RepoTree data={repo_tree} repoLink={project.repo_link} bare />
+            </CollapsibleCard>
           )}
 
           {/* Journal — all entries shown inline */}
           {allEntries.length > 0 && (
-            <div className="rounded-md border border-border overflow-hidden">
-              <div className="px-3 py-2 bg-muted/50 flex items-center gap-2">
-                <span className="text-sm font-semibold">Journal</span>
-                <span className="text-xs text-muted-foreground">
+            <CollapsibleCard
+              title="Journal"
+              storageKey="design-journal"
+              summary={
+                <>
                   Count: {allEntries.length}
-                  {' · '}Total: {(allEntries.reduce((s, e) => s + e.total_duration, 0) / 3600).toFixed(1)}h{' · '}Avg:{' '}
-                  {(allEntries.reduce((s, e) => s + e.total_duration, 0) / allEntries.length / 3600).toFixed(2)}h{' · '}
+                  {' | '}Total: {(allEntries.reduce((s, e) => s + e.total_duration, 0) / 3600).toFixed(1)}h{' | '}Avg:{' '}
+                  {(allEntries.reduce((s, e) => s + e.total_duration, 0) / allEntries.length / 3600).toFixed(2)}h{' | '}
                   Range: {(Math.min(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h –{' '}
                   {(Math.max(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h
-                </span>
-              </div>
+                </>
+              }
+              defaultOpen
+            >
               <div className="divide-y divide-border">
                 {allEntries.map((entry) => (
                   <div key={entry.id} className="p-3 space-y-2">
-                    {/* Header: author · date · time */}
+                    {/* Header */}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <img src={entry.author_avatar} alt="" className="size-4 rounded-full" />
                       <span>{entry.author_display_name}</span>
-                      <span>·</span>
+                      <span>|</span>
                       <span>{entry.created_at}</span>
                       <span className="flex items-center gap-1">
                         <ClockIcon className="size-3" />
@@ -652,7 +732,7 @@ export default function DesignReviewsShow({
                   </div>
                 ))}
               </div>
-            </div>
+            </CollapsibleCard>
           )}
         </div>
 

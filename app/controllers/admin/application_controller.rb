@@ -15,7 +15,15 @@ class Admin::ApplicationController < ApplicationController
           pending_build_reviews_count: BuildReview.pending.count,
           flagged_projects_count: ProjectFlag.select(:project_id).distinct.count
         }
-      end
+      end,
+      # Role-based access for sidebar and frontend gating
+      admin_permissions: {
+        is_admin: current_user&.admin? || false,
+        can_review_time_audits: current_user&.can_review?(:time_audit) || false,
+        can_review_requirements_checks: current_user&.can_review?(:requirements_check) || false,
+        can_review_design_reviews: current_user&.can_review?(:design_review) || false,
+        can_review_build_reviews: current_user&.can_review?(:build_review) || false
+      }
     }
   end
 

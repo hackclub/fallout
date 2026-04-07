@@ -3,9 +3,8 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
     base = policy_scope(RequirementsCheckReview)
       .includes(ship: [ :project, project: :user ], reviewer: [])
 
-    pending_reviews = base.pending.order(created_at: :asc)
-    all_reviews = base.order(created_at: :desc)
-    @pagy, @all_reviews = pagy(all_reviews)
+    pending_reviews = base.pending.order(created_at: :asc).load
+    @pagy, @all_reviews = pagy(base.order(created_at: :desc))
 
     render inertia: {
       pending_reviews: pending_reviews.map { |r| serialize_review_row(r) },

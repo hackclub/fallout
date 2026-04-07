@@ -26,13 +26,12 @@ class TimeAuditReviewPolicy < ApplicationPolicy
   end
 
   def staff_reviewer?
-    user&.reviewer?
+    user&.can_review?(:time_audit) # Only time auditors (and admins) can access this queue
   end
 
   class Scope < ApplicationPolicy::Scope
     def resolve
-      if user&.admin? || user&.reviewer?
-        # Exclude reviews for flagged projects — they move to the admin flagged queue
+      if user&.can_review?(:time_audit)
         scope.where.not(ship_id: Ship.where(project_id: ProjectFlag.select(:project_id)).select(:id))
       else
         scope.none

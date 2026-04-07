@@ -34,70 +34,114 @@ interface AdminStats {
   flagged_projects_count: number
 }
 
+interface AdminPermissions {
+  is_admin: boolean
+  can_review_time_audits: boolean
+  can_review_requirements_checks: boolean
+  can_review_design_reviews: boolean
+  can_review_build_reviews: boolean
+}
+
+type PermissionKey = keyof AdminPermissions
+
 type NavItem = {
   label: string
   href: string
   icon: typeof LayoutDashboard
   statKey: keyof AdminStats | null
   external?: boolean
-  adminOnly?: boolean
+  requirePermission?: PermissionKey
 }
 
-const navSections: { items: NavItem[]; adminOnly?: boolean }[] = [
-  {
-    items: [{ label: 'Dashboard', href: '/admin', icon: LayoutDashboard, statKey: null }],
-  },
-  {
-    items: [
-      { label: 'Time Audit', href: '/admin/reviews/time_audits', icon: Clock, statKey: 'pending_time_audits_count' },
-      {
-        label: 'Requirements Check',
-        href: '/admin/reviews/requirements_checks',
-        icon: ClipboardCheck,
-        statKey: 'pending_requirements_checks_count',
-      },
-      {
-        label: 'Design Review',
-        href: '/admin/reviews/design_reviews',
-        icon: Compass,
-        statKey: 'pending_design_reviews_count',
-      },
-      {
-        label: 'Build Review',
-        href: '/admin/reviews/build_reviews',
-        icon: Hammer,
-        statKey: 'pending_build_reviews_count',
-      },
-    ],
-  },
-  {
-    adminOnly: true,
-    items: [
-      { label: 'Projects', href: '/admin/projects', icon: FolderOpen, statKey: 'projects_count', adminOnly: true },
-      { label: 'Users', href: '/admin/users', icon: Users, statKey: 'users_count', adminOnly: true },
-      {
-        label: 'Flagged',
-        href: '/admin/project_flags',
-        icon: Flag,
-        statKey: 'flagged_projects_count',
-        adminOnly: true,
-      },
-    ],
-  },
-  {
-    adminOnly: true,
-    items: [
-      { label: 'Jobs', href: '/jobs', icon: BriefcaseBusiness, external: true, statKey: null, adminOnly: true },
-      { label: 'Flipper', href: '/flipper', icon: SlidersHorizontal, external: true, statKey: null, adminOnly: true },
-    ],
-  },
-  {
-    adminOnly: true,
-    items: [
-      { label: 'Activity Checks', href: '/admin/activity_checks/new', icon: Activity, statKey: null, adminOnly: true },
-    ],
-  },
-]
+function buildNavSections(): { items: NavItem[] }[] {
+  return [
+    {
+      items: [{ label: 'Dashboard', href: '/admin', icon: LayoutDashboard, statKey: null }],
+    },
+    {
+      items: [
+        {
+          label: 'Time Audit',
+          href: '/admin/reviews/time_audits',
+          icon: Clock,
+          statKey: 'pending_time_audits_count',
+          requirePermission: 'can_review_time_audits',
+        },
+        {
+          label: 'Requirements Check',
+          href: '/admin/reviews/requirements_checks',
+          icon: ClipboardCheck,
+          statKey: 'pending_requirements_checks_count',
+          requirePermission: 'can_review_requirements_checks',
+        },
+        {
+          label: 'Design Review',
+          href: '/admin/reviews/design_reviews',
+          icon: Compass,
+          statKey: 'pending_design_reviews_count',
+          requirePermission: 'can_review_design_reviews',
+        },
+        {
+          label: 'Build Review',
+          href: '/admin/reviews/build_reviews',
+          icon: Hammer,
+          statKey: 'pending_build_reviews_count',
+          requirePermission: 'can_review_build_reviews',
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          label: 'Projects',
+          href: '/admin/projects',
+          icon: FolderOpen,
+          statKey: 'projects_count',
+          requirePermission: 'is_admin',
+        },
+        { label: 'Users', href: '/admin/users', icon: Users, statKey: 'users_count', requirePermission: 'is_admin' },
+        {
+          label: 'Flagged',
+          href: '/admin/project_flags',
+          icon: Flag,
+          statKey: 'flagged_projects_count',
+          requirePermission: 'is_admin',
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          label: 'Jobs',
+          href: '/jobs',
+          icon: BriefcaseBusiness,
+          external: true,
+          statKey: null,
+          requirePermission: 'is_admin',
+        },
+        {
+          label: 'Flipper',
+          href: '/flipper',
+          icon: SlidersHorizontal,
+          external: true,
+          statKey: null,
+          requirePermission: 'is_admin',
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          label: 'Activity Checks',
+          href: '/admin/activity_checks/new',
+          icon: Activity,
+          statKey: null,
+          requirePermission: 'is_admin',
+        },
+      ],
+    },
+  ]
+}
 
 function renderNavItem(item: NavItem, pathname: string, collapsed: boolean, admin_stats?: AdminStats) {
   const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href))
@@ -133,8 +177,16 @@ function renderNavItem(item: NavItem, pathname: string, collapsed: boolean, admi
 }
 
 export default function AdminSidebar() {
-  const { auth, admin_stats } = usePage<SharedProps & { admin_stats?: AdminStats }>().props
-  const isAdmin = auth.user?.is_admin ?? false
+  const { auth, admin_stats, admin_permissions } = usePage<
+    SharedProps & { admin_stats?: AdminStats; admin_permissions?: AdminPermissions }
+  >().props
+  const perms: AdminPermissions = admin_permissions ?? {
+    is_admin: auth.user?.is_admin ?? false,
+    can_review_time_audits: false,
+    can_review_requirements_checks: false,
+    can_review_design_reviews: false,
+    can_review_build_reviews: false,
+  }
   const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -177,13 +229,14 @@ export default function AdminSidebar() {
       </div>
 
       <nav className="flex-1 overflow-hidden py-2 px-1.5">
-        {navSections.map((section, i) => {
-          if (section.adminOnly && !isAdmin) return null
+        {buildNavSections().map((section, i) => {
+          const visibleItems = section.items.filter((item) => !item.requirePermission || perms[item.requirePermission])
+          if (visibleItems.length === 0) return null
           return (
             <div key={i}>
               {i > 0 && <div className="my-2 mx-2 border-t border-sidebar-border" />}
               <div className="space-y-0.5">
-                {section.items.map((item) => renderNavItem(item, pathname, collapsed, admin_stats))}
+                {visibleItems.map((item) => renderNavItem(item, pathname, collapsed, admin_stats))}
               </div>
             </div>
           )

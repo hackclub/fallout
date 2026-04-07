@@ -86,7 +86,8 @@ class User < ApplicationRecord
   validates :avatar, :display_name, :email, :timezone, presence: true
   validates :slack_id, presence: true, unless: :trial?
   validates :hca_id, presence: true, unless: :trial?
-  VALID_ROLES = %w[user admin reviewer].freeze
+  VALID_ROLES = %w[user admin time_auditor requirements_checker pass2_reviewer].freeze
+  REVIEWER_ROLES = %w[time_auditor requirements_checker pass2_reviewer].freeze
   SLACK_WELCOME_CHANNELS = %w[C037157AL30 C0ACG0XQWGN C0ACJ290090].freeze
 
   validates :roles, presence: true, unless: :trial?
@@ -118,7 +119,30 @@ class User < ApplicationRecord
   end
 
   def reviewer?
-    has_role?(:reviewer)
+    (roles & REVIEWER_ROLES).any?
+  end
+
+  def time_auditor?
+    has_role?(:time_auditor)
+  end
+
+  def requirements_checker?
+    has_role?(:requirements_checker)
+  end
+
+  def pass2_reviewer?
+    has_role?(:pass2_reviewer)
+  end
+
+  # True if user can review in a specific queue
+  def can_review?(queue)
+    return true if admin?
+    case queue.to_s
+    when "time_audit" then time_auditor?
+    when "requirements_check" then requirements_checker? || pass2_reviewer?
+    when "design_review", "build_review" then pass2_reviewer?
+    else false
+    end
   end
 
   def staff?

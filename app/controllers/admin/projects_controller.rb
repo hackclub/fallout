@@ -12,6 +12,7 @@ class Admin::ProjectsController < Admin::ApplicationController
     project_ids = @projects.map(&:id)
     @entry_counts = JournalEntry.where(project_id: project_ids, discarded_at: nil).group(:project_id).count
     @last_entries = JournalEntry.where(project_id: project_ids, discarded_at: nil).group(:project_id).maximum(:created_at)
+    @hours_tracked = Project.batch_time_logged(project_ids)
 
     render inertia: {
       projects: @projects.map { |p| serialize_project_row(p) },
@@ -46,7 +47,7 @@ class Admin::ProjectsController < Admin::ApplicationController
       user_display_name: project.user.display_name,
       journal_entries_count: @entry_counts[project.id] || 0,
       repo_link: project.repo_link,
-      hours_tracked: (project.time_logged / 3600.0).round(1),
+      hours_tracked: ((@hours_tracked[project.id] || 0) / 3600.0).round(1),
       last_entry_at: @last_entries[project.id]&.strftime("%b %d, %Y"),
       is_unlisted: project.is_unlisted,
       is_discarded: project.discarded?,

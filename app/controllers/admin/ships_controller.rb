@@ -49,7 +49,7 @@ class Admin::ShipsController < Admin::ApplicationController
   private
 
   def set_ship
-    @ship = Ship.find(params[:id])
+    @ship = Ship.includes(:reviewer, project: :user).find(params[:id])
   end
 
   def ship_params

@@ -44,6 +44,7 @@ class Ship < ApplicationRecord
   has_one :requirements_check_review, dependent: :destroy
   has_one :design_review, dependent: :destroy
   has_one :build_review, dependent: :destroy
+  has_many :journal_entries, dependent: :nullify
   has_many :reviewer_notes, dependent: :nullify
   has_many :project_flags, dependent: :nullify
 
@@ -63,6 +64,7 @@ class Ship < ApplicationRecord
     includes(:time_audit_review, :requirements_check_review, :design_review, :build_review)
   }
 
+  after_create :claim_journal_entries! # Assign this cycle's entries to this ship (runs in same transaction)
   after_create :create_initial_reviews! # after_create (not after_commit) so reviews are created in the same transaction — partial creation rolls back the ship
   after_update_commit :notify_status_change, if: :saved_change_to_status?
 
@@ -87,6 +89,18 @@ class Ship < ApplicationRecord
   def previous_journal_entries
     cutoff = previous_approved_ship&.created_at || Time.at(0)
     project.journal_entries.kept.where("created_at <= ?", cutoff)
+  end
+
+  def total_hours
+    (journal_entries.kept.joins(:recordings)
+      .sum(Arel.sql(<<~SQL.squish)) / 3600.0).round(1)
+        CASE recordings.recordable_type
+          WHEN 'LapseTimelapse' THEN (SELECT duration FROM lapse_timelapses WHERE id = recordings.recordable_id)
+          WHEN 'LookoutTimelapse' THEN (SELECT duration FROM lookout_timelapses WHERE id = recordings.recordable_id)
+          WHEN 'YouTubeVideo' THEN (SELECT duration_seconds FROM you_tube_videos WHERE id = recordings.recordable_id)
+          ELSE 0
+        END
+      SQL
   end
 
   # Query DB directly (not association cache) for correctness under concurrency
@@ -123,6 +137,19 @@ class Ship < ApplicationRecord
   end
 
   private
+
+  # Claim this cycle's journal entries — entries not locked to an approved ship get assigned to this ship.
+  # Entries already assigned to an approved ship are immutable (that cycle is finalized).
+  def claim_journal_entries!
+    approved_ship_ids = project.ships.approved.pluck(:id)
+    scope = new_journal_entries
+    scope = if approved_ship_ids.any?
+      scope.where("ship_id IS NULL OR ship_id NOT IN (?)", approved_ship_ids)
+    else
+      scope # No approved ships — all entries are claimable
+    end
+    scope.update_all(ship_id: id)
+  end
 
   TERMINAL_STATUSES = %w[approved returned rejected].freeze
 

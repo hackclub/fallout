@@ -8,17 +8,20 @@
 #  created_at   :datetime         not null
 #  updated_at   :datetime         not null
 #  project_id   :bigint           not null
+#  ship_id      :bigint
 #  user_id      :bigint           not null
 #
 # Indexes
 #
 #  index_journal_entries_on_discarded_at  (discarded_at)
 #  index_journal_entries_on_project_id    (project_id)
+#  index_journal_entries_on_ship_id       (ship_id)
 #  index_journal_entries_on_user_id       (user_id)
 #
 # Foreign Keys
 #
 #  fk_rails_...  (project_id => projects.id)
+#  fk_rails_...  (ship_id => ships.id)
 #  fk_rails_...  (user_id => users.id)
 #
 class JournalEntry < ApplicationRecord
@@ -28,6 +31,7 @@ class JournalEntry < ApplicationRecord
 
   belongs_to :user
   belongs_to :project
+  belongs_to :ship, optional: true # Set when a ship claims this entry; locked once the ship is approved
   has_many :recordings, dependent: :destroy
   has_many :lapse_timelapses, through: :recordings, source: :recordable, source_type: "LapseTimelapse"
   has_many :you_tube_videos, through: :recordings, source: :recordable, source_type: "YouTubeVideo"
