@@ -15,7 +15,7 @@ export default function SingleChoiceStep({ step, selected, onSelect, onPromptCom
   const { displayedText, isComplete, skip } = useDialogue(step.prompt, { onComplete: onPromptComplete })
 
   return (
-    <section className="relative z-1 w-full flex-1 pt-6 flex flex-col items-center lg:justify-center">
+    <section className="relative z-1 w-full min-h-full pt-6 pb-28 flex flex-col items-center justify-center">
       <div className="flex items-center cursor-pointer" onClick={skip}>
         <img
           src="/onboarding/chinese_heidi.webp"

@@ -222,65 +222,37 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
         className="absolute top-0 left-0 right-0 overflow-hidden pointer-events-none"
         style={{
           height: isPathTransitioning ? '20%' : '55%',
-          transform: isPathTransitioning ? 'translateY(-6vh)' : 'translateY(0vh)',
-          transition: `height ${finalPathTransitionDelayMs}ms ${sceneTransitionEase}, transform ${finalPathTransitionDelayMs}ms ${sceneTransitionEase}`,
+          transition: `height ${finalPathTransitionDelayMs}ms ${sceneTransitionEase}`,
         }}
       >
         <img
           src="/clouds/4.webp"
           alt=""
           className="absolute bottom-0 left-0 h-20 md:h-36"
-          style={{
-            transform: isPathTransitioning
-              ? 'translateX(-33.333%) translateY(-12%) scale(1.45)'
-              : 'translateX(-33.333%) translateY(0%) scale(1)',
-            transition: `transform ${finalPathTransitionDelayMs}ms ${sceneTransitionEase}`,
-          }}
+          style={{ transform: 'translateX(-33.333%) translateY(0%) scale(1)' }}
         />
         <img
           src="/clouds/1.webp"
           alt=""
           className="absolute bottom-0 left-40 h-20 md:h-32"
-          style={{
-            transform: isPathTransitioning
-              ? 'translateX(33.333%) translateY(-16%) scale(1.5)'
-              : 'translateX(33.333%) translateY(0%) scale(1)',
-            transition: `transform ${finalPathTransitionDelayMs}ms ${sceneTransitionEase}`,
-          }}
+          style={{ transform: 'translateX(33.333%) translateY(0%) scale(1)' }}
         />
         <img
           src="/clouds/2.webp"
           alt=""
           className="absolute bottom-0 right-0 h-20 md:h-28"
-          style={{
-            transform: isPathTransitioning
-              ? 'translateX(-83.333%) translateY(-14%) scale(1.45)'
-              : 'translateX(-83.333%) translateY(0%) scale(1)',
-            transition: `transform ${finalPathTransitionDelayMs}ms ${sceneTransitionEase}`,
-          }}
+          style={{ transform: 'translateX(-83.333%) translateY(0%) scale(1)' }}
         />
         <img
           src="/clouds/3.webp"
           alt=""
           className="absolute bottom-0 right-0 h-20 md:h-36"
-          style={{
-            transform: isPathTransitioning
-              ? 'translateX(33.333%) translateY(-12%) scale(1.45)'
-              : 'translateX(33.333%) translateY(0%) scale(1)',
-            transition: `transform ${finalPathTransitionDelayMs}ms ${sceneTransitionEase}`,
-          }}
+          style={{ transform: 'translateX(33.333%) translateY(0%) scale(1)' }}
         />
       </div>
 
       {/* Grass */}
-      <div
-        className="absolute inset-0"
-        style={{
-          transform: isPathTransitioning ? 'translateY(-22vh) scale(1.03)' : 'translateY(0vh) scale(1)',
-          transformOrigin: 'center bottom',
-          transition: `transform ${finalPathTransitionDelayMs}ms ${sceneTransitionEase}`,
-        }}
-      >
+      <div className="absolute inset-0">
         <img src="/grass/1.svg" className="absolute bottom-[32%] left-[3%] z-1 w-8" />
         <img src="/grass/2.svg" className="absolute bottom-[22%] left-[12%] z-1 w-10" />
         <img src="/grass/3.svg" className="absolute bottom-[10%] left-[8%] z-1 w-9" />
@@ -310,7 +282,7 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
         sceneTransitionEase={sceneTransitionEase}
       />
 
-      <div className="relative z-10 w-full flex-1">
+      <div className="relative z-10 w-full flex-1 min-h-0 overflow-y-auto">
         {step.type === 'dialogue' && (
           <DialogueStep step={step} onComplete={() => setCompletedPromptStepKey(step.key)} />
         )}
