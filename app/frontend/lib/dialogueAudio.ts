@@ -1,4 +1,7 @@
 const AUDIO_BASE = '/dialogueaudio'
+const LETTER_VOLUME = 0.12
+const EFFECT_VOLUME = 0.16
+const URL_VOLUME = 0.16
 
 const LETTER_FILES = [
   'a',
@@ -60,14 +63,17 @@ export function preload(): Promise<void> {
   return preloadPromise
 }
 
-function playBuffer(buffer: AudioBuffer, detuneCents: number, onEnded?: () => void): void {
+function playBuffer(buffer: AudioBuffer, detuneCents: number, volume: number, onEnded?: () => void): void {
   const ctx = getContext()
   if (ctx.state === 'suspended') ctx.resume()
 
   const source = ctx.createBufferSource()
+  const gainNode = ctx.createGain()
   source.buffer = buffer
   source.detune.value = detuneCents // pitch shift only — playbackRate stays 1.0 (no speed change)
-  source.connect(ctx.destination)
+  gainNode.gain.value = volume
+  source.connect(gainNode)
+  gainNode.connect(ctx.destination)
   activeSources.add(source)
   source.onended = () => {
     activeSources.delete(source)
@@ -83,30 +89,30 @@ export function playLetter(char: string, nextChar?: string): { consumed: number 
 
   if (lower === 's' && nextLower === 'h') {
     const buf = buffers.get('sh')
-    if (buf) playBuffer(buf, detune)
+    if (buf) playBuffer(buf, detune, LETTER_VOLUME)
     return { consumed: 2 }
   }
   if (lower === 't' && nextLower === 'h') {
     const buf = buffers.get('th')
-    if (buf) playBuffer(buf, detune)
+    if (buf) playBuffer(buf, detune, LETTER_VOLUME)
     return { consumed: 2 }
   }
 
   if (/[a-z]/.test(lower)) {
     const buf = buffers.get(lower)
-    if (buf) playBuffer(buf, detune)
+    if (buf) playBuffer(buf, detune, LETTER_VOLUME)
     return { consumed: 1 }
   }
 
   const spaceBuf = buffers.get('space')
-  if (spaceBuf) playBuffer(spaceBuf, 3000)
+  if (spaceBuf) playBuffer(spaceBuf, 3000, LETTER_VOLUME)
   return { consumed: 1 }
 }
 
 export function playThonk(): void {
   const index = Math.floor(Math.random() * 3) + 1
   const buf = buffers.get(`thonk${index}`)
-  if (buf) playBuffer(buf, 1200) // 1 octave up
+  if (buf) playBuffer(buf, 1200, EFFECT_VOLUME) // 1 octave up
 }
 
 // Fetch, decode (cached), and play an arbitrary audio file with pitch shift only
@@ -122,7 +128,7 @@ export async function playUrl(url: string, detuneCents: number, onEnded?: () => 
     urlBuffers.set(url, buffer)
   }
 
-  playBuffer(buffer, detuneCents, onEnded)
+  playBuffer(buffer, detuneCents, URL_VOLUME, onEnded)
 }
 
 export function stopAll(): void {
