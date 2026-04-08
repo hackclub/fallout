@@ -28,8 +28,8 @@ export default function useDialogue(
   text: string,
   { speed = 45, enabled = true, onComplete }: UseDialogueOptions = {},
 ): UseDialogueReturn {
-  const [displayedText, setDisplayedText] = useState(enabled ? '' : text)
-  const [isComplete, setIsComplete] = useState(!enabled)
+  const [displayedText, setDisplayedText] = useState('')
+  const [isComplete, setIsComplete] = useState(false)
   const indexRef = useRef(0)
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const onCompleteRef = useRef(onComplete)
@@ -47,8 +47,8 @@ export default function useDialogue(
 
   useEffect(() => {
     if (!enabled) {
-      setDisplayedText(text)
-      setIsComplete(true)
+      setDisplayedText('')
+      setIsComplete(false)
       return
     }
 

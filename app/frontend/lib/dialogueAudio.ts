@@ -1,7 +1,7 @@
 const AUDIO_BASE = '/dialogueaudio'
-const LETTER_VOLUME = 0.12
-const EFFECT_VOLUME = 0.16
-const URL_VOLUME = 0.16
+const LETTER_VOLUME = 0.1
+const EFFECT_VOLUME = 0.7
+const URL_VOLUME = 0.5
 
 const LETTER_FILES = [
   'a',
@@ -116,7 +116,12 @@ export function playThonk(): void {
 }
 
 // Fetch, decode (cached), and play an arbitrary audio file with pitch shift only
-export async function playUrl(url: string, detuneCents: number, onEnded?: () => void): Promise<void> {
+export async function playUrl(
+  url: string,
+  detuneCents: number,
+  onEnded?: () => void,
+  volume: number = URL_VOLUME,
+): Promise<void> {
   const ctx = getContext()
   if (ctx.state === 'suspended') ctx.resume()
 
@@ -128,7 +133,7 @@ export async function playUrl(url: string, detuneCents: number, onEnded?: () => 
     urlBuffers.set(url, buffer)
   }
 
-  playBuffer(buffer, detuneCents, URL_VOLUME, onEnded)
+  playBuffer(buffer, detuneCents, volume, onEnded)
 }
 
 export function stopAll(): void {
