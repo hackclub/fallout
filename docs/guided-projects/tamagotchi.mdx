@@ -1,0 +1,595 @@
+| title | Tamagotchi |
+| description | Guided Project by @TaniWanKenobi |
+| --- | --- |
+
+# Tamagotchi PCB Tutorial
+
+<div class="-mt-4">
+  <small>_Made by @TaniWanKenobi_</small>
+</div>
+
+> **Note:** Your schematic should NOT look like this at the end of the tutorial! You are required to add your own components and switch it up to personalize it :D
+
+---
+
+## Table of Contents
+
+- [Installing KiCad](#installing-kicad)
+- [Creating the Schematic](#creating-the-schematic)
+  - [Importing the MCU](#importing-the-mcu)
+  - [Adding the OLED Display](#adding-the-oled-display)
+  - [Adding Buttons](#adding-buttons)
+  - [Adding a Buzzer](#adding-a-buzzer)
+  - [Assigning Footprints](#assigning-footprints)
+- [Creating the PCB](#creating-the-pcb)
+  - [Laying Out Components](#laying-out-components)
+  - [Button Footprint Mismatch](#button-footprint-mismatch)
+  - [Defining the Board Outline](#defining-the-board-outline)
+- [PCB Routing](#pcb-routing)
+  - [Placing Components](#placing-components)
+  - [Routing Traces](#routing-traces)
+- [Customization](#customization)
+- [Run Design Rules Check](#run-design-rules-check)
+  - [Common DRC Errors](#common-drc-errors)
+  - [Late Additions](#late-additions)
+- [Add Your Files to Your GitHub Repo](#add-your-files-to-your-github-repo)
+- [Upload Your Files to GitHub](#upload-your-files-to-github)
+  - [Edit Your README](#edit-your-readme)
+- [Getting a JLCPCB Price](#getting-a-jlcpcb-price)
+  - [Settings](#settings)
+- [Designing the Case](#designing-the-case)
+
+---
+
+## Installing KiCad
+
+Download KiCad from the official site: **[https://www.kicad.org/download/](https://www.kicad.org/download/)**
+
+1. Go to the download page and select your operating system (Windows, macOS, or Linux).
+2. Download the latest **stable release** (KiCad 10.x).
+3. Run the installer and follow the on-screen instructions (the defaults are fine).
+4. When prompted, make sure to **install the default libraries** (they're selected by default).
+5. Launch KiCad and create a new project (**File → New Project** or **Ctrl+N**).
+
+<details>
+<summary>What are the default libraries?</summary>
+
+KiCad ships with a large set of schematic symbols, PCB footprints, and 3D models. These cover most common components (resistors, capacitors, connectors, etc.) so you don't have to create them from scratch. You'll still need to import specialty parts (like the XIAO or OLED), but the defaults cover the basics.
+
+</details>
+
+> **New to KiCad?** Read the official getting started guide before continuing:
+> [KiCad 10.0: Getting Started](https://docs.kicad.org/10.0/en/getting_started_in_kicad/getting_started_in_kicad.html)
+
+---
+
+## Creating the Schematic
+
+The XIAO-ESP32-C6 will be used as the MCU! This is because it's tiny and includes WiFi, Bluetooth, and built-in battery charging, which makes it perfect for this.
+
+<details>
+<summary>What is an MCU?</summary>
+
+MCU stands for **Microcontroller Unit**, the tiny computer (brain) of your project. It runs your code and controls all the other components (display, buttons, buzzer, etc.). The XIAO-ESP32-C6 is the MCU we're using here.
+
+That said, other MCUs are worth knowing about. The RP2040 is a good pick if you don't need wireless: dual-core, and has really good documentation! The nRF52840 is the go-to for low power BLE projects, with sleep currents that blow the ESP32 out of the water. For this project the C6 wins because it's the same price as other XIAO variants, has WiFi 6 and BLE 5 built in, and includes onboard LiPo charging so no external charger chip is needed. The kit uses the C6 for those reasons.
+
+</details>
+
+<details>
+<summary>Useful schematic editor keybinds</summary>
+
+| Key        | Action                                       |
+| ---------- | -------------------------------------------- |
+| **A**      | Add a symbol (component)                     |
+| **W**      | Draw a wire                                  |
+| **P**      | Add a power symbol (VCC, GND, 3V3, etc.)     |
+| **L**      | Add a net label                              |
+| **M**      | Move a component                             |
+| **R**      | Rotate a component                           |
+| **G**      | Grab/drag a component (keeps wires attached) |
+| **E**      | Edit component properties                    |
+| **C**      | Copy a component                             |
+| **Delete** | Delete selected item                         |
+| **Ctrl+Z** | Undo                                         |
+| **Ctrl+S** | Save                                         |
+
+</details>
+
+### Importing the MCU
+
+First, I imported the XIAO-ESP32-C6 from the [OPL Library](https://github.com/Seeed-Studio/OPL_Kicad_Library/tree/master). Here's an [excellent tutorial](https://www.youtube.com/watch?v=lnCvyGIQong) on using it!
+
+I then clicked **A** (Add Symbol), searched for the part, and imported it. I ended up with this:
+
+![Xiao](/docs-assets/guided-projects/tamagotchi/xiao-schematic.webp)
+
+Most symbols won't label every pin with its function (SDA, SCL, MOSI, etc.) They'll just show pin numbers. When that happens, google the MCU name + "pinout" to find the official diagram and cross-reference which pin number maps to which function :D
+
+Now, for this tutorial, I will create the base Tamagotchi. Spice your own Tamagotchi up more than this one! Add some flavor!
+
+### Adding the OLED Display
+
+I then added the [0.96" OLED](https://www.lcsc.com/product-detail/C5248080.html) via EasyEDA to KiCad. Follow this [guide](https://hwdocs.hackclub.dev/user-contrib-guides/easyeda2kicad/)!
+
+I connected GND to GND, SDA to SDA, and SCL to SCL. Use **W** to draw wires between pins.
+
+<details>
+<summary>What are SDA, SCL, and GND?</summary>
+
+- **GND** = Ground, the common reference point for all electrical signals.
+- **SDA** = Serial Data, the line that carries data back and forth over I2C.
+- **SCL** = Serial Clock, the line that provides the timing signal for I2C communication.
+
+I2C is a protocol that lets multiple devices talk over just two wires (SDA + SCL).
+
+</details>
+
+<details>
+<summary>Do I need pull-up resistors on SDA and SCL?</summary>
+
+Normally yes. I2C requires pull-up resistors on SDA and SCL; however, the XIAO boards already include internal pull-ups, so you don't need external ones here.
+
+</details>
+
+I checked the [datasheet](https://www.lcsc.com/datasheet/C5248080.pdf) attached on the LCSC page and found that VCC should be connected to 3V3.
+
+![OLED wiring](/docs-assets/guided-projects/tamagotchi/oled-wiring.webp)
+
+### Adding Buttons
+
+Since a Tamagotchi has three buttons, I decided to add those as well!
+
+For this, I decided to use an **active-low** button layout (which is the most common approach).
+
+Each button connects one side to **GND** and the other to a **GPIO pin** with the XIAO's **internal pull-up** enabled. This makes the pin read **HIGH** when the button is idle, and **LOW** when the button is pressed.
+
+<details>
+<summary>What does "active-low" mean?</summary>
+
+"Active-low" means the button is considered "pressed" when the signal goes LOW (0V / GND). When the button is not pressed, the internal pull-up resistor keeps the pin HIGH (3.3V). This is the most common button wiring approach because it's simple: you only need the button and a ground connection, no extra resistors.
+
+</details>
+
+<details>
+<summary>What is a GPIO pin?</summary>
+
+GPIO stands for **General Purpose Input/Output**. These are the programmable pins on your microcontroller that can be configured as either inputs (to read sensors/buttons) or outputs (to drive LEDs/buzzers). On the XIAO, pins like D0–D10 are GPIOs.
+
+</details>
+
+### Adding a Buzzer
+
+I also added a buzzer from [here](https://www.lcsc.com/product-detail/C49246964.html)!
+
+The buzzer is wired with one pin to a GPIO output and the other to GND, letting the GPIO drive it with a square-wave tone.
+
+![Buzzer schematic](/docs-assets/guided-projects/tamagotchi/buzzer-schematic.webp)
+
+### Assigning Footprints
+
+This is my final schematic! Let's make the PCB now. First, let's assign parts. Click this:
+
+![Assign footprints button](/docs-assets/guided-projects/tamagotchi/assign-footprints-btn.webp)
+
+Then assign the corresponding EasyEDA / OPL parts! For the buttons, import from [here](https://www.lcsc.com/product-detail/C2888493.html)!
+
+![Footprint assignment](/docs-assets/guided-projects/tamagotchi/footprint-assignment.webp)
+
+Now, press this and open the PCB viewer:
+
+![Open PCB viewer](/docs-assets/guided-projects/tamagotchi/open-pcb-viewer.webp)
+
+---
+
+## Creating the PCB
+
+**The maximum size of your PCB should be 100mm²!**
+
+You should see something like this:
+
+![PCB editor](/docs-assets/guided-projects/tamagotchi/pcb-editor.webp)
+
+To synchronize changes between your schematic and PCB layout in KiCad:
+
+- Press **F8**, _or_
+- Click the **Update PCB from Schematic** button
+
+You can do this anytime you want to refresh the PCB with the latest schematic updates.
+
+### Laying Out Components
+
+First, I laid my PCB out in a 100×100 box. I then laid out all my components:
+
+![Component layout](/docs-assets/guided-projects/tamagotchi/component-layout.webp)
+
+## Button Footprint Mismatch
+
+> **Always verify your footprint before finalizing your PCB layout.** Even if a component looks correct in the schematic, the footprint may have incorrect pad numbering that causes your circuit to fail silently. A common red flag: any pin without a net almost always means something went wrong during import.
+
+---
+
+### Why This Happens
+
+After importing a button from EasyEDA into KiCad, the footprint may look fine at first glance:
+
+![KiCad imported switch footprint](/docs-assets/guided-projects/tamagotchi/kicad-imported-switch.webp)
+
+EasyEDA uses a **redundant 4-pin symbol**, showing all four pins separately even though two pairs are internally shorted:
+
+![EasyEDA button symbol](/docs-assets/guided-projects/tamagotchi/easyeda-button-symbol.webp)
+
+KiCad uses a **cleaner 2-pin representation**:
+
+![KiCad button symbol](/docs-assets/guided-projects/tamagotchi/kicad-button-symbol.webp)
+
+When imported, EasyEDA's pins 1 and 2 map to opposite footprint pads, but on a tactile switch they're on the **same physical side** (internally shorted). This means pads that should be electrically separated end up sharing a net, and the button does nothing because one side is permanently shorted to itself.
+
+| EasyEDA pins |  Physical side   | KiCad net |
+| :----------: | :--------------: | :-------: |
+|     1, 2     | Side A (shorted) |   Net 1   |
+|     3, 4     | Side B (shorted) |   Net 2   |
+
+The switch connects **Side A to Side B** when pressed. The footprint must reflect this.
+
+---
+
+### Confirming with the Datasheet
+
+Verify the pinout using the component's datasheet. If sourcing from LCSC, the datasheet is available directly on the product page. For example:
+
+- [Product page](https://www.lcsc.com/product-detail/C2888493.html)
+- [Datasheet](https://www.lcsc.com/datasheet/C2888493.pdf)
+
+![Physical pin diagram](/docs-assets/guided-projects/tamagotchi/physical-pin-diagram.webp)
+![Internal schematic](/docs-assets/guided-projects/tamagotchi/internal-schematic.webp)
+
+These confirm that **pads 1 and 2 are shorted** (Side A) and **pads 3 and 4 are shorted** (Side B).
+
+---
+
+### Fixing the Pad Numbering
+
+Renumber the footprint pads to match the correct mapping:
+
+- Pads **1 and 2** (same physical side) → renumber both to **`1`**
+- Pads **3 and 4** (other physical side) → renumber both to **`2`**
+
+1. Double-click the footprint in the PCB editor and click **Edit Library Footprint**.
+
+![Edit Library Footprint dialog](/docs-assets/guided-projects/tamagotchi/edit-library-footprint.webp)
+
+2. Double-click each pad hole and update the pad number to match the corrected mapping:
+
+![Corrected pad numbering](/docs-assets/guided-projects/tamagotchi/corrected-pad-numbering.webp)
+
+3. Press `Ctrl+S` to save.
+
+---
+
+### Applying the Fix
+
+1. Go to **Tools > Update Footprint from Library**.
+
+![Update Footprint from Library menu](/docs-assets/guided-projects/tamagotchi/update-footprint-menu.webp)
+
+2. Click **Update**.
+
+The footprint will refresh with the corrected pad numbering: one net on Side A, a separate net on Side B, and the switch bridging them when pressed.
+
+> Does this not work? Try deleting the buttons, and updating from schematic again :)
+
+![Fixed footprint](/docs-assets/guided-projects/tamagotchi/fixed-footprint.webp)
+
+### Defining the Board Outline
+
+You'll notice a white outline surrounding the entire board. This is the **Edge Cuts** layer, which defines the physical boundary where the PCB will be cut.
+
+This is done by modifying the `Edge.Cuts` layer on the right side. There are many ways to do this, such as manually drawing it with the given menu.
+
+I found the default outline options limiting and wanted to create something more complex. To do this, I:
+
+1. Drew out the edge cuts layer. I just did this on Figma, you can do this anywhere!
+2. Converted the image into a DXF file using an image-to-DXF converter.
+3. Imported the DXF file into KiCad.
+4. Created a 100×100 mm box as a reference.
+5. Used the measuring tool to determine the correct scale.
+6. Scaled the outline down so it fit within 100 mm.
+
+You can also use the KiCad tools on the right to draw a barrier, they work well! I just wanted to make a cool and unique border. You should try it!
+
+---
+
+## PCB Routing
+
+A PCB is made up of multiple layers. Our boards are "two-layer," meaning that they have two layers of copper wire.
+
+<details>
+<summary>What are the PCB layers?</summary>
+
+| Layer                       | Description                                                  |
+| --------------------------- | ------------------------------------------------------------ |
+| **Top & bottom silkscreen** | The white ink layer where you can add art                    |
+| **Top & bottom copper**     | The layers where you make your copper wires                  |
+| **Substrate**               | The actual plastic (usually green) which makes up your board |
+| **Via**                     | The tunnels which connect the top and bottom copper layers   |
+
+![PCB layers](/docs-assets/guided-projects/tamagotchi/pcb-layers.webp)
+
+</details>
+
+### Placing Components
+
+Place all of your components inside the board outline. Move components to shorten **ratlines**, which are the straight blue lines.
+
+- **M**: Move a component
+- **R**: Rotate a component
+- **F**: Flip a component to the other side of the board
+- **Ctrl+S** / **⌘+S**: Save (do this often!)
+
+<details>
+<summary>What are ratlines?</summary>
+
+Ratlines (also called "ratsnest lines") are the thin straight lines that show unrouted connections between pads. They indicate which pads need to be connected with copper traces. Your goal is to arrange components so these lines are as short as possible and don't cross each other, which makes routing much easier.
+
+</details>
+
+### Routing Traces
+
+Now it's time to route the PCB! Hit **X** on your keyboard and click anything with a thin blue line poking out of it. It should dim the entire screen, show you which direction you need to go with a thin blue line, and highlight the destination:
+
+![Routing example](/docs-assets/guided-projects/tamagotchi/routing-example.webp)
+
+**Key routing shortcuts:**
+
+- **X**: Start routing a trace
+- **V**: Add a via (switch trace to the other side of the board mid-route)
+- **Backspace**: Delete the last trace segment while routing
+- **Esc**: Cancel the current route
+- **D**: Drag a trace (reposition it without breaking connections)
+- **U**: Select the entire trace from the point you click
+
+Join the highlighted points together. If there isn't enough space on the front side, or there is a trace already present that is blocking you, you can route on the back side by clicking **B.Cu** on the right toolbar. If you want to change sides during routing, press **V** and a via will be added, which will transfer your trace to the other side of the board.
+
+> **Important:** Wires and pads of different colors (except golden) can't be connected together directly! You must use a via to the other side.
+
+<details>
+<summary>What is a via?</summary>
+
+A via is a small plated hole that connects a copper trace on one layer of the board to a trace on another layer. Think of it as a tiny tunnel through the PCB. You use them when you can't route a trace on one side because another trace is in the way. Press **V** while routing to drop a via and continue the trace on the other side.
+
+</details>
+
+Your routing is complete!
+
+![Ground plane](/docs-assets/guided-projects/tamagotchi/ground-plane.webp)
+
+> **Tip:** Place everything based on what shortens the blue lines, and what makes them not cross!
+
+> **Tip:** Use a [ground plane](https://www.kicadtips.com/how-to/make-a-ground-plane) to help with routing and to reduce noise. That's what the red and blue layers are for! It's not necessary, but looks nice and is easy to set up!
+
+> **Note:** You may notice [stitching vias](https://resources.altium.com/p/everything-you-need-know-about-stitching-vias) in my board (the small holes scattered across the ground plane). **You do NOT need to add these.** They are completely optional and unnecessary for a board like this. I only added them for fun.
+>
+> ![Stitching vias](/docs-assets/guided-projects/tamagotchi/stitching-vias.webp)
+
+---
+
+## Customization
+
+You may have already added some text and art to customize your board like me. If not, you can click **F.Silkscreen** and use the text tool.
+
+![Sample text](/docs-assets/guided-projects/tamagotchi/sample-text.webp)
+
+To add art, select the **Top Silkscreen Layer** or **Bottom Silkscreen Layer** in the sidebars, then use the KiCad image converter to add custom art.
+
+![KiCad image converter](/docs-assets/guided-projects/tamagotchi/kicad-image-converter.webp)
+
+Your board is now beautiful!
+
+---
+
+## Run Design Rules Check
+
+**DRC** stands for **Design Rules Check**. This runs a check that makes sure your board has no interference errors, no components are off the board, and no wires are intersecting. It does **not**, however, confirm that your board works.
+
+![DRC](/docs-assets/guided-projects/tamagotchi/drc.webp)
+
+Using the output, correct any errors. This can be confusing, so remember: you can always ask for help!
+
+<details>
+<summary>What are common DRC errors?</summary>
+
+- **Track and copper errors**: clearance violations, track width, annular rings
+- **Via errors**: diameter, micro vias, blind/buried vias
+- **Pad and footprint errors**: pad-to-pad, hole clearances
+- **Edge and board outline errors**: copper edge clearance, silkscreen issues
+- **Zone errors**: copper slivers, starved thermals, unconnected items
+- **Net and connection errors**: missing connections, net conflicts
+- **Courtyard errors**: overlaps, missing courtyards
+
+</details>
+
+Once your PCB passes the DRC, it is finished!
+
+In the PCB editor, click **View → 3D Viewer** to see your finished work!
+
+![3D Viewer](/docs-assets/guided-projects/tamagotchi/pcb-3d-viewer.webp)
+
+### Late Additions
+
+There will be moments when you realize you want to add something after you've done most of the work. That's totally fine!
+
+Here, I decided to add battery functionality. Since the XIAO's underside pins are extremely difficult to solder, I designed the board so those pins connect to a pad instead. The battery can then plug into a set of male pins that interface with that pad. Here's what it looks like:
+
+![Battery schematic](/docs-assets/guided-projects/tamagotchi/battery-schematic.webp)
+
+Here's my final schematic:
+
+![Final Schematic](/docs-assets/guided-projects/tamagotchi/final-schematic.webp)
+
+Here's my final PCB:
+
+![PCB](/docs-assets/guided-projects/tamagotchi/final-pcb.webp)
+
+![3D Model Front](/docs-assets/guided-projects/tamagotchi/pcb-3d-front.webp)
+
+![3D Model Back](/docs-assets/guided-projects/tamagotchi/pcb-3d-back.webp)
+
+---
+
+## Add Your Files to Your GitHub Repo
+
+Now it is time to order your board. Get the following files from your project:
+
+- **A screenshot of your 3D view**
+  - In PCB Editor: **View → 3D Viewer → Edit → Copy 3D Image**
+- `.kicad_pro` (KiCad project file)
+- `.kicad_sch` (schematic)
+- `.kicad_pcb` (PCB layout)
+- **Your Gerber files** (see below)
+
+<details>
+<summary>How do I export Gerber files?</summary>
+
+1. In your PCB editor: **File → Fabrication Outputs → Gerbers (.gbr)**
+2. Set an output folder (e.g., a new "Gerbers" folder)
+3. Select necessary layers (generally already selected)
+4. Click **Plot**
+5. Click **Generate Drill Files**
+6. Zip the resulting files for your manufacturer
+
+Gerber files are the industry-standard format that PCB manufacturers use to fabricate your board. They contain the copper layers, silkscreen, solder mask, drill locations, and board outline.
+
+</details>
+
+---
+
+## Upload Your Files to GitHub
+
+Go back to the GitHub repo you created at the start. Click **Add File → Upload files**.
+
+Drag in your:
+
+- Screenshot of your 3D view
+- `.kicad_pro` (KiCad project file)
+- `.kicad_sch` (schematic)
+- `.kicad_pcb` (PCB layout)
+- Gerbers (zipped)
+
+You should have downloaded all of these in the previous step.
+
+Click to commit your changes.
+
+### Edit Your README
+
+Finally, edit your README to include the submission requirements:
+
+- A short description of what your project is
+- A couple sentences on why you made the project
+- A couple sentences on how to use your project
+
+**Pictures of your project:**
+
+- A screenshot of a full 3D model of your project
+- A screenshot of your PCB, if you have one
+- A wiring diagram, if you're doing any wiring that isn't on a PCB
+
+**A BOM (Bill of Materials) in table format at the end of the README, with links.**
+
+> **NOTE:** ALL projects you make for Fallout must have a project photo in your README.
+
+---
+
+## Getting a JLCPCB Price
+
+Go to [jlcpcb.com](https://jlcpcb.com/) and make an account. Then, add your Gerber file for the instant quote.
+
+![JLCPCB upload](/docs-assets/guided-projects/tamagotchi/jlcpcb-upload.webp)
+
+### Settings
+
+You should keep the default settings for everything. The only thing you should/can change is the **PCB Color**. I did black as seen below:
+
+![PCB color](/docs-assets/guided-projects/tamagotchi/pcb-color.webp)
+
+For high-spec options, also keep the default. **Do not** click PCB assembly. We will give you a kit to hand-solder your board.
+
+![High-spec options](/docs-assets/guided-projects/tamagotchi/high-spec-options.webp)
+
+Once you have successfully _not_ changed any of the settings (except the board color), on the right, change the shipping method to **Global Standard Direct** (or **Air Registered Mail** if it is cheaper).
+
+---
+
+## Designing the Case
+
+Export the PCB from KiCad into your CAD platform! For me, this is Onshape.
+
+I googled and found headers! I found this from [here](https://www.3dcontentcentral.com/download-model.aspx?catalogid=171&id=1025256)!
+
+I then experimented with the CAD a lot. I used revolve, but it did not look nice and was hard to use. I also tried multiple placements for the battery and found it was optimal if it's placed vertically.
+
+To make these, I created a sketch by clicking the sketch button in the upper-left-hand side and made multiple shapes that include tolerance and my shell size.
+
+![Case sketch 1](/docs-assets/guided-projects/tamagotchi/case-sketch-1.webp)
+
+![Case sketch 2](/docs-assets/guided-projects/tamagotchi/case-sketch-2.webp)
+
+![Case sketch 3](/docs-assets/guided-projects/tamagotchi/case-sketch-3.webp)
+
+I also decided to change the PCB to add the vibration motor to the back and raise the screen!
+
+From
+
+![PCB before](/docs-assets/guided-projects/tamagotchi/pcb-before.webp)
+
+to
+
+![PCB after](/docs-assets/guided-projects/tamagotchi/pcb-after.webp)
+
+My headers overlapped with the buzzer, so I decided to reposition the buzzer to the middle of the board! The gap between the LCD and the headers should give me enough space!
+
+![Buzzer repositioned](/docs-assets/guided-projects/tamagotchi/buzzer-repositioned.webp)
+
+I made the back portion with 3D-printed standoffs and added large fillets to round the edges. I made the top part and added some tolerance between the top of the plate and the bottom of the top half of the case!
+
+![Case 3D](/docs-assets/guided-projects/tamagotchi/case-3d.webp)
+
+I added a hole for the battery and a hole for the USB-C. Generally, there may be issues printing this, but for this small amount of bridging there shouldn't be any issues!
+
+I also made sure to add an offset to the USB-C! The USB-C I measured with my calipers was 7 mm x 13 mm about, would recommend making it bigger just in case by ~1 mm. If you have a 3D printer, you can just test values yourself! My values worked for me (12.5 x 7.5 mm, although they are pretty tight, **I would definitely make it a little bigger**)
+
+![Case USB-C hole](/docs-assets/guided-projects/tamagotchi/case-usbc.webp)
+
+![Case USB-C detail](/docs-assets/guided-projects/tamagotchi/case-usbc-2.webp)
+
+Finally, I used the section view tool to confirm that there is no overlapping:
+
+![Case section view](/docs-assets/guided-projects/tamagotchi/case-section-view.webp)
+
+Now, my design is finished! I uploaded all necessary files to my GitHub repo.
+
+**Note: Design is an iterative process. I spent about 20+ hours manually adjusting everything to look as pretty as possible! But don't worry, #fallout is here to guide you! This is a normal process and you are not alone.**
+
+I recommend **not** following the above 1:1; this was my process, and it will differ greatly from yours!
+
+I also recommend checking my [Onshape](https://cad.onshape.com/documents/fa5791d8e7f345b436054923/w/ad8e09905eb572b0a8a40e9d/e/e81f06aa82a76dd04f8e6832?renderMode=0&uiState=6990af61d8ec4667253f72ea) for inspiration! Check my feature tree and see my iterations yourself.
+
+> **A Note:**
+>
+> This project took me way longer than expected, and that's completely normal.
+>
+> My 3D printer wouldn't connect to the network, then had config issues once it did. I spent hours trying to flash my XIAO to the wrong COM port before realizing the flashing process had changed. A button stopped working after soldering, and while trying to fix it I accidentally shorted something on the XIAO, which took a few more hours to debug and desolder.
+>
+> None of this means you did something wrong. You got this!
+>
+> The biggest thing I learned: if you're stuck on something that feels like it's eating hours with no end in sight, it's often faster to find a completely different approach than to keep pushing through. Flashing not working? Try a different method. Component not desoldering cleanly? Maybe there's a workaround that doesn't require removing it at all. The path forward usually exists, it just might not be the one you started on.
+>
+> You've got the whole Fallout community to ask for help :D
+
+Enjoy making :D!
+
+---
+
+## Next: Firmware
+
+Ready to bring your Tamagotchi to life? Head over to the [Firmware Setup Tutorial](/docs/guided-projects/tamagotchi-firmware) to program your board with Arduino IDE.
