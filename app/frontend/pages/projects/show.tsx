@@ -402,7 +402,7 @@ export default function ProjectsShow({
                         }
                       >
                         <div
-                          className="prose prose-sm max-w-none text-dark-brown wrap-break-word [&_img]:max-h-48 [&_img]:w-auto"
+                          className="prose prose-sm max-w-none text-dark-brown wrap-break-word [&_img]:max-h-48 [&_img]:w-auto markdown-content timeline-markdown"
                           dangerouslySetInnerHTML={{ __html: entry.content_html }}
                         />
                       </Timeline.DetailItem>
@@ -488,7 +488,7 @@ export default function ProjectsShow({
                       </h3>
                       <p className="text-sm text-dark-brown mb-2">{formatTime(entry.time_logged)} tracked</p>
                       <div
-                        className="prose prose-sm max-w-none text-dark-brown wrap-break-word [&_img]:max-h-48 [&_img]:w-auto"
+                        className="prose prose-sm max-w-none text-dark-brown wrap-break-word [&_img]:max-h-48 [&_img]:w-auto markdown-content timeline-markdown"
                         dangerouslySetInnerHTML={{ __html: entry.content_html }}
                       />
                     </div>
