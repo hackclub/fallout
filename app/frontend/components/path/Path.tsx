@@ -97,6 +97,7 @@ function prefersReducedMotion() {
 }
 
 export const PathCenterContext = createContext<number>(0)
+export const ScrollToNodeContext = createContext<((nodeIndex: number) => void) | null>(null)
 
 const LANE_PATTERN = [1, 2, 1, 0] // middle, right, middle, left
 
@@ -556,233 +557,235 @@ export default function Path({ nodes, introTransition }: PathProps) {
   }
 
   return (
-    <PathCenterContext.Provider value={centerX}>
-      <div style={{ height: `calc(100vh + ${maxScroll}px)` }} />
-      <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
-        {/* Sky */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: skyHeight,
-            background: 'var(--color-light-blue)',
-          }}
-        />
-        {/* Clouds — behind all 3D content, constrained to sky band */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: skyHeight,
-            overflow: 'hidden',
-            pointerEvents: 'none',
-          }}
-        >
-          <img
-            src="/clouds/4.webp"
-            alt=""
-            className="absolute bottom-0 left-0 h-30 md:h-50"
-            style={cloudTransform('translateX(-33.333%) translateY(0px) scale(1)')}
+    <ScrollToNodeContext.Provider value={scrollToNode}>
+      <PathCenterContext.Provider value={centerX}>
+        <div style={{ height: `calc(100vh + ${maxScroll}px)` }} />
+        <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
+          {/* Sky */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: skyHeight,
+              background: 'var(--color-light-blue)',
+            }}
           />
-          <img
-            src="/clouds/1.webp"
-            alt=""
-            className="absolute bottom-0 left-40 h-30"
-            style={cloudTransform('translateX(33.333%) translateY(0px) scale(1)')}
-          />
-          <img
-            src="/clouds/2.webp"
-            alt=""
-            className="absolute bottom-0 right-0 h-30"
-            style={cloudTransform('translateX(-83.333%) translateY(0px) scale(1)')}
-          />
-          <img
-            src="/clouds/3.webp"
-            alt=""
-            className="absolute bottom-0 right-0 h-30 md:h-50 w-auto"
-            style={cloudTransform('translateX(33.333%) translateY(0px) scale(1)')}
-          />
-        </div>
-
-        <div style={onboardingGrassOverlayStyle}>
-          {ONBOARDING_GRASS_SPRITES.map((sprite, index) => (
+          {/* Clouds — behind all 3D content, constrained to sky band */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: skyHeight,
+              overflow: 'hidden',
+              pointerEvents: 'none',
+            }}
+          >
             <img
-              key={`${sprite.src}-${index}`}
-              src={sprite.src}
+              src="/clouds/4.webp"
               alt=""
-              className={sprite.className}
+              className="absolute bottom-0 left-0 h-30 md:h-50"
+              style={cloudTransform('translateX(-33.333%) translateY(0px) scale(1)')}
+            />
+            <img
+              src="/clouds/1.webp"
+              alt=""
+              className="absolute bottom-0 left-40 h-30"
+              style={cloudTransform('translateX(33.333%) translateY(0px) scale(1)')}
+            />
+            <img
+              src="/clouds/2.webp"
+              alt=""
+              className="absolute bottom-0 right-0 h-30"
+              style={cloudTransform('translateX(-83.333%) translateY(0px) scale(1)')}
+            />
+            <img
+              src="/clouds/3.webp"
+              alt=""
+              className="absolute bottom-0 right-0 h-30 md:h-50 w-auto"
+              style={cloudTransform('translateX(33.333%) translateY(0px) scale(1)')}
+            />
+          </div>
+
+          <div style={onboardingGrassOverlayStyle}>
+            {ONBOARDING_GRASS_SPRITES.map((sprite, index) => (
+              <img
+                key={`${sprite.src}-${index}`}
+                src={sprite.src}
+                alt=""
+                className={sprite.className}
+                style={{
+                  position: 'absolute',
+                  height: 'auto',
+                  ...sprite.style,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Back grass canvas */}
+          <canvas
+            ref={backCanvasRef}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              visibility: ready ? 'visible' : 'hidden',
+              ...sharedGroundStyle,
+              ...liveGroundFadeStyle,
+            }}
+          />
+          {/* Back billboard scene — past inflection (behind cover) */}
+          <motion.div
+            initial={false}
+            animate={{ opacity: introActive ? (introNodesVisible ? 1 : 0) : 1 }}
+            transition={{
+              duration: PATH_ENTRY_NODE_DURATION_MS / 1000,
+              ease: [0.22, 1, 0.36, 1],
+              delay: introActive && introNodesVisible ? 0.04 : 0,
+            }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              perspective: `${PERSPECTIVE}px`,
+              perspectiveOrigin: `${centerPct}% calc(${HORIZON_PCT}% + ${PERSPECTIVE_OFFSET_PX}px)`,
+              pointerEvents: 'none',
+              visibility: ready ? 'visible' : 'hidden',
+            }}
+          >
+            <div
               style={{
                 position: 'absolute',
-                height: 'auto',
-                ...sprite.style,
+                top: '-10000%',
+                bottom: 0,
+                left: `${centerPct}%`,
+                marginLeft: -MAX_WIDTH / 2,
+                width: MAX_WIDTH,
+                transformOrigin: 'bottom center',
+                transformStyle: 'preserve-3d',
+                transform: `rotateX(${GROUND_ANGLE}deg)`,
               }}
-            />
-          ))}
-        </div>
-
-        {/* Back grass canvas */}
-        <canvas
-          ref={backCanvasRef}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            visibility: ready ? 'visible' : 'hidden',
-            ...sharedGroundStyle,
-            ...liveGroundFadeStyle,
-          }}
-        />
-        {/* Back billboard scene — past inflection (behind cover) */}
-        <motion.div
-          initial={false}
-          animate={{ opacity: introActive ? (introNodesVisible ? 1 : 0) : 1 }}
-          transition={{
-            duration: PATH_ENTRY_NODE_DURATION_MS / 1000,
-            ease: [0.22, 1, 0.36, 1],
-            delay: introActive && introNodesVisible ? 0.04 : 0,
-          }}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            perspective: `${PERSPECTIVE}px`,
-            perspectiveOrigin: `${centerPct}% calc(${HORIZON_PCT}% + ${PERSPECTIVE_OFFSET_PX}px)`,
-            pointerEvents: 'none',
-            visibility: ready ? 'visible' : 'hidden',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              top: '-10000%',
-              bottom: 0,
-              left: `${centerPct}%`,
-              marginLeft: -MAX_WIDTH / 2,
-              width: MAX_WIDTH,
-              transformOrigin: 'bottom center',
-              transformStyle: 'preserve-3d',
-              transform: `rotateX(${GROUND_ANGLE}deg)`,
-            }}
-          >
-            {billboards.map((b, i) => (
-              <div
-                key={b.id}
-                ref={(el) => {
-                  backBillboardRefs.current[i] = el
-                }}
-                style={{
-                  position: 'absolute',
-                  left: `${(b.lane * 100) / LANES}%`,
-                  width: `${100 / LANES}%`,
-                  height: 'auto',
-                  transformOrigin: 'bottom center',
-                }}
-              >
+            >
+              {billboards.map((b, i) => (
                 <div
-                  style={{ width: '100%', transform: `translateY(${BILLBOARD_Y_OFFSET}px)`, cursor: 'pointer' }}
-                  onClick={() => scrollToNode(billboards.length - 1 - i)}
-                >
-                  {(() => {
-                    const node = nodes[billboards.length - 1 - i]
-                    return React.isValidElement(node)
-                      ? React.cloneElement(node as React.ReactElement<{ interactive?: boolean }>, {
-                          interactive: false,
-                        })
-                      : node
-                  })()}
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-        {/* Hill cover */}
-        <div
-          style={{
-            position: 'absolute',
-            top: inflectionScreenY,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'var(--color-light-green)',
-            pointerEvents: 'none',
-            ...sharedGroundStyle,
-          }}
-        />
-        {/* Front grass canvas */}
-        <canvas
-          ref={frontCanvasRef}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            visibility: ready ? 'visible' : 'hidden',
-            ...sharedGroundStyle,
-            ...liveGroundFadeStyle,
-          }}
-        />
-        {/* Front billboard scene — before inflection (in front of cover) */}
-        <motion.div
-          initial={false}
-          animate={{ opacity: introActive ? (introNodesVisible ? 1 : 0) : 1 }}
-          transition={{
-            duration: PATH_ENTRY_NODE_DURATION_MS / 1000,
-            ease: [0.22, 1, 0.36, 1],
-            delay: introActive && introNodesVisible ? 0.14 : 0,
-          }}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            perspective: `${PERSPECTIVE}px`,
-            perspectiveOrigin: `${centerPct}% calc(${HORIZON_PCT}% + ${PERSPECTIVE_OFFSET_PX}px)`,
-            pointerEvents: 'none',
-            visibility: ready ? 'visible' : 'hidden',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              top: '-10000%',
-              bottom: 0,
-              left: `${centerPct}%`,
-              marginLeft: -MAX_WIDTH / 2,
-              width: MAX_WIDTH,
-              transformOrigin: 'bottom center',
-              transformStyle: 'preserve-3d',
-              transform: `rotateX(${GROUND_ANGLE}deg)`,
-            }}
-          >
-            {billboards.map((b, i) => (
-              <div
-                key={b.id}
-                ref={(el) => {
-                  frontBillboardRefs.current[i] = el
-                }}
-                style={{
-                  position: 'absolute',
-                  left: `${(b.lane * 100) / LANES}%`,
-                  width: `${100 / LANES}%`,
-                  height: 'auto',
-                  transformOrigin: 'bottom center',
-                }}
-              >
-                <div
-                  style={{
-                    width: '100%',
-                    transform: `translateY(${BILLBOARD_Y_OFFSET}px)`,
-                    cursor: 'pointer',
+                  key={b.id}
+                  ref={(el) => {
+                    backBillboardRefs.current[i] = el
                   }}
-                  onClick={() => scrollToNode(billboards.length - 1 - i)}
+                  style={{
+                    position: 'absolute',
+                    left: `${(b.lane * 100) / LANES}%`,
+                    width: `${100 / LANES}%`,
+                    height: 'auto',
+                    transformOrigin: 'bottom center',
+                  }}
                 >
-                  {nodes[billboards.length - 1 - i]}
+                  <div
+                    style={{ width: '100%', transform: `translateY(${BILLBOARD_Y_OFFSET}px)`, cursor: 'pointer' }}
+                    onClick={() => scrollToNode(billboards.length - 1 - i)}
+                  >
+                    {(() => {
+                      const node = nodes[billboards.length - 1 - i]
+                      return React.isValidElement(node)
+                        ? React.cloneElement(node as React.ReactElement<{ interactive?: boolean }>, {
+                            interactive: false,
+                          })
+                        : node
+                    })()}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-    </PathCenterContext.Provider>
+              ))}
+            </div>
+          </motion.div>
+          {/* Hill cover */}
+          <div
+            style={{
+              position: 'absolute',
+              top: inflectionScreenY,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'var(--color-light-green)',
+              pointerEvents: 'none',
+              ...sharedGroundStyle,
+            }}
+          />
+          {/* Front grass canvas */}
+          <canvas
+            ref={frontCanvasRef}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              visibility: ready ? 'visible' : 'hidden',
+              ...sharedGroundStyle,
+              ...liveGroundFadeStyle,
+            }}
+          />
+          {/* Front billboard scene — before inflection (in front of cover) */}
+          <motion.div
+            initial={false}
+            animate={{ opacity: introActive ? (introNodesVisible ? 1 : 0) : 1 }}
+            transition={{
+              duration: PATH_ENTRY_NODE_DURATION_MS / 1000,
+              ease: [0.22, 1, 0.36, 1],
+              delay: introActive && introNodesVisible ? 0.14 : 0,
+            }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              perspective: `${PERSPECTIVE}px`,
+              perspectiveOrigin: `${centerPct}% calc(${HORIZON_PCT}% + ${PERSPECTIVE_OFFSET_PX}px)`,
+              pointerEvents: 'none',
+              visibility: ready ? 'visible' : 'hidden',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: '-10000%',
+                bottom: 0,
+                left: `${centerPct}%`,
+                marginLeft: -MAX_WIDTH / 2,
+                width: MAX_WIDTH,
+                transformOrigin: 'bottom center',
+                transformStyle: 'preserve-3d',
+                transform: `rotateX(${GROUND_ANGLE}deg)`,
+              }}
+            >
+              {billboards.map((b, i) => (
+                <div
+                  key={b.id}
+                  ref={(el) => {
+                    frontBillboardRefs.current[i] = el
+                  }}
+                  style={{
+                    position: 'absolute',
+                    left: `${(b.lane * 100) / LANES}%`,
+                    width: `${100 / LANES}%`,
+                    height: 'auto',
+                    transformOrigin: 'bottom center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '100%',
+                      transform: `translateY(${BILLBOARD_Y_OFFSET}px)`,
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => scrollToNode(billboards.length - 1 - i)}
+                  >
+                    {nodes[billboards.length - 1 - i]}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </PathCenterContext.Provider>
+    </ScrollToNodeContext.Provider>
   )
 }

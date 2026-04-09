@@ -17,6 +17,7 @@ type CtxValue = {
   trackScroll: boolean
   alwaysShow: boolean
   snapWhenOffscreen: (() => { x: number; y: number }) | false
+  onSnapClick?: () => void
 }
 
 const Ctx = createContext<CtxValue | null>(null)
@@ -46,6 +47,7 @@ export function Tooltip({
   trackScroll = false,
   alwaysShow = false,
   snapWhenOffscreen = false,
+  onSnapClick,
 }: {
   children: ReactNode
   side?: Side
@@ -54,6 +56,7 @@ export function Tooltip({
   trackScroll?: boolean
   alwaysShow?: boolean
   snapWhenOffscreen?: (() => { x: number; y: number }) | false
+  onSnapClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLElement>(null)
@@ -70,6 +73,7 @@ export function Tooltip({
         trackScroll,
         alwaysShow,
         snapWhenOffscreen,
+        onSnapClick,
       }}
     >
       {children}
@@ -245,11 +249,12 @@ function Arrow({ side }: { side: Side }) {
 }
 
 export function TooltipContent({ children, className }: { children: ReactNode; className?: string }) {
-  const { open, setOpen, triggerRef, side, autoFlip, gap, trackScroll, snapWhenOffscreen } = useCtx()
+  const { open, setOpen, triggerRef, side, autoFlip, gap, trackScroll, snapWhenOffscreen, onSnapClick } = useCtx()
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<Pos | null>(null)
   const posRef = useRef<Pos | null>(null)
   const snappedRef = useRef(false)
+  const [isSnapped, setIsSnapped] = useState(false)
 
   const applyPos = useCallback(
     (el: HTMLDivElement, tr: DOMRect) => {
@@ -260,6 +265,7 @@ export function TooltipContent({ children, className }: { children: ReactNode; c
       el.style.visibility = 'visible'
       if (snappedRef.current) {
         snappedRef.current = false
+        setIsSnapped(false)
         el.style.animation = ''
       }
       // Update React state only when resolved side changes (for arrow direction)
@@ -309,6 +315,7 @@ export function TooltipContent({ children, className }: { children: ReactNode; c
           el.style.visibility = 'visible'
           if (!snappedRef.current) {
             snappedRef.current = true
+            setIsSnapped(true)
             ensureBobKeyframes()
             el.style.animation = 'tooltip-bob 1.2s ease-in-out infinite'
           }
@@ -357,11 +364,13 @@ export function TooltipContent({ children, className }: { children: ReactNode; c
       ref={ref}
       role="tooltip"
       className={twMerge(
-        'fixed z-50 pointer-events-none px-3 py-2 text-sm rounded',
+        'fixed z-50 px-3 py-2 text-sm rounded',
+        isSnapped && onSnapClick ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none',
         'bg-light-brown border-2 border-dark-brown text-dark-brown shadow-md',
         className,
       )}
       style={pos ? { top: pos.top, left: pos.left } : { visibility: 'hidden', top: 0, left: 0 }}
+      onClick={isSnapped && onSnapClick ? onSnapClick : undefined}
     >
       {pos && <Arrow side={pos.side} />}
       {children}

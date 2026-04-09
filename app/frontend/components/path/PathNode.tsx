@@ -3,7 +3,7 @@ import { Link, usePage } from '@inertiajs/react'
 // @ts-expect-error useModalStack lacks type declarations in this beta package
 import { ModalLink, useModalStack } from '@inertiaui/modal-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
-import { PathCenterContext } from '@/components/path/Path'
+import { PathCenterContext, ScrollToNodeContext } from '@/components/path/Path'
 import { notify } from '@/lib/notifications'
 import type { SharedProps } from '@/types'
 
@@ -35,12 +35,14 @@ export default function PathNode({
   const isTrial = authUser?.is_trial ?? false
 
   const pathCenterX = useContext(PathCenterContext)
+  const scrollToNode = useContext(ScrollToNodeContext)
 
   const { stack } = useModalStack()
   const modalOpen = stack.length > 0
   const [activeReady, setActiveReady] = useState(false)
 
   const snapPosition = useCallback(() => ({ x: pathCenterX, y: window.innerHeight - 40 }), [pathCenterX])
+  const handleSnapClick = useCallback(() => scrollToNode?.(index), [scrollToNode, index])
 
   // Delay showing active tooltip so it appears after modal fade-out
   useEffect(() => {
@@ -148,7 +150,14 @@ export default function PathNode({
             : 'Continue here!'
     const showAlways = readDocsNudge ? false : index === 0 ? !modalOpen : activeReady && !modalOpen
     return (
-      <Tooltip side="top" gap={12} trackScroll alwaysShow={showAlways} snapWhenOffscreen={snapPosition}>
+      <Tooltip
+        side="top"
+        gap={12}
+        trackScroll
+        alwaysShow={showAlways}
+        snapWhenOffscreen={snapPosition}
+        onSnapClick={handleSnapClick}
+      >
         <TooltipTrigger>{content}</TooltipTrigger>
         <TooltipContent>{tooltipText}</TooltipContent>
       </Tooltip>
