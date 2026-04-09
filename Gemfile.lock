@@ -458,12 +458,13 @@ GEM
       rexml (~> 3.2, >= 3.2.5)
       rubyzip (>= 1.2.2, < 4.0)
       websocket (~> 1.0)
-    sentry-rails (5.28.1)
-      railties (>= 5.0)
-      sentry-ruby (~> 5.28.1)
-    sentry-ruby (5.28.1)
+    sentry-rails (6.5.0)
+      railties (>= 5.2.0)
+      sentry-ruby (~> 6.5.0)
+    sentry-ruby (6.5.0)
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.0.2)
+      logger
     skylight (7.1.0)
       activesupport (>= 7.2.0)
     slack-ruby-client (3.1.0)
@@ -598,8 +599,8 @@ DEPENDENCIES
   ruby_llm (~> 1.14)
   scoped_search (~> 4.3)
   selenium-webdriver
-  sentry-rails (~> 5.28)
-  sentry-ruby (~> 5.28)
+  sentry-rails (~> 6.5)
+  sentry-ruby (~> 6.5)
   skylight (~> 7.1)
   slack-ruby-client (~> 3.0)
   solid_cable
