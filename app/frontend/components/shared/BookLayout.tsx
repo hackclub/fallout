@@ -18,7 +18,7 @@ const BookLayout = ({
       showBorderOnMobile ? 'relative pl-4.25 pt-3.75 pr-6.25 pb-5.5 xl:p-12' : 'relative xl:p-12',
     )}
   >
-    <div className={twMerge('relative flex-1 h-full my-auto', className)}>
+    <div className={twMerge('relative flex-1 h-full my-auto min-w-0', className)}>
       <div className="inset-0 bg-light-brown h-full w-full max-xl:p-3 md:max-xl:p-4">{children}</div>
       <div className="hidden xl:block absolute pointer-events-none -left-5 -right-5 top-5 -bottom-5">
         <div className="absolute left-0 bottom-0 top-0 w-5 bg-[#d4bb9d]"></div>
