@@ -1,0 +1,38 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+# == Schema Information
+#
+# Table name: hcb_connections
+#
+#  id               :bigint           not null, primary key
+#  access_token     :text
+#  connected_at     :datetime
+#  refresh_token    :text
+#  token_expires_at :datetime
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
+#  connected_by_id  :bigint           not null
+#
+# Indexes
+#
+#  index_hcb_connections_on_connected_by_id  (connected_by_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (connected_by_id => users.id)
+#
+one:
+  access_token: MyText
+  refresh_token: MyText
+  token_expires_at: 2026-04-08 13:52:00
+  hcb_organization_id: MyString
+  connected_by: one
+  connected_at: 2026-04-08 13:52:00
+
+two:
+  access_token: MyText
+  refresh_token: MyText
+  token_expires_at: 2026-04-08 13:52:00
+  hcb_organization_id: MyString
+  connected_by: two
+  connected_at: 2026-04-08 13:52:00

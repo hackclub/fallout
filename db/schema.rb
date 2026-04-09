@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_07_174922) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_08_235300) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -205,6 +205,60 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_174922) do
     t.datetime "updated_at", null: false
     t.text "value"
     t.index ["feature_key", "key", "value"], name: "index_flipper_gates_on_feature_key_and_key_and_value", unique: true
+  end
+
+  create_table "hcb_connections", force: :cascade do |t|
+    t.text "access_token"
+    t.datetime "connected_at"
+    t.bigint "connected_by_id", null: false
+    t.datetime "created_at", null: false
+    t.text "refresh_token"
+    t.datetime "token_expires_at"
+    t.datetime "updated_at", null: false
+    t.index ["connected_by_id"], name: "index_hcb_connections_on_connected_by_id"
+  end
+
+  create_table "hcb_grant_cards", force: :cascade do |t|
+    t.integer "amount_cents", null: false
+    t.integer "balance_cents"
+    t.datetime "canceled_at"
+    t.string "card_id"
+    t.string "category_lock", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.string "email"
+    t.date "expires_on"
+    t.string "hcb_id"
+    t.string "keyword_lock"
+    t.string "last4"
+    t.datetime "last_synced_at"
+    t.string "merchant_lock", default: [], null: false, array: true
+    t.boolean "one_time_use", default: false, null: false
+    t.string "purpose"
+    t.string "status", default: "active", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["hcb_id"], name: "index_hcb_grant_cards_on_hcb_id", unique: true
+    t.index ["user_id", "status"], name: "index_hcb_grant_cards_on_user_id_and_status"
+    t.index ["user_id"], name: "index_hcb_grant_cards_on_user_id"
+    t.index ["user_id"], name: "index_hcb_grant_cards_on_user_id_active_unique", unique: true, where: "((status)::text = 'active'::text)"
+  end
+
+  create_table "hcb_transactions", force: :cascade do |t|
+    t.integer "amount_cents", null: false
+    t.datetime "created_at", null: false
+    t.boolean "declined", default: false, null: false
+    t.bigint "hcb_grant_card_id", null: false
+    t.string "hcb_id", null: false
+    t.datetime "last_synced_at"
+    t.string "memo"
+    t.string "merchant_name"
+    t.boolean "pending", default: false, null: false
+    t.boolean "reversed", default: false, null: false
+    t.datetime "transaction_date", null: false
+    t.datetime "updated_at", null: false
+    t.index ["hcb_grant_card_id", "transaction_date"], name: "index_hcb_transactions_on_card_and_date"
+    t.index ["hcb_grant_card_id"], name: "index_hcb_transactions_on_hcb_grant_card_id"
+    t.index ["hcb_id"], name: "index_hcb_transactions_on_hcb_id", unique: true
   end
 
   create_table "journal_entries", force: :cascade do |t|
@@ -667,6 +721,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_07_174922) do
   add_foreign_key "critters", "users"
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
+  add_foreign_key "hcb_connections", "users", column: "connected_by_id"
+  add_foreign_key "hcb_grant_cards", "users"
+  add_foreign_key "hcb_transactions", "hcb_grant_cards"
   add_foreign_key "journal_entries", "projects"
   add_foreign_key "journal_entries", "ships"
   add_foreign_key "journal_entries", "users"

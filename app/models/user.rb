@@ -77,6 +77,8 @@ class User < ApplicationRecord
   has_many :collaborated_projects, through: :collaborations, source: :collaboratable, source_type: "Project"
   has_many :received_collaboration_invites, -> { kept }, class_name: "CollaborationInvite", foreign_key: :invitee_id, dependent: :destroy, inverse_of: :invitee
   has_many :sent_collaboration_invites, -> { kept }, class_name: "CollaborationInvite", foreign_key: :inviter_id, dependent: :destroy, inverse_of: :inviter
+  has_many :hcb_grant_cards, dependent: :destroy
+  has_one :active_hcb_grant_card, -> { where(status: "active") }, class_name: "HcbGrantCard"
   has_many :reviewer_notes
   has_many :project_flags
 

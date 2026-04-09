@@ -1,0 +1,70 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+# == Schema Information
+#
+# Table name: hcb_grant_cards
+#
+#  id             :bigint           not null, primary key
+#  amount_cents   :integer          not null
+#  balance_cents  :integer
+#  canceled_at    :datetime
+#  category_lock  :string           default([]), not null, is an Array
+#  email          :string
+#  expires_on     :date
+#  keyword_lock   :string
+#  last4          :string
+#  last_synced_at :datetime
+#  merchant_lock  :string           default([]), not null, is an Array
+#  one_time_use   :boolean          default(FALSE), not null
+#  purpose        :string
+#  status         :string           default("active"), not null
+#  created_at     :datetime         not null
+#  updated_at     :datetime         not null
+#  card_id        :string
+#  hcb_id         :string
+#  user_id        :bigint           not null
+#
+# Indexes
+#
+#  index_hcb_grant_cards_on_hcb_id                 (hcb_id) UNIQUE
+#  index_hcb_grant_cards_on_user_id                (user_id)
+#  index_hcb_grant_cards_on_user_id_active_unique  (user_id) UNIQUE WHERE ((status)::text = 'active'::text)
+#  index_hcb_grant_cards_on_user_id_and_status     (user_id,status)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (user_id => users.id)
+#
+one:
+  user: one
+  hcb_id: MyString
+  status: MyString
+  amount_cents: 1
+  balance_cents: 1
+  purpose: MyString
+  one_time_use: false
+  card_id: MyString
+  last4: MyString
+  expires_on: 2026-04-08
+  merchant_lock: false
+  category_lock: false
+  keyword_lock: MyString
+  last_synced_at: 2026-04-08 18:35:11
+  canceled_at: 2026-04-08 18:35:11
+
+two:
+  user: two
+  hcb_id: MyString
+  status: MyString
+  amount_cents: 1
+  balance_cents: 1
+  purpose: MyString
+  one_time_use: false
+  card_id: MyString
+  last4: MyString
+  expires_on: 2026-04-08
+  merchant_lock: false
+  category_lock: false
+  keyword_lock: MyString
+  last_synced_at: 2026-04-08 18:35:11
+  canceled_at: 2026-04-08 18:35:11

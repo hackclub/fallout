@@ -178,6 +178,10 @@ Rails.application.routes.draw do
   get "auth/lapse/start" => "lapse_auth#start", as: :lapse_start
   get "auth/lapse/callback" => "lapse_auth#callback", as: :lapse_callback
 
+  get "auth/hcb/start" => "hcb_auth#start", as: :hcb_start
+  get "auth/hcb/callback" => "hcb_auth#callback", as: :hcb_callback
+  delete "auth/hcb" => "hcb_auth#destroy", as: :hcb_disconnect
+
   post "trial_session" => "trial_sessions#create", as: :trial_session
   post "rsvp" => "rsvps#create", as: :rsvp
 

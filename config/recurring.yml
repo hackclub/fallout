@@ -33,3 +33,13 @@ production:
     class: ExpireStaleReviewClaimsJob
     queue: background
     schedule: every 10 minutes
+
+  hcb_token_refresh:
+    class: HcbTokenRefreshJob
+    queue: background
+    schedule: every hour
+
+  hcb_grant_card_sync:
+    class: HcbGrantCardSyncJob
+    queue: background
+    schedule: every 15 minutes
