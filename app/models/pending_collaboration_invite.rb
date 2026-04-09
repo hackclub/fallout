@@ -2,16 +2,31 @@
 #
 # Table name: pending_collaboration_invites
 #
-#  id                       :bigint           not null, primary key
-#  discarded_at             :datetime
-#  invitee_email            :string           not null
-#  status                   :integer          default("pending"), not null
-#  token                    :string           not null
-#  created_at               :datetime         not null
-#  updated_at               :datetime         not null
-#  collaboration_invite_id  :bigint
-#  inviter_id               :bigint           not null
-#  project_id               :bigint           not null
+#  id                      :bigint           not null, primary key
+#  discarded_at            :datetime
+#  invitee_email           :string           not null
+#  status                  :integer          default("pending"), not null
+#  token                   :string           not null
+#  created_at              :datetime         not null
+#  updated_at              :datetime         not null
+#  collaboration_invite_id :bigint
+#  inviter_id              :bigint           not null
+#  project_id              :bigint           not null
+#
+# Indexes
+#
+#  idx_pending_collab_invites_on_project_email_status              (project_id,invitee_email,status)
+#  index_pending_collaboration_invites_on_collaboration_invite_id  (collaboration_invite_id)
+#  index_pending_collaboration_invites_on_discarded_at             (discarded_at)
+#  index_pending_collaboration_invites_on_inviter_id               (inviter_id)
+#  index_pending_collaboration_invites_on_project_id               (project_id)
+#  index_pending_collaboration_invites_on_token                    (token) UNIQUE
+#
+# Foreign Keys
+#
+#  fk_rails_...  (collaboration_invite_id => collaboration_invites.id)
+#  fk_rails_...  (inviter_id => users.id)
+#  fk_rails_...  (project_id => projects.id)
 #
 class PendingCollaborationInvite < ApplicationRecord
   include Discardable

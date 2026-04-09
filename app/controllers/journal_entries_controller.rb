@@ -122,7 +122,7 @@ class JournalEntriesController < ApplicationController
   def maybe_award_critter(journal_entry, user)
     return nil unless user.can_earn_critter?
 
-    user.critters.create!(variant: Critter::VARIANTS.sample, journal_entry: journal_entry)
+    user.critters.create!(variant: Critter.roll_variant, journal_entry: journal_entry)
   end
 
   def award_critters_to_collaborators(journal_entry)

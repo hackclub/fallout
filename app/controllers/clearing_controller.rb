@@ -3,7 +3,7 @@ class ClearingController < ApplicationController
     critters = policy_scope(Critter).order(created_at: :desc)
 
     critter_props = if Rails.env.development? && params[:simulate].present?
-      Critter::VARIANTS.each_with_index.map { |v, i|
+      Critter::ALL_VARIANTS.each_with_index.map { |v, i|
         { id: i + 1, image_path: "/critters/#{v}.webp", created_at: Time.current.iso8601 }
       }
     else

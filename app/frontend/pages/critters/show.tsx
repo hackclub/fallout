@@ -10,6 +10,7 @@ type CritterProps = {
   id: number
   variant: string
   image_path: string
+  audio_path: string
   spun: boolean
 }
 
@@ -137,7 +138,7 @@ export default function CritterShow({ critter, clearing_path }: PageProps) {
           playsInline
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <audio ref={audioRef} src={`/sfx/spin/${critter.variant}.mp3`} preload="auto" />
+        <audio ref={audioRef} src={critter.audio_path} preload="auto" />
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <div

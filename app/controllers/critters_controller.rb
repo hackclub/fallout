@@ -11,6 +11,7 @@ class CrittersController < ApplicationController
         id: @critter.id,
         variant: @critter.variant,
         image_path: @critter.image_path,
+        audio_path: @critter.audio_path,
         spun: @critter.spun
       },
       clearing_path: clearing_path
