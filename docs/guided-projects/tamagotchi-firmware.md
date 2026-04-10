@@ -652,19 +652,7 @@ void loop() {
 
 **Loop order:**
 
-```
-┌──────────────────────────────────────────────────────┐
-│                    GAME LOOP                         │
-│                                                      │
-│  ┌─────────┐   ┌────────┐   ┌───────┐   ┌────────┐ │
-│  │  INPUT   │──▶│ UPDATE │──▶│ LOGIC │──▶│ RENDER │ │
-│  │ (read    │   │ (decay │   │ (feed,│   │ (draw  │ │
-│  │ buttons) │   │ stats) │   │ play) │   │ OLED)  │ │
-│  └─────────┘   └────────┘   └───────┘   └────────┘ │
-│       ▲                                      │      │
-│       └──────────── delay(100) ──────────────┘      │
-└──────────────────────────────────────────────────────┘
-```
+![Loop](https://cdn.hackclub.com/019d7810-8bbf-7712-9a8b-22c9e8d7c17f/image_1.png)
 
 1. **Input**: Read buttons, set `currentScreen`.
 2. **Update**: Decay stats based on elapsed time.
