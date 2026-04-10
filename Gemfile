@@ -98,7 +98,7 @@ gem "pg_search", "~> 2.3"
 
 gem "inertia_rails", "~> 3.20"
 
-gem "vite_rails", "~> 3.0"
+gem "vite_rails", "~> 3.10"
 
 gem "inertia_rails-contrib", "~> 0.5.2"
 
