@@ -233,7 +233,7 @@ class StreakService
       ":oi: #{name}!! it's been a whole day and i've seen zero koi. ZERO. your #{streak}-day streak is at risk and i'm at risk of fading away :<",
       ":oi: knock knock. who's there. it's soup. soup who. soup who is HUNGRY and needs #{name} to post a journal entry before their #{streak}-day streak ends :<",
       ":oi: #{name}! i asked the other fish and they said you haven't journaled today. your #{streak}-day streak said \"tell them i miss them\" :<",
-      ":oi: URGENT: #{name} has not posted a journal entry. soup is hungry. #{streak}-day streak is endangered. situation critical. please advise (by journaling).",
+      ":politefella: hi #{name} can your journal today i'm a tad bit hungry kthxbye."
     ]
     variants.sample
   end
