@@ -8,12 +8,12 @@ class StreakService
   def self.record_activity(user)
     return if user.trial?
 
-    reconcile_missed_days(user) # Backfill all unreconciled days before recording today
+    reconcile_missed_days(user)
 
     today = Date.current.in_time_zone(user.timezone).to_date
     streak_day = StreakDay.find_or_initialize_by(user: user, date: today)
     return if streak_day.status_active?
-    return unless daily_seconds_logged(user, today) >= STREAK_THRESHOLD_SECONDS # Day doesn't count until total recordings reach 1 hour
+    return unless daily_seconds_logged(user, today) >= STREAK_THRESHOLD_SECONDS
 
     streak_day.status = :active
     streak_day.save!
@@ -38,20 +38,13 @@ class StreakService
   end
 
   def self.reconcile_missed_days(user)
-    # Lock the user row to prevent concurrent reconciliation (page load + cron + record_activity)
     user.with_lock do
       today = Date.current.in_time_zone(user.timezone).to_date
-      # Anchor from the last day that actually counted — pending/missed days shouldn't push the window forward
       last_entry = StreakDay.where(user: user).streak_counting.where("date < ?", today).reverse_chronological.first
-
-      # Nothing to reconcile if user has no streak history before today
       next unless last_entry
 
-      # Snapshot the streak length before any missed days are inserted, so mark_missed
-      # can record the correct broken streak regardless of iteration order.
       streak_before_reconciliation = StreakDay.current_streak(user)
 
-      # Walk each day between last entry and yesterday, apply freeze or miss
       ((last_entry.date + 1.day)...(today)).each do |date|
         streak_day = StreakDay.find_by(user: user, date: date)
         next unless streak_day.nil? || streak_day.status_pending?
@@ -61,7 +54,7 @@ class StreakService
           use_freeze(user, date, streak_day)
         else
           mark_missed(user, date, streak_day, streak_before_reconciliation)
-          streak_before_reconciliation = 0 # Only the first miss breaks the streak
+          streak_before_reconciliation = 0
         end
       end
     end
@@ -129,7 +122,6 @@ class StreakService
     user.streak_events.create!(event_type: "freeze_used", metadata: { date: date.iso8601, remaining: user.streak_freezes })
 
     goal = user.streak_goal
-    # Skip DM/in-app notifications if user opted out for this specific goal
     return if goal && !goal.notify_streak_events
 
     if user.streak_slack_notifications && user.slack_id.present?
@@ -168,11 +160,9 @@ class StreakService
       )
     end
 
-    # Queue the congrats dialog for the next time the user visits the path page
     campaign = user.dialog_campaigns.find_or_initialize_by(key: "streak_goal_completed")
     campaign.update!(seen_at: nil)
 
-    # Reset the nudge timer so it doesn't re-trigger for 12 days after goal completion
     nudge = user.dialog_campaigns.find_by(key: "streak_goal_nudge")
     nudge&.mark_seen!
 
@@ -184,7 +174,6 @@ class StreakService
       )
     end
 
-    # Skip DM/in-app notifications if user opted out for this specific goal
     unless goal.notify_streak_events == false
       if user.streak_slack_notifications && user.slack_id.present?
         SlackMsgJob.perform_later(user.slack_id, ":tada: You completed your #{goal.target_days}-day streak goal!")
@@ -209,18 +198,17 @@ class StreakService
 
     goal = user.streak_goal
     if goal
-      goal_notify = goal.notify_streak_events # Capture before destroy
+      goal_notify = goal.notify_streak_events
       user.streak_events.create!(event_type: "goal_broken", metadata: { target_days: goal.target_days, started_on: goal.started_on.iso8601 })
       broken_target = goal.target_days
       goal.destroy!
       if goal_notify
-        MailDeliveryService.streak_goal_broken(user, broken_target) # Only notify if user opted in for this goal
+        MailDeliveryService.streak_goal_broken(user, broken_target)
       end
       announce_goal_broken(user, broken_target) if user.slack_id.present?
     end
 
     if broken_streak > 0
-      # Skip streak-broken notifications if user opted out for this specific goal
       goal_notify = goal_notify.nil? ? true : goal_notify
       if goal_notify
         if user.streak_slack_notifications && user.slack_id.present?

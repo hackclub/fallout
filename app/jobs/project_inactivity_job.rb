@@ -6,7 +6,6 @@ class ProjectInactivityJob < ApplicationJob
   INACTIVITY_THRESHOLD = 2.weeks
 
   def perform
-    # Only full, non-deleted users with a Slack ID — trial users have no slack_id
     User.kept.where.not(type: "TrialUser").where.not(slack_id: nil).find_each do |user|
       inactive_projects = user.projects.kept.select do |project|
         next false if project.inactivity_dm_sent_at.present? # Already notified, never repeat
@@ -21,7 +20,6 @@ class ProjectInactivityJob < ApplicationJob
 
       send_messages(user.slack_id, inactive_projects)
 
-      # Mark all notified projects so they never receive another DM
       Project.where(id: inactive_projects.map(&:id)).update_all(inactivity_dm_sent_at: Time.current)
     end
   end

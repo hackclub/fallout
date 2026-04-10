@@ -35,12 +35,9 @@ class StreakDay < ApplicationRecord
     today = Date.current.in_time_zone(user.timezone).to_date
     yesterday = today - 1.day
 
-    # Only consider active/frozen days — pending/missed entries must not affect the start point
     days = where(user: user).streak_counting.where("date <= ?", today).reverse_chronological.pluck(:date)
     return 0 if days.empty?
 
-    # If today has no active/frozen entry yet, allow counting from yesterday so
-    # the streak doesn't show 0 in the morning before the day's journal is posted.
     most_recent_date = days.first
     start_from = if most_recent_date == today
       today

@@ -60,7 +60,7 @@ class StreakGoalsController < ApplicationController
       notify_streak_events: params.fetch(:notify_streak_events, true)
     )
 
-    if request.headers["X-InertiaUI-Modal"].present? # Modal stays open and reloads props
+    if request.headers["X-InertiaUI-Modal"].present?
       head :no_content
     else
       redirect_to streak_goal_path, notice: "Committed to a #{new_goal.target_days}-day streak!"
@@ -72,14 +72,13 @@ class StreakGoalsController < ApplicationController
     if goal
       authorize goal
       goal.destroy!
-      # Reset the nudge timer so it doesn't re-trigger for 12 days after manual goal removal
       nudge = current_user.dialog_campaigns.find_by(key: "streak_goal_nudge")
       nudge&.mark_seen!
     else
       skip_authorization
     end
 
-    if request.headers["X-InertiaUI-Modal"].present? # Modal stays open and reloads props
+    if request.headers["X-InertiaUI-Modal"].present?
       head :no_content
     else
       redirect_to streak_goal_path, notice: "Streak goal removed."

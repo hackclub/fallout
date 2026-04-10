@@ -6,7 +6,7 @@ class ApplicationController < ActionController::Base
   include InertiaPagination
 
   before_action :set_paper_trail_whodunnit # Track who made changes in PaperTrail audit log
-  before_action :sync_browser_timezone # Keep user.timezone current from the browser's Intl API
+  before_action :sync_browser_timezone
   after_action :track_page_view
 
   after_action :verify_authorized, except: :index
@@ -53,12 +53,12 @@ class ApplicationController < ActionController::Base
               .where.not(id: current_user.mail_interactions.read.select(:mail_message_id))
               .exists?
   }
-  inertia_share current_streak: -> { # Streak count shown in the header next to koi
+  inertia_share current_streak: -> {
     next 0 unless current_user && !current_user.trial?
-    StreakService.reconcile_missed_days(current_user) # Apply freezes/misses on every page load so the streak is always current
+    StreakService.reconcile_missed_days(current_user) # Backfill freezes/misses so the streak is current
     StreakDay.current_streak(current_user)
   }
-  inertia_share streak_freezes: -> { # Streak freeze count shown in the header
+  inertia_share streak_freezes: -> {
     next 0 unless current_user && !current_user.trial?
     current_user.streak_freezes
   }

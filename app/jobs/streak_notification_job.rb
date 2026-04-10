@@ -1,6 +1,4 @@
-# Sends streak reminders to users who haven't posted a journal entry today.
-# Runs hourly; only notifies users when their local hour matches their preferred reminder hour
-# (derived from their journaling habits via User#preferred_reminder_hour).
+# Sends streak reminders to users who haven't journaled today, at their preferred local hour.
 class StreakNotificationJob < ApplicationJob
   queue_as :background
 

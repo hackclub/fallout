@@ -39,7 +39,6 @@ class Admin::ApplicationController < ApplicationController
 
   CENSORED_FIELD_PATTERNS = %w[secret token key password encrypted].freeze
 
-  # PaperTrail stores enum values as integers; map them to human labels here
   ENUM_MAPPINGS = {
     "StreakDay" => {
       "status" => StreakDay.statuses.invert.transform_values(&:to_s)
@@ -54,7 +53,6 @@ class Admin::ApplicationController < ApplicationController
     whodunnit_ids = versions.map(&:whodunnit).compact.uniq
     users_by_id = User.where(id: whodunnit_ids).index_by { |u| u.id.to_s }
 
-    # Batch-load streak day dates so we don't N+1 for each version
     streak_day_ids = versions.select { |v| v.item_type == "StreakDay" }.map(&:item_id).uniq
     streak_day_dates = streak_day_ids.any? ? StreakDay.where(id: streak_day_ids).pluck(:id, :date).to_h : {}
 
@@ -76,7 +74,6 @@ class Admin::ApplicationController < ApplicationController
       end
 
       label = version.item_type
-      # Add context for related records so the audit log entry is identifiable
       if version.item_type == "StreakDay"
         date = version.object_changes&.dig("date")&.last || streak_day_dates[version.item_id]
         label = "Streak Day#{date ? " (#{date})" : ""}"

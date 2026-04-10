@@ -429,6 +429,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_12_115215) do
     t.string "demo_link"
     t.text "description"
     t.datetime "discarded_at"
+    t.datetime "inactivity_dm_sent_at"
     t.boolean "is_unlisted", default: false, null: false
     t.string "name", null: false
     t.string "repo_link"
@@ -731,6 +732,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_12_115215) do
     t.index ["discarded_at"], name: "index_users_on_discarded_at"
     t.index ["email"], name: "index_users_unique_verified_email", unique: true, where: "((type IS NULL) AND (discarded_at IS NULL))"
     t.index ["hca_id"], name: "index_users_on_hca_id", unique: true, where: "(hca_id IS NOT NULL)"
+    t.check_constraint "streak_freezes >= 0", name: "streak_freezes_non_negative"
   end
 
   create_table "versions", force: :cascade do |t|

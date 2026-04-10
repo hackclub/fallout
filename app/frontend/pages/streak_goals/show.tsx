@@ -210,7 +210,6 @@ function StreakGoalShow({ goal, current_streak, streak_freezes, targets, last_go
                 const activeDays = goal.progress - goal.frozen_days
                 const activePct = Math.min((activeDays / goal.target_days) * 100, 100)
                 const frozenPct = Math.min((goal.progress / goal.target_days) * 100, 100)
-                // gradient stops are relative to the filled div width, not the full bar
                 const fillGradient =
                   goal.frozen_days > 0 && frozenPct > 0
                     ? `linear-gradient(to right, #ff7d70 0%, #ff7d70 ${(activePct / frozenPct) * 100}%, #c3efff ${(activePct / frozenPct) * 100}%, #c3efff 100%)`

@@ -185,7 +185,6 @@ function NewJournal({
 
   const streakWarningMessage = useMemo(() => {
     if (streak_seconds_logged == null || streak_threshold == null) return null
-    // Can't predict accurately if any selected YouTube video has unknown duration
     if (youtubeVideos.some((v) => v.duration_seconds == null)) return null
     const selectedLapseDuration = (timelapses ?? [])
       .filter((t) => selectedTimelapses.has(t.id))

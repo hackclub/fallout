@@ -337,7 +337,6 @@ export default function PathIndex() {
     void visitModal(modalUrl)
   }, [introFinished, pendingModal, stack.length, visitModal])
 
-  // Auto-trigger pending campaign dialog after intro animation finishes
   const campaignDialogTriggered = useRef(false)
   useEffect(() => {
     if (campaignDialogTriggered.current) return
@@ -355,7 +354,6 @@ export default function PathIndex() {
     campaignDialogTriggered.current = true
     setActiveDialog(scriptFn())
 
-    // Plain fetch to mark campaign as seen — NOT router.post (Inertia expects an Inertia response from head :no_content)
     fetch(`/dialog_campaigns/${pending_dialog}/mark_seen`, {
       method: 'POST',
       headers: {

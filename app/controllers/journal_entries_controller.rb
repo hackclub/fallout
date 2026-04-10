@@ -20,7 +20,6 @@ class JournalEntriesController < ApplicationController
 
     lapse_connected = current_user.lapse_token.present? || ENV["LAPSE_PROGRAM_KEY"].present?
 
-    # Pre-compute streak data so the frontend can warn before submission
     streak_data = streak_data_for_warning(current_user)
 
     render inertia: "journal_entries/new", props: {
@@ -114,7 +113,6 @@ class JournalEntriesController < ApplicationController
     award_critters_to_collaborators(@journal_entry)
     StreakService.record_activity(current_user)
 
-    # Queue the first-journal congrats dialog if this is the user's very first journal entry
     if current_user.journal_entries.kept.count == 1
       current_user.dialog_campaigns.find_or_create_by!(key: "first_journal") { |c| c.seen_at = nil }
     end

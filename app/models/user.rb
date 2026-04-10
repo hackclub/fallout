@@ -404,17 +404,12 @@ class User < ApplicationRecord
     @hca_identity ||= HcaService.me(hca_token)&.dig("identity")
   end
 
-  # Computes the best hour to send a streak reminder based on journaling habits.
-  # Takes the median local hour of each day's earliest journal entry, then subtracts
-  # the average recording duration (so the reminder arrives before they'd normally start).
-  # Falls back to 18 (6 PM) if no journal history exists.
   def preferred_reminder_hour
     tz = ActiveSupport::TimeZone[timezone] || ActiveSupport::TimeZone["UTC"]
 
     entries = journal_entries.kept.order(:created_at).pluck(:created_at)
     return 18 if entries.empty?
 
-    # Group by local date, keep only the earliest entry per day
     earliest_by_day = entries.each_with_object({}) do |created_at, hash|
       local_time = created_at.in_time_zone(tz)
       local_date = local_time.to_date
@@ -423,11 +418,9 @@ class User < ApplicationRecord
 
     return 18 if earliest_by_day.empty?
 
-    # Extract the local hour of each day's earliest journal
     hours = earliest_by_day.values.map(&:hour).sort
     median_hour = hours[hours.size / 2]
 
-    # Average recording duration across all kept journal entries (in hours)
     entry_ids = journal_entries.kept.select(:id)
     total_seconds = LapseTimelapse.joins(:recording).where(recordings: { journal_entry_id: entry_ids }).sum(:duration).to_i +
                     YouTubeVideo.joins(:recording).where(recordings: { journal_entry_id: entry_ids }).sum(:duration_seconds).to_i +

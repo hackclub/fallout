@@ -9,7 +9,6 @@ import DefaultLayout from '../layouts/DefaultLayout'
 import { notify } from '../lib/notifications'
 import type { ReactNode } from 'react'
 
-// Send browser timezone on every request so Rails can keep user.timezone current
 axios.defaults.headers.common['X-Browser-Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone
 
 // sessionStorage can be blocked in sandboxed/privacy contexts; catch gracefully so Inertia doesn't crash

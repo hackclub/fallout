@@ -1,8 +1,6 @@
 class DialogCampaign < ApplicationRecord
   belongs_to :user
 
-  # Campaign keys — each maps to a dialog script on the frontend.
-  # Add new keys here as new campaigns are created.
   CAMPAIGN_KEYS = %w[
     first_journal
     streak_goal_nudge
