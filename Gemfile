@@ -100,7 +100,7 @@ gem "inertia_rails", "~> 3.20"
 
 gem "vite_rails", "~> 3.0"
 
-gem "inertia_rails-contrib", "~> 0.5.2"
+gem "inertia_rails-contrib", "~> 0.6.0"
 
 gem "countries", "~> 8.1"
 
