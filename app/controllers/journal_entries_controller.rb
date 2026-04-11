@@ -160,7 +160,7 @@ class JournalEntriesController < ApplicationController
     if user.trial?
       { seconds_logged: nil, threshold: nil }
     else
-      today = Date.current.in_time_zone(user.timezone).to_date
+      today = Time.current.in_time_zone(user.timezone).to_date
       streak_day = StreakDay.find_by(user: user, date: today)
       if streak_day&.status_active?
         { seconds_logged: nil, threshold: nil } # Already hit the threshold — no warning needed

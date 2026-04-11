@@ -10,7 +10,7 @@ class StreakService
 
     reconcile_missed_days(user)
 
-    today = Date.current.in_time_zone(user.timezone).to_date
+    today = Time.current.in_time_zone(user.timezone).to_date
     streak_day = StreakDay.find_or_initialize_by(user: user, date: today)
     return if streak_day.status_active?
     return unless daily_seconds_logged(user, today) >= STREAK_THRESHOLD_SECONDS
@@ -39,7 +39,7 @@ class StreakService
 
   def self.reconcile_missed_days(user)
     user.with_lock do
-      today = Date.current.in_time_zone(user.timezone).to_date
+      today = Time.current.in_time_zone(user.timezone).to_date
       last_entry = StreakDay.where(user: user).streak_counting.where("date < ?", today).reverse_chronological.first
       next unless last_entry
 
@@ -82,7 +82,7 @@ class StreakService
   end
 
   def self.send_reminder(user)
-    today = Date.current.in_time_zone(user.timezone).to_date
+    today = Time.current.in_time_zone(user.timezone).to_date
     streak_day = StreakDay.find_by(user: user, date: today)
 
     return if streak_day&.status_active?

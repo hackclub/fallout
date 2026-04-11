@@ -32,7 +32,7 @@ class StreakLeaderboardJob < ApplicationJob
   private
 
   def current_streak_frozen_count(user)
-    today = Date.current.in_time_zone(user.timezone).to_date
+    today = Time.current.in_time_zone(user.timezone).to_date
     yesterday = today - 1.day
 
     days = StreakDay.where(user: user).streak_counting.where("date <= ?", today).reverse_chronological.pluck(:date, :status)

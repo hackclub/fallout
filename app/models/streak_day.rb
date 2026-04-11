@@ -32,7 +32,7 @@ class StreakDay < ApplicationRecord
   scope :streak_counting, -> { where(status: [ :active, :frozen ]) }
 
   def self.current_streak(user)
-    today = Date.current.in_time_zone(user.timezone).to_date
+    today = Time.current.in_time_zone(user.timezone).to_date
     yesterday = today - 1.day
 
     days = where(user: user).streak_counting.where("date <= ?", today).reverse_chronological.pluck(:date)

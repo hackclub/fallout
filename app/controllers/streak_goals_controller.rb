@@ -56,7 +56,7 @@ class StreakGoalsController < ApplicationController
 
     new_goal = current_user.create_streak_goal!(
       target_days: params[:target_days].to_i,
-      started_on: Date.current.in_time_zone(current_user.timezone).to_date,
+      started_on: Time.current.in_time_zone(current_user.timezone).to_date,
       notify_streak_events: params.fetch(:notify_streak_events, true)
     )
 
