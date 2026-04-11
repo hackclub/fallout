@@ -1,6 +1,6 @@
 desc "Backfill streak days for journal entries affected by the Date.current timezone bug"
 task backfill_streak_days: :environment do
-  cutoff = 15.hours.ago
+  cutoff = Time.utc(2026, 4, 10, 19, 0, 0) # Apr 10 7PM UTC — ~15hrs before the fix was deployed
   fixed = 0
   skipped = 0
 
@@ -12,7 +12,7 @@ task backfill_streak_days: :environment do
     .distinct
     .pluck(:user_id)
 
-  puts "Found #{user_ids.size} users with journal entries in the last 15 hours."
+  puts "Found #{user_ids.size} users with journal entries since #{cutoff}."
 
   User.where(id: user_ids).find_each do |user|
     tz = ActiveSupport::TimeZone[user.timezone] || ActiveSupport::TimeZone["UTC"]
