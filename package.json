@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
+    "@videojs/react": "^10.0.0-beta.11",
     "@headlessui/react": "^2.1.0",
     "@heroicons/react": "^2.2.0",
     "@inertiajs/core": "^2.3.17",
