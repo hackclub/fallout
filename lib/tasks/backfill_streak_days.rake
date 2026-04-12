@@ -20,7 +20,7 @@ task backfill_streak_days: :environment do
     # Get all journal entry dates in the user's local timezone within the window
     dates = JournalEntry.kept
       .where(user: user)
-      .where("created_at >= ?", cutoff)
+    .where("journal_entries.created_at >= ?", cutoff)
       .pluck(:created_at)
       .map { |t| t.in_time_zone(tz).to_date }
       .uniq

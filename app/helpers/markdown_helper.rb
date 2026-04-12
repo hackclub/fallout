@@ -260,10 +260,24 @@ module MarkdownHelper
     raw = File.read(path)
     cleaned = strip_front_matter_table(raw)
 
-    return render_markdown(cleaned, base_url: base_url) if Rails.env.development?
+    html = if Rails.env.development?
+      render_markdown(cleaned, base_url: base_url)
+    else
+      key = [ "guide_md_html", path.to_s, File.mtime(path).to_i, base_url ]
+      Rails.cache.fetch(key) { render_markdown(cleaned, base_url: base_url) }
+    end
 
-    key = [ "guide_md_html", path.to_s, File.mtime(path).to_i, base_url ]
-    Rails.cache.fetch(key) { render_markdown(cleaned, base_url: base_url) }
+    # Move src to data-src on <video> tags so the browser never fetches video
+    # files on parse — React portals them lazily once near the viewport instead.
+    # Add loading="lazy" to <img> tags so the browser defers off-screen image fetches.
+    html
+      .gsub(/<video([^>]*)\ssrc="([^"]*)"([^>]*)>/i) do
+        "<video#{Regexp.last_match(1)} data-src=\"#{Regexp.last_match(2)}\"#{Regexp.last_match(3)}>"
+      end
+      .gsub(/<img(?![^>]*loading=)/i) do |match|
+        match + ' loading="lazy"'
+      end
+      .html_safe
   end
 
   def docs_metadata(base:, url_prefix:, default_index_title: "")

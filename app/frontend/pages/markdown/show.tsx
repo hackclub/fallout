@@ -1,18 +1,12 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { type ReactNode, useEffect, useRef } from 'react'
 import { Head } from '@inertiajs/react'
 import { router } from '@inertiajs/react'
 import MarkdownLayout from '@/layouts/MarkdownLayout'
 import DocVideo from '@/components/docs/DocVideo'
-
-interface VideoPortal {
-  container: HTMLDivElement
-  src: string
-}
+import { createRoot } from 'react-dom/client'
 
 function MarkdownShow({ content_html, page_title }: { content_html: string; page_title: string }) {
   const contentRef = useRef<HTMLDivElement>(null)
-  const [videoPortals, setVideoPortals] = useState<VideoPortal[]>([])
 
   useEffect(() => {
     const container = contentRef.current
@@ -41,23 +35,23 @@ function MarkdownShow({ content_html, page_title }: { content_html: string; page
       controllers.push(controller)
     })
 
-    // Lazy-load images
-    container.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
-      img.loading = 'lazy'
-    })
-
-    // Replace <video> elements with portalled DocVideo components
-    const portals: VideoPortal[] = []
+    // Mount DocVideo into each <video> placeholder. Uses createRoot because
+    // dangerouslySetInnerHTML content is outside React's tree — portals don't work.
+    const roots: ReturnType<typeof createRoot>[] = []
     container.querySelectorAll<HTMLVideoElement>('video').forEach((video) => {
-      const src = video.getAttribute('src') || video.querySelector('source')?.getAttribute('src') || ''
+      const src = video.dataset.src || video.getAttribute('src') || ''
       if (!src) return
-      const placeholder = document.createElement('div')
-      video.replaceWith(placeholder)
-      portals.push({ container: placeholder, src })
+      const wrapper = document.createElement('div')
+      video.replaceWith(wrapper)
+      const root = createRoot(wrapper)
+      root.render(<DocVideo src={src} />)
+      roots.push(root)
     })
-    setVideoPortals(portals)
 
-    return () => controllers.forEach((c) => c.abort())
+    return () => {
+      controllers.forEach((c) => c.abort())
+      roots.forEach((r) => r.unmount())
+    }
   }, [content_html])
 
   return (
@@ -66,7 +60,6 @@ function MarkdownShow({ content_html, page_title }: { content_html: string; page
         <style>{`:root { background-color: #fffcf5; } @media (prefers-color-scheme: dark) { :root { background-color: #1a1412; } }`}</style>
       </Head>
       <div ref={contentRef} className="markdown-content" dangerouslySetInnerHTML={{ __html: content_html }} />
-      {videoPortals.map(({ container, src }, i) => createPortal(<DocVideo src={src} />, container, String(i)))}
     </>
   )
 }
