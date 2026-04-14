@@ -205,7 +205,7 @@ GEM
       actionpack (>= 6.0.0)
       activesupport (>= 6.0.0)
       railties (>= 6.0.0)
-    inertia_rails (3.20.0)
+    inertia_rails (3.21.0)
       railties (>= 6)
     inertia_rails-contrib (0.5.2)
       inertia_rails (>= 3.5.0)
@@ -387,7 +387,7 @@ GEM
       tsort (>= 0.2)
       zeitwerk (~> 2.6)
     rainbow (3.1.1)
-    rake (13.3.1)
+    rake (13.4.1)
     rdoc (7.2.0)
       erb
       psych (>= 4.0.0)
@@ -580,7 +580,7 @@ DEPENDENCIES
   flipper-ui (~> 1.4)
   geocoder
   image_processing (~> 1.2)
-  inertia_rails (~> 3.20)
+  inertia_rails (~> 3.21)
   inertia_rails-contrib (~> 0.5.2)
   jbuilder
   kamal
