@@ -302,7 +302,7 @@ GEM
     nokogiri (1.19.2-x86_64-linux-musl)
       racc (~> 1.4)
     ostruct (0.6.3)
-    pagy (43.4.0)
+    pagy (43.5.0)
       json
       uri
       yaml
@@ -586,7 +586,7 @@ DEPENDENCIES
   kamal
   letter_opener
   mission_control-jobs (~> 1.1)
-  pagy (~> 43.4)
+  pagy (~> 43.5)
   paper_trail (~> 17.0)
   pg (~> 1.5)
   pg_search (~> 2.3)
