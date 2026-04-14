@@ -105,7 +105,7 @@ gem "inertia_rails-contrib", "~> 0.5.2"
 gem "countries", "~> 8.1"
 
 gem "flipper", "~> 1.4"
-gem "flipper-active_record", "~> 1.3"
+gem "flipper-active_record", "~> 1.4"
 gem "flipper-ui", "~> 1.4"
 
 gem "ruby_llm", "~> 1.14"
