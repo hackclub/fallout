@@ -56,7 +56,7 @@ class StreakGoalsController < ApplicationController
 
     new_goal = current_user.create_streak_goal!(
       target_days: params[:target_days].to_i,
-      started_on: Time.current.in_time_zone(current_user.timezone).to_date,
+      started_on: streak_start_date(current_user),
       notify_streak_events: params.fetch(:notify_streak_events, true)
     )
 
@@ -83,5 +83,27 @@ class StreakGoalsController < ApplicationController
     else
       redirect_to streak_goal_path, notice: "Streak goal removed."
     end
+  end
+
+  private
+
+  # Anchor the goal to the start of the user's current streak so progress
+  # reflects days already completed. Falls back to today if no streak exists.
+  def streak_start_date(user)
+    today = Time.current.in_time_zone(user.timezone).to_date
+    days = StreakDay.where(user: user).streak_counting.where("date <= ?", today).order(date: :desc).pluck(:date)
+    return today if days.empty?
+
+    most_recent = days.first
+    return today unless most_recent == today || most_recent == today - 1.day
+
+    expected = most_recent
+    start = most_recent
+    days.each do |date|
+      break unless date == expected
+      start = date
+      expected -= 1.day
+    end
+    start
   end
 end

@@ -5,7 +5,7 @@
     "@types/node": "^25.3.1",
     "prettier": "^3.8.1",
     "shadcn": "^4.1.2",
-    "vite": "^8.0.8",
+    "vite": "^7.3.2",
     "vite-plugin-ruby": "^5.2.1"
   },
   "dependencies": {

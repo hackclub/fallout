@@ -151,7 +151,9 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
 
     case recordable
     when LookoutTimelapse
-      base.merge(playback_url: recordable.playback_url, thumbnail_url: recordable.thumbnail_url)
+      # Lookout video URLs are signed and expire, so fetch a fresh one at serve time
+      fresh_video_url = LookoutService.get_video_url(recordable.session_token)&.dig("videoUrl")
+      base.merge(playback_url: fresh_video_url || recordable.playback_url, thumbnail_url: recordable.thumbnail_url)
     when LapseTimelapse
       base.merge(playback_url: recordable.playback_url, thumbnail_url: recordable.thumbnail_url)
     when YouTubeVideo
