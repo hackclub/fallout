@@ -45,7 +45,12 @@ class StreakService
 
       # Count streak length ending at last_entry — can't use current_streak here because it
       # requires continuity to today/yesterday, which doesn't hold when reconciling a gap.
-      streak_before_reconciliation = streak_length_ending_at(user, last_entry.date)
+      # If a streak_broken event already exists after the last active day, the notification
+      # was already sent — don't re-notify on subsequent missed days.
+      already_broken = user.streak_events.where(event_type: "streak_broken")
+                           .where("metadata->>'date' > ?", last_entry.date.iso8601)
+                           .exists?
+      streak_before_reconciliation = already_broken ? 0 : streak_length_ending_at(user, last_entry.date)
 
       ((last_entry.date + 1.day)...(today)).each do |date|
         streak_day = StreakDay.find_by(user: user, date: date)
