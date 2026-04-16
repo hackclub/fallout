@@ -75,6 +75,8 @@ class User < ApplicationRecord
   has_many :critters, dependent: :destroy
   has_many :koi_transactions, dependent: :destroy
   has_many :acting_koi_transactions, class_name: "KoiTransaction", foreign_key: :actor_id, dependent: :nullify, inverse_of: :actor
+  has_many :gold_transactions, dependent: :destroy
+  has_many :acting_gold_transactions, class_name: "GoldTransaction", foreign_key: :actor_id, dependent: :nullify, inverse_of: :actor
   has_many :shop_orders, dependent: :destroy
   has_many :streak_days, dependent: :destroy
   has_many :streak_events, dependent: :destroy
@@ -326,7 +328,14 @@ class User < ApplicationRecord
     return 0 if trial? # Trial users cannot earn or spend koi
 
     koi_transactions.sum(:amount) -
-      shop_orders.where.not(state: :rejected).sum("frozen_price * quantity")
+      shop_orders.joins(:shop_item).where(shop_items: { currency: "koi" }).where.not(state: :rejected).sum("frozen_price * quantity")
+  end
+
+  def gold
+    return 0 if trial? # Trial users cannot earn or spend gold
+
+    gold_transactions.sum(:amount) -
+      shop_orders.joins(:shop_item).where(shop_items: { currency: "gold" }).where.not(state: :rejected).sum("frozen_price * quantity")
   end
 
   def self.normalize_country_code(country)

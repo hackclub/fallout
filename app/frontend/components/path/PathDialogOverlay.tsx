@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { preload as preloadDialogue, playLetter, playThonk, stopAll, playUrl } from '@/lib/dialogueAudio'
 
@@ -9,7 +10,11 @@ export type DialogChoice = {
 }
 
 export type DialogStep = {
-  text: string
+  text?: string
+  // Inline mix of animated strings and React nodes (images, SVGs, etc.)
+  segments?: Array<string | ReactNode>
+  // Full ReactNode for the whole step body (no char animation)
+  content?: ReactNode
   choices?: DialogChoice[]
   last?: boolean
 }
@@ -36,15 +41,28 @@ export default function PathDialogOverlay({
   const [showInstantly, setShowInstantly] = useState(false)
   const [isRevealed, setIsRevealed] = useState(false)
   const [showDialog, setShowDialog] = useState(false)
-  const [fontSize, setFontSize] = useState(42)
   const [pressing, setPressing] = useState(false)
   const [showArrow, setShowArrow] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
   const [speed, setSpeed] = useState(1)
+  const [dialogScale, setDialogScale] = useState(() =>
+    typeof window !== 'undefined' ? Math.min(1, (window.innerWidth - 32) / 750) : 1,
+  )
+
+  useEffect(() => {
+    const update = () => setDialogScale(Math.min(1, (window.innerWidth - 32) / 750))
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
   const currentDialog = steps[step]
-  const text = currentDialog?.text || ''
-  const textRef = useRef<HTMLParagraphElement>(null)
+  const hasSegments = !!currentDialog?.segments
+  const hasContent = !!currentDialog?.content && !hasSegments
+  // Derive plain text for audio timing: from segments string parts, or text field
+  const text = hasSegments
+    ? currentDialog.segments!.filter((s): s is string => typeof s === 'string').join('')
+    : (currentDialog?.text ?? '')
+
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const dialogTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const audioTimersRef = useRef<NodeJS.Timeout[]>([])
@@ -77,7 +95,7 @@ export default function PathDialogOverlay({
   }, [isOpen])
 
   useEffect(() => {
-    if (!isOpen || !showDialog || showInstantly) return
+    if (!isOpen || !showDialog || showInstantly || hasContent) return
 
     audioTimersRef.current.forEach(clearTimeout)
     audioTimersRef.current = []
@@ -102,7 +120,7 @@ export default function PathDialogOverlay({
       audioTimersRef.current.forEach(clearTimeout)
       audioTimersRef.current = []
     }
-  }, [text, isOpen, showDialog, showInstantly, speed])
+  }, [text, isOpen, showDialog, showInstantly, speed, hasContent])
 
   useEffect(() => {
     if (!isOpen || !showDialog) return
@@ -113,15 +131,12 @@ export default function PathDialogOverlay({
       setShowArrow(false)
     }
 
-    if (textRef.current) {
-      let currentSize = 36
-      const el = textRef.current
-      el.style.fontSize = `${currentSize}px`
-      while (el.scrollHeight > 140 && currentSize > 16) {
-        currentSize -= 1
-        el.style.fontSize = `${currentSize}px`
+    if (hasContent) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => setIsRevealed(true), speed > 1 ? 0 : 400)
+      return () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
       }
-      setFontSize(currentSize)
     }
 
     const msPerChar = 30 / speed
@@ -136,7 +151,7 @@ export default function PathDialogOverlay({
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
     }
-  }, [text, isOpen, showDialog, speed])
+  }, [text, isOpen, showDialog, speed, hasContent])
 
   const arrowTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -199,43 +214,80 @@ export default function PathDialogOverlay({
     }
   }
 
-  const words = text.split(/(\s+)/)
-  let _charIndex = 0
-  const renderedWords = words.map((word, wordIndex) => {
-    if (word.match(/^\s+$/)) {
-      _charIndex += word.length
+  // Renders a plain string with char-by-char animation, advancing globalCharIndex
+  function renderAnimatedString(str: string, keyPrefix: string, counter: { value: number }) {
+    return str.split(/(\s+)/).map((word, wordIdx) => {
+      if (word.match(/^\s+$/)) {
+        counter.value += word.length
+        return (
+          <span key={`${keyPrefix}-s${wordIdx}`} style={{ whiteSpace: 'pre-wrap' }}>
+            {word}
+          </span>
+        )
+      }
       return (
-        <span key={wordIndex} style={{ whiteSpace: 'pre-wrap' }}>
-          {word}
+        <span key={`${keyPrefix}-w${wordIdx}`} className="inline-block">
+          {word.split('').map((char, charIdx) => {
+            const delay = counter.value++
+            return (
+              <motion.span
+                key={charIdx}
+                initial={showInstantly ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  delay: showInstantly ? 0 : delay * (0.03 / speed),
+                  type: 'spring',
+                  stiffness: 1400,
+                  damping: 80,
+                  mass: 4,
+                }}
+                className="inline-block"
+              >
+                {char}
+              </motion.span>
+            )
+          })}
         </span>
       )
-    }
+    })
+  }
 
-    return (
-      <span key={wordIndex} className="inline-block">
-        {word.split('').map((char, index) => {
-          const currentDelay = _charIndex++
-          return (
-            <motion.span
-              key={index}
-              initial={showInstantly ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: showInstantly ? 0 : currentDelay * (0.03 / speed),
-                type: 'spring',
-                stiffness: 1400,
-                damping: 80,
-                mass: 4,
-              }}
-              className="inline-block"
-            >
-              {char}
-            </motion.span>
-          )
-        })}
-      </span>
+  let dialogBody: ReactNode
+
+  if (hasSegments) {
+    const counter = { value: 0 }
+    dialogBody = currentDialog.segments!.map((seg, segIdx) => {
+      if (typeof seg === 'string') {
+        return renderAnimatedString(seg, `${segIdx}`, counter)
+      }
+      const delay = counter.value
+      return (
+        <motion.span
+          key={`${segIdx}-node`}
+          className="inline-block align-middle"
+          initial={showInstantly ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{
+            delay: showInstantly ? 0 : delay * (0.03 / speed),
+            type: 'spring',
+            stiffness: 500,
+            damping: 30,
+          }}
+        >
+          {seg}
+        </motion.span>
+      )
+    })
+  } else if (hasContent) {
+    dialogBody = (
+      <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className="inline">
+        {currentDialog.content}
+      </motion.span>
     )
-  })
+  } else {
+    const counter = { value: 0 }
+    dialogBody = renderAnimatedString(text, 'text', counter)
+  }
 
   return (
     <AnimatePresence>
@@ -267,100 +319,101 @@ export default function PathDialogOverlay({
           <div className="relative w-full max-w-4xl h-full flex items-center justify-center">
             <AnimatePresence>
               {showDialog && (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0, y: 50 }}
-                  animate={{
-                    scale: isClosing ? 0.8 : pressing ? 0.96 : 1,
-                    opacity: isClosing ? 0 : 1,
-                    y: isClosing ? 50 : 0,
-                  }}
-                  exit={{ scale: 0.8, opacity: 0, y: 50 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                  className="relative w-[750px] h-[260px] z-20 rotate-[1.36deg]"
-                >
-                  <img
-                    src="/dialogbox.svg"
-                    alt="Dialog"
-                    className="absolute inset-0 w-full h-full pointer-events-none"
-                  />
+                <div style={{ transform: `scale(${dialogScale})`, transformOrigin: 'center' }}>
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0, y: 50 }}
+                    animate={{
+                      scale: isClosing ? 0.8 : pressing ? 0.96 : 1,
+                      opacity: isClosing ? 0 : 1,
+                      y: isClosing ? 50 : 0,
+                    }}
+                    exit={{ scale: 0.8, opacity: 0, y: 50 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    className="relative w-[750px] h-[260px] z-20 rotate-[1.36deg]"
+                  >
+                    <img
+                      src="/dialogbox.svg"
+                      alt="Dialog"
+                      className="absolute inset-0 w-full h-full pointer-events-none"
+                    />
 
-                  <div className="absolute top-[10px] left-[60px] bg-[#E2826A] text-white px-7 py-1.5 rounded-full font-medium text-2xl rotate-[-5.3deg]">
-                    {speakerName}
-                  </div>
+                    <div className="absolute top-0 left-[60px] bg-[#E2826A] text-white px-7 py-1.5 rounded-full font-medium text-2xl rotate-[-5.3deg]">
+                      {speakerName}
+                    </div>
 
-                  <div className="absolute inset-0 z-10 flex flex-col justify-center pl-[80px] pr-[50px] pt-[30px] pb-[30px]">
-                    <p
-                      key={step}
-                      ref={textRef}
-                      className="text-[#8A7B66] leading-[1.45] w-full text-left"
-                      style={{
-                        fontSize: `${fontSize}px`,
-                        fontFamily: '"Google Sans Flex", sans-serif',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {renderedWords}
-                    </p>
-
-                    {!currentDialog.choices && (
-                      <motion.img
-                        src="/next.svg"
-                        alt="Next"
-                        initial={{ opacity: 0, scale: 0 }}
-                        animate={{ opacity: showArrow ? 1 : 0, scale: showArrow ? 1 : 0 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                        className="absolute right-[80px] bottom-[70px] w-[20px] h-auto pointer-events-none"
-                      />
-                    )}
-                  </div>
-
-                  <AnimatePresence>
-                    {currentDialog.choices && isRevealed && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: -8 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: -8 }}
-                        transition={{ type: 'spring', stiffness: 600, damping: 30 }}
-                        className="absolute right-[40px] top-[0px] -translate-y-1/2 z-40"
+                    <div className="absolute inset-0 z-10 flex flex-col justify-center pl-[80px] pr-[50px] pt-[30px] pb-[30px]">
+                      <p
+                        key={step}
+                        className="text-[#8A7B66] leading-[1.3] w-full text-left"
                         style={{
-                          background: '#FFFEF4',
-                          border: '4px solid #5C4A2A',
-                          borderRadius: '18px',
-                          boxShadow: '0 4px 0 #5C4A2A',
-                          minWidth: '160px',
-                          overflow: 'hidden',
+                          fontSize: '36px',
+                          fontFamily: '"Google Sans Flex", sans-serif',
+                          fontWeight: 500,
                         }}
                       >
-                        {currentDialog.choices.map((choice, i) => (
-                          <button
-                            key={choice.label}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleChoice(choice)
-                            }}
-                            className="w-full flex items-center gap-2 px-5 py-3 cursor-pointer group relative"
-                            style={{
-                              fontFamily: '"Google Sans Flex", sans-serif',
-                              fontWeight: 700,
-                              fontSize: '22px',
-                              color: '#3B2F1E',
-                              borderTop: i > 0 ? '2px solid #D4C9A8' : 'none',
-                              background: 'transparent',
-                            }}
-                          >
-                            <span
-                              className="transition-opacity duration-100 opacity-0 group-hover:opacity-100"
-                              style={{ color: '#E2826A', fontSize: '18px', lineHeight: 1 }}
+                        {dialogBody}
+                      </p>
+
+                      {!currentDialog.choices && (
+                        <motion.img
+                          src="/next.svg"
+                          alt="Next"
+                          initial={{ opacity: 0, scale: 0 }}
+                          animate={{ opacity: showArrow ? 1 : 0, scale: showArrow ? 1 : 0 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          className="absolute right-[60px] bottom-[70px] w-[20px] h-auto pointer-events-none"
+                        />
+                      )}
+                    </div>
+
+                    <AnimatePresence>
+                      {currentDialog.choices && isRevealed && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.9, y: -8 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.9, y: -8 }}
+                          transition={{ type: 'spring', stiffness: 600, damping: 30 }}
+                          className="absolute right-[40px] top-[0px] -translate-y-1/2 z-40"
+                          style={{
+                            background: '#FFFEF4',
+                            border: '4px solid #5C4A2A',
+                            borderRadius: '18px',
+                            boxShadow: '0 4px 0 #5C4A2A',
+                            minWidth: '160px',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {currentDialog.choices.map((choice, i) => (
+                            <button
+                              key={choice.label}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleChoice(choice)
+                              }}
+                              className="w-full flex items-center gap-2 px-5 py-3 cursor-pointer group relative"
+                              style={{
+                                fontFamily: '"Google Sans Flex", sans-serif',
+                                fontWeight: 700,
+                                fontSize: '22px',
+                                color: '#3B2F1E',
+                                borderTop: i > 0 ? '2px solid #D4C9A8' : 'none',
+                                background: 'transparent',
+                              }}
                             >
-                              ►
-                            </span>
-                            {choice.label}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                              <span
+                                className="transition-opacity duration-100 opacity-0 group-hover:opacity-100"
+                                style={{ color: '#E2826A', fontSize: '18px', lineHeight: 1 }}
+                              >
+                                ►
+                              </span>
+                              {choice.label}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                </div>
               )}
             </AnimatePresence>
           </div>

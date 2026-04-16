@@ -36,7 +36,8 @@ class ShopOrder < ApplicationRecord
   validates :frozen_price, presence: true, numericality: { greater_than: 0 }
   validates :quantity, presence: true, numericality: { greater_than: 0, only_integer: true }
   validates :address, presence: true
-  validates :phone, presence: true, format: { with: /\A[\d\+\(\)\-\s\.]{7,20}\z/, message: "must be a valid phone number" }
+  validates :phone, presence: true
+  validate :phone_digit_count
   validate :user_can_afford, on: :create
 
   def self.airtable_sync_base_id
@@ -67,12 +68,23 @@ class ShopOrder < ApplicationRecord
     self.frozen_price ||= shop_item&.price
   end
 
+  def phone_digit_count
+    return unless phone
+    errors.add(:phone, "must be a valid phone number") unless phone.gsub(/\D/, "").length.between?(7, 15)
+  end
+
   def user_can_afford
-    return unless user && frozen_price && quantity
+    return unless user && shop_item && frozen_price && quantity
     return if user.trial? # trial users are blocked at policy level
 
-    if user.koi < frozen_price * quantity
-      errors.add(:base, "You don't have enough koi for this purchase")
+    total_cost = frozen_price * quantity
+    case shop_item.currency
+    when "gold"
+      errors.add(:base, "You don't have enough gold for this purchase") if user.gold < total_cost
+    when "hours"
+      errors.add(:base, "This item cannot be purchased directly")
+    else
+      errors.add(:base, "You don't have enough koi for this purchase") if user.koi < total_cost
     end
   end
 end
