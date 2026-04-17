@@ -11,6 +11,7 @@ type ShopItem = {
   price: number
   image_url: string
   currency: 'koi' | 'gold'
+  grants_streak_freeze: boolean
 }
 
 export default function ShopOrderNew({
@@ -49,7 +50,8 @@ export default function ShopOrderNew({
   }, [])
   const phoneDigits = form.data.phone.replace(/\D/g, '')
   const phoneValid = phoneDigits.length >= 7 && phoneDigits.length <= 15
-  const isInteractive = !form.processing && hasAddresses && maxQuantity >= 1 && phoneValid
+  const shippingReady = shop_item.grants_streak_freeze || (hasAddresses && phoneValid)
+  const isInteractive = !form.processing && maxQuantity >= 1 && shippingReady
 
   function setQty(n: number) {
     const clamped = Math.max(1, Math.min(n, maxQuantity))
@@ -188,85 +190,87 @@ export default function ShopOrderNew({
             </div>
           </div>
 
-          <div className="w-full justify-between flex flex-col sm:flex-row gap-3 mb-6">
-            <div className="w-full sm:w-[50%]">
-              <p className="block font-bold text-dark-brown mb-1 text-lg">Shipping address</p>
-              {hasAddresses ? (
-                <>
-                  <div ref={dropdownRef} className="relative mb-2">
-                    <button
-                      type="button"
-                      onClick={() => setDropdownOpen((o) => !o)}
-                      className="w-full flex items-center justify-between text-light-brown border-dark-brown font-medium bg-brown px-3 py-2 text-lg rounded-sm cursor-pointer"
-                    >
-                      <span>{hca_addresses[selectedIndex].split('\n')[0]}</span>
-                      <svg
-                        className={`w-4 h-4 ml-2 shrink-0 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`}
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
+          {!shop_item.grants_streak_freeze && (
+            <div className="w-full justify-between flex flex-col sm:flex-row gap-3 mb-6">
+              <div className="w-full sm:w-[50%]">
+                <p className="block font-bold text-dark-brown mb-1 text-lg">Shipping address</p>
+                {hasAddresses ? (
+                  <>
+                    <div ref={dropdownRef} className="relative mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setDropdownOpen((o) => !o)}
+                        className="w-full flex items-center justify-between text-light-brown border-dark-brown font-medium bg-brown px-3 py-2 text-lg rounded-sm cursor-pointer"
                       >
-                        <path
-                          fillRule="evenodd"
-                          d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </button>
-                    {dropdownOpen && (
-                      <ul className="absolute z-20 w-full mt-2 bg-beige border-2 border-dark-brown rounded-sm shadow-md overflow-hidden">
-                        {hca_addresses.map((addr, i) => (
-                          <li
-                            key={i}
-                            onClick={() => {
-                              setSelectedIndex(i)
-                              form.setData('address_index', String(i))
-                              setDropdownOpen(false)
-                            }}
-                            className={`p-2 px-3 cursor-pointer rounded-xs  ${i === selectedIndex ? 'font-bold bg-brown text-light-brown ' : 'text-dark-brown hover:bg-light-brown'}`}
-                          >
-                            {addr.split('\n')[0]}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <p className="bg-beige text-dark-brown whitespace-pre-line text-sm p-4 rounded-sm">
-                    {hca_addresses[selectedIndex]}
+                        <span>{hca_addresses[selectedIndex].split('\n')[0]}</span>
+                        <svg
+                          className={`w-4 h-4 ml-2 shrink-0 transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`}
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                      {dropdownOpen && (
+                        <ul className="absolute z-20 w-full mt-2 bg-beige border-2 border-dark-brown rounded-sm shadow-md overflow-hidden">
+                          {hca_addresses.map((addr, i) => (
+                            <li
+                              key={i}
+                              onClick={() => {
+                                setSelectedIndex(i)
+                                form.setData('address_index', String(i))
+                                setDropdownOpen(false)
+                              }}
+                              className={`p-2 px-3 cursor-pointer rounded-xs  ${i === selectedIndex ? 'font-bold bg-brown text-light-brown ' : 'text-dark-brown hover:bg-light-brown'}`}
+                            >
+                              {addr.split('\n')[0]}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <p className="bg-beige text-dark-brown whitespace-pre-line text-sm p-4 rounded-sm">
+                      {hca_addresses[selectedIndex]}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-brown">
+                    No addresses on file.{' '}
+                    <a
+                      href="https://identity.hackclub.com/addresses"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline font-bold"
+                    >
+                      Add one at identity.hackclub.com/addresses
+                    </a>{' '}
+                    first, then come back here.
                   </p>
-                </>
-              ) : (
-                <p className="text-brown">
-                  No addresses on file.{' '}
-                  <a
-                    href="https://identity.hackclub.com/addresses"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline font-bold"
-                  >
-                    Add one at identity.hackclub.com/addresses
-                  </a>{' '}
-                  first, then come back here.
-                </p>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="w-full sm:w-[50%]">
-              <p className="block font-bold text-lg text-dark-brown mb-1">
-                Phone number <span className="text-dark-brown font-normal text-sm">(for delivery)</span>
-              </p>
-              <input
-                type="tel"
-                required
-                value={form.data.phone}
-                onChange={(e) => form.setData('phone', e.target.value.replace(/[^\d+\-\s().]/g, ''))}
-                placeholder="+1 234 567 8900"
-                className="w-full border-2 border-beige focus:border-dark-brown transition-all text-dark-brown px-3 py-2 rounded-sm bg-beige focus:bg-white"
-              />
-              {form.data.phone.trim() && !phoneValid && (
-                <p className="text-brown text-sm mt-1">Enter a valid phone number (7–15 digits)</p>
-              )}
+              <div className="w-full sm:w-[50%]">
+                <p className="block font-bold text-lg text-dark-brown mb-1">
+                  Phone number <span className="text-dark-brown font-normal text-sm">(for delivery)</span>
+                </p>
+                <input
+                  type="tel"
+                  required
+                  value={form.data.phone}
+                  onChange={(e) => form.setData('phone', e.target.value.replace(/[^\d+\-\s().]/g, ''))}
+                  placeholder="+1 234 567 8900"
+                  className="w-full border-2 border-beige focus:border-dark-brown transition-all text-dark-brown px-3 py-2 rounded-sm bg-beige focus:bg-white"
+                />
+                {form.data.phone.trim() && !phoneValid && (
+                  <p className="text-brown text-sm mt-1">Enter a valid phone number (7–15 digits)</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <form onSubmit={submit}>
             <div className="flex md:gap-4">

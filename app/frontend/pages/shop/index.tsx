@@ -185,10 +185,10 @@ export default function ShopIndex({
   })
 
   const content = (
-    <div className="w-full mx-auto p-2 xs:p-4 md:p-8 h-full overflow-y-auto">
+    <div className="w-full mx-auto p-2 xs:p-4 md:p-8 h-full overflow-y-auto bg-light-brown">
       <div className="flex flex-col items-start">
         <div className="grid grid-cols-3 w-full items-center justify-between">
-          {is_modal && (
+          
             <button
               onClick={() => modalRef.current?.close()}
               className="cursor-pointer text-dark-brown hover:opacity-80 shrink-0"
@@ -196,10 +196,10 @@ export default function ShopIndex({
             >
               <ArrowLeftIcon className="w-8 h-8" />
             </button>
-          )}
-          <div className="flex items-center justify-center">
-            <h1 className="font-bold whitespace-nowrap text-2xl sm:text-3xl md:text-4xl text-dark-brown">The Shop</h1>
-          </div>
+        
+
+            <h1 className="font-bold mx-auto  whitespace-nowrap text-2xl sm:text-3xl md:text-4xl text-dark-brown">The Shop</h1>
+
         </div>
         <div className="my-2 mx-auto text-sm sm:text-base text-brown text-center max-w-sm leading-tight">
           Prizes unrelated to the inperson event will be available for purchase after the hackathon (July 7th)

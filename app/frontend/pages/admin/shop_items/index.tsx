@@ -16,6 +16,7 @@ type ShopItem = {
   status: 'available' | 'unavailable'
   featured: boolean
   currency: 'koi' | 'gold' | 'hours'
+  grants_streak_freeze: boolean
 }
 
 type RowState = Omit<ShopItem, 'id'>
@@ -28,6 +29,7 @@ const BLANK_ROW: RowState = {
   status: 'available',
   featured: false,
   currency: 'koi',
+  grants_streak_freeze: false,
 }
 
 function itemToRow(item: ShopItem): RowState {
@@ -39,6 +41,7 @@ function itemToRow(item: ShopItem): RowState {
     status: item.status,
     featured: item.featured,
     currency: item.currency,
+    grants_streak_freeze: item.grants_streak_freeze,
   }
 }
 
@@ -107,6 +110,14 @@ function EditableRow({
           type="checkbox"
           checked={!!row.featured}
           onChange={(e) => onChange('featured', e.target.checked)}
+          className="w-4 h-4 cursor-pointer"
+        />
+      </TableCell>
+      <TableCell className="text-center">
+        <input
+          type="checkbox"
+          checked={!!row.grants_streak_freeze}
+          onChange={(e) => onChange('grants_streak_freeze', e.target.checked)}
           className="w-4 h-4 cursor-pointer"
         />
       </TableCell>
@@ -196,12 +207,10 @@ function EditableRow({
 
 export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopItem[] }) {
   const { errors } = usePage<SharedProps>().props
-  const shopItemsRef = useRef(shop_items)
   const [rows, setRows] = useState<Record<number, RowState>>(
     Object.fromEntries(shop_items.map((item) => [item.id, itemToRow(item)])),
   )
   useEffect(() => {
-    shopItemsRef.current = shop_items
     setRows((prev) => {
       const next = { ...prev }
       shop_items.forEach((item) => {
@@ -229,12 +238,6 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
       { shop_item: row },
       {
         preserveScroll: true,
-        preserveState: true,
-        onSuccess: () => {
-          setSaving((prev) => ({ ...prev, [item.id]: false }))
-          const fresh = shopItemsRef.current.find((i) => i.id === item.id)
-          if (fresh) setRows((prev) => ({ ...prev, [fresh.id]: itemToRow(fresh) }))
-        },
         onError: () => {
           setSaving((prev) => ({ ...prev, [item.id]: false }))
           setRowErrors((prev) => ({ ...prev, [item.id]: 'Failed to save' }))
@@ -305,6 +308,7 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
             <TableRow>
               <TableHead className="whitespace-nowrap">Status</TableHead>
               <TableHead className="whitespace-nowrap">Featured</TableHead>
+              <TableHead className="whitespace-nowrap">Streak Freeze</TableHead>
               <TableHead className="whitespace-nowrap">Currency</TableHead>
               <TableHead className="min-w-36">Name</TableHead>
               <TableHead className="min-w-16">Price</TableHead>
@@ -344,7 +348,7 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
             )}
             {shop_items.length === 0 && !newRow && (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                   No shop items yet.
                 </TableCell>
               </TableRow>

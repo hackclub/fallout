@@ -26,7 +26,9 @@ class Admin::ShopOrdersController < Admin::ApplicationController
     @order = ShopOrder.find(params[:id])
     authorize @order
 
+    was_rejected = @order.rejected?
     if @order.update(order_params)
+      revoke_streak_freeze(@order, was_rejected)
       redirect_to admin_shop_order_path(@order), notice: "Order updated."
     else
       redirect_back fallback_location: admin_shop_order_path(@order),
@@ -35,6 +37,15 @@ class Admin::ShopOrdersController < Admin::ApplicationController
   end
 
   private
+
+  def revoke_streak_freeze(order, was_rejected_before)
+    # If a streak freeze order is newly rejected, decrement the user's streak freezes to match the refund
+    return if was_rejected_before
+    return unless order.rejected? && order.shop_item.grants_streak_freeze?
+
+    User.where(id: order.user_id).where("streak_freezes >= ?", order.quantity)
+        .update_all([ "streak_freezes = streak_freezes - ?", order.quantity ])
+  end
 
   def order_params
     params.expect(shop_order: [ :state, :admin_note ])

@@ -48,11 +48,12 @@ class Admin::ShopItemsController < Admin::ApplicationController
   private
 
   def shop_item_params
-    params.expect(shop_item: [ :name, :description, :price, :image_url, :status, :featured, :currency ])
+    params.expect(shop_item: [ :name, :description, :price, :image_url, :status, :featured, :currency, :grants_streak_freeze ])
   end
 
   def serialize(item)
     { id: item.id, name: item.name, description: item.description.to_s, price: item.price,
-      image_url: item.image_url.to_s, status: item.status, featured: item.featured, currency: item.currency }
+      image_url: item.image_url.to_s, status: item.status, featured: item.featured, currency: item.currency,
+      grants_streak_freeze: item.grants_streak_freeze }
   end
 end

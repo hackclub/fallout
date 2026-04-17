@@ -37,24 +37,26 @@ class ShopOrdersController < ApplicationController
       shop_item: serialize_shop_item(@shop_item),
       koi_balance: current_user.koi,
       gold_balance: current_user.gold,
-      hca_addresses: hca_formatted_addresses
+      hca_addresses: @shop_item.grants_streak_freeze? ? [] : hca_formatted_addresses
     }
   end
 
   def create
-    addresses = hca_formatted_addresses
-    index = params[:address_index].to_i
-    address = (index >= 0 && index < addresses.length) ? addresses[index] : nil # Reject negative/out-of-bounds indices
+    unless @shop_item.grants_streak_freeze?
+      addresses = hca_formatted_addresses
+      index = params[:address_index].to_i
+      address = (index >= 0 && index < addresses.length) ? addresses[index] : nil # Reject negative/out-of-bounds indices
 
-    unless address.present?
-      return redirect_back fallback_location: new_shop_item_shop_order_path(@shop_item),
-        inertia: { errors: { base: [ "A valid shipping address is required" ] } }
-    end
+      unless address.present?
+        return redirect_back fallback_location: new_shop_item_shop_order_path(@shop_item),
+          inertia: { errors: { base: [ "A valid shipping address is required" ] } }
+      end
 
-    phone = params[:phone].to_s.strip
-    unless phone.present?
-      return redirect_back fallback_location: new_shop_item_shop_order_path(@shop_item),
-        inertia: { errors: { base: [ "A phone number is required" ] } }
+      phone = params[:phone].to_s.strip
+      unless phone.present?
+        return redirect_back fallback_location: new_shop_item_shop_order_path(@shop_item),
+          inertia: { errors: { base: [ "A phone number is required" ] } }
+      end
     end
 
     quantity = params[:quantity].to_i
@@ -81,7 +83,12 @@ class ShopOrdersController < ApplicationController
       else
         @shop_order.frozen_price = @shop_item.price # Freeze the price read inside the lock
         @shop_order.quantity = quantity
-        @shop_order.save
+        if @shop_order.save
+          current_user.increment!(:streak_freezes, quantity) if @shop_item.grants_streak_freeze?
+          true
+        else
+          false
+        end
       end
     end
 
@@ -125,6 +132,6 @@ class ShopOrdersController < ApplicationController
   end
 
   def serialize_shop_item(item)
-    { id: item.id, name: item.name, description: item.description, price: item.price, image_url: item.image_url, currency: item.currency }
+    { id: item.id, name: item.name, description: item.description, price: item.price, image_url: item.image_url, currency: item.currency, grants_streak_freeze: item.grants_streak_freeze? }
   end
 end

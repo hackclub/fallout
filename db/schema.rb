@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_16_172400) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_17_132117) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -525,6 +525,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_16_172400) do
     t.string "currency", default: "koi", null: false
     t.text "description"
     t.boolean "featured", default: false, null: false
+    t.boolean "grants_streak_freeze", default: false, null: false
     t.string "image_url"
     t.string "name"
     t.integer "price"
