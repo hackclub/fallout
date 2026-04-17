@@ -159,7 +159,10 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
               <ContentPhase currentPage={currentPage} totalPages={totalPages} onContinue={next} onBack={prev}>
                 <div className="flex flex-col w-full max-w-4xl mx-auto h-full flex-1">
                   <div className="mb-[clamp(0.5rem,2vh,1rem)] sm:mb-[clamp(1rem,4vh,2rem)] flex flex-nowrap items-center gap-[clamp(0.5rem,2vh,1rem)] shrink-0">
-                    <img src="/onboarding/chinese_heidi.webp" className="h-auto w-[clamp(4rem,15vh,14rem)] shrink-0 object-contain" />
+                    <img
+                      src="/onboarding/chinese_heidi.webp"
+                      className="h-auto w-[clamp(4rem,15vh,14rem)] shrink-0 object-contain"
+                    />
 
                     <div className="min-w-0 flex-1 relative top-0 sm:pt-[clamp(1rem,4vh,3rem)]">
                       <SpeechBubble dir="left" style={{ maxWidth: 'min(32rem, 100%)' }}>
@@ -172,7 +175,13 @@ function ProjectsOnboarding({ is_modal }: { is_modal: boolean }) {
 
                   <div className="flex-1 min-h-0 relative w-full mb-[clamp(0.5rem,2vh,3rem)] lg:mb-[clamp(2rem,8vh,6rem)]">
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <video src="/intro.mp4" className="max-w-full max-h-full border-2 border-dark-brown rounded-2xl bg-white focus:outline-none" autoPlay controls playsInline />
+                      <video
+                        src="/intro.mp4"
+                        className="max-w-full max-h-full border-2 border-dark-brown rounded-2xl bg-white focus:outline-none"
+                        autoPlay
+                        controls
+                        playsInline
+                      />
                     </div>
                   </div>
                 </div>
