@@ -46,11 +46,11 @@ export default function PathDialogOverlay({
   const [isClosing, setIsClosing] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [dialogScale, setDialogScale] = useState(() =>
-    typeof window !== 'undefined' ? Math.min(1, (window.innerWidth - 32) / 750) : 1,
+    typeof window !== 'undefined' ? Math.min(1, (window.innerWidth - 32) / 860) : 1,
   )
 
   useEffect(() => {
-    const update = () => setDialogScale(Math.min(1, (window.innerWidth - 32) / 750))
+    const update = () => setDialogScale(Math.min(1, (window.innerWidth - 32) / 860))
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
   }, [])
@@ -329,7 +329,7 @@ export default function PathDialogOverlay({
                     }}
                     exit={{ scale: 0.8, opacity: 0, y: 50 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    className="relative w-[750px] h-[260px] z-20 rotate-[1.36deg]"
+                    className="relative w-[860px] h-[290px] z-20 rotate-[1.36deg]"
                   >
                     <img
                       src="/dialogbox.svg"
@@ -346,7 +346,7 @@ export default function PathDialogOverlay({
                         key={step}
                         className="text-[#8A7B66] leading-[1.3] w-full text-left"
                         style={{
-                          fontSize: '36px',
+                          fontSize: '38px',
                           fontFamily: '"Google Sans Flex", sans-serif',
                           fontWeight: 500,
                         }}

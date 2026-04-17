@@ -67,21 +67,11 @@ export default function ShopIndex({
       { text: 'Just a reminder, your Koi is converted to Gold once you build your project!' },
       {
         segments: [
-          'Most items can be purchased with Koi or Gold ',
-          <div key="koi" className="inline-grid grid-cols-1 grid-rows-1 place-items-center align-middle mb-2">
-            <img
-              src="/gold.webp"
-              alt="golden"
-              className="col-start-1 row-start-1 text-xs w-14 mr-2 object-contain opacity-80 -rotate-10"
-            />
-            <img
-              src="/koifish.webp"
-              alt="koi"
-              className="z-10 rotate-10 col-start-1 row-start-1 text-xs w-14 mx-1 object-contain"
-            />
-          </div>,
-          ', but some are ',
-          <img key="gold" src="/gold.webp" alt="gold" className="inline w-14 mb-2 h-auto object-contain mr-2 " />,
+          'Most items can be bought with Koi or Gold ',
+          <img key="koi" src="/koi-gold.webp" alt="gold" className="inline w-20 mb-2 h-auto object-contain mr-2 " />,
+
+          ', but some are Gold',
+          <img key="gold" src="/gold.webp" alt="gold" className="inline w-20 mb-2 h-auto object-contain mx-2 " />,
           'only.',
         ],
       },
@@ -187,7 +177,7 @@ export default function ShopIndex({
   const content = (
     <div className="w-full mx-auto p-2 xs:p-4 md:p-8 h-full overflow-y-auto bg-light-brown">
       <div className="relative flex flex-col items-center">
-      {is_modal && (
+        {is_modal && (
           <button
             onClick={() => modalRef.current?.close()}
             className="absolute left-0 top-0 cursor-pointer text-dark-brown hover:opacity-80 shrink-0"
@@ -196,10 +186,8 @@ export default function ShopIndex({
             <ArrowLeftIcon className="w-8 h-8" />
           </button>
         )}
-        
-        <h1 className=" font-bold whitespace-nowrap text-2xl sm:text-3xl md:text-4xl text-dark-brown">
-          The Shop
-        </h1>
+
+        <h1 className=" font-bold whitespace-nowrap text-2xl sm:text-3xl md:text-4xl text-dark-brown">The Shop</h1>
         <div className="my-2 mx-auto text-sm sm:text-base text-brown text-center max-w-sm leading-tight">
           Prizes unrelated to the inperson event will be available for purchase after the hackathon (July 7th)
         </div>
@@ -297,18 +285,8 @@ export default function ShopIndex({
                     </div>
                   ) : (
                     <div className="flex items-center gap-1 shrink-0">
-                      <div className="grid grid-cols-1 grid-rows-1 place-items-center">
-                        <img
-                          src="/gold.webp"
-                          alt="golden"
-                          className="col-start-1 row-start-1 text-xs w-11 mr-2 object-contain opacity-60 -rotate-10"
-                        />
-                        <img
-                          src="/koifish.webp"
-                          alt="koi"
-                          className=" rotate-10 col-start-1 row-start-1 text-xs w-11 mx-1 object-contain"
-                        />
-                      </div>
+                      <img src="/koi-gold.webp" alt="gold" className="inline w-11 h-auto object-contain" />
+
                       <span className="text-2xl font-bold text-dark-brown">{item.price}</span>
                     </div>
                   )}
