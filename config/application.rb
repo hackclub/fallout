@@ -29,6 +29,9 @@ module Fallout
     MissionControl::Jobs.base_controller_class = "Admin::EngineController"
     config.mission_control.jobs.http_basic_auth_enabled = false
 
+    # Load Flipper feature flag descriptions for the Flipper UI dashboard
+    config.flipper_features = config_for(:flipper_features)
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
