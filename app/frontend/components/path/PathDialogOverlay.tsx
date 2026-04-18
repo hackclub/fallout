@@ -313,7 +313,7 @@ export default function PathDialogOverlay({
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 30, mass: 2 }}
             className="absolute z-30 object-contain object-bottom pointer-events-none -translate-x-1/2"
-            style={{ bottom: 0, height: 'calc(50vh - 130px)', left: 'calc(50% - 10vw)', scale: 1.7, rotate: '12deg' }}
+            style={{ bottom: 0, height: 'calc(44vh - 130px)', left: 'calc(50% - 10vw)', scale: 1.7, rotate: '12deg' }}
           />
 
           <div className="relative w-full max-w-4xl h-full flex items-center justify-center">
