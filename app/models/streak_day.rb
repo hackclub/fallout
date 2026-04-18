@@ -64,10 +64,14 @@ class StreakDay < ApplicationRecord
     days = where(user: user).where("date >= ?", start_date).chronological.pluck(:date, :status)
     return 0 if days.empty?
 
-    count = 0
-    expected = start_date
+    first_idx = days.index { |_, status| status.in?(%w[active frozen]) }
+    return 0 if first_idx.nil?
 
-    days.each do |date, status|
+    count = 0
+    expected = nil
+
+    days[first_idx..].each do |date, status|
+      expected ||= date
       break unless date == expected && status.in?(%w[active frozen])
 
       count += 1
