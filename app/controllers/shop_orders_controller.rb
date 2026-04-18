@@ -12,7 +12,7 @@ class ShopOrdersController < ApplicationController
     authorize @shop_order
 
     render inertia: "shop_orders/show", props: {
-      shop_item: { id: @shop_item.id, name: @shop_item.name, image_url: @shop_item.image_url },
+      shop_item: { id: @shop_item.id, name: @shop_item.name, image_url: @shop_item.image_url, currency: @shop_item.currency },
       order: {
         id: @shop_order.id,
         state: @shop_order.state,
@@ -28,27 +28,35 @@ class ShopOrdersController < ApplicationController
     @shop_order = @shop_item.shop_orders.build(user: current_user)
     authorize @shop_order
 
+    balance = @shop_item.currency == "gold" ? current_user.gold : current_user.koi
+    if balance < @shop_item.price
+      return redirect_to "/shop", inertia: { errors: { base: [ "You don't have enough #{@shop_item.currency} to buy this item" ] } }
+    end
+
     render inertia: "shop_orders/new", props: {
       shop_item: serialize_shop_item(@shop_item),
       koi_balance: current_user.koi,
-      hca_addresses: hca_formatted_addresses
+      gold_balance: current_user.gold,
+      hca_addresses: @shop_item.grants_streak_freeze? ? [] : hca_formatted_addresses
     }
   end
 
   def create
-    addresses = hca_formatted_addresses
-    index = params[:address_index].to_i
-    address = (index >= 0 && index < addresses.length) ? addresses[index] : nil # Reject negative/out-of-bounds indices
+    unless @shop_item.grants_streak_freeze?
+      addresses = hca_formatted_addresses
+      index = params[:address_index].to_i
+      address = (index >= 0 && index < addresses.length) ? addresses[index] : nil # Reject negative/out-of-bounds indices
 
-    unless address.present?
-      return redirect_back fallback_location: new_shop_item_shop_order_path(@shop_item),
-        inertia: { errors: { base: [ "A valid shipping address is required" ] } }
-    end
+      unless address.present?
+        return redirect_back fallback_location: new_shop_item_shop_order_path(@shop_item),
+          inertia: { errors: { base: [ "A valid shipping address is required" ] } }
+      end
 
-    phone = params[:phone].to_s.strip
-    unless phone.present?
-      return redirect_back fallback_location: new_shop_item_shop_order_path(@shop_item),
-        inertia: { errors: { base: [ "A phone number is required" ] } }
+      phone = params[:phone].to_s.strip
+      unless phone.present?
+        return redirect_back fallback_location: new_shop_item_shop_order_path(@shop_item),
+          inertia: { errors: { base: [ "A phone number is required" ] } }
+      end
     end
 
     quantity = params[:quantity].to_i
@@ -57,19 +65,30 @@ class ShopOrdersController < ApplicationController
     @shop_order = @shop_item.shop_orders.build(address: address, phone: phone, quantity: quantity, user: current_user)
     authorize @shop_order
 
-    # Lock the user row to prevent concurrent orders from double-spending koi
+    # Lock the user row to prevent concurrent orders from double-spending currency
     saved = current_user.with_lock do
       @shop_item.reload # Re-read current price inside the lock
-      balance = current_user.koi
+      if @shop_item.currency == "hours"
+        @shop_order.errors.add(:base, "This item cannot be purchased directly")
+        next false
+      end
+
       total_cost = @shop_item.price * quantity
+      balance = @shop_item.currency == "gold" ? current_user.gold : current_user.koi
+      currency_name = @shop_item.currency == "gold" ? "gold" : "koi"
 
       if balance < total_cost
-        @shop_order.errors.add(:base, "You don't have enough koi for this purchase")
+        @shop_order.errors.add(:base, "You don't have enough #{currency_name} for this purchase")
         false
       else
         @shop_order.frozen_price = @shop_item.price # Freeze the price read inside the lock
         @shop_order.quantity = quantity
-        @shop_order.save
+        if @shop_order.save
+          current_user.increment!(:streak_freezes, quantity) if @shop_item.grants_streak_freeze?
+          true
+        else
+          false
+        end
       end
     end
 
@@ -97,6 +116,9 @@ class ShopOrdersController < ApplicationController
   end
 
   def hca_formatted_addresses
+    test_address = "Test User\n123 Test Street\nToronto, ON, M5V 1A1\nCanada"
+    return [ test_address ] if Rails.env.development?
+
     (current_user.hca_identity&.dig("addresses") || []).map do |addr|
       [
         [ addr["first_name"], addr["last_name"] ].compact.join(" ").presence,
@@ -110,6 +132,6 @@ class ShopOrdersController < ApplicationController
   end
 
   def serialize_shop_item(item)
-    { id: item.id, name: item.name, description: item.description, price: item.price, image_url: item.image_url }
+    { id: item.id, name: item.name, description: item.description, price: item.price, image_url: item.image_url, currency: item.currency, grants_streak_freeze: item.grants_streak_freeze? }
   end
 end

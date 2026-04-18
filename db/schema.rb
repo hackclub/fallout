@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_11_123017) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_17_132117) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -215,6 +215,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_11_123017) do
     t.datetime "updated_at", null: false
     t.text "value"
     t.index ["feature_key", "key", "value"], name: "index_flipper_gates_on_feature_key_and_key_and_value", unique: true
+  end
+
+  create_table "gold_transactions", force: :cascade do |t|
+    t.bigint "actor_id"
+    t.integer "amount", null: false
+    t.datetime "created_at", null: false
+    t.text "description", null: false
+    t.string "reason", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["actor_id"], name: "index_gold_transactions_on_actor_id"
+    t.index ["user_id", "created_at"], name: "index_gold_transactions_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_gold_transactions_on_user_id"
   end
 
   create_table "hcb_connections", force: :cascade do |t|
@@ -509,13 +522,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_11_123017) do
 
   create_table "shop_items", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "currency", default: "koi", null: false
     t.text "description"
     t.boolean "featured", default: false, null: false
+    t.boolean "grants_streak_freeze", default: false, null: false
     t.string "image_url"
     t.string "name"
     t.integer "price"
     t.string "status", default: "available", null: false
-    t.boolean "ticket", default: false, null: false
     t.datetime "updated_at", null: false
     t.index ["status"], name: "index_shop_items_on_status"
   end
@@ -786,6 +800,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_11_123017) do
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
   add_foreign_key "dialog_campaigns", "users"
+  add_foreign_key "gold_transactions", "users"
+  add_foreign_key "gold_transactions", "users", column: "actor_id"
   add_foreign_key "hcb_connections", "users", column: "connected_by_id"
   add_foreign_key "hcb_grant_cards", "users"
   add_foreign_key "hcb_transactions", "hcb_grant_cards"

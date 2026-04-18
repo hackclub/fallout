@@ -440,10 +440,14 @@ export default function PathIndex() {
         </Tooltip>
         <Tooltip disabled={isDialogOverlayOpen}>
           <TooltipTrigger>
-            {features.shop ? (
+            {features.shop && !authUser?.is_trial ? (
               <ModalLink href="/shop" className="outline-0">
                 <img src="/icon/shop.webp" alt="Shop" className="cursor-pointer w-20 xs:w-25" />
               </ModalLink>
+            ) : features.shop && authUser?.is_trial ? (
+              <button onClick={() => notify('alert', 'This is locked! Click on the star')}>
+                <img src="/icon/shop.webp" alt="Shop" className="cursor-pointer w-20 xs:w-25" />
+              </button>
             ) : (
               <button onClick={() => notify('alert', "The shop isn't open yet. Check back later!")}>
                 <img src="/icon/shop.webp" alt="Shop" className="cursor-pointer w-20 xs:w-25" />

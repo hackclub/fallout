@@ -315,6 +315,11 @@ Rails.application.routes.draw do
     resources :shop_orders, only: [ :new, :create, :show ], path: "orders" # Purchase flow
   end
 
+  # Adblocker-safe tracking redirects — sets utm_source on Ahoy visit without query params
+  %w[infill rmrrf infill-2026 rmrrf-2026].each do |slug|
+    get slug => "tracking_redirects#show", defaults: { slug: slug }
+  end
+
   get "faq" => redirect("/docs/faq") # Shortcut to FAQ docs page
   get "info" => redirect("/docs")
   get "about" => redirect("/docs")
