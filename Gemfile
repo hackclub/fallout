@@ -74,6 +74,7 @@ end
 
 
 gem "faraday", "~> 2.13"
+gem "rubyzip", "~> 3.0"
 
 gem "slack-ruby-client", "~> 3.0"
 

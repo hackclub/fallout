@@ -198,6 +198,7 @@ Rails.application.routes.draw do
           member do
             post :heartbeat
             post :refresh_tree
+            get :gerber_zip_files
           end
           collection { get :next }
         end

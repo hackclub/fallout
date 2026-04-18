@@ -1,3 +1,6 @@
+require "zip"
+require "open3"
+
 class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseController
   def index
     base = policy_scope(RequirementsCheckReview)
@@ -38,6 +41,7 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
       sibling_statuses: serialize_sibling_statuses(ship),
       repo_tree: @review.repo_tree,
       refresh_tree_path: refresh_tree_admin_reviews_requirements_check_path(@review),
+      gerber_zip_files_path: gerber_zip_files_admin_reviews_requirements_check_path(@review),
       reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
       reviewer_notes_path: admin_project_reviewer_notes_path(project),
       project_flagged: project.flagged?,
@@ -54,6 +58,77 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
     authorize @review, :update?
     FetchRepoTreeJob.perform_later(@review.id)
     render json: { ok: true }
+  end
+
+  def gerber_zip_files
+    @review = RequirementsCheckReview.find(params[:id])
+    authorize @review, :update?
+
+    zip_path = params[:path].to_s
+    unless zip_path.end_with?(".zip")
+      return render json: { error: "Not a zip file" }, status: :unprocessable_entity
+    end
+
+    project = @review.ship.project
+    match = project.repo_link.to_s.match(%r{github\.com/([^/]+)/([^/]+?)(?:\.git)?$})
+    unless match
+      return render json: { error: "Could not parse repo URL" }, status: :unprocessable_entity
+    end
+
+    owner, repo = match[1], match[2]
+    branch = @review.repo_tree&.dig("default_branch") || "main"
+
+    # Fetch file metadata via the GitHub contents API (returns JSON with base64 content or download_url)
+    meta_response = GithubService.connection.get("/gh/repos/#{owner}/#{repo}/contents/#{zip_path}") do |req|
+      req.params["ref"] = branch
+    end
+
+    unless meta_response.status == 200
+      return render json: { error: "Could not fetch zip from GitHub" }, status: :bad_gateway
+    end
+
+    meta = JSON.parse(meta_response.body)
+
+    # Prefer base64-encoded content inline; fall back to download_url for large files
+    zip_binary = if meta["encoding"] == "base64" && meta["content"].present?
+      Base64.decode64(meta["content"])
+    elsif meta["download_url"].present?
+      dl = Faraday.get(meta["download_url"])
+      raise "Download failed (#{dl.status})" unless dl.status == 200
+      dl.body
+    else
+      return render json: { error: "No downloadable content found" }, status: :bad_gateway
+    end
+
+    gerber_extensions = %w[gbr gtl gbl gts gbs gto gbo gko gm1 drl exc xln]
+    node_script = Rails.root.join("lib/gerber_to_svg.cjs").to_s
+    files = []
+
+    Tempfile.create([ "gerber", ".zip" ], binmode: true) do |tmp|
+      tmp.write(zip_binary)
+      tmp.flush
+
+      Zip::File.open(tmp.path) do |zip|
+        zip.each do |entry|
+          next unless entry.file?
+          ext = File.extname(entry.name).delete_prefix(".").downcase
+          next unless gerber_extensions.include?(ext)
+          files << { name: File.basename(entry.name), content: entry.get_input_stream.read.force_encoding("UTF-8") }
+        end
+      end
+    end
+
+    return render json: { error: "No Gerber files found in zip" }, status: :unprocessable_entity if files.empty?
+
+    # Render top+bottom board SVGs via pcb-stackup in Node
+    stdout, stderr, status = Open3.capture3("node #{node_script}", stdin_data: files.to_json)
+    unless status.success?
+      return render json: { error: "Render failed: #{stderr.truncate(200)}" }, status: :internal_server_error
+    end
+
+    render json: JSON.parse(stdout)
+  rescue => e
+    render json: { error: e.message }, status: :internal_server_error
   end
 
   def update

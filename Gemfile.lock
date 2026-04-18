@@ -599,6 +599,7 @@ DEPENDENCIES
   redis (~> 5.0)
   rubocop-rails-omakase
   ruby_llm (~> 1.14)
+  rubyzip (~> 3.0)
   scoped_search (~> 4.3)
   selenium-webdriver
   sentry-rails (~> 6.5)

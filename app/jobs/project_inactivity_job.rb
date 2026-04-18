@@ -29,15 +29,19 @@ class ProjectInactivityJob < ApplicationJob
   private
 
   def send_messages(slack_id, projects)
+    message_parts = []
+
     if projects.one?
-      SlackMsgJob.perform_later(slack_id, ":oi: hey! looks like #{projects.first.name.downcase} hasn't had any journal entries in a while")
+      message_parts << ":oi: hey! looks like #{projects.first.name.downcase} hasn't had any journal entries in a while"
     else
       names = projects.map { |p| p.name.downcase }.join(", ")
-      SlackMsgJob.perform_later(slack_id, ":oi: hey! looks like a few of your projects haven't had any journal entries in a while: #{names}")
+      message_parts << ":oi: hey! looks like a few of your projects haven't had any journal entries in a while: #{names}"
     end
 
-    SlackMsgJob.perform_later(slack_id, "not sure where to start? we've got docs that walk you through the whole process from zero to shipped (we put a LOT of time on it - they're really helpful!!): https://fallout.hackclub.com/docs")
-    SlackMsgJob.perform_later(slack_id, "ALSO! if you have any questions you should ask in <#C037157AL30>! the community is super helpful :))")
-    SlackMsgJob.perform_later(slack_id, "hardware is more approachable than it seems. jump back in whenever you're ready! (i'm so hungry)")
+    message_parts << "not sure where to start? we've got docs that walk you through the whole process from zero to shipped (we put a LOT of time on it - they're really helpful!!): https://fallout.hackclub.com/docs"
+    message_parts << "ALSO! if you have any questions you should ask in <#C037157AL30>! the community is super helpful :))"
+    message_parts << "hardware is more approachable than it seems. jump back in whenever you're ready! (i'm so hungry)"
+
+    SlackMsgJob.perform_later(slack_id, message_parts.join("\n"))
   end
 end
