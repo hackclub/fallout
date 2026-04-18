@@ -14,7 +14,13 @@ module YouTubeService
     video_id = extract_video_id(url)
     return nil if video_id.blank?
 
-    YouTubeVideo.find_by(video_id: video_id) || fetch_and_create(video_id, url: url)
+    video = YouTubeVideo.find_by(video_id: video_id)
+    if video
+      refetch_duration_if_missing(video)
+      return video
+    end
+
+    fetch_and_create(video_id, url: url)
   end
 
   def thumbnail_url(url, quality: "default")
@@ -39,7 +45,9 @@ module YouTubeService
     attrs = fetch_video_data(video_id, url: url)
     return nil if attrs.nil?
 
-    YouTubeVideo.create!(attrs.merge(last_refreshed_at: Time.current))
+    video = YouTubeVideo.create!(attrs.merge(last_refreshed_at: Time.current))
+    YouTubeVideoRefetchJob.perform_later(video.id) if video.duration_seconds.nil?
+    video
   rescue ActiveRecord::RecordNotUnique
     YouTubeVideo.find_by(video_id: video_id)
   end
@@ -164,5 +172,12 @@ module YouTubeService
       f.options.open_timeout = 5
       f.options.timeout = 10
     end
+  end
+
+  def refetch_duration_if_missing(video)
+    return unless video.duration_seconds.nil?
+    video.refetch_data!
+  rescue StandardError
+    nil
   end
 end
