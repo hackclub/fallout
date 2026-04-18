@@ -6,7 +6,7 @@ task backfill_streak_days: :environment do
 
   # Find all verified users who created journal entries in the affected window
   user_ids = JournalEntry.kept
-    .where("created_at >= ?", cutoff)
+    .where("journal_entries.created_at >= ?", cutoff)
     .joins(:user)
     .where(users: { type: nil }) # Full users only (not TrialUser)
     .distinct
