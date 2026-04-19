@@ -11,11 +11,37 @@ class Admin::DashboardController < Admin::ApplicationController
       stats: {
         all_time: reviewer_stats(completed),
         this_week: reviewer_stats(completed_this_week)
-      }
+      },
+      backlog_chart: backlog_by_day
     }
   end
 
   private
+
+  def backlog_by_day
+    start_date = Date.new(2025, 4, 7)
+    end_date = Date.today
+
+    ships_by_day = Ship.where("created_at < ?", end_date.end_of_day)
+      .group("created_at::date")
+      .count
+
+    terminal_statuses = %w[approved returned rejected]
+    completed_by_day = TimeAuditReview.where(status: terminal_statuses)
+      .where("updated_at < ?", end_date.end_of_day)
+      .group("updated_at::date")
+      .count
+
+    cumulative_ships = Ship.where("created_at < ?", start_date).count
+    cumulative_completed = TimeAuditReview.where(status: terminal_statuses)
+      .where("updated_at < ?", start_date).count
+
+    (start_date..end_date).map do |date|
+      cumulative_ships += ships_by_day[date].to_i
+      cumulative_completed += completed_by_day[date].to_i
+      { date: date.iso8601, backlog: cumulative_ships - cumulative_completed }
+    end
+  end
 
   def reviewer_stats(scope)
     rows = scope
