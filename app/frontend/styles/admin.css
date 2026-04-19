@@ -107,6 +107,15 @@
   border-top-color: oklch(0.4 0 0);
 }
 
+.media-minimal-skin {
+  border-radius: 0 !important;
+}
+
+.media-minimal-skin .media-button--mute,
+.media-minimal-skin .media-popover--volume {
+  display: none !important;
+}
+
 .admin.dark .markdown-content aside {
   background-color: oklch(0.25 0 0);
   color: oklch(0.9 0 0);
