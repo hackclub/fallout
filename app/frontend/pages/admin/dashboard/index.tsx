@@ -36,7 +36,6 @@ function formatDuration(seconds: number): string {
   return `${m}m`
 }
 
-const MEDAL = ['🥇', '🥈', '🥉']
 
 type SortKey = 'review_count' | 'total_approved_seconds' | 'median_seconds_per_review'
 
@@ -51,7 +50,7 @@ function RankRow({ reviewer, rank, metric }: { reviewer: ReviewerStat; rank: num
   return (
     <div className="flex items-center gap-3 py-2 border-b last:border-0">
       <div className="w-6 text-center text-sm font-bold text-muted-foreground shrink-0">
-        {rank <= 3 ? MEDAL[rank - 1] : `#${rank}`}
+        {rank}
       </div>
       {reviewer.avatar ? (
         <img src={reviewer.avatar} className="size-7 rounded-full shrink-0" alt="" />
@@ -157,7 +156,7 @@ export default function AdminDashboardIndex() {
           all_time={stats.all_time}
         />
         <LeaderboardCard
-          title="Median per Review"
+          title="Median of time spent per design/build review"
           metric="median_seconds_per_review"
           this_week={stats.this_week}
           all_time={stats.all_time}
