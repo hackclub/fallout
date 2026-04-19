@@ -10,8 +10,6 @@ interface ReviewerStat {
   avatar: string | null
   review_count: number
   total_approved_seconds: number
-  avg_seconds_per_review: number
-  median_seconds_per_review: number
 }
 
 interface PeriodStats {
@@ -37,15 +35,13 @@ function formatDuration(seconds: number): string {
 }
 
 
-type SortKey = 'review_count' | 'total_approved_seconds' | 'median_seconds_per_review'
+type SortKey = 'review_count' | 'total_approved_seconds'
 
 function RankRow({ reviewer, rank, metric }: { reviewer: ReviewerStat; rank: number; metric: SortKey }) {
   const value =
     metric === 'review_count'
       ? `${reviewer.review_count}`
-      : metric === 'total_approved_seconds'
-        ? formatDuration(reviewer.total_approved_seconds)
-        : formatDuration(reviewer.median_seconds_per_review)
+      : formatDuration(reviewer.total_approved_seconds)
 
   return (
     <div className="flex items-center gap-3 py-2 border-b last:border-0">
@@ -142,7 +138,7 @@ export default function AdminDashboardIndex() {
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">Welcome to the Fallout admin panel.</p>
       </div>
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-2 gap-4">
         <LeaderboardCard
           title="Reviews Completed"
           metric="review_count"
@@ -152,12 +148,6 @@ export default function AdminDashboardIndex() {
         <LeaderboardCard
           title="Time Audited"
           metric="total_approved_seconds"
-          this_week={stats.this_week}
-          all_time={stats.all_time}
-        />
-        <LeaderboardCard
-          title="Median of time spent per design/build review"
-          metric="median_seconds_per_review"
           this_week={stats.this_week}
           all_time={stats.all_time}
         />

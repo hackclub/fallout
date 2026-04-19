@@ -26,8 +26,7 @@ class Admin::DashboardController < Admin::ApplicationController
         "users.display_name",
         "users.avatar",
         "COUNT(*) AS review_count",
-        "SUM(time_audit_reviews.approved_seconds) AS total_approved_seconds",
-        "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY time_audit_reviews.approved_seconds) AS median_seconds_per_review"
+        "SUM(time_audit_reviews.approved_seconds) AS total_approved_seconds"
       )
       .order("review_count DESC")
       .map do |r|
@@ -36,8 +35,7 @@ class Admin::DashboardController < Admin::ApplicationController
           display_name: r.display_name,
           avatar: r.avatar,
           review_count: r.review_count,
-          total_approved_seconds: r.total_approved_seconds.to_i,
-          median_seconds_per_review: r.median_seconds_per_review.to_i
+          total_approved_seconds: r.total_approved_seconds.to_i
         }
       end
 
