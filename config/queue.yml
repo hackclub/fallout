@@ -13,9 +13,6 @@ default: &default
     - queues: [active_storage, solid_queue_recurring]
       threads: 2
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 2) %>
-    - queues: [heavy]
-      threads: 2
-      processes: 1
 
 development:
   <<: *default

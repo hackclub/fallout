@@ -76,7 +76,7 @@ class TimelapseActivityChecker
     when LapseTimelapse
       download_from_url(@recordable.playback_url)
     when YouTubeVideo
-      nil
+      nil # YouTube downloads are unreliable due to bot detection; skip activity checking
     end
   end
 
