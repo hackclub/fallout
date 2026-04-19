@@ -16,7 +16,7 @@ class Admin::OtherStatsController < Admin::ApplicationController
     terminal = %w[approved returned rejected]
 
     all_reviews = []
-    [DesignReview, BuildReview].each do |klass|
+    [DesignReview, BuildReview, RequirementsCheckReview].each do |klass|
       all_reviews += klass
         .where(status: terminal)
         .where.not(reviewer_id: nil)
