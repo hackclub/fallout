@@ -365,7 +365,9 @@ export interface ReviewRecording {
   name: string
   playback_url?: string
   thumbnail_url?: string
+  recordable_id?: number
   video_id?: string
+  yt_duration_seconds?: number
   inactive_segments?: InactiveSegment[]
   inactive_percentage?: number
   activity_checked?: boolean

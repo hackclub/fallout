@@ -1,6 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react'
 import type { ReactNode } from 'react'
 import { Link, router } from '@inertiajs/react'
+import { createPlayer } from '@videojs/react'
+import { MinimalVideoSkin, Video, videoFeatures } from '@videojs/react/video'
+import '@videojs/react/video/minimal-skin.css'
 import { useReviewHeartbeat } from '@/hooks/useReviewHeartbeat'
 import ReviewLayout from '@/layouts/ReviewLayout'
 import { Badge } from '@/components/admin/ui/badge'
@@ -42,6 +45,8 @@ import {
   SparklesIcon,
   MessageSquareTextIcon,
   FlagIcon,
+  PlayIcon,
+  PauseIcon,
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/admin/ui/tooltip'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
@@ -470,7 +475,7 @@ function AnnotationTimeline({
           <span className="flex items-center gap-1">
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-purple-500/60" /> Inactive
           </span>
-        ) : !checked ? (
+        ) : !checked && recording.type !== 'YouTubeVideo' ? (
           <span className="flex items-center gap-1">
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-muted" /> Not analyzed
           </span>
@@ -635,14 +640,16 @@ function SegmentEditor({
     setDeflatedPercent(50)
   }
 
-  // Segments are in video seconds; multiply by 60 to get real-time equivalents for display
+  // Segments are in video seconds; multiply by scale to get real-time equivalents for display
+  // YouTube: 1 video second = 1 real second. Timelapse: 1 video second ≈ 60 real seconds.
+  const scale = recording.type === 'YouTubeVideo' ? 1 : 60
   const removedRealSec = segments
     .filter((s) => s.type === 'removed')
-    .reduce((sum, s) => sum + (s.end_seconds - s.start_seconds) * 60, 0)
+    .reduce((sum, s) => sum + (s.end_seconds - s.start_seconds) * scale, 0)
   const deflatedRealSec = segments
     .filter((s) => s.type === 'deflated')
-    .reduce((sum, s) => sum + ((s.end_seconds - s.start_seconds) * 60 * (s.deflated_percent ?? 0)) / 100, 0)
-  const approvedSec = Math.max(0, recording.duration * 60 - removedRealSec - deflatedRealSec)
+    .reduce((sum, s) => sum + ((s.end_seconds - s.start_seconds) * scale * (s.deflated_percent ?? 0)) / 100, 0)
+  const approvedSec = Math.max(0, recording.duration * scale - removedRealSec - deflatedRealSec)
 
   return (
     <div className="space-y-2">
@@ -854,6 +861,19 @@ function SegmentEditor({
   )
 }
 
+const AuditPlayer = createPlayer({ features: videoFeatures })
+
+const AUDIT_PLAYBACK_RATES = [0.5, 1, 1.5, 2, 3, 4]
+
+function PlayerConfig() {
+  const store = AuditPlayer.usePlayer()
+  useEffect(() => {
+    // Patch available playback rates — no public setter exists, patch internal state directly
+    ;(store.$state as { patch?: (p: object) => void }).patch?.({ playbackRates: AUDIT_PLAYBACK_RATES })
+  }, [store])
+  return null
+}
+
 // --- Single Recording Block ---
 
 function RecordingBlock({
@@ -882,21 +902,45 @@ function RecordingBlock({
   const hasInactiveData = recording.activity_checked
   const inactivePct = recording.inactive_percentage ?? 0
 
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const videoContainerRef = useRef<HTMLDivElement>(null)
   const [currentTime, setCurrentTime] = useState(0) // video seconds
   const [videoDuration, setVideoDuration] = useState<number | null>(null)
   const [preview, setPreview] = useState<{ start: number; end: number; type: 'removed' | 'deflated' } | null>(null)
 
+  const isYouTube = recording.type === 'YouTubeVideo'
+  const hasPlaybackUrl = !!recording.playback_url
+  const isMissingDuration = isYouTube && recording.duration === 0
+  const [refetching, setRefetching] = useState(false)
+  const [scrubbing, setScrubbing] = useState(false)
+  const [ytPlaying, setYtPlaying] = useState(false)
+  const ytPlayRafRef = useRef<number>(0)
+  const ytPlayLastTimeRef = useRef<number>(0)
+
+  async function handleRefetch() {
+    if (!recording.recordable_id) return
+    setRefetching(true)
+    try {
+      const res = await fetch(`/admin/you_tube_videos/${recording.recordable_id}/refetch`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken(), Accept: 'application/json' },
+      })
+      if (res.ok) router.reload()
+    } finally {
+      setRefetching(false)
+    }
+  }
+
   // API time = recording.duration (real tracked seconds, source of truth for billing)
   // Video time = videoDuration (playback seconds, what the timeline follows)
   // timeMultiplier = apiTime / videoTime (for converting video ranges to real deductions)
+  // For YouTube, 1 video second = 1 real second. For timelapse types, 1 video second ≈ 60 real seconds.
   const apiTime = recording.duration
-  const timeMultiplier = videoDuration && videoDuration > 0 ? apiTime / videoDuration : 60
-  const videoRealTime = videoDuration ? videoDuration * 60 : apiTime // expected real time from video at 60x
-  const hasTimeMismatch = videoDuration !== null && Math.abs(apiTime - videoRealTime) / apiTime > 0.1
+  const timeMultiplier = videoDuration && videoDuration > 0 ? apiTime / videoDuration : isYouTube ? 1 : 60
+  const videoRealTime = videoDuration ? videoDuration * (isYouTube ? 1 : 60) : apiTime
+  const hasTimeMismatch = videoDuration !== null && apiTime > 0 && Math.abs(apiTime - videoRealTime) / apiTime > 0.1
 
   // Timeline operates in video seconds
-  const timelineDuration = videoDuration ?? apiTime / 60 // fallback before video loads
+  const timelineDuration = videoDuration ?? (isYouTube ? (recording.yt_duration_seconds ?? apiTime) : apiTime / 60) // fallback before video loads
   const granularity = useMemo(() => 1, []) // 1 video second
   const snapPoints = useMemo(
     () => computeSnapPoints(recording, segments, timelineDuration),
@@ -904,56 +948,154 @@ function RecordingBlock({
   )
   const snapThreshold = useMemo(() => Math.max(timelineDuration * 0.015, 3), [timelineDuration])
 
-  const handleLoadedMetadata = useCallback(() => {
-    const vid = videoRef.current
-    if (vid && vid.duration > 0) {
-      setVideoDuration(vid.duration)
-    }
-  }, [])
+  // 120x custom playback for YouTube: advance timeline cursor smoothly, seek iframe every 250ms
+  const timelineDurationRef = useRef(timelineDuration)
+  timelineDurationRef.current = timelineDuration
+  const ytPlayingRef = useRef(ytPlaying)
+  ytPlayingRef.current = ytPlaying
+  const lastSeekRef = useRef(0)
+  useEffect(() => {
+    if (!isYouTube || !ytPlaying) return
+    ytPlayLastTimeRef.current = performance.now()
+    lastSeekRef.current = 0
 
-  // Poll video.currentTime via rAF for smooth cursor tracking
+    const tick = (now: number) => {
+      const elapsed = (now - ytPlayLastTimeRef.current) / 1000
+      ytPlayLastTimeRef.current = now
+      setCurrentTime((prev) => {
+        const next = prev + elapsed * 120
+        if (next >= timelineDurationRef.current) {
+          setYtPlaying(false)
+          return timelineDurationRef.current
+        }
+        // Only seek iframe every 250ms so it has time to decode/respond
+        if (now - lastSeekRef.current > 250) {
+          lastSeekRef.current = now
+          iframeRef.current?.contentWindow?.postMessage(
+            JSON.stringify({ event: 'command', func: 'seekTo', args: [next, true] }),
+            '*',
+          )
+        }
+        return next
+      })
+      ytPlayRafRef.current = requestAnimationFrame(tick)
+    }
+
+    ytPlayRafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(ytPlayRafRef.current)
+  }, [isYouTube, ytPlaying])
+
+  // Poll the underlying <video> element for currentTime via rAF
   const rafRef = useRef<number>(0)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
+    if (!isYouTube) return
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    // Use postMessage to communicate with the YouTube iframe (enablejsapi=1)
+    function sendCommand(func: string, args: unknown[] = []) {
+      iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*')
+    }
+
+    // Listen for getCurrentTime responses
+    function onMessage(e: MessageEvent) {
+      if (e.source !== iframe?.contentWindow) return
+      try {
+        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+        if (data?.event === 'infoDelivery' && data?.info) {
+          if (typeof data.info.currentTime === 'number') setCurrentTime(data.info.currentTime)
+          if (typeof data.info.duration === 'number' && data.info.duration > 0 && videoDuration === null) {
+            setVideoDuration(data.info.duration)
+          }
+        }
+      } catch {}
+    }
+
+    window.addEventListener('message', onMessage)
+
+    // Request info updates at ~4Hz
+    const interval = setInterval(() => sendCommand('getVideoData'), 250)
+
+    return () => {
+      window.removeEventListener('message', onMessage)
+      clearInterval(interval)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isYouTube, videoDuration])
+
+  // Keep the iframe paused whenever our 60x player is active
+  useEffect(() => {
+    if (!isYouTube) return
+    const cmd = ytPlaying ? 'pauseVideo' : null
+    if (cmd) {
+      iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: cmd, args: [] }), '*')
+    }
+  }, [isYouTube, ytPlaying])
+
+  useEffect(() => {
+    if (isYouTube) return
     const tick = () => {
-      if (videoRef.current) {
-        setCurrentTime(videoRef.current.currentTime)
+      const video = videoContainerRef.current?.querySelector('video')
+      if (video) {
+        setCurrentTime(video.currentTime)
+        if (video.duration > 0 && videoDuration === null) {
+          setVideoDuration(video.duration)
+        }
       }
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [])
+  }, [isYouTube, videoDuration])
 
-  const seekTo = useCallback((videoSeconds: number) => {
-    setCurrentTime(videoSeconds)
-    if (videoRef.current) {
-      videoRef.current.currentTime = videoSeconds
-    }
-  }, [])
+  const seekTo = useCallback(
+    (videoSeconds: number) => {
+      setCurrentTime(videoSeconds)
+      if (isYouTube) {
+        iframeRef.current?.contentWindow?.postMessage(
+          JSON.stringify({ event: 'command', func: 'seekTo', args: [videoSeconds, true] }),
+          '*',
+        )
+      } else {
+        const video = videoContainerRef.current?.querySelector('video')
+        if (video) video.currentTime = videoSeconds
+      }
+    },
+    [isYouTube],
+  )
 
   return (
     <div className="space-y-3">
       {/* Video */}
-      <div className="border border-border rounded-lg overflow-hidden">
-        {recording.playback_url && recording.type !== 'YouTubeVideo' ? (
-          <video
-            ref={videoRef}
-            src={recording.playback_url}
-            controls
-            muted
-            preload="metadata"
-            className="w-full aspect-video bg-black"
-            poster={recording.thumbnail_url}
-            onLoadedMetadata={handleLoadedMetadata}
-          />
-        ) : recording.type === 'YouTubeVideo' && recording.video_id ? (
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${recording.video_id}?mute=1`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="w-full aspect-video"
-          />
+      <div ref={videoContainerRef} className="border border-border rounded-lg overflow-hidden">
+        {isYouTube ? (
+          <div className="relative w-full aspect-video">
+            <iframe
+              ref={iframeRef}
+              src={`https://www.youtube.com/embed/${recording.video_id}?enablejsapi=1`}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+            {/* Blocks YouTube's seek overlay from showing while scrubbing our timeline */}
+            {scrubbing && <div className="absolute inset-0" />}
+          </div>
+        ) : hasPlaybackUrl ? (
+          <AuditPlayer.Provider>
+            <PlayerConfig />
+            <MinimalVideoSkin style={{ width: '100%', height: '100%' }}>
+              <Video
+                src={recording.playback_url!}
+                muted
+                playsInline
+                autoPlay={false}
+                poster={recording.thumbnail_url}
+                className="w-full aspect-video bg-black rounded-none"
+              />
+            </MinimalVideoSkin>
+          </AuditPlayer.Provider>
         ) : null}
       </div>
 
@@ -989,21 +1131,48 @@ function RecordingBlock({
             <span className="text-muted-foreground/60"> ({formatDuration(Math.round(videoRealTime))} video)</span>
           )}
         </span>
+        {isMissingDuration && (
+          <Button variant="outline" size="sm" className="text-xs" disabled={refetching} onClick={handleRefetch}>
+            {refetching ? <LoaderIcon className="size-3 animate-spin mr-1" /> : null}
+            Refetch metadata
+          </Button>
+        )}
       </div>
 
       {/* Timeline — follows video time */}
-      <AnnotationTimeline
-        recording={{ ...recording, duration: timelineDuration }}
-        segments={segments}
-        currentTime={currentTime}
-        onSeek={seekTo}
-        snapPoints={snapPoints}
-        snapThreshold={snapThreshold}
-        granularity={granularity}
-        onInteractionEnd={() => videoRef.current?.focus({ preventScroll: true })}
-        preview={preview}
-        readOnly={readOnly}
-      />
+      <div className="flex items-center gap-2">
+        {isYouTube && (
+          <button
+            onClick={() => setYtPlaying((p) => !p)}
+            className="shrink-0 size-7 flex items-center justify-center rounded border border-input hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title={ytPlaying ? 'Pause 120× preview' : 'Play at 120×'}
+          >
+            {ytPlaying ? <PauseIcon className="size-3.5" /> : <PlayIcon className="size-3.5" />}
+          </button>
+        )}
+        <div className="flex-1">
+          <AnnotationTimeline
+            recording={{ ...recording, duration: timelineDuration }}
+            segments={segments}
+            currentTime={currentTime}
+            onSeek={(t) => {
+              setYtPlaying(false)
+              setScrubbing(true)
+              seekTo(t)
+            }}
+            snapPoints={[]}
+            snapThreshold={0}
+            granularity={granularity}
+            onInteractionEnd={() => {
+              setScrubbing(false)
+              const video = videoContainerRef.current?.querySelector('video')
+              video?.focus({ preventScroll: true })
+            }}
+            preview={preview}
+            readOnly={readOnly}
+          />
+        </div>
+      </div>
 
       {/* Segment editor — operates in video time, multiplier converts to API time */}
       {!readOnly && (
@@ -1098,7 +1267,7 @@ const EntrySection = memo(
       for (const rec of entry.recordings) {
         const recData = annotations.recordings?.[String(rec.id)]
         if (!recData?.segments) continue
-        const multiplier = 60
+        const multiplier = rec.type === 'YouTubeVideo' ? 1 : 60
         for (const seg of recData.segments) {
           const videoRange = seg.end_seconds - seg.start_seconds
           const realRange = videoRange * multiplier
@@ -1462,8 +1631,8 @@ export default function TimeAuditsShow({
       let entryTime = entry.total_duration
       const recs = annotations.recordings
       if (recs) {
-        const multiplier = 60
         for (const rec of entry.recordings) {
+          const multiplier = rec.type === 'YouTubeVideo' ? 1 : 60
           const data = recs[String(rec.id)]
           if (!data?.segments) continue
           for (const seg of data.segments) {

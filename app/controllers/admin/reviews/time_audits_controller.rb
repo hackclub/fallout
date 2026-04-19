@@ -156,9 +156,10 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
       base.merge(playback_url: recordable.playback_url, thumbnail_url: recordable.thumbnail_url)
     when YouTubeVideo
       base.merge(
-        playback_url: "https://www.youtube.com/watch?v=#{recordable.video_id}",
+        recordable_id: recordable.id, # YouTubeVideo record id for admin refetch action
+        video_id: recordable.video_id,
         thumbnail_url: recordable.thumbnail_url,
-        video_id: recordable.video_id
+        yt_duration_seconds: recordable.duration_seconds # used as timeline fallback before YT player loads
       )
     else
       base
