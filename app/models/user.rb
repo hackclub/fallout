@@ -320,7 +320,7 @@ class User < ApplicationRecord
     entry_scope = { project_id: projects.kept.select(:id), discarded_at: nil }
 
     LapseTimelapse.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration).to_i +
-      YouTubeVideo.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration_seconds).to_i +
+      YouTubeVideo.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(Arel.sql("duration_seconds * stretch_multiplier")).to_i +
       LookoutTimelapse.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration).to_i
   end
 
@@ -430,7 +430,7 @@ class User < ApplicationRecord
 
     entry_ids = journal_entries.kept.select(:id)
     total_seconds = LapseTimelapse.joins(:recording).where(recordings: { journal_entry_id: entry_ids }).sum(:duration).to_i +
-                    YouTubeVideo.joins(:recording).where(recordings: { journal_entry_id: entry_ids }).sum(:duration_seconds).to_i +
+                    YouTubeVideo.joins(:recording).where(recordings: { journal_entry_id: entry_ids }).sum(Arel.sql("duration_seconds * stretch_multiplier")).to_i +
                     LookoutTimelapse.joins(:recording).where(recordings: { journal_entry_id: entry_ids }).sum(:duration).to_i
     avg_duration_hours = (total_seconds.to_f / hours.size / 3600).ceil
 

@@ -566,6 +566,7 @@ function DeflationInputs({
 function SegmentEditor({
   recording,
   segments,
+  multiplier,
   onAdd,
   onRemove,
   currentTime,
@@ -574,6 +575,7 @@ function SegmentEditor({
 }: {
   recording: ReviewRecording
   segments: TimeAuditSegment[]
+  multiplier: number
   onAdd: (seg: TimeAuditSegment) => void
   onRemove: (index: number) => void
   currentTime: number
@@ -640,9 +642,8 @@ function SegmentEditor({
     setDeflatedPercent(50)
   }
 
-  // Segments are in video seconds; multiply by scale to get real-time equivalents for display
-  // YouTube: 1 video second = 1 real second. Timelapse: 1 video second ≈ 60 real seconds.
-  const scale = recording.type === 'YouTubeVideo' ? 1 : 60
+  // Segments are in video seconds; multiply by multiplier to get real-time equivalents for display
+  const scale = multiplier
   const removedRealSec = segments
     .filter((s) => s.type === 'removed')
     .reduce((sum, s) => sum + (s.end_seconds - s.start_seconds) * scale, 0)
@@ -675,7 +676,8 @@ function SegmentEditor({
             .sort((a, b) => a.seg.start_seconds - b.seg.start_seconds)
             .map(({ seg, origIndex: i }) => {
               const videoRange = seg.end_seconds - seg.start_seconds
-              const rangeMin = Math.round(videoRange * 10) / 10 // 1 video sec ≈ 1 real min
+              const rangeRealSec = videoRange * scale
+              const rangeMin = Math.round((rangeRealSec / 60) * 10) / 10
               const deflatedToMin =
                 seg.type === 'deflated' && seg.deflated_percent
                   ? Math.round(((rangeMin * (100 - seg.deflated_percent)) / 100) * 10) / 10
@@ -880,22 +882,26 @@ function RecordingBlock({
   recording,
   description,
   segments,
+  multiplier,
   saved,
   readOnly,
   onDescriptionChange,
   onSegmentAdd,
   onSegmentRemove,
+  onStretchChange,
   onSave,
   saving,
 }: {
   recording: ReviewRecording
   description: string
   segments: TimeAuditSegment[]
+  multiplier: number
   saved: boolean
   readOnly?: boolean
   onDescriptionChange: (description: string) => void
   onSegmentAdd: (seg: TimeAuditSegment) => void
   onSegmentRemove: (index: number) => void
+  onStretchChange: (multiplier: number) => void
   onSave: () => void
   saving: boolean
 }) {
@@ -933,9 +939,9 @@ function RecordingBlock({
   // API time = recording.duration (real tracked seconds, source of truth for billing)
   // Video time = videoDuration (playback seconds, what the timeline follows)
   // timeMultiplier = apiTime / videoTime (for converting video ranges to real deductions)
-  // For YouTube, 1 video second = 1 real second. For timelapse types, 1 video second ≈ 60 real seconds.
+  // For YouTube, the multiplier is controlled by the reviewer (stretch_multiplier). For timelapse types, 1 video second ≈ 60 real seconds.
   const apiTime = recording.duration
-  const timeMultiplier = videoDuration && videoDuration > 0 ? apiTime / videoDuration : isYouTube ? 1 : 60
+  const timeMultiplier = videoDuration && videoDuration > 0 ? apiTime / videoDuration : isYouTube ? multiplier : 60
   const videoRealTime = videoDuration ? videoDuration * (isYouTube ? 1 : 60) : apiTime
   const hasTimeMismatch = videoDuration !== null && apiTime > 0 && Math.abs(apiTime - videoRealTime) / apiTime > 0.1
 
@@ -1124,6 +1130,36 @@ function RecordingBlock({
             {inactivePct.toFixed(0)}% inactive
           </Badge>
         )}
+        {isYouTube && !readOnly && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-muted-foreground">×</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    step={1}
+                    value={multiplier}
+                    onChange={(e) => {
+                      const v = Number(e.target.value)
+                      if (v >= 1) onStretchChange(v)
+                    }}
+                    className="w-14 h-6 rounded border border-input bg-background px-1.5 text-xs"
+                    title="Stretch multiplier"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>
+                  Stretch multiplier: 1 video second = {multiplier} real second{multiplier !== 1 ? 's' : ''}
+                </p>
+                <p className="text-muted-foreground text-xs">Set to 60 for a timelapse uploaded to YouTube</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         <span className="flex-1" />
         <span className="text-muted-foreground">
           {formatDuration(apiTime)}
@@ -1179,6 +1215,7 @@ function RecordingBlock({
         <SegmentEditor
           recording={{ ...recording, duration: timelineDuration }}
           segments={segments}
+          multiplier={multiplier}
           onAdd={onSegmentAdd}
           onRemove={onSegmentRemove}
           currentTime={currentTime}
@@ -1239,6 +1276,7 @@ const EntrySection = memo(
     onSegmentAdd,
     onSegmentRemove,
     onSave,
+    onStretchChange,
     savingRecording,
   }: {
     entry: ReviewJournalEntry
@@ -1252,6 +1290,7 @@ const EntrySection = memo(
     onSegmentAdd: (recordingId: number, seg: TimeAuditSegment) => void
     onSegmentRemove: (recordingId: number, index: number) => void
     onSave: (recordingId: number) => void
+    onStretchChange: (recordingId: number, multiplier: number) => void
     savingRecording: number | null
   }) {
     const allSaved =
@@ -1263,11 +1302,17 @@ const EntrySection = memo(
       })
 
     const entryApprovedSeconds = useMemo(() => {
-      let total = entry.total_duration
+      // Recompute base: replace each YouTube recording's duration with duration * stretch_multiplier
+      let total = 0
+      for (const rec of entry.recordings) {
+        const recData = annotations.recordings?.[String(rec.id)]
+        const multiplier = rec.type === 'YouTubeVideo' ? (recData?.stretch_multiplier ?? 1) : 1
+        total += rec.duration * multiplier
+      }
       for (const rec of entry.recordings) {
         const recData = annotations.recordings?.[String(rec.id)]
         if (!recData?.segments) continue
-        const multiplier = rec.type === 'YouTubeVideo' ? 1 : 60
+        const multiplier = rec.type === 'YouTubeVideo' ? (recData.stretch_multiplier ?? 1) : 60
         for (const seg of recData.segments) {
           const videoRange = seg.end_seconds - seg.start_seconds
           const realRange = videoRange * multiplier
@@ -1349,11 +1394,13 @@ const EntrySection = memo(
                     recording={rec}
                     description={recAnnotation?.description ?? ''}
                     segments={recAnnotation?.segments ?? []}
+                    multiplier={rec.type === 'YouTubeVideo' ? (recAnnotation?.stretch_multiplier ?? 1) : 60}
                     saved={savedRecordings.has(recId)}
                     readOnly={readOnly}
                     onDescriptionChange={(d) => onDescriptionChange(rec.id, d)}
                     onSegmentAdd={(seg) => onSegmentAdd(rec.id, seg)}
                     onSegmentRemove={(i) => onSegmentRemove(rec.id, i)}
+                    onStretchChange={(m) => onStretchChange(rec.id, m)}
                     onSave={() => onSave(rec.id)}
                     saving={savingRecording === rec.id}
                   />
@@ -1539,6 +1586,24 @@ export default function TimeAuditsShow({
     })
   }, [])
 
+  const handleStretchChange = useCallback((recordingId: number, newMultiplier: number) => {
+    setAnnotations((prev) => ({
+      ...prev,
+      recordings: {
+        ...prev.recordings,
+        [String(recordingId)]: {
+          ...prev.recordings?.[String(recordingId)],
+          stretch_multiplier: newMultiplier,
+        },
+      },
+    }))
+    setSavedRecordings((prev) => {
+      const next = new Set(prev)
+      next.delete(String(recordingId))
+      return next
+    })
+  }, [])
+
   const handleSegmentAdd = useCallback((recordingId: number, seg: TimeAuditSegment) => {
     setAnnotations((prev) => {
       const recId = String(recordingId)
@@ -1628,14 +1693,20 @@ export default function TimeAuditsShow({
     let total = 0
     for (const entry of new_entries) {
       if (!entryReviewedCheck(entry)) continue
-      let entryTime = entry.total_duration
+      // Recompute base: replace each YouTube recording's duration with duration * stretch_multiplier
+      let entryTime = 0
+      for (const rec of entry.recordings) {
+        const recData = annotations.recordings?.[String(rec.id)]
+        const baseMultiplier = rec.type === 'YouTubeVideo' ? (recData?.stretch_multiplier ?? 1) : 1
+        entryTime += rec.duration * baseMultiplier
+      }
       const recs = annotations.recordings
       if (recs) {
         for (const rec of entry.recordings) {
-          const multiplier = rec.type === 'YouTubeVideo' ? 1 : 60
-          const data = recs[String(rec.id)]
-          if (!data?.segments) continue
-          for (const seg of data.segments) {
+          const recData = recs[String(rec.id)]
+          const multiplier = rec.type === 'YouTubeVideo' ? (recData?.stretch_multiplier ?? 1) : 60
+          if (!recData?.segments) continue
+          for (const seg of recData.segments) {
             const videoRange = seg.end_seconds - seg.start_seconds
             const realRange = videoRange * multiplier
             if (seg.type === 'removed') {
@@ -1716,6 +1787,7 @@ export default function TimeAuditsShow({
             onSegmentAdd={handleSegmentAdd}
             onSegmentRemove={handleSegmentRemove}
             onSave={handleSaveRecording}
+            onStretchChange={handleStretchChange}
             savingRecording={savingRecording}
           />
         ))}

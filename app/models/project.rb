@@ -112,7 +112,7 @@ class Project < ApplicationRecord
     youtube = YouTubeVideo
       .joins(recording: :journal_entry)
       .where(journal_entries: { project_id: id, discarded_at: nil })
-      .sum(:duration_seconds).to_i
+      .sum(Arel.sql("duration_seconds * stretch_multiplier")).to_i
 
     lookout = LookoutTimelapse
       .joins(recording: :journal_entry)
@@ -130,7 +130,7 @@ class Project < ApplicationRecord
         COALESCE(SUM(CASE r.recordable_type
           WHEN 'LapseTimelapse' THEN lt.duration
           WHEN 'LookoutTimelapse' THEN lot.duration
-          WHEN 'YouTubeVideo' THEN yt.duration_seconds
+          WHEN 'YouTubeVideo' THEN yt.duration_seconds * yt.stretch_multiplier
           ELSE 0 END), 0) AS total
       FROM journal_entries je
       JOIN recordings r ON r.journal_entry_id = je.id
