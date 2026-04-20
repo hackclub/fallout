@@ -209,7 +209,13 @@ class ProjectsController < ApplicationController
       created_at_iso: journal_entry.created_at.iso8601,
       author_display_name: journal_entry.user.display_name,
       author_avatar: journal_entry.user.avatar,
-      time_logged: journal_entry.recordings.sum { |r| r.recordable.respond_to?(:duration_seconds) ? r.recordable.duration_seconds.to_i : r.recordable.duration.to_i },
+      time_logged: journal_entry.recordings.sum { |r|
+        if r.recordable.is_a?(YouTubeVideo)
+          r.recordable.duration_seconds.to_i * (r.recordable.stretch_multiplier || 1)
+        else
+          r.recordable.respond_to?(:duration_seconds) ? r.recordable.duration_seconds.to_i : r.recordable.duration.to_i
+        end
+      },
       collaborators: journal_entry.collaborator_users.map { |u| { display_name: u.display_name, avatar: u.avatar } }
     }
   end

@@ -31,7 +31,7 @@ class StreakService
     journal_ids = JournalEntry.kept.where(user: user, created_at: day_start..day_end).select(:id)
 
     lapse = LapseTimelapse.joins(:recording).where(recordings: { journal_entry_id: journal_ids }).sum(:duration).to_i
-    youtube = YouTubeVideo.joins(:recording).where(recordings: { journal_entry_id: journal_ids }).sum(:duration_seconds).to_i
+    youtube = YouTubeVideo.joins(:recording).where(recordings: { journal_entry_id: journal_ids }).sum(Arel.sql("duration_seconds * stretch_multiplier")).to_i
     lookout = LookoutTimelapse.joins(:recording).where(recordings: { journal_entry_id: journal_ids }).sum(:duration).to_i
 
     lapse + youtube + lookout

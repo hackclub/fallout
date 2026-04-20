@@ -203,10 +203,12 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       rec_data = recording_annotations[rec_id] || {}
       duration = recording_duration(r)
       segments = rec_data["segments"] || []
+      # YouTube stretch_multiplier lets reviewers treat a YT video as a timelapse (e.g. ×60)
+      multiplier = r.recordable.is_a?(YouTubeVideo) ? (rec_data["stretch_multiplier"]&.to_f || 1.0) : 60.0
 
       removed_seconds = segments.sum do |seg|
         video_range = seg["end_seconds"].to_f - seg["start_seconds"].to_f
-        real_range = video_range * 60
+        real_range = video_range * multiplier
         case seg["type"]
         when "removed" then real_range
         when "deflated" then real_range * (seg["deflated_percent"].to_f / 100)
@@ -243,7 +245,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   def recording_duration(recording)
     case recording.recordable
     when LookoutTimelapse, LapseTimelapse then recording.recordable.duration.to_i
-    when YouTubeVideo then recording.recordable.duration_seconds.to_i
+    when YouTubeVideo then recording.recordable.duration_seconds.to_i * (recording.recordable.stretch_multiplier || 1)
     else 0
     end
   end

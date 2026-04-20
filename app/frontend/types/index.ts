@@ -339,6 +339,7 @@ export interface TimeAuditAnnotations {
     {
       description?: string
       segments?: TimeAuditSegment[]
+      stretch_multiplier?: number
     }
   >
 }
