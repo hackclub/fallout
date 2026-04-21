@@ -31,13 +31,12 @@ class SendSoupCampaignJob < ApplicationJob
     slack_ids = collect_slack_ids(campaign)
 
     slack_ids.each do |slack_id, display_name|
-      next if SoupCampaignRecipient.exists?(soup_campaign_id: campaign.id, slack_id: slack_id)
-
-      campaign.soup_campaign_recipients.create!(
-        slack_id: slack_id,
-        display_name: display_name,
-        status: :pending
-      )
+      campaign.soup_campaign_recipients.find_or_create_by!(slack_id: slack_id) do |r|
+        r.display_name = display_name
+        r.status = :pending
+      end
+    rescue ActiveRecord::RecordNotUnique
+      # Concurrent job already created this recipient — safe to skip
     end
   end
 

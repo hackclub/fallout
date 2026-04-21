@@ -106,6 +106,11 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     campaign = SoupCampaign.find(params[:id])
     authorize campaign
 
+    unless campaign.draft?
+      redirect_to admin_soup_campaign_path(campaign), alert: "Campaign has already been sent or is currently sending."
+      return
+    end
+
     SendSoupCampaignJob.perform_later(campaign.id)
     redirect_to admin_soup_campaign_path(campaign), notice: "Campaign is now sending!"
   end
