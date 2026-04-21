@@ -40,7 +40,7 @@ export default function AuditLog({ entries }: { entries: AuditLogEntry[] }) {
   return (
     <div>
       <h2 className="text-lg font-semibold tracking-tight mb-4">Audit Log</h2>
-      <Card className="py-0">
+      <Card className="py-0 max-h-140 overflow-y-auto">
         <div className="divide-y divide-border">
           {entries.map((entry) => (
             <div key={entry.id} className="px-4 py-3">
