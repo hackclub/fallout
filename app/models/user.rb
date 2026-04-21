@@ -359,8 +359,38 @@ class User < ApplicationRecord
 
   def self.airtable_sync_preload(records)
     user_ids = records.map(&:id)
+
+    first_project_created_at = {}
+    hours_approved = {}
+    Project.kept.left_joins(:ships).where(user_id: user_ids).group(:user_id).pluck(
+      :user_id,
+      Arel.sql("MIN(projects.created_at)"),
+      Arel.sql("COALESCE(SUM(ships.approved_seconds), 0)")
+    ).each do |uid, first_created, approved_secs|
+      first_project_created_at[uid] = first_created
+      hours_approved[uid] = approved_secs.to_f / 3600.0
+    end
+
+    hours_logged = Recording
+      .joins(journal_entry: :project)
+      .joins("LEFT JOIN lapse_timelapses ON recordings.recordable_type = 'LapseTimelapse' AND lapse_timelapses.id = recordings.recordable_id")
+      .joins("LEFT JOIN you_tube_videos ON recordings.recordable_type = 'YouTubeVideo' AND you_tube_videos.id = recordings.recordable_id")
+      .joins("LEFT JOIN lookout_timelapses ON recordings.recordable_type = 'LookoutTimelapse' AND lookout_timelapses.id = recordings.recordable_id")
+      .where(recordings: { user_id: user_ids }, journal_entries: { discarded_at: nil }, projects: { discarded_at: nil })
+      .group("recordings.user_id")
+      .sum(Arel.sql(<<~SQL.squish))
+        CASE recordings.recordable_type
+          WHEN 'LapseTimelapse' THEN lapse_timelapses.duration
+          WHEN 'YouTubeVideo' THEN you_tube_videos.duration_seconds
+          WHEN 'LookoutTimelapse' THEN lookout_timelapses.duration
+        END
+      SQL
+      .transform_values { |s| s.to_f / 3600.0 }
+
     {
-      first_project_created_at: Project.kept.where(user_id: user_ids).group(:user_id).minimum(:created_at)
+      first_project_created_at: first_project_created_at,
+      hours_logged: hours_logged,
+      hours_approved: hours_approved
     }
   end
 
@@ -378,7 +408,9 @@ class User < ApplicationRecord
       },
       "First Project Created At" => ->(u, pre) { pre[:first_project_created_at][u.id]&.iso8601 },
       "Created At" => ->(u) { u.created_at&.iso8601 },
-      "Email Verified" => ->(u) { !u.trial? }
+      "Email Verified" => ->(u) { !u.trial? },
+      "Hours Logged" => ->(u, pre) { (pre[:hours_logged][u.id] || 0).round(2) },
+      "Hours Approved" => ->(u, pre) { (pre[:hours_approved][u.id] || 0).round(2) }
     }
   end
 
