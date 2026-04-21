@@ -129,6 +129,13 @@ export interface JournalEntryCard {
   author_avatar: string
   time_logged: number
   collaborators: { display_name: string; avatar: string }[]
+  can_switch_project: boolean
+  can_delete: boolean
+}
+
+export interface JournalSwitchableProject {
+  id: number
+  name: string
 }
 
 export interface ShipEvent {
