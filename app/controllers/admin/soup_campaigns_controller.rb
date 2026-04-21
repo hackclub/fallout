@@ -175,12 +175,14 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
   end
 
   def build_test_blocks(campaign, unsubscribe_url)
+    display_name = params[:slack_id].to_s.strip.split(/[_-]/).first&.upcase || "there"
+
     blocks = []
 
-    blocks << { type: "section", text: { type: "mrkdwn", text: "[TEST] #{campaign.body}" } }
+    blocks << { type: "section", text: { type: "mrkdwn", text: "[TEST] #{campaign.body.gsub("{name}", display_name)}" } }
 
     if campaign.footer.present?
-      blocks << { type: "section", text: { type: "mrkdwn", text: campaign.footer } }
+      blocks << { type: "section", text: { type: "mrkdwn", text: campaign.footer.gsub("{name}", display_name) } }
     end
 
     if campaign.image_url.present?
