@@ -122,15 +122,18 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     slack_id = params[:slack_id].to_s.strip
     return render json: { error: "slack_id is required" }, status: :unprocessable_entity if slack_id.blank?
 
-    # Build a one-off recipient for the test (not persisted)
-    message = build_test_message(campaign, slack_id)
+    unsubscribe_url = soup_campaign_unsubscribe_url(
+      token: "test-token",
+      host: ENV.fetch("APP_HOST", "fallout.hackclub.com")
+    )
 
     client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
     client.chat_postMessage(
       channel: slack_id,
-      text: message,
+      text: "[TEST] #{campaign.body}",
       username: "Soup",
-      icon_url: "https://avatars.slack-edge.com/2026-03-03/10620134255189_994e10cd91f0fc88ad9c_512.jpg"
+      icon_url: "https://avatars.slack-edge.com/2026-03-03/10620134255189_994e10cd91f0fc88ad9c_512.jpg",
+      blocks: build_test_blocks(campaign, unsubscribe_url).to_json
     )
 
     render json: { ok: true }
@@ -171,16 +174,29 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     params.expect(soup_campaign: [ :name, :body, :footer, :unsubscribe_label, :image_url ])
   end
 
-  def build_test_message(campaign, _slack_id)
-    unsubscribe_url = soup_campaign_unsubscribe_url(
-      token: "test-token",
-      host: ENV.fetch("APP_HOST", "fallout.hackclub.com")
-    )
+  def build_test_blocks(campaign, unsubscribe_url)
+    blocks = []
 
-    parts = [ "[TEST] #{campaign.body}" ]
-    parts << campaign.footer if campaign.footer.present?
-    parts << "_<#{unsubscribe_url}|Unsubscribe from Soup campaign messages>_"
-    parts.join("\n\n")
+    blocks << { type: "section", text: { type: "mrkdwn", text: "[TEST] #{campaign.body}" } }
+
+    if campaign.footer.present?
+      blocks << { type: "section", text: { type: "mrkdwn", text: campaign.footer } }
+    end
+
+    if campaign.image_url.present?
+      blocks << { type: "image", image_url: campaign.image_url, alt_text: campaign.name }
+    end
+
+    blocks << { type: "divider" }
+
+    blocks << {
+      type: "context",
+      elements: [
+        { type: "mrkdwn", text: "#{campaign.unsubscribe_label} · <#{unsubscribe_url}|Unsubscribe>" }
+      ]
+    }
+
+    blocks
   end
 
   def serialize_campaign(campaign)
