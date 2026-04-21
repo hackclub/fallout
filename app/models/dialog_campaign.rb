@@ -26,6 +26,7 @@ class DialogCampaign < ApplicationRecord
     streak_goal_nudge
     streak_goal_completed
     shop_intro
+    mail_intro
   ].freeze
 
   validates :key, presence: true, inclusion: { in: CAMPAIGN_KEYS }

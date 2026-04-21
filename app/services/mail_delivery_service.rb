@@ -78,6 +78,43 @@ class MailDeliveryService
     )
   end
 
+  def self.mail_intro(user)
+    first_name = user.display_name.split.first
+    MailMessage.create!(
+      summary: "Hey #{first_name}! I have VERY IMPORTANT UPDATES!",
+      content: <<~MARKDOWN,
+        **1.** Deadline to reach 60h is **NOW JUNE 20TH!!**
+
+        ---
+        ---
+
+        **2.** One random human who fills out our feedback form gets a **$25 USD Amazon Gift Card!** [forms.hackclub.com/fallout](https://forms.hackclub.com/fallout) (be truthful! answers don't affect your chances)
+
+        ---
+        
+
+        **3.** **Need & Merit-based flight grants!!** (even if you don't think you'll get it, apply! If approved, we'll reimburse you after you reach 60h) [forms.hackclub.com/flyfallout](https://forms.hackclub.com/flyfallout)
+
+        ---
+
+        **4.** #{first_name}, don't think you can complete 60 hours on time? **DM @Anson Chung or @renran sun to owe us hours after the event!!**
+
+        ---
+
+        **5.** **GET TRAVEL GRANTS EVEN IF YOU DON'T BUILD IT IRL!** 7 Koi = $5 USD Travel Grant if you're not building your project (original rate still applies if you're building your projects irl - $8.5/hour for design + build hours)
+
+        ---
+
+        _now, feed me_
+
+        — Soup
+
+        ![Soup](/chineseHeidi.gif)
+      MARKDOWN
+      user: user
+    )
+  end
+
   def self.streak_goal_completed(user, target_days)
     MailMessage.create!(
       summary: "You completed your #{target_days}-day streak goal! Set a new goal to keep going!",

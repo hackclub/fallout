@@ -27,6 +27,7 @@ type PageProps = {
   journal_entry_count: number
   critter_variants: (string | null)[]
   pending_dialog: string | null
+  mail_intro_id: number | null
 }
 
 const PATH_ENTRY_HUD_DELAY_MS = 420
@@ -115,6 +116,7 @@ export default function PathIndex() {
     journal_entry_count,
     critter_variants,
     pending_dialog,
+    mail_intro_id,
     has_unread_mail,
     features,
     auth: { user: authUser },
@@ -335,6 +337,15 @@ export default function PathIndex() {
     setPendingModal(null)
     void visitModal(modalUrl)
   }, [introFinished, pendingModal, stack.length, visitModal])
+
+  const mailIntroTriggered = useRef(false)
+  useEffect(() => {
+    if (mailIntroTriggered.current) return
+    if (!introFinished || !mail_intro_id || pendingModal || stack.length > 0 || activeDialog) return
+
+    mailIntroTriggered.current = true
+    void visitModal(`/mails/${mail_intro_id}`)
+  }, [introFinished, mail_intro_id, pendingModal, stack.length, activeDialog, visitModal])
 
   const campaignDialogTriggered = useRef(false)
   useEffect(() => {

@@ -26,7 +26,7 @@ function MailShow({ mail, is_modal }: PageProps) {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-4">
         {mail.content && (
-          <div className="prose prose-sm max-w-none text-dark-brown mb-6">
+          <div className="prose prose-sm max-w-none text-dark-brown mb-6 [&_img]:max-w-48 [&_hr]:border-light-brown [&_p]:my-1">
             <Markdown remarkPlugins={[remarkGfm]}>{mail.content}</Markdown>
           </div>
         )}

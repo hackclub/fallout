@@ -4,6 +4,8 @@ class PathController < ApplicationController
   skip_after_action :verify_policy_scoped, only: %i[index] # No scoped collection
 
   def index
+    mail_intro_id = deliver_mail_intro
+
     # Include both owned and collaborated journal entries for path progression
     owned = current_user.journal_entries.kept
     collaborated_ids = if collaborators_enabled?
@@ -26,13 +28,25 @@ class PathController < ApplicationController
       journal_entry_count: journal_entries.size,
       # Critter variant per journal entry (by creation order), nil if no critter was awarded
       critter_variants: journal_entries.map { |je| je.critters.find { |c| c.user_id == current_user.id }&.variant },
-      pending_dialog: pending_dialog_key(journal_entries)
+      pending_dialog: pending_dialog_key(journal_entries),
+      mail_intro_id: mail_intro_id
     }
   end
 
   private
 
   NUDGE_INTERVAL_DAYS = 12
+
+  def deliver_mail_intro
+    return if current_user.trial?
+
+    created = false
+    campaign = current_user.dialog_campaigns.find_or_create_by!(key: "mail_intro") { created = true }
+    return unless created
+
+    campaign.mark_seen!
+    MailDeliveryService.mail_intro(current_user).id
+  end
 
   def pending_dialog_key(journal_entries)
     return nil if current_user.trial?
