@@ -135,7 +135,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
     client.chat_postMessage(
       channel: slack_id,
-      text: "[TEST] #{campaign.body}",
+      text: "[TEST] #{campaign.body.gsub("{name}", (display_name&.split&.first || "there"))}",
       blocks: build_test_blocks(campaign, unsubscribe_url, display_name).to_json
     )
 
