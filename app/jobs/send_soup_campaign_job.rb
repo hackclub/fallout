@@ -55,7 +55,7 @@ class SendSoupCampaignJob < ApplicationJob
 
     # Fallout users with a slack_id
     User.verified.kept.where.not(slack_id: nil).find_each do |user|
-      results[user.normalized_slack_id] ||= user.display_name
+      results[user.slack_id] ||= user.display_name
     end
 
     # Members of #fallout channel who may not be registered Fallout users
