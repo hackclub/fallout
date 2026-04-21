@@ -22,11 +22,11 @@ const CHECKLIST_ITEMS = [
 
 function SubmissionLayout({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-linear-to-b from-light-blue to-blue from-20%">
-      <div className="text-center flex flex-col items-center text-dark-brown bg-lighter-blue w-full max-w-2xl border border-dark-brown mt-12 mb-18 h-[calc(100vh-11rem)]">
+    <div className="relative w-screen h-screen flex items-center justify-center bg-linear-to-b from-light-blue to-blue from-20%">
+      <div className="text-center flex flex-col items-center text-dark-brown bg-lighter-blue w-full max-w-2xl border border-dark-brown mt-12 mb-18 mx-4 p-4 md:p-0 md:h-[calc(100vh-4rem)]">
         {title && (
           <p
-            className="w-[calc(100%+7rem)] mt-8 uppercase font-outfit text-4xl font-bold text-center bg-blue text-white py-4"
+            className="w-[calc(100%+5rem)] sm:w-[calc(100%+7rem)] mt-8 uppercase font-outfit text-2xl xs:text-4xl font-bold text-center bg-blue text-white py-4 px-6 xs:px-10"
             style={{ clipPath: 'polygon(0 0, 100% 0, calc(100% - 1.5rem) 50%, 100% 100%, 0 100%, 1.5rem 50%)' }}
           >
             {title}
@@ -38,7 +38,7 @@ function SubmissionLayout({ title, children }: { title?: string; children: React
         <img
           src="/submission/decoration.webp"
           alt=""
-          className="hidden md:block lg:-mb-12 xl:-mb-24 w-full"
+          className="hidden md:block md:-mb-12 lg:-mb-24 2xl:-mb-34 w-full"
           aria-hidden="true"
         />
       </div>
@@ -51,7 +51,7 @@ function GuidelinesStep({ onContinue }: { onContinue: () => void }) {
 
   return (
     <SubmissionLayout title="Read The Guidelines">
-      <p className="max-w-98 pb-6 py-4">
+      <p className="max-w-sm pb-6 py-4">
         Please read through our{' '}
         <a href="/docs/requirements/submitting-design" className="underline uppercase" target="_blank">
           submission guidelines
@@ -60,14 +60,14 @@ function GuidelinesStep({ onContinue }: { onContinue: () => void }) {
       </p>
       <div className="my-auto flex flex-col items-center pb-20">
         <img src="/icon/project.webp" className="w-24" alt="Project Icon"></img>
-        <p className="text-4xl font-bold max-w-140 py-4">95% of rejections could have taken 5 MIN to fix</p>
+        <p className="text-2xl max-w-sm sm:text-4xl font-bold max-w-140 py-4">95% of rejections could have taken 5 MIN to fix</p>
         <Button
           onClick={confirmed ? onContinue : () => setConfirmed(true)}
-          className="bg-brown text-light-brown border-2 border-dark-brown font-bold uppercase py-2 px-6 text-2xl"
+          className="bg-brown text-light-brown border-2 border-dark-brown font-bold uppercase py-2 px-4 w-fit sm:px-6 text-xl sm:text-2xl"
         >
           {confirmed ? 'Are you sure?' : "I've read & am ready to submit!"}
         </Button>
-        <Link href="/path" className="underline">
+        <Link href="/path" className="underline mt-4">
           Nevermind! Take me back.
         </Link>
         <p className="pt-4">Our reviewers will manually check.</p>
@@ -95,8 +95,8 @@ function ChecklistStep({
 
   return (
     <SubmissionLayout title="Pre-ship Checklist">
-      <p className="max-w-98 pb-6 py-4 wrap-anywhere">
-        Check over <span className="italic">{projectName}</span> again!
+      <p className="max-w-sm pb-6 py-4 wrap-anywhere">
+        Check over <span className="italic font-bold">{projectName}</span> again!
         <br />
         We're here to help you build{' '}
         <a href="/docs/requirements/what-is-shipping" className="underline" target="_blank">
@@ -321,12 +321,12 @@ function ScanStep({
 
   return (
     <SubmissionLayout title="Pre-ship Scan">
-      <p className="max-w-98 pb-6 py-4 wrap-anywhere">
-        Scanning <span className="italic">{projectName}</span> for easy-to-miss errors.
+      <p className="max-w-sm pb-4 py-4 wrap-anywhere">
+        Scanning <span className="italic font-bold">{projectName}</span> for easy-to-miss errors.
         <br />
         This can take a few minutes!
       </p>
-      <div className="w-full px-6 text-left overflow-y-auto grow min-h-0">
+      <div className="w-full px-6 text-left overflow-y-auto h-100 md:grow mb-10 min-h-0">
         {failed.map((c) => (
           <CheckRow key={c.key} check={c} />
         ))}
@@ -358,7 +358,7 @@ function ScanStep({
         )}
       </div>
       {submitError && <p className="text-red-700 text-sm px-6 py-2">{submitError}</p>}
-      <div className="flex items-center justify-center gap-4 py-6 shrink-0">
+      <div className="flex items-center justify-center gap-4 py-6 mb-shrink-0">
         <Button
           onClick={onBack}
           className="bg-light-brown text-dark-brown border-2 border-dark-brown font-bold uppercase"
@@ -399,7 +399,7 @@ function SubmittedStep({ projectName }: { projectName: string }) {
           </svg>
         </div>
         <p className="pt-10">
-          <span className="italic">{projectName}</span> has been submitted for review!
+          <span className="italic font-bold">{projectName}</span> has been submitted for review!
         </p>
         <p className="pt-6">
           Our reviewers will manually check your project.

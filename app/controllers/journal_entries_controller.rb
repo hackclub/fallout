@@ -125,6 +125,43 @@ class JournalEntriesController < ApplicationController
     end
   end
 
+  def destroy
+    @journal_entry = JournalEntry.kept.find(params[:id])
+    authorize @journal_entry
+
+    source_project = @journal_entry.project
+    @journal_entry.discard
+
+    if modal_json_request?
+      head :no_content
+    else
+      redirect_to project_path(source_project), notice: "Journal entry deleted."
+    end
+  end
+
+  def switch_project
+    @journal_entry = JournalEntry.kept.includes(:project).find(params[:id])
+    authorize @journal_entry, :switch_project?
+
+    new_project = Project.kept.find(params[:project_id])
+    authorize JournalEntry.new(user: current_user, project: new_project), :create? # Re-check project access for the destination project
+
+    source_project = @journal_entry.project
+    if source_project.ships.approved.exists? || new_project.ships.approved.exists?
+      return render_switch_project_error("Cannot move a journal entry from or to an approved project.")
+    end
+
+    if @journal_entry.update(project: new_project)
+      if modal_json_request?
+        head :no_content
+      else
+        redirect_to project_path(source_project), notice: "Journal moved."
+      end
+    else
+      render_switch_project_error(@journal_entry.errors.full_messages.to_sentence)
+    end
+  end
+
   private
 
   def maybe_award_critter(journal_entry, user)
@@ -168,5 +205,17 @@ class JournalEntriesController < ApplicationController
         { seconds_logged: StreakService.daily_seconds_logged(user, today), threshold: StreakService::STREAK_THRESHOLD_SECONDS }
       end
     end
+  end
+
+  def render_switch_project_error(message)
+    if modal_json_request? || request.headers["X-Inertia"].present?
+      render json: { errors: { base: [ message ] } }, status: :unprocessable_entity
+    else
+      redirect_back fallback_location: projects_path, inertia: { errors: { base: [ message ] } }
+    end
+  end
+
+  def modal_json_request?
+    request.format.json? || request.headers["X-InertiaUI-Modal"].present?
   end
 end

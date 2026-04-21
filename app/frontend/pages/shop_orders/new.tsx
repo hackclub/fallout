@@ -11,7 +11,7 @@ type ShopItem = {
   price: number
   image_url: string
   currency: 'koi' | 'gold'
-  grants_streak_freeze: boolean
+  requires_shipping: boolean
 }
 
 export default function ShopOrderNew({
@@ -50,7 +50,7 @@ export default function ShopOrderNew({
   }, [])
   const phoneDigits = form.data.phone.replace(/\D/g, '')
   const phoneValid = phoneDigits.length >= 7 && phoneDigits.length <= 15
-  const shippingReady = shop_item.grants_streak_freeze || (hasAddresses && phoneValid)
+  const shippingReady = !shop_item.requires_shipping || (hasAddresses && phoneValid)
   const isInteractive = !form.processing && maxQuantity >= 1 && shippingReady
 
   function setQty(n: number) {
@@ -190,7 +190,7 @@ export default function ShopOrderNew({
             </div>
           </div>
 
-          {!shop_item.grants_streak_freeze && (
+          {shop_item.requires_shipping && (
             <div className="w-full justify-between flex flex-col sm:flex-row gap-3 mb-6">
               <div className="w-full sm:w-[50%]">
                 <p className="block font-bold text-dark-brown mb-1 text-lg">Shipping address</p>

@@ -83,12 +83,12 @@ class Ship < ApplicationRecord
 
   def new_journal_entries
     cutoff = previous_approved_ship&.created_at || Time.at(0)
-    project.journal_entries.kept.where("created_at > ?", cutoff)
+    project.journal_entries.kept.where("journal_entries.created_at > ?", cutoff)
   end
 
   def previous_journal_entries
     cutoff = previous_approved_ship&.created_at || Time.at(0)
-    project.journal_entries.kept.where("created_at <= ?", cutoff)
+    project.journal_entries.kept.where("journal_entries.created_at <= ?", cutoff)
   end
 
   def total_hours
@@ -97,7 +97,7 @@ class Ship < ApplicationRecord
         CASE recordings.recordable_type
           WHEN 'LapseTimelapse' THEN (SELECT duration FROM lapse_timelapses WHERE id = recordings.recordable_id)
           WHEN 'LookoutTimelapse' THEN (SELECT duration FROM lookout_timelapses WHERE id = recordings.recordable_id)
-          WHEN 'YouTubeVideo' THEN (SELECT duration_seconds FROM you_tube_videos WHERE id = recordings.recordable_id)
+          WHEN 'YouTubeVideo' THEN (SELECT duration_seconds * stretch_multiplier FROM you_tube_videos WHERE id = recordings.recordable_id)
           ELSE 0
         END
       SQL
@@ -132,11 +132,24 @@ class Ship < ApplicationRecord
   def sync_approved_seconds_from_ta!
     ta = time_audit_review
     return unless ta&.approved? && ta.approved_seconds.present?
+    sync_youtube_stretch_multipliers!(ta)
     return if approved_seconds == ta.approved_seconds
     update_columns(approved_seconds: ta.approved_seconds)
   end
 
   private
+
+  # Persist stretch_multiplier from TA annotations onto YouTubeVideo records so aggregation queries use correct values
+  def sync_youtube_stretch_multipliers!(ta)
+    rec_annotations = ta.annotations&.dig("recordings") || {}
+    new_journal_entries.includes(recordings: :recordable).each do |entry|
+      entry.recordings.each do |rec|
+        next unless rec.recordable.is_a?(YouTubeVideo)
+        stretch = rec_annotations.dig(rec.id.to_s, "stretch_multiplier")&.to_i || 1
+        rec.recordable.update_column(:stretch_multiplier, stretch) if rec.recordable.stretch_multiplier != stretch
+      end
+    end
+  end
 
   # Claim this cycle's journal entries — entries not locked to an approved ship get assigned to this ship.
   # Entries already assigned to an approved ship are immutable (that cycle is finalized).
@@ -219,20 +232,25 @@ class Ship < ApplicationRecord
     total = 0
     new_journal_entries.includes(recordings: :recordable).each do |entry|
       entry.recordings.each do |rec|
-        duration =
+        rec_annotations = annotations.dig("recordings", rec.id.to_s) || {}
+        # YouTube stretch_multiplier lets reviewers treat a YT video as a timelapse (e.g. ×60)
+        multiplier = rec.recordable.is_a?(YouTubeVideo) ? (rec_annotations["stretch_multiplier"]&.to_f || 1.0) : 60.0
+        raw_duration =
           case rec.recordable
           when LookoutTimelapse, LapseTimelapse then rec.recordable.duration.to_i
-          when YouTubeVideo then rec.recordable.duration_seconds.to_i
+          when YouTubeVideo                     then rec.recordable.duration_seconds.to_i
           else 0
           end
-        total += duration
-        segments = annotations.dig("recordings", rec.id.to_s, "segments") || []
+        # For YouTube, base is raw video seconds * stretch_multiplier. For timelapse, duration is already in real seconds.
+        base_duration = rec.recordable.is_a?(YouTubeVideo) ? raw_duration * multiplier : raw_duration
+        total += base_duration
+        segments = rec_annotations["segments"] || []
         segments.each do |seg|
           video_range = seg["end_seconds"].to_f - seg["start_seconds"].to_f
-          real_range = video_range * 60
+          real_range = video_range * multiplier
           case seg["type"]
-          when "removed" then total -= real_range
-          when "deflated" then total -= real_range * (seg["deflated_percent"].to_f / 100)
+          when "removed"   then total -= real_range
+          when "deflated"  then total -= real_range * (seg["deflated_percent"].to_f / 100)
           end
         end
       end

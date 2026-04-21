@@ -78,6 +78,15 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
     TimeAuditReview
   end
 
+  # Time audit frontend handles stretch_multiplier itself — keep raw video duration here to avoid double-counting
+  def recording_duration(recording)
+    case recording.recordable
+    when LookoutTimelapse, LapseTimelapse then recording.recordable.duration.to_i
+    when YouTubeVideo then recording.recordable.duration_seconds.to_i
+    else 0
+    end
+  end
+
   def review_params
     permitted = params.require(:time_audit_review).permit(:status, :feedback, :approved_seconds)
     if params.dig(:time_audit_review, :annotations)

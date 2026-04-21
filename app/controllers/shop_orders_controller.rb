@@ -37,12 +37,12 @@ class ShopOrdersController < ApplicationController
       shop_item: serialize_shop_item(@shop_item),
       koi_balance: current_user.koi,
       gold_balance: current_user.gold,
-      hca_addresses: @shop_item.grants_streak_freeze? ? [] : hca_formatted_addresses
+      hca_addresses: @shop_item.requires_shipping? ? hca_formatted_addresses : []
     }
   end
 
   def create
-    unless @shop_item.grants_streak_freeze?
+    if @shop_item.requires_shipping?
       addresses = hca_formatted_addresses
       index = params[:address_index].to_i
       address = (index >= 0 && index < addresses.length) ? addresses[index] : nil # Reject negative/out-of-bounds indices
@@ -132,6 +132,6 @@ class ShopOrdersController < ApplicationController
   end
 
   def serialize_shop_item(item)
-    { id: item.id, name: item.name, description: item.description, price: item.price, image_url: item.image_url, currency: item.currency, grants_streak_freeze: item.grants_streak_freeze? }
+    { id: item.id, name: item.name, description: item.description, price: item.price, image_url: item.image_url, currency: item.currency, requires_shipping: item.requires_shipping? }
   end
 end

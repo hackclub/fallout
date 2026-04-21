@@ -147,13 +147,19 @@ class Admin::ProjectsController < Admin::ApplicationController
 
   def recording_duration(recording)
     rec = recording.recordable
-    rec.respond_to?(:duration_seconds) ? rec.duration_seconds.to_i : rec.duration.to_i
+    if rec.is_a?(YouTubeVideo)
+      rec.duration_seconds.to_i * (rec.stretch_multiplier || 1)
+    else
+      rec.respond_to?(:duration_seconds) ? rec.duration_seconds.to_i : rec.duration.to_i
+    end
   end
 
-  def compute_removed_seconds(segments)
+  def compute_removed_seconds(segments, recording: nil, rec_data: {})
+    # YouTube stretch_multiplier lets reviewers treat a YT video as a timelapse (e.g. ×60)
+    multiplier = recording&.recordable.is_a?(YouTubeVideo) ? (rec_data["stretch_multiplier"]&.to_f || 1.0) : 60.0
     segments.sum do |seg|
       video_range = seg["end_seconds"].to_f - seg["start_seconds"].to_f
-      real_range = video_range * 60
+      real_range = video_range * multiplier
       case seg["type"]
       when "removed" then real_range
       when "deflated" then real_range * (seg["deflated_percent"].to_f / 100)
@@ -166,7 +172,7 @@ class Admin::ProjectsController < Admin::ApplicationController
     duration = recording_duration(recording)
     rec_data = rec_annotations[recording.id.to_s] || {}
     segments = rec_data["segments"] || []
-    removed = segments.any? ? compute_removed_seconds(segments) : 0
+    removed = segments.any? ? compute_removed_seconds(segments, recording: recording, rec_data: rec_data) : 0
     {
       id: recording.id,
       type: recording.recordable_type,

@@ -17,9 +17,15 @@ class JournalEntryPolicy < ApplicationPolicy
     record.project&.user == user || (collaborators_enabled? && record.project&.owner_or_collaborator?(user)) # Collaborator edit access is flag-gated
   end
 
+  def switch_project?
+    return false if record.ship_id.present? # Shipped entries are locked to preserve submission history
+    update?
+  end
+
   def destroy?
     return true if admin?
     return false unless owner?
+    return false if record.project&.ships&.approved&.exists? # Preserve submission history on approved projects
     record.project&.user == user || (collaborators_enabled? && record.project&.owner_or_collaborator?(user)) # Collaborator delete access is flag-gated
   end
 

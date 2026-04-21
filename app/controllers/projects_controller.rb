@@ -43,6 +43,7 @@ class ProjectsController < ApplicationController
     render inertia: {
       project: serialize_project_detail(@project),
       journal_entries: journal_entries.map { |je| serialize_journal_entry_card(je) },
+      switchable_projects_for_journal: switchable_projects_for_journal,
       collaborators: collab_enabled ? @project.collaborators.includes(:user).map { |c|
         { id: c.id, user_id: c.user.id, display_name: c.user.display_name, avatar: c.user.avatar }
       } : [],
@@ -209,8 +210,35 @@ class ProjectsController < ApplicationController
       created_at_iso: journal_entry.created_at.iso8601,
       author_display_name: journal_entry.user.display_name,
       author_avatar: journal_entry.user.avatar,
-      time_logged: journal_entry.recordings.sum { |r| r.recordable.respond_to?(:duration_seconds) ? r.recordable.duration_seconds.to_i : r.recordable.duration.to_i },
-      collaborators: journal_entry.collaborator_users.map { |u| { display_name: u.display_name, avatar: u.avatar } }
+      time_logged: journal_entry.recordings.sum { |r|
+        if r.recordable.is_a?(YouTubeVideo)
+          r.recordable.duration_seconds.to_i * (r.recordable.stretch_multiplier || 1)
+        else
+          r.recordable.respond_to?(:duration_seconds) ? r.recordable.duration_seconds.to_i : r.recordable.duration.to_i
+        end
+      },
+      collaborators: journal_entry.collaborator_users.map { |u| { display_name: u.display_name, avatar: u.avatar } },
+      can_switch_project: policy(journal_entry).switch_project?,
+      can_delete: policy(journal_entry).destroy?
     }
+  end
+
+  def switchable_projects_for_journal
+    scope = Project.kept.where(user: current_user)
+    if collaborators_enabled?
+      collaborated_ids = Collaborator.kept.where(user: current_user, collaboratable_type: "Project").select(:collaboratable_id)
+      scope = scope.or(Project.kept.where(id: collaborated_ids))
+    end
+
+    unshipped_ids = Project.kept
+      .where(id: scope)
+      .where.not(id: Ship.approved.select(:project_id))
+      .pluck(:id)
+      .to_set
+
+    scope.select { |project|
+      next false unless unshipped_ids.include?(project.id)
+      JournalEntryPolicy.new(current_user, project.journal_entries.build(user: current_user)).create?
+    }.map { |project| { id: project.id, name: project.name } }
   end
 end

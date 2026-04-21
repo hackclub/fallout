@@ -187,6 +187,7 @@ Rails.application.routes.draw do
   constraints Constraints::StaffConstraint.new do
     namespace :admin do
       get "/" => "dashboard#index", as: :root
+      get "other_stats" => "other_stats#index" # Unlisted stats page for internal use
 
       # Per-type review queues must be defined before the catch-all ships resource
       namespace :reviews do
@@ -318,6 +319,8 @@ Rails.application.routes.draw do
 
   # Top-level journal entry point — redirects to project-scoped route or shows project selection
   get "journal_entries/new" => "journal_entries#new", as: :new_journal_entry
+  patch "journal_entries/:id/switch_project" => "journal_entries#switch_project", as: :switch_project_journal_entry
+  delete "journal_entries/:id" => "journal_entries#destroy", as: :journal_entry
   post "journal_entries/preview" => "journal_entries#preview", as: :preview_journal_entry
   post "you_tube_videos/lookup" => "you_tube_videos#lookup", as: :lookup_you_tube_video
   resources :lookout_sessions, only: %i[new] do
@@ -344,6 +347,7 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       resources :projects, only: [ :index, :show ]
+      resources :users, only: [ :index, :show ], param: :id 
     end
   end
 end

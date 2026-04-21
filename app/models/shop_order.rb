@@ -35,8 +35,8 @@ class ShopOrder < ApplicationRecord
 
   validates :frozen_price, presence: true, numericality: { greater_than: 0 }
   validates :quantity, presence: true, numericality: { greater_than: 0, only_integer: true }
-  validates :address, presence: true, if: -> { shop_item && !shop_item.grants_streak_freeze? }
-  validates :phone, presence: true, if: -> { shop_item && !shop_item.grants_streak_freeze? }
+  validates :address, presence: true, if: -> { shop_item&.requires_shipping? }
+  validates :phone, presence: true, if: -> { shop_item&.requires_shipping? }
   validate :phone_digit_count
   validate :user_can_afford, on: :create
 
@@ -69,7 +69,7 @@ class ShopOrder < ApplicationRecord
   end
 
   def phone_digit_count
-    return unless phone && shop_item && !shop_item.grants_streak_freeze?
+    return unless phone && shop_item&.requires_shipping?
     errors.add(:phone, "must be a valid phone number") unless phone.gsub(/\D/, "").length.between?(7, 15)
   end
 

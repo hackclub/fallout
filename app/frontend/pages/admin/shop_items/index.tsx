@@ -17,6 +17,7 @@ type ShopItem = {
   featured: boolean
   currency: 'koi' | 'gold' | 'hours'
   grants_streak_freeze: boolean
+  requires_shipping: boolean
 }
 
 type RowState = Omit<ShopItem, 'id'>
@@ -30,6 +31,7 @@ const BLANK_ROW: RowState = {
   featured: false,
   currency: 'koi',
   grants_streak_freeze: false,
+  requires_shipping: true,
 }
 
 function itemToRow(item: ShopItem): RowState {
@@ -42,6 +44,7 @@ function itemToRow(item: ShopItem): RowState {
     featured: item.featured,
     currency: item.currency,
     grants_streak_freeze: item.grants_streak_freeze,
+    requires_shipping: item.requires_shipping,
   }
 }
 
@@ -118,6 +121,14 @@ function EditableRow({
           type="checkbox"
           checked={!!row.grants_streak_freeze}
           onChange={(e) => onChange('grants_streak_freeze', e.target.checked)}
+          className="w-4 h-4 cursor-pointer"
+        />
+      </TableCell>
+      <TableCell className="text-center">
+        <input
+          type="checkbox"
+          checked={!!row.requires_shipping}
+          onChange={(e) => onChange('requires_shipping', e.target.checked)}
           className="w-4 h-4 cursor-pointer"
         />
       </TableCell>
@@ -309,6 +320,7 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
               <TableHead className="whitespace-nowrap">Status</TableHead>
               <TableHead className="whitespace-nowrap">Featured</TableHead>
               <TableHead className="whitespace-nowrap">Streak Freeze</TableHead>
+              <TableHead className="whitespace-nowrap">Needs Shipping</TableHead>
               <TableHead className="whitespace-nowrap">Currency</TableHead>
               <TableHead className="min-w-36">Name</TableHead>
               <TableHead className="min-w-16">Price</TableHead>
@@ -348,7 +360,7 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
             )}
             {shop_items.length === 0 && !newRow && (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                   No shop items yet.
                 </TableCell>
               </TableRow>
