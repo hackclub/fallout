@@ -6,19 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/admin/ui/
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/admin/ui/chart'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 
-interface ReviewerStat {
+interface ReviewCountStat {
   id: number
   display_name: string
   avatar: string | null
   review_count: number
+}
+
+interface TimeAuditedStat {
+  id: number
+  display_name: string
+  avatar: string | null
   total_approved_seconds: number
 }
 
 interface PeriodStats {
-  reviewers: ReviewerStat[]
-  top_reviewer: ReviewerStat | null
-  total_reviews: number
-  total_approved_seconds: number
+  reviewers: ReviewCountStat[]
+  time_audited: TimeAuditedStat[]
 }
 
 interface BacklogPoint {
@@ -42,36 +46,30 @@ function formatDuration(seconds: number): string {
   return `${m}m`
 }
 
-type SortKey = 'review_count' | 'total_approved_seconds'
+interface RowItem {
+  id: number
+  display_name: string
+  avatar: string | null
+  value: number
+  label: string
+}
 
-function RankRow({ reviewer, rank, metric }: { reviewer: ReviewerStat; rank: number; metric: SortKey }) {
-  const value = metric === 'review_count' ? `${reviewer.review_count}` : formatDuration(reviewer.total_approved_seconds)
-
+function RankRow({ item, rank }: { item: RowItem; rank: number }) {
   return (
     <div className="flex items-center gap-3 py-2 border-b last:border-0">
       <div className="w-6 text-center text-sm font-bold text-muted-foreground shrink-0">{rank}</div>
-      {reviewer.avatar ? (
-        <img src={reviewer.avatar} className="size-7 rounded-full shrink-0" alt="" />
+      {item.avatar ? (
+        <img src={item.avatar} className="size-7 rounded-full shrink-0" alt="" />
       ) : (
         <div className="size-7 rounded-full bg-muted shrink-0" />
       )}
-      <p className="flex-1 text-sm font-medium truncate">{reviewer.display_name}</p>
-      <p className="text-sm font-semibold tabular-nums shrink-0">{value}</p>
+      <p className="flex-1 text-sm font-medium truncate">{item.display_name}</p>
+      <p className="text-sm font-semibold tabular-nums shrink-0">{item.label}</p>
     </div>
   )
 }
 
-function LeaderboardCard({
-  title,
-  metric,
-  this_week,
-  all_time,
-}: {
-  title: string
-  metric: SortKey
-  this_week: PeriodStats
-  all_time: PeriodStats
-}) {
+function LeaderboardCard({ title, this_week, all_time }: { title: string; this_week: RowItem[]; all_time: RowItem[] }) {
   const [tab, setTab] = useState<'this_week' | 'all_time'>('this_week')
   const thisWeekRef = useRef<HTMLButtonElement>(null)
   const allTimeRef = useRef<HTMLButtonElement>(null)
@@ -85,8 +83,8 @@ function LeaderboardCard({
     const btnRect = btn.getBoundingClientRect()
     setPillStyle({ left: btnRect.left - containerRect.left, width: btnRect.width })
   }, [tab])
-  const sorted = (data: PeriodStats) => [...data.reviewers].sort((a, b) => b[metric] - a[metric])
-  const rows = sorted(tab === 'this_week' ? this_week : all_time)
+
+  const rows = tab === 'this_week' ? this_week : all_time
   const direction = tab === 'this_week' ? 'slide-in-from-left-2' : 'slide-in-from-right-2'
 
   return (
@@ -123,7 +121,7 @@ function LeaderboardCard({
           {rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">{tab === 'this_week' ? 'No data this week.' : 'No data.'}</p>
           ) : (
-            rows.map((r, i) => <RankRow key={r.id} reviewer={r} rank={i + 1} metric={metric} />)
+            rows.map((r, i) => <RankRow key={r.id} item={r} rank={i + 1} />)
           )}
         </div>
       </CardContent>
@@ -138,6 +136,16 @@ const backlogChartConfig: ChartConfig = {
 export default function AdminDashboardIndex() {
   const { stats, backlog_chart } = usePage<Props>().props
 
+  const toCountRows = (data: PeriodStats): RowItem[] =>
+    data.reviewers.map((r) => ({ ...r, value: r.review_count, label: `${r.review_count}` }))
+
+  const toTimeRows = (data: PeriodStats): RowItem[] =>
+    data.time_audited.map((r) => ({
+      ...r,
+      value: r.total_approved_seconds,
+      label: formatDuration(r.total_approved_seconds),
+    }))
+
   return (
     <div className="space-y-6">
       <div>
@@ -147,15 +155,13 @@ export default function AdminDashboardIndex() {
       <div className="grid md:grid-cols-3 gap-4">
         <LeaderboardCard
           title="Reviews Completed"
-          metric="review_count"
-          this_week={stats.this_week}
-          all_time={stats.all_time}
+          this_week={toCountRows(stats.this_week)}
+          all_time={toCountRows(stats.all_time)}
         />
         <LeaderboardCard
           title="Time Audited"
-          metric="total_approved_seconds"
-          this_week={stats.this_week}
-          all_time={stats.all_time}
+          this_week={toTimeRows(stats.this_week)}
+          all_time={toTimeRows(stats.all_time)}
         />
         <Card>
           <CardHeader className="pb-2">

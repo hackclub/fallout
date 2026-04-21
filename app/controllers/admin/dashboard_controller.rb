@@ -4,16 +4,70 @@ class Admin::DashboardController < Admin::ApplicationController
 
   def index
     week_ago = 7.days.ago
-    completed = TimeAuditReview.where(status: :approved).where.not(approved_seconds: nil)
-    completed_this_week = completed.where("time_audit_reviews.updated_at >= ?", week_ago)
+    terminal = %w[approved returned rejected]
+
+    completed_ta = TimeAuditReview.where(status: :approved).where.not(approved_seconds: nil)
+    completed_ta_week = completed_ta.where("time_audit_reviews.updated_at >= ?", week_ago)
 
     render inertia: "admin/dashboard/index", props: {
       stats: {
-        all_time: reviewer_stats(completed),
-        this_week: reviewer_stats(completed_this_week)
+        all_time: {
+          reviewers: review_count_stats(terminal, since: nil),
+          **time_audited_stats(completed_ta)
+        },
+        this_week: {
+          reviewers: review_count_stats(terminal, since: week_ago),
+          **time_audited_stats(completed_ta_week)
+        }
       },
       backlog_chart: backlog_by_day
     }
+  end
+
+  private
+
+  # Counts completed reviews across all three review types per reviewer
+  def review_count_stats(terminal_statuses, since:)
+    counts = Hash.new(0)
+
+    [
+      [TimeAuditReview, "time_audit_reviews"],
+      [DesignReview, "design_reviews"],
+      [BuildReview, "build_reviews"],
+      [RequirementsCheckReview, "requirements_check_reviews"]
+    ].each do |klass, table|
+      scope = klass.where(status: terminal_statuses).where.not(reviewer_id: nil)
+      scope = scope.where("#{table}.updated_at >= ?", since) if since
+      scope.group(:reviewer_id).count.each { |id, n| counts[id] += n }
+    end
+
+    reviewer_ids = counts.keys
+    users = User.where(id: reviewer_ids).index_by(&:id)
+
+    counts.filter_map do |reviewer_id, count|
+      user = users[reviewer_id]
+      next unless user
+      { id: reviewer_id, display_name: user.display_name, avatar: user.avatar, review_count: count }
+    end.sort_by { |r| -r[:review_count] }
+  end
+
+  # Sums approved_seconds per reviewer for time audit reviews only
+  def time_audited_stats(scope)
+    rows = scope
+      .joins("INNER JOIN users ON users.id = time_audit_reviews.reviewer_id")
+      .group("users.id", "users.display_name", "users.avatar")
+      .select(
+        "users.id",
+        "users.display_name",
+        "users.avatar",
+        "SUM(time_audit_reviews.approved_seconds) AS total_approved_seconds"
+      )
+      .map do |r|
+        { id: r.id, display_name: r.display_name, avatar: r.avatar, total_approved_seconds: r.total_approved_seconds.to_i }
+      end
+      .sort_by { |r| -r[:total_approved_seconds] }
+
+    { time_audited: rows }
   end
 
   private
