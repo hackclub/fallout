@@ -7,6 +7,7 @@
 #  footer                         :text
 #  image_url                      :string
 #  name                           :string           not null
+#  notification_preview           :string
 #  scheduled_at                   :datetime
 #  sent_at                        :datetime
 #  soup_campaign_recipients_count :integer          default(0), not null

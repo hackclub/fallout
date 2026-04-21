@@ -28,7 +28,7 @@ class SendSoupCampaignMessageJob < ApplicationJob
     client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
     client.chat_postMessage(
       channel: recipient.slack_id,
-      text: interpolate(campaign.body, recipient), # Fallback text for notifications
+      text: campaign.notification_preview.presence || interpolate(campaign.body, recipient), # Fallback text for notifications/push previews
       blocks: build_blocks(campaign, unsubscribe_url, recipient).to_json
     )
 

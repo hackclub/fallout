@@ -32,6 +32,7 @@ interface Campaign {
   footer: string
   unsubscribe_label: string
   image_url: string
+  notification_preview: string
   status: string
 }
 
@@ -61,7 +62,7 @@ const SOUP_AVATAR = 'https://avatars.slack-edge.com/2026-03-03/10620134255189_99
 const DEFAULT_UNSUBSCRIBE_LABEL = 'Important program related announcement | Unsubscribe'
 const PREVIEW_NAME = 'Alex'
 const AUTOSAVE_DEBOUNCE_MS = 800
-const FIELDS = ['name', 'body', 'footer', 'unsubscribe_label', 'image_url'] as const
+const FIELDS = ['name', 'body', 'footer', 'unsubscribe_label', 'image_url', 'notification_preview'] as const
 type Field = (typeof FIELDS)[number]
 
 // ── Slack preview renderer ────────────────────────────────────────────────────
@@ -421,6 +422,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
     footer: campaign.footer ?? '',
     unsubscribe_label: campaign.unsubscribe_label,
     image_url: campaign.image_url ?? '',
+    notification_preview: campaign.notification_preview ?? '',
   })
 
   // ── Init Yjs doc + Awareness ─────────────────────────────────────────────────
@@ -443,6 +445,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
           doc.getText('footer').insert(0, campaign.footer ?? '')
           doc.getText('unsubscribe_label').insert(0, campaign.unsubscribe_label)
           doc.getText('image_url').insert(0, campaign.image_url ?? '')
+          doc.getText('notification_preview').insert(0, campaign.notification_preview ?? '')
         }
       } catch (e) {
         console.error('Failed to parse yjs_state, falling back to DB fields:', e)
@@ -451,6 +454,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
         doc.getText('footer').insert(0, campaign.footer ?? '')
         doc.getText('unsubscribe_label').insert(0, campaign.unsubscribe_label)
         doc.getText('image_url').insert(0, campaign.image_url ?? '')
+        doc.getText('notification_preview').insert(0, campaign.notification_preview ?? '')
       }
       isSyncedRef.current = true
     } else {
@@ -460,6 +464,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
       doc.getText('footer').insert(0, campaign.footer ?? '')
       doc.getText('unsubscribe_label').insert(0, campaign.unsubscribe_label)
       doc.getText('image_url').insert(0, campaign.image_url ?? '')
+      doc.getText('notification_preview').insert(0, campaign.notification_preview ?? '')
       isSyncedRef.current = true
     }
     ydocRef.current = doc
@@ -828,6 +833,22 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
               placeholderText={DEFAULT_UNSUBSCRIBE_LABEL}
               singleLine
               onFocus={() => handleFieldFocus('unsubscribe_label')}
+              onBlur={handleFieldBlur}
+            />
+          </section>
+
+          {/* Notification preview */}
+          <section>
+            <label className="text-sm font-semibold tracking-tight mb-1 block">Notification preview</label>
+            <p className="text-xs text-muted-foreground mb-3">
+              Shown as the push notification / preview text instead of the message body. Leave blank to use the body.
+            </p>
+            <CollabEditor
+              yText={ydoc.getText('notification_preview')}
+              awareness={awareness}
+              placeholderText="e.g. :siren1: IMPORTANT > READ NOW :siren1:"
+              singleLine
+              onFocus={() => handleFieldFocus('notification_preview')}
               onBlur={handleFieldBlur}
             />
           </section>

@@ -135,7 +135,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
     client.chat_postMessage(
       channel: slack_id,
-      text: "[TEST] #{campaign.body.gsub("{name}", (display_name&.split&.first || "there"))}",
+      text: "[TEST] #{campaign.notification_preview.presence || campaign.body.gsub("{name}", (display_name&.split&.first || "there"))}",
       blocks: build_test_blocks(campaign, unsubscribe_url, display_name).to_json
     )
 
@@ -174,7 +174,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
   private
 
   def campaign_params
-    params.expect(soup_campaign: [ :name, :body, :footer, :unsubscribe_label, :image_url ])
+    params.expect(soup_campaign: [ :name, :body, :footer, :unsubscribe_label, :image_url, :notification_preview ])
   end
 
   def build_test_blocks(campaign, unsubscribe_url, display_name = nil)
@@ -212,6 +212,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       footer: campaign.footer,
       unsubscribe_label: campaign.unsubscribe_label,
       image_url: campaign.image_url,
+      notification_preview: campaign.notification_preview,
       status: campaign.status,
       sent_at: campaign.sent_at&.iso8601,
       scheduled_at: campaign.scheduled_at&.iso8601,
