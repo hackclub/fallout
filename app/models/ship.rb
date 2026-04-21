@@ -83,12 +83,12 @@ class Ship < ApplicationRecord
 
   def new_journal_entries
     cutoff = previous_approved_ship&.created_at || Time.at(0)
-    project.journal_entries.kept.where("created_at > ?", cutoff)
+    project.journal_entries.kept.where("journal_entries.created_at > ?", cutoff)
   end
 
   def previous_journal_entries
     cutoff = previous_approved_ship&.created_at || Time.at(0)
-    project.journal_entries.kept.where("created_at <= ?", cutoff)
+    project.journal_entries.kept.where("journal_entries.created_at <= ?", cutoff)
   end
 
   def total_hours
