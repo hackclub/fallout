@@ -131,8 +131,6 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     client.chat_postMessage(
       channel: slack_id,
       text: "[TEST] #{campaign.body}",
-      username: "Soup",
-      icon_url: "https://avatars.slack-edge.com/2026-03-03/10620134255189_994e10cd91f0fc88ad9c_512.jpg",
       blocks: build_test_blocks(campaign, unsubscribe_url).to_json
     )
 

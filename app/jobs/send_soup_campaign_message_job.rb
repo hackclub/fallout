@@ -29,8 +29,6 @@ class SendSoupCampaignMessageJob < ApplicationJob
     client.chat_postMessage(
       channel: recipient.slack_id,
       text: interpolate(campaign.body, recipient), # Fallback text for notifications
-      username: "Soup",
-      icon_url: "https://avatars.slack-edge.com/2026-03-03/10620134255189_994e10cd91f0fc88ad9c_512.jpg",
       blocks: build_blocks(campaign, unsubscribe_url, recipient).to_json
     )
 
