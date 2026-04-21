@@ -82,6 +82,7 @@ class MailDeliveryService
     first_name = user.display_name.split.first
     MailMessage.create!(
       summary: "Hey #{first_name}! I have VERY IMPORTANT UPDATES!",
+      dismissable: false,
       content: <<~MARKDOWN,
         **1.** Deadline to reach 60h is **NOW JUNE 20TH!!**
 

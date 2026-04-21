@@ -45,7 +45,9 @@ class PathController < ApplicationController
     return unless created
 
     campaign.mark_seen!
-    MailDeliveryService.mail_intro(current_user).id
+    mail = MailDeliveryService.mail_intro(current_user)
+    current_user.mail_interactions.create!(mail_message: mail, read_at: Time.current) # Pre-read so it doesn't trigger the unread badge
+    mail.id
   end
 
   def pending_dialog_key(journal_entries)

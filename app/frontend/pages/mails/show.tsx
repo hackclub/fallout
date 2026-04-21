@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { router } from '@inertiajs/react'
-import { Modal } from '@inertiaui/modal-react'
+import { Modal, useModal } from '@inertiaui/modal-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Frame from '@/components/shared/Frame'
@@ -13,8 +13,13 @@ type PageProps = {
 }
 
 function MailShow({ mail, is_modal }: PageProps) {
+  const modal = useModal()
+
   function handleDismiss() {
-    router.post(`/mails/${mail.id}/dismiss`, {}, { preserveScroll: true })
+    router.post(`/mails/${mail.id}/dismiss`, {}, {
+      preserveScroll: true,
+      onSuccess: () => { if (is_modal) modal.close() },
+    })
   }
 
   const content = (
@@ -42,10 +47,16 @@ function MailShow({ mail, is_modal }: PageProps) {
             View
           </a>
         )}
-        {mail.dismissable && (
+        {mail.dismissable ? (
           <Button onClick={handleDismiss} className="bg-light-brown text-dark-brown">
             Dismiss
           </Button>
+        ) : (
+          is_modal && (
+            <Button onClick={() => modal.close()} className="bg-light-brown text-dark-brown">
+              Close
+            </Button>
+          )
         )}
       </div>
     </div>
