@@ -122,8 +122,13 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     slack_id = params[:slack_id].to_s.strip
     return render json: { error: "slack_id is required" }, status: :unprocessable_entity if slack_id.blank?
 
+    # Use a real recipient token if this person is already a recipient, otherwise a no-op test token
+    recipient = campaign.soup_campaign_recipients.find_by(slack_id: slack_id)
+    display_name = recipient&.display_name ||
+                   User.verified.kept.find_by(slack_id: slack_id)&.display_name
+    unsubscribe_token = recipient&.unsubscribe_token || "test-token"
     unsubscribe_url = soup_campaign_unsubscribe_url(
-      token: "test-token",
+      token: unsubscribe_token,
       host: ENV.fetch("APP_HOST", "fallout.hackclub.com")
     )
 
@@ -131,7 +136,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     client.chat_postMessage(
       channel: slack_id,
       text: "[TEST] #{campaign.body}",
-      blocks: build_test_blocks(campaign, unsubscribe_url).to_json
+      blocks: build_test_blocks(campaign, unsubscribe_url, display_name).to_json
     )
 
     render json: { ok: true }
@@ -172,15 +177,15 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     params.expect(soup_campaign: [ :name, :body, :footer, :unsubscribe_label, :image_url ])
   end
 
-  def build_test_blocks(campaign, unsubscribe_url)
-    display_name = params[:slack_id].to_s.strip.split(/[_-]/).first&.upcase || "there"
+  def build_test_blocks(campaign, unsubscribe_url, display_name = nil)
+    first_name = display_name&.split&.first || "there"
 
     blocks = []
 
-    blocks << { type: "section", text: { type: "mrkdwn", text: "[TEST] #{campaign.body.gsub("{name}", display_name)}" } }
+    blocks << { type: "section", text: { type: "mrkdwn", text: "[TEST] #{campaign.body.gsub("{name}", first_name)}" } }
 
     if campaign.footer.present?
-      blocks << { type: "section", text: { type: "mrkdwn", text: campaign.footer.gsub("{name}", display_name) } }
+      blocks << { type: "section", text: { type: "mrkdwn", text: campaign.footer.gsub("{name}", first_name) } }
     end
 
     if campaign.image_url.present?

@@ -6,6 +6,16 @@ class SendSoupCampaignJob < ApplicationJob
 
   FALLOUT_CHANNEL_ID = "C037157AL30"
 
+  # These Slack IDs are excluded from all Soup campaign sends (staff, bots, opted-out accounts)
+  BLOCKLIST = %w[
+    U04KEK4TS72 U06PR6B8D37 U082DPCGPST U07FCRNHS1J U0823F39GV8
+    U05JNJZJ0BS U09U8US2XU6 U0261EB1EG7 U08RWM5U4L9 U078DFX40A2
+    U09Q8MLTE58 U06T30DNB3L UDK5M9Y13 U07HEH4N8UV U081RE37QEB
+    U07BLJ1MBEE U07UBCSSQH3 U04QD71QWS0 U09UQ385LSG U09ULFV88KU
+    U05EZRFKRV4 U07BN55GN3D U078J6H1XL3 U093FC28A82 U06U80G86H1
+    U07ACECRYM6 U080A3QP42C U03UBRVG2MS U07DJMFAQQP U09UE480JHH
+  ].freeze
+
   def perform(campaign_id)
     campaign = SoupCampaign.find_by(id: campaign_id)
     return unless campaign
@@ -54,7 +64,7 @@ class SendSoupCampaignJob < ApplicationJob
       results[slack_id] ||= nil
     end
 
-    results
+    results.reject { |slack_id, _| BLOCKLIST.include?(slack_id) }
   end
 
   def fetch_channel_members
