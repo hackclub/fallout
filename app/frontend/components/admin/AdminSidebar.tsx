@@ -23,6 +23,7 @@ import {
   Store,
   ShoppingCart,
   Fish,
+  Soup,
 } from 'lucide-react'
 
 interface AdminStats {
@@ -124,6 +125,13 @@ function buildNavSections(): { items: NavItem[] }[] {
           label: 'Koi Transactions',
           href: '/admin/koi_transactions',
           icon: Fish,
+          statKey: null,
+          requirePermission: 'is_admin',
+        },
+        {
+          label: 'Soup Campaigns',
+          href: '/admin/soup_campaigns',
+          icon: Soup,
           statKey: null,
           requirePermission: 'is_admin',
         },

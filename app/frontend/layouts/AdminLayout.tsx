@@ -7,7 +7,7 @@ import AdminSidebar from '@/components/admin/AdminSidebar'
 import type { SharedProps } from '@/types'
 import '@/styles/admin.css'
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+export default function AdminLayout({ children, flush }: { children: ReactNode; flush?: boolean }) {
   const { auth } = usePage<SharedProps>().props
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       <div className="flex-1 min-w-0">
         <FlashMessages />
-        <main className="p-6">{children}</main>
+        <main className={flush ? undefined : 'p-6'}>{children}</main>
       </div>
     </div>
   )

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_21_150452) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_21_160513) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -653,6 +653,42 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_150452) do
     t.index ["expires_at"], name: "index_solid_queue_semaphores_on_expires_at"
     t.index ["key", "value"], name: "index_solid_queue_semaphores_on_key_and_value"
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
+  end
+
+  create_table "soup_campaign_recipients", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "display_name"
+    t.text "error_message"
+    t.datetime "sent_at"
+    t.string "slack_id", null: false
+    t.bigint "soup_campaign_id", null: false
+    t.integer "status", default: 0, null: false
+    t.string "unsubscribe_token", null: false
+    t.datetime "updated_at", null: false
+    t.index ["soup_campaign_id", "slack_id"], name: "index_soup_recipients_on_campaign_and_slack", unique: true
+    t.index ["soup_campaign_id"], name: "index_soup_campaign_recipients_on_soup_campaign_id"
+    t.index ["status"], name: "index_soup_campaign_recipients_on_status"
+    t.index ["unsubscribe_token"], name: "index_soup_campaign_recipients_on_unsubscribe_token", unique: true
+  end
+
+  create_table "soup_campaigns", force: :cascade do |t|
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.bigint "created_by_id", null: false
+    t.text "footer"
+    t.string "image_url"
+    t.string "name", null: false
+    t.datetime "scheduled_at"
+    t.datetime "sent_at"
+    t.integer "soup_campaign_recipients_count", default: 0, null: false
+    t.integer "status", default: 0, null: false
+    t.string "unsubscribe_label", default: "Important program related announcement | Unsubscribe", null: false
+    t.string "unsubscribe_token", null: false
+    t.datetime "updated_at", null: false
+    t.binary "yjs_state"
+    t.index ["created_by_id"], name: "index_soup_campaigns_on_created_by_id"
+    t.index ["status"], name: "index_soup_campaigns_on_status"
+    t.index ["unsubscribe_token"], name: "index_soup_campaigns_on_unsubscribe_token", unique: true
   end
 
   create_table "streak_days", force: :cascade do |t|

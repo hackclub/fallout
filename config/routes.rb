@@ -244,6 +244,14 @@ Rails.application.routes.draw do
           post :refetch # Re-fetch YouTube metadata for videos with missing duration
         end
       end
+      resources :soup_campaigns, only: [ :index, :show, :new, :create, :update, :edit, :destroy ] do
+        member do
+          post :send_campaign
+          post :test_send
+          post :cancel
+          post "recipients/:recipient_id/toggle_unsubscribe", action: :toggle_unsubscribe, as: :toggle_recipient_unsubscribe
+        end
+      end
     end
   end
 
@@ -329,6 +337,8 @@ Rails.application.routes.draw do
   end
 
   get "faq" => redirect("/docs/faq") # Shortcut to FAQ docs page
+  get "unsubscribe/soup/:token" => "soup_campaign_unsubscribes#show", as: :soup_campaign_unsubscribe
+  post "unsubscribe/soup/:token" => "soup_campaign_unsubscribes#create"
   get "info" => redirect("/docs")
   get "about" => redirect("/docs")
   get "docs" => "markdown#show", as: :docs
