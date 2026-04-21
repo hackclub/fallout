@@ -338,6 +338,8 @@ Rails.application.routes.draw do
   post "onboarding" => "onboarding#update"
 
   get "path" => "path#index", as: :path
+  get "bulletin_board" => "bulletin_board#index", as: :bulletin_board
+  get "bulletin_board/search" => "bulletin_board#search", as: :bulletin_board_search # JSON endpoint for debounced explore search; stays on the page instead of re-rendering via Inertia
 
   resource :streak_goal, only: [ :show, :create, :destroy ]
 

@@ -6,6 +6,7 @@
     "@types/three": "^0.184.0",
     "prettier": "^3.8.1",
     "react-scan": "^0.5.3",
+    "sass-embedded": "^1.99.0",
     "shadcn": "^4.1.2",
     "vite": "^7.3.2",
     "vite-plugin-ruby": "^5.2.1"

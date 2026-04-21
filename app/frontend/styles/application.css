@@ -184,6 +184,9 @@
 .im-modal-wrapper {
   @apply h-full! min-w-full! p-8;
 }
+.im-modal-wrapper:has(> .bulletin-board-modal-panel) {
+  @apply py-0!;
+}
 
 img {
   @apply select-none;

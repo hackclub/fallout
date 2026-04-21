@@ -1,0 +1,17 @@
+.marquee {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+}
+
+.marqueeTrack {
+  display: flex;
+  width: max-content;
+  gap: 2rem;
+  will-change: transform;
+}
+
+.marqueeCopy {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
