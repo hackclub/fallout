@@ -56,7 +56,7 @@ class StreakGoalsController < ApplicationController
 
     new_goal = current_user.create_streak_goal!(
       target_days: params[:target_days].to_i,
-      started_on: streak_start_date(current_user),
+      started_on: streak_start_date(current_user, params[:target_days].to_i),
       notify_streak_events: params.fetch(:notify_streak_events, true)
     )
 
@@ -87,9 +87,27 @@ class StreakGoalsController < ApplicationController
 
   private
 
-  # Always anchor new goals to today — backdating to the streak start caused
-  # goals to be immediately completable when set after finishing a previous goal.
-  def streak_start_date(user)
-    Time.current.in_time_zone(user.timezone).to_date
+  # Anchor the goal to the start of the user's current streak so existing streak
+  # days count toward progress. Cap the backdate to target_days - 1 days so the
+  # goal is never immediately satisfiable on creation.
+  def streak_start_date(user, target_days)
+    today = Time.current.in_time_zone(user.timezone).to_date
+    days = StreakDay.where(user: user).streak_counting.where("date <= ?", today).order(date: :desc).pluck(:date)
+    return today if days.empty?
+
+    most_recent = days.first
+    return today unless most_recent == today || most_recent == today - 1.day
+
+    expected = most_recent
+    start = most_recent
+    count = 0
+    days.each do |date|
+      break unless date == expected
+      break if count >= target_days - 1 # Never give more than target_days-1 days head start
+      start = date
+      expected -= 1.day
+      count += 1
+    end
+    start
   end
 end
