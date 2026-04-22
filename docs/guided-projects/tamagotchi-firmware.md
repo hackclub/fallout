@@ -14,7 +14,7 @@ First, install the [Arduino IDE](https://www.arduino.cc/en/software/).
 <details>
 <summary>What is Arduino IDE?</summary>
 
-Arduino IDE is used to edit sketches and upload them to boards like the [ESP32-C6](https://www.espressif.com/en/products/socs/esp32-c6) over USB.
+<p>Arduino IDE is used to edit sketches and upload them to boards like the <a href="https://www.espressif.com/en/products/socs/esp32-c6">ESP32-C6</a> over USB.</p>
 
 </details>
 
@@ -58,7 +58,7 @@ ESP32 support isn't included by default, so you need to add Espressif's board pa
 <details>
 <summary>Why this step?</summary>
 
-This URL provides Arduino with Espressif's board definitions and the tools needed to compile and upload.
+<p>This URL provides Arduino with Espressif's board definitions and the tools needed to compile and upload.</p>
 
 </details>
 
@@ -74,7 +74,7 @@ This URL provides Arduino with Espressif's board definitions and the tools neede
 <details>
 <summary>What gets installed?</summary>
 
-It installs the [RISC-V](https://en.wikipedia.org/wiki/RISC-V) cross-compiler toolchain, ESP-IDF libraries, and upload tools.
+<p>It installs the <a href="https://en.wikipedia.org/wiki/RISC-V">RISC-V</a> cross-compiler toolchain, ESP-IDF libraries, and upload tools.</p>
 
 </details>
 
@@ -86,7 +86,7 @@ It installs the [RISC-V](https://en.wikipedia.org/wiki/RISC-V) cross-compiler to
 <details>
 <summary>Why does the board selection matter?</summary>
 
-The selected board controls default pin mappings and build settings (flash size, bootloader, clock speed).
+<p>The selected board controls default pin mappings and build settings (flash size, bootloader, clock speed).</p>
 
 </details>
 
@@ -94,14 +94,16 @@ The selected board controls default pin mappings and build settings (flash size,
 
 In **Sketch > Include Library > Manage Libraries**, install:
 
-1. **Adafruit SSD1306** (by Adafruit)
-2. **Adafruit GFX Library** (by Adafruit), which will be prompted as a dependency.
+1. <b>Adafruit SSD1306</b> (by Adafruit)
+2. <b>Adafruit GFX Library</b> (by Adafruit), which will be prompted as a dependency.
 
 <details>
 <summary>What are these libraries for?</summary>
 
-- **Adafruit SSD1306**: SSD1306 OLED driver (I2C).
-- **Adafruit GFX**: drawing primitives used by the driver.
+<ul>
+<li><b>Adafruit SSD1306</b>: SSD1306 OLED driver (I2C). <br></li>
+<li><b>Adafruit GFX</b>: drawing primitives used by the driver.</li>
+</ul>
 
 </details>
 
@@ -112,7 +114,7 @@ Create a new Arduino sketch: **File > New Sketch**, then save it as `Tamagotchi.
 <details>
 <summary>What is a .ino file?</summary>
 
-Arduino treats `.ino` as C++. The IDE adds `Arduino.h` and generates `main()`, so sketches only need to implement [`setup()`](https://docs.arduino.cc/language-reference/en/structure/sketch/setup/) and [`loop()`](https://docs.arduino.cc/language-reference/en/structure/sketch/loop/).
+Arduino treats <code>.ino</code> as C++. The IDE adds <code>Arduino.h</code> and generates <code>main()</code>, so sketches only need to implement <code><a href="https://docs.arduino.cc/language-reference/en/structure/sketch/setup/">setup()</a></code> and <code><a href="https://docs.arduino.cc/language-reference/en/structure/sketch/loop/">loop()</a></code>
 
 </details>
 
@@ -152,10 +154,11 @@ Example pin mapping from my schematic (yours will differ):
 <details>
 <summary>How do I know if my buzzer is active or passive?</summary>
 
-- **Active buzzer**: has an internal oscillator. Turn it on/off with a digital signal.
-- **Passive buzzer**: requires a driven waveform. Control pitch with `tone()`.
-
-Check the datasheet or distributor listing. Active buzzers typically mention an internal oscillator; passive ones don't.
+<ul>
+<li><b>Active buzzer</b> has an internal oscillator. Turn it on/off with a digital signal. <br></li>
+<li><b>Passive buzzer</b>: requires a driven waveform. Control pitch with <code>tone()</code>.</li>
+</ul>
+<p>Check the datasheet or distributor listing. Active buzzers typically mention an internal oscillator; passive ones don't.</p>
 
 </details>
 
@@ -215,7 +218,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 <details>
 <summary>What if my buttons are on different pins?</summary>
 
-Check your KiCad schematic to see which GPIO pins your buttons are wired to. Then change `D0`, `D1`, `D2`, and `D3` to match. For example, if your left button is on pin D5, change the line to `#define BTN_LEFT D5`.
+<p>Check your KiCad schematic to see which GPIO pins your buttons are wired to. Then change <code>D0, D1, D2</code>, and <code>D3</code> to match. For example, if your left button is on pin D5, change the line to <code>#define BTN_LEFT D5</code>.</p>
 
 </details>
 
@@ -247,7 +250,7 @@ Pet pet;
 <details>
 <summary>Why global?</summary>
 
-A [global variable](https://docs.arduino.cc/language-reference/en/variables/variable-scope-qualifiers/scope/) lets `setup()`, `loop()`, and helpers share the same state.
+<p>A <a href="https://docs.arduino.cc/language-reference/en/variables/variable-scope-qualifiers/scope/">global variable</a> lets <code>setup()</code>, <code>loop()</code>, and helpers share the same state.</p>
 
 </details>
 
@@ -274,7 +277,7 @@ Screen currentScreen = SCREEN_MAIN;
 <details>
 <summary>Why use a state machine?</summary>
 
-Without it, you end up with deeply nested `if` statements that are hard to read and debug. A state machine makes the logic predictable: *"When I'm in state X and event Y happens, go to state Z."* This is the same pattern used in [real embedded systems](https://en.wikipedia.org/wiki/UML_state_machine), game engines, and protocol parsers.
+<p>Without it, you end up with deeply nested <code>if</code> statements that are hard to read and debug. A state machine makes the logic predictable: <i>"When I'm in state X and event Y happens, go to state Z."</i> This is the same pattern used in <a href="https://en.wikipedia.org/wiki/UML_state_machine">real embedded systems</a>, game engines, and protocol parsers.</p>
 
 </details>
 
@@ -320,10 +323,12 @@ void setup() {
 <details>
 <summary>What if my OLED doesn't turn on?</summary>
 
-The most common issues are:
-- **Wrong I2C address**: Some OLEDs use `0x3D` instead of `0x3C`. Try changing the address in `display.begin()`.
-- **Wiring**: Double-check that SDA, SCL, VCC (3V3), and GND are connected correctly.
-- **Library not installed**: Make sure you installed both Adafruit SSD1306 and Adafruit GFX.
+<p>The most common issues are:</p>
+<ul>
+<li><b>Wrong I2C address</b>: Some OLEDs use <code>0x3D</code> instead of <code>0x3C</code>. Try changing the address in <code>display.begin()</code>.</li>
+<li><b>Wiring</b>: Double-check that SDA, SCL, VCC (3V3), and GND are connected correctly.</li>
+<li><b>Library not installed</b>: Make sure you installed both Adafruit SSD1306 and Adafruit GFX.</li>
+</ul>
 
 </details>
 
@@ -361,7 +366,7 @@ void updatePet() {
 <details>
 <summary>What is non-blocking timing?</summary>
 
-This `millis()` pattern is fundamental to embedded programming. It's how you schedule periodic tasks without blocking the CPU. You'll see this exact pattern in [Arduino's BlinkWithoutDelay example](https://docs.arduino.cc/built-in-examples/digital/BlinkWithoutDelay/).
+<p>This <code>millis()</code> pattern is fundamental to embedded programming. It's how you schedule periodic tasks without blocking the CPU. You'll see this exact pattern in <a href="https://docs.arduino.cc/built-in-examples/digital/BlinkWithoutDelay/">Arduino's BlinkWithoutDelay example</a>.</p>
 
 </details>
 
@@ -404,7 +409,7 @@ void checkButtons() {
 <details>
 <summary>What is debouncing?</summary>
 
-When you press a button, the contacts bounce for a few milliseconds, creating rapid on/off signals. The 200ms cooldown timer filters these out so one press registers once.
+<p>When you press a button, the contacts bounce for a few milliseconds, creating rapid on/off signals. The 200ms cooldown timer filters these out so one press registers once.</p>
 
 </details>
 
@@ -462,7 +467,7 @@ void handleScreenLogic() {
 <details>
 <summary>Why does SCREEN_MAIN do nothing?</summary>
 
-`SCREEN_MAIN` only renders stats; actions happen in the other states.
+<p><code>SCREEN_MAIN</code> only renders stats; actions happen in the other states.</p>
 
 </details>
 
@@ -563,7 +568,7 @@ const unsigned char PROGMEM petSleep[] = {
 <details>
 <summary>Can I make the pet sprite bigger?</summary>
 
-Yes. Use a larger bitmap (e.g., 32x32) and update the `drawBitmap()` dimensions to match. Larger sprites use more flash and screen space.
+<p>Yes. Use a larger bitmap (e.g., 32x32) and update the <code>drawBitmap()</code> dimensions to match. Larger sprites use more flash and screen space.</p>
 
 </details>
 
@@ -632,7 +637,7 @@ void drawBar(int x, int y, int value) {
 <details>
 <summary>Why do we clear and redraw every frame?</summary>
 
-The SSD1306 uses a framebuffer. Without clearing first, old pixels remain and overlap new content. The clear → draw → display pattern is standard for frame-based rendering.
+<p>The SSD1306 uses a framebuffer. Without clearing first, old pixels remain and overlap new content. The clear → draw → display pattern is standard for frame-based rendering.</p>
 
 </details>
 
@@ -663,6 +668,6 @@ void loop() {
 <details>
 <summary>What is a game loop?</summary>
 
-This is a standard [game loop](https://gameprogrammingpatterns.com/game-loop.html) pattern (input → update → render), common in interactive programs.
+<p>This is a standard <a href="https://gameprogrammingpatterns.com/game-loop.html">game loop</a> pattern (input → update → render), common in interactive programs.</p>
 
 </details>
