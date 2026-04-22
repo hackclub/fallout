@@ -68,3 +68,8 @@ production:
     class: UserBanCheckJob
     queue: background
     schedule: every 30 minutes
+
+  hca_identity_refresh:
+    class: HcaIdentityRefreshJob
+    queue: background
+    schedule: every 10 minutes

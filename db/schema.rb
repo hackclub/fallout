@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_21_194909) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_22_155629) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -765,6 +765,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_194909) do
     t.datetime "discarded_at"
     t.string "display_name", null: false
     t.string "email", null: false
+    t.boolean "has_hca_address", default: false, null: false
     t.string "hca_id"
     t.text "hca_token"
     t.boolean "is_adult", default: false, null: false

@@ -2,12 +2,13 @@ import { Modal } from '@inertiaui/modal-react'
 import { useRef, useState, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { ArrowLeftIcon } from '@heroicons/react/20/solid'
-import { Link } from '@inertiajs/react'
+import { Link, usePage } from '@inertiajs/react'
 import Frame from '@/components/shared/Frame'
 import { gsap } from 'gsap'
 import { Flip } from 'gsap/Flip'
 import PathDialogOverlay from '@/components/path/PathDialogOverlay'
 import type { DialogScript } from '@/components/path/PathDialogOverlay'
+import type { SharedProps } from '@/types'
 
 gsap.registerPlugin(Flip)
 
@@ -39,6 +40,9 @@ export default function ShopIndex({
   user_id: number
   pending_dialog: string | null
 }) {
+  const { identity_gate } = usePage<SharedProps>().props
+  const identityBlocked = identity_gate !== null && identity_gate.state !== 'verified_with_address'
+
   const modalRef = useRef<{ close: () => void }>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const defaultPinned = shop_items.filter((i) => i.currency === 'hours').map((i) => i.id)
@@ -306,6 +310,12 @@ export default function ShopIndex({
                     <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-dark-brown px-2 py-1 text-xs text-light-brown opacity-0 transition-opacity group-hover/hours:opacity-100">
                       Claim when hours are approved
                     </span>
+                  </div>
+                ) : buyable && identityBlocked ? (
+                  <div className="mt-auto w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center cursor-not-allowed text-base px-2 text-center">
+                    {identity_gate?.state === 'verified_no_address'
+                      ? 'Add address to purchase'
+                      : 'Verify identity to purchase'}
                   </div>
                 ) : buyable ? (
                   <Link

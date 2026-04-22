@@ -21,6 +21,14 @@ export interface Features {
   shop?: boolean
 }
 
+export type IdentityGateState = 'unverified' | 'pending' | 'verified_no_address' | 'verified_with_address'
+
+export interface IdentityGate {
+  state: IdentityGateState
+  verify_url: string
+  address_url: string
+}
+
 export interface SharedProps {
   auth: { user: User | null }
   flash: FlashData
@@ -32,6 +40,7 @@ export interface SharedProps {
   has_unread_mail: boolean
   current_streak: number
   streak_freezes: number
+  identity_gate: IdentityGate | null
   errors: Record<string, string[]>
   [key: string]: unknown
 }

@@ -48,7 +48,7 @@ class Ship < ApplicationRecord
   has_many :reviewer_notes, dependent: :nullify
   has_many :project_flags, dependent: :nullify
 
-  enum :status, { pending: 0, approved: 1, returned: 2, rejected: 3 }
+  enum :status, { pending: 0, approved: 1, returned: 2, rejected: 3, awaiting_identity: 4 }
   enum :ship_type, { design: 0, build: 1 }, prefix: true
 
   serialize :frozen_hca_data, coder: JSON
@@ -65,8 +65,18 @@ class Ship < ApplicationRecord
   }
 
   after_create :claim_journal_entries! # Assign this cycle's entries to this ship (runs in same transaction)
-  after_create :create_initial_reviews! # after_create (not after_commit) so reviews are created in the same transaction — partial creation rolls back the ship
+  # Only seed reviews when the ship enters the review queue. Ships created as :awaiting_identity
+  # defer this until they're promoted to :pending (see promote_awaiting_identity_for).
+  after_create :create_initial_reviews!, if: :pending?
+  after_update_commit :create_initial_reviews!, if: :became_pending_from_awaiting?
   after_update_commit :notify_status_change, if: :saved_change_to_status?
+
+  # Called when a user becomes fully_identity_gated? — moves their held submissions into the review queue.
+  def self.promote_awaiting_identity_for(user)
+    for_user(user).awaiting_identity.find_each do |ship|
+      ship.update!(status: :pending)
+    end
+  end
 
   def review_status
     {
@@ -171,6 +181,11 @@ class Ship < ApplicationRecord
     return if new_record?
     return unless TERMINAL_STATUSES.include?(status_was)
     errors.add(:status, "cannot transition from #{status_was}")
+  end
+
+  def became_pending_from_awaiting?
+    change = saved_change_to_status
+    change && change[0] == "awaiting_identity" && change[1] == "pending"
   end
 
   def derive_status

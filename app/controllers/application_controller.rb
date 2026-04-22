@@ -62,6 +62,15 @@ class ApplicationController < ActionController::Base
     next 0 unless current_user && !current_user.trial?
     current_user.streak_freezes
   }
+  # Powers the global IdentityBanner. nil for unauth'd + trial users (no HCA account to link to).
+  inertia_share identity_gate: -> {
+    next nil unless current_user && !current_user.trial?
+    {
+      state: current_user.identity_gate_state,
+      verify_url: HcaService.verify_portal_url(return_to: request.url),
+      address_url: HcaService.address_portal_url(return_to: request.url)
+    }
+  }
 
   private
 

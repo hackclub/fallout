@@ -9,6 +9,7 @@
 #  discarded_at                :datetime
 #  display_name                :string           not null
 #  email                       :string           not null
+#  has_hca_address             :boolean          default(FALSE), not null
 #  hca_token                   :text
 #  is_adult                    :boolean          default(FALSE), not null
 #  is_banned                   :boolean          default(FALSE), not null
@@ -179,6 +180,46 @@ class User < ApplicationRecord
     true
   end
 
+  def ysws_verified?
+    verification_status == "verified"
+  end
+
+  def fully_identity_gated?
+    ysws_verified? && has_hca_address?
+  end
+
+  def identity_gate_state
+    return :verified_with_address if fully_identity_gated?
+    return :verified_no_address   if ysws_verified?
+    return :pending               if verification_status == "pending"
+
+    :unverified
+  end
+
+  # Sync cached identity fields (verification_status + has_hca_address) from an HCA identity
+  # hash we already have. Returns true if anything changed. Promotes any held ships when the
+  # user flips to fully_identity_gated?.
+  def apply_identity_cache!(identity)
+    return false if identity.blank?
+
+    new_status = identity["verification_status"].to_s
+    new_has_addr = identity["addresses"].is_a?(Array) && identity["addresses"].any?
+    return false if new_status == verification_status.to_s && new_has_addr == has_hca_address?
+
+    was_gated = fully_identity_gated?
+    update!(verification_status: new_status, has_hca_address: new_has_addr)
+    Ship.promote_awaiting_identity_for(self) if !was_gated && fully_identity_gated?
+    true
+  end
+
+  # Fetch fresh identity from HCA and sync cached fields. Used by the periodic refresh job.
+  def refresh_identity_cache!
+    return false if hca_token.blank?
+
+    identity = HcaService.identity(hca_token)
+    apply_identity_cache!(identity)
+  end
+
   def self.exchange_hca_token(code, redirect_uri)
     token_data = HcaService.exchange_code_for_token(code, redirect_uri)
 
@@ -215,6 +256,7 @@ class User < ApplicationRecord
       end
 
       user.update(hca_token: access_token, email: email)
+      user.apply_identity_cache!(identity)
       user.refresh_profile_from_slack
       return user
     end
@@ -231,7 +273,6 @@ class User < ApplicationRecord
     avatar = identity["profile_picture"].presence || "/static-assets/pfp_fallback.webp"
     timezone = "UTC"
     slack_id = identity["slack_id"] || ""
-    verification_status = identity["verification_status"] || ""
     is_adult = determine_is_adult(identity)
 
     if email.blank? || !(email =~ URI::MailTo::EMAIL_REGEXP)
@@ -251,19 +292,20 @@ class User < ApplicationRecord
       }.to_json)
     end
 
-    User.create!(
+    user = User.create!(
       email: email,
       display_name: display_name,
       avatar: avatar,
       timezone: timezone,
       slack_id: slack_id,
-      verification_status: verification_status,
       hca_token: access_token,
       hca_id: identity["id"],
       is_adult: is_adult,
       is_banned: false,
       roles: [ "user" ]
     )
+    user.apply_identity_cache!(identity)
+    user
   end
 
   def refresh_profile_from_slack

@@ -60,7 +60,9 @@ function GuidelinesStep({ onContinue }: { onContinue: () => void }) {
       </p>
       <div className="my-auto flex flex-col items-center pb-20">
         <img src="/icon/project.webp" className="w-24" alt="Project Icon"></img>
-        <p className="text-2xl max-w-sm sm:text-4xl font-bold max-w-140 py-4">95% of rejections could have taken 5 MIN to fix</p>
+        <p className="text-2xl max-w-sm sm:text-4xl font-bold max-w-140 py-4">
+          95% of rejections could have taken 5 MIN to fix
+        </p>
         <Button
           onClick={confirmed ? onContinue : () => setConfirmed(true)}
           className="bg-brown text-light-brown border-2 border-dark-brown font-bold uppercase py-2 px-4 w-fit sm:px-6 text-xl sm:text-2xl"
@@ -201,7 +203,7 @@ function ScanStep({
   runId: number | null
   onRunIdChange: (id: number) => void
   onBack: () => void
-  onContinue: () => void
+  onContinue: (opts: { awaitingIdentity: boolean }) => void
 }) {
   const [checks, setChecks] = useState<PreflightCheck[] | null>(null)
   const [overallStatus, setOverallStatus] = useState<string | null>(null)
@@ -296,7 +298,8 @@ function ScanStep({
         body: JSON.stringify({ run_id: runIdRef.current }),
       })
       if (res.ok) {
-        onContinue()
+        const data = await res.json().catch(() => ({}))
+        onContinue({ awaitingIdentity: Boolean(data?.awaiting_identity) })
       } else {
         const data = await res.json()
         setSubmitError(data.error || 'Submission failed. Please try again.')
@@ -385,7 +388,7 @@ function ScanStep({
   )
 }
 
-function SubmittedStep({ projectName }: { projectName: string }) {
+function SubmittedStep({ projectName, awaitingIdentity }: { projectName: string; awaitingIdentity: boolean }) {
   return (
     <SubmissionLayout>
       <div className="my-auto flex flex-col items-center">
@@ -401,13 +404,23 @@ function SubmittedStep({ projectName }: { projectName: string }) {
         <p className="pt-10">
           <span className="italic font-bold">{projectName}</span> has been submitted for review!
         </p>
-        <p className="pt-6">
-          Our reviewers will manually check your project.
-          <br />
-          This will take some time, so be patient.
-          <br />
-          In the meantime, you <strong>should start another project</strong>!
-        </p>
+        {awaitingIdentity ? (
+          <p className="pt-6">
+            Your submission is <strong>on hold</strong> until you verify your identity and address.
+            <br />
+            Finish up on auth.hackclub.com to move it into the review queue.
+            <br />
+            In the meantime, you <strong>should start another project</strong>!
+          </p>
+        ) : (
+          <p className="pt-6">
+            Our reviewers will manually check your project.
+            <br />
+            This will take some time, so be patient.
+            <br />
+            In the meantime, you <strong>should start another project</strong>!
+          </p>
+        )}
         <Link
           href="/path"
           className="bg-brown text-light-brown border-2 border-dark-brown font-bold uppercase mt-10 px-4 py-2"
@@ -423,6 +436,7 @@ function SubmittedStep({ projectName }: { projectName: string }) {
 export default function ShipsPreflight({ project }: { project: { id: number; name: string } }) {
   const [step, setStep] = useState<Step>('guidelines')
   const [runId, setRunId] = useState<number | null>(null)
+  const [awaitingIdentity, setAwaitingIdentity] = useState(false)
 
   return (
     <>
@@ -441,10 +455,13 @@ export default function ShipsPreflight({ project }: { project: { id: number; nam
           runId={runId}
           onRunIdChange={setRunId}
           onBack={() => setStep('checklist')}
-          onContinue={() => setStep('submitted')}
+          onContinue={({ awaitingIdentity }) => {
+            setAwaitingIdentity(awaitingIdentity)
+            setStep('submitted')
+          }}
         />
       )}
-      {step === 'submitted' && <SubmittedStep projectName={project.name} />}
+      {step === 'submitted' && <SubmittedStep projectName={project.name} awaitingIdentity={awaitingIdentity} />}
     </>
   )
 }

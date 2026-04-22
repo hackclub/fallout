@@ -9,6 +9,7 @@
 #  discarded_at                :datetime
 #  display_name                :string           not null
 #  email                       :string           not null
+#  has_hca_address             :boolean          default(FALSE), not null
 #  hca_token                   :text
 #  is_adult                    :boolean          default(FALSE), not null
 #  is_banned                   :boolean          default(FALSE), not null

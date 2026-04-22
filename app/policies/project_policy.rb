@@ -33,7 +33,7 @@ class ProjectPolicy < ApplicationPolicy
 
   def ship?
     return false if record.discarded?
-    return false if record.ships.pending.exists? # Block while a submission is already pending review
+    return false if record.ships.where(status: %i[pending awaiting_identity]).exists? # Block while a submission is queued or held for identity verification
     !user.trial? && owner? # Only verified project owners can submit for review
   end
 
