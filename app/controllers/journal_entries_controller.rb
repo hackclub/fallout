@@ -78,7 +78,7 @@ class JournalEntriesController < ApplicationController
       Array(params[:images]).each { |signed_id| @journal_entry.images.attach(signed_id) }
 
       timelapse_ids.each do |tid|
-        timelapse = current_user.lapse_timelapses.create!(lapse_timelapse_id: tid)
+        timelapse = current_user.lapse_timelapses.find_or_create_by!(lapse_timelapse_id: tid)
         timelapse.refetch_data! # Fetches from Lapse API to verify and populate cached fields
         @journal_entry.recordings.create!(recordable: timelapse, user: current_user)
       end
