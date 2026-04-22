@@ -4,6 +4,7 @@
 #
 #  id                          :bigint           not null, primary key
 #  avatar                      :string           not null
+#  ban_type                    :string
 #  device_token                :text
 #  discarded_at                :datetime
 #  display_name                :string           not null
@@ -105,9 +106,15 @@ class User < ApplicationRecord
   REVIEWER_ROLES = %w[time_auditor requirements_checker pass2_reviewer].freeze
   SLACK_WELCOME_CHANNELS = %w[C037157AL30 C0ACG0XQWGN C0ACJ290090].freeze
 
+  # Ban types in priority order (highest first). Higher-priority bans take precedence.
+  BAN_PRIORITY = %w[fallout hcb hardware age hackatime].freeze
+  # Ban types set/managed manually by humans — UserBanCheckJob will not override these
+  MANUAL_BAN_TYPES = %w[fallout hcb hardware age].freeze
+
   validates :roles, presence: true, unless: :trial?
   validate :roles_must_be_valid, unless: :trial?
   validates :is_banned, inclusion: { in: [ true, false ] }
+  validates :ban_type, inclusion: { in: BAN_PRIORITY }, allow_nil: true
 
   def has_role?(role)
     roles.include?(role.to_s)

@@ -4,6 +4,7 @@
 #
 #  id                          :bigint           not null, primary key
 #  avatar                      :string           not null
+#  ban_type                    :string
 #  device_token                :text
 #  discarded_at                :datetime
 #  display_name                :string           not null

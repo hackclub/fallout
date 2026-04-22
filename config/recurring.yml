@@ -63,3 +63,8 @@ production:
     class: ProjectInactivityJob
     queue: background
     schedule: every day at 9am
+
+  user_ban_check:
+    class: UserBanCheckJob
+    queue: background
+    schedule: every 30 minutes

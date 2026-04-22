@@ -153,6 +153,7 @@ class Admin::UsersController < Admin::ApplicationController
       projects_count: @projects_count,
       timezone: user.timezone,
       is_banned: user.is_banned,
+      ban_type: user.ban_type,
       is_discarded: user.discarded?,
       discarded_at: user.discarded_at&.strftime("%b %d, %Y"),
       created_at: user.created_at.strftime("%b %d, %Y")

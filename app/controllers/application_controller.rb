@@ -29,6 +29,7 @@ class ApplicationController < ActionController::Base
           is_admin: u.admin?,
           is_staff: u.staff?,
           is_banned: u.is_banned,
+          ban_type: u.ban_type,
           is_trial: u.trial?,
           is_onboarded: u.onboarded?
         }

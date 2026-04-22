@@ -1,3 +1,5 @@
+export type BanType = 'fallout' | 'hcb' | 'hardware' | 'age' | 'hackatime'
+
 export interface User {
   id: number
   display_name: string
@@ -7,6 +9,7 @@ export interface User {
   is_admin: boolean
   is_staff: boolean
   is_banned: boolean
+  ban_type: BanType | null
   is_trial: boolean
   is_onboarded: boolean
 }
@@ -173,6 +176,7 @@ export interface AdminUserDetail {
   projects_count: number
   timezone: string
   is_banned: boolean
+  ban_type: BanType | null
   is_discarded: boolean
   discarded_at: string | null
   created_at: string
