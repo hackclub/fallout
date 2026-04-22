@@ -209,7 +209,7 @@ class StreakService
       goal_notify = goal.notify_streak_events
       user.streak_events.create!(event_type: "goal_broken", metadata: { target_days: goal.target_days, started_on: goal.started_on.iso8601 })
       broken_target = goal.target_days
-      goal.destroy!
+      goal.discard
       if goal_notify && broken_target > 3
         MailDeliveryService.streak_goal_broken(user, broken_target)
       end

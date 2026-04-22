@@ -49,7 +49,7 @@ class StreakGoalsController < ApplicationController
     goal = current_user.streak_goal
     if goal
       authorize goal, :destroy? # Changing goal requires permission to abandon old one
-      goal.destroy!
+      goal.discard
     else
       skip_authorization
     end
@@ -71,7 +71,7 @@ class StreakGoalsController < ApplicationController
     goal = current_user.streak_goal
     if goal
       authorize goal
-      goal.destroy!
+      goal.discard
       nudge = current_user.dialog_campaigns.find_by(key: "streak_goal_nudge")
       nudge&.mark_seen!
     else
@@ -87,23 +87,9 @@ class StreakGoalsController < ApplicationController
 
   private
 
-  # Anchor the goal to the start of the user's current streak so progress
-  # reflects days already completed. Falls back to today if no streak exists.
+  # Always anchor new goals to today — backdating to the streak start caused
+  # goals to be immediately completable when set after finishing a previous goal.
   def streak_start_date(user)
-    today = Time.current.in_time_zone(user.timezone).to_date
-    days = StreakDay.where(user: user).streak_counting.where("date <= ?", today).order(date: :desc).pluck(:date)
-    return today if days.empty?
-
-    most_recent = days.first
-    return today unless most_recent == today || most_recent == today - 1.day
-
-    expected = most_recent
-    start = most_recent
-    days.each do |date|
-      break unless date == expected
-      start = date
-      expected -= 1.day
-    end
-    start
+    Time.current.in_time_zone(user.timezone).to_date
   end
 end
