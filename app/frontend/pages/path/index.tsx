@@ -418,7 +418,7 @@ export default function PathIndex() {
               rel="noopener noreferrer"
               className="text-center font-medium rounded-xs underline"
             >
-              Share your Fallout feedback — takes 2 minutes!
+              Share your Fallout feedback - random person gets $25 USD Amazon Gift Card!
             </a>
             <span
               className="cursor-pointer"
