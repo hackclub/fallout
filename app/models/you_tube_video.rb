@@ -15,6 +15,7 @@
 #  last_refreshed_at      :datetime
 #  live_broadcast_content :string
 #  published_at           :datetime
+#  stretch_multiplier     :integer          default(1), not null
 #  tags                   :text
 #  thumbnail_url          :string
 #  title                  :string

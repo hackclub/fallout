@@ -10,6 +10,7 @@
 #  image_url            :string
 #  name                 :string
 #  price                :integer
+#  requires_shipping    :boolean          default(TRUE), not null
 #  status               :string           default("available"), not null
 #  created_at           :datetime         not null
 #  updated_at           :datetime         not null
