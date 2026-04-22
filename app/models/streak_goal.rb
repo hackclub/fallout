@@ -23,11 +23,13 @@ class StreakGoal < ApplicationRecord
 
   has_paper_trail
 
+  include Discardable
+
   belongs_to :user
 
   validates :target_days, presence: true, inclusion: { in: VALID_TARGETS }
   validates :started_on, presence: true
-  validates :user_id, uniqueness: true
+  validates :user_id, uniqueness: { conditions: -> { kept } } # Partial index allows multiple discarded goals per user
 
   def progress
     StreakDay.consecutive_days_from(user, started_on)
