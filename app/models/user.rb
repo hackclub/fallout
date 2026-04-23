@@ -226,11 +226,25 @@ class User < ApplicationRecord
   end
 
   # Fetch fresh identity from HCA and sync cached fields. Used by the periodic refresh job.
+  # Raises HcaService::InvalidToken if HCA rejects our stored token (401/403); the caller
+  # is expected to handle that by clearing the user's HCA session via #clear_hca_session!.
   def refresh_identity_cache!
     return false if hca_token.blank?
 
     identity = HcaService.identity(hca_token)
     apply_identity_cache!(identity)
+  end
+
+  # Idempotent: drops the stored HCA token and resets cached identity fields so the user is
+  # treated as unverified on the next request. Invoked when HCA has told us the token is no
+  # longer valid — stops us from hammering HCA with a known-dead token. Intentionally does
+  # NOT demote any ships that were already promoted out of :awaiting_identity; that promotion
+  # is one-way by design and the next successful refresh will restore verified state.
+  def clear_hca_session!
+    return false if hca_token.blank? && verification_status.blank? && !has_hca_address?
+
+    update!(hca_token: nil, verification_status: nil, has_hca_address: false)
+    true
   end
 
   def self.exchange_hca_token(code, redirect_uri)
@@ -474,6 +488,10 @@ class User < ApplicationRecord
     return nil if hca_token.blank?
 
     @hca_identity ||= HcaService.me(hca_token)&.dig("identity")
+  rescue HcaService::InvalidToken
+    # Persistent auth failure during a web request — degrade to nil so callers like the shop
+    # address picker keep working. HcaIdentityRefreshJob handles clearing stored state.
+    nil
   end
 
   def preferred_reminder_hour

@@ -13,6 +13,14 @@ class HcaIdentityRefreshJob < ApplicationJob
 
     scope.find_each do |user|
       user.refresh_identity_cache!
+    rescue HcaService::InvalidToken
+      # HCA persistently rejected this user's stored token. Clear the session so we stop
+      # hitting HCA with a dead token on every refresh cycle; the user will re-auth via the
+      # normal HCA flow on their next visit. Deliberately does not retry.
+      user.clear_hca_session!
+      ErrorReporter.capture_message("Cleared HCA session after persistent auth failure", level: :info, contexts: {
+        hca_identity_refresh: { user_id: user.id }
+      })
     rescue *HcaService::TRANSIENT_NETWORK_ERRORS => e
       # Transient HCA upstream issue — next run will retry this user. Warn-level only.
       Rails.logger.warn("HcaIdentityRefreshJob transient HCA error for user #{user.id}: #{e.class}: #{e.message}")
