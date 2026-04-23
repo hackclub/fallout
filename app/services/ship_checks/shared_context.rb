@@ -34,7 +34,8 @@ module ShipChecks
     def file_content(path)
       data = github_api("/repos/#{github_nwo}/contents/#{path}")
       return nil unless data&.key?("content")
-      Base64.decode64(data["content"]).force_encoding("UTF-8")
+      # Scrub invalid byte sequences so downstream regex/string ops don't raise on non-UTF-8 repo files
+      Base64.decode64(data["content"]).force_encoding("UTF-8").scrub("")
     end
 
     # Vision LLM descriptions of README images, memoized for downstream checks
@@ -108,7 +109,8 @@ module ShipChecks
       return nil unless repo_meta
       data = github_api("/repos/#{github_nwo}/readme")
       return nil unless data&.key?("content")
-      Base64.decode64(data["content"]).force_encoding("UTF-8")
+      # Scrub invalid byte sequences so downstream regex/string ops don't raise on non-UTF-8 README bytes
+      Base64.decode64(data["content"]).force_encoding("UTF-8").scrub("")
     end
 
     def fetch_bom_content
@@ -117,7 +119,8 @@ module ShipChecks
       return nil unless bom_path
       data = github_api("/repos/#{github_nwo}/contents/#{bom_path}")
       return nil unless data&.key?("content")
-      Base64.decode64(data["content"]).force_encoding("UTF-8")
+      # Scrub invalid byte sequences so downstream regex/string ops don't raise on non-UTF-8 BOM bytes
+      Base64.decode64(data["content"]).force_encoding("UTF-8").scrub("")
     end
 
     def find_bom_path
