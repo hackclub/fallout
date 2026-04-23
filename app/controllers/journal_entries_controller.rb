@@ -140,7 +140,9 @@ class JournalEntriesController < ApplicationController
     authorize @journal_entry
 
     source_project = @journal_entry.project
-    @journal_entry.discard
+    unless @journal_entry.discard
+      return render_journal_entry_error("Could not delete this journal entry. Please try again.")
+    end
 
     if modal_json_request?
       head :no_content
