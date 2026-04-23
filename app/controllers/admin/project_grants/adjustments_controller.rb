@@ -30,12 +30,16 @@ class Admin::ProjectGrants::AdjustmentsController < Admin::ApplicationController
       return
     end
 
+    # `actual` and `expected` use the same framing as the stats tile and the per-card
+    # view on admin/users/show: actual is what HCB actually holds (reality), expected
+    # is what Fallout's ledger says should be there. The adjustment being previewed
+    # shifts expected (since it writes a ledger row) and leaves actual unchanged.
     render json: {
       found: true,
       user: { id: user.id, display_name: user.display_name, email: user.email },
       has_card: user.hcb_grant_cards.exists?,
-      expected_cents: ProjectFundingTopupService.expected_usd_cents(user),
-      transferred_cents: ProjectFundingTopupService.transferred_usd_cents(user)
+      actual_cents: user.hcb_grant_cards.sum(:amount_cents),
+      expected_cents: ProjectFundingTopupService.transferred_usd_cents(user)
     }
   end
 

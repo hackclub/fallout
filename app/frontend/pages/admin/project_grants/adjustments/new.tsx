@@ -11,8 +11,10 @@ type LedgerData = {
   found: boolean
   user?: { id: number; display_name: string; email: string }
   has_card?: boolean
+  // actual = what HCB actually holds across this user's grant cards
+  // expected = Fallout's ledger net (completed in-topups minus out-adjustments)
+  actual_cents?: number
   expected_cents?: number
-  transferred_cents?: number
 }
 
 function formatDollars(cents: number): string {
@@ -22,31 +24,36 @@ function formatDollars(cents: number): string {
 
 function LedgerSnapshot({
   label,
+  actual,
   expected,
-  transferred,
   highlight,
 }: {
   label: string
+  actual: number
   expected: number
-  transferred: number
   highlight?: boolean
 }) {
-  const delta = expected - transferred
+  const gap = actual - expected
+  const gapLabel =
+    gap === 0 ? 'match' : `${formatDollars(Math.abs(gap))} ${gap > 0 ? 'extra on HCB' : 'missing from HCB'}`
   return (
     <div className={`rounded-md border p-2.5 ${highlight ? 'border-primary bg-primary/5' : 'border-border'}`}>
       <div className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">{label}</div>
       <dl className="space-y-0.5 text-xs font-mono">
-        <div className="flex justify-between">
-          <dt className="text-muted-foreground">expected</dt>
-          <dd>{formatDollars(expected)}</dd>
+        <div className="flex justify-between" title="HCB's authoritative amount_cents — the real-world state">
+          <dt className="text-muted-foreground">actual (HCB)</dt>
+          <dd>{formatDollars(actual)}</dd>
         </div>
-        <div className="flex justify-between">
-          <dt className="text-muted-foreground">transferred</dt>
-          <dd className={transferred < 0 ? 'text-red-700' : ''}>{formatDollars(transferred)}</dd>
+        <div
+          className="flex justify-between"
+          title="Fallout's ledger net (in minus out) — what we think should be there"
+        >
+          <dt className="text-muted-foreground">expected (ledger)</dt>
+          <dd className={expected < 0 ? 'text-red-700' : ''}>{formatDollars(expected)}</dd>
         </div>
         <div className="flex justify-between border-t border-border pt-1 mt-1">
-          <dt className="text-muted-foreground">delta</dt>
-          <dd className={delta > 0 ? 'text-green-700' : delta < 0 ? 'text-red-700' : ''}>{formatDollars(delta)}</dd>
+          <dt className="text-muted-foreground">gap</dt>
+          <dd className={gap === 0 ? '' : 'text-red-700'}>{gapLabel}</dd>
         </div>
       </dl>
     </div>
@@ -92,15 +99,18 @@ export default function AdminProjectGrantsAdjustmentsNew({ prefill_user_id }: { 
     form.post('/admin/project_grants/adjustments')
   }
 
-  // Client-side projection. `in` adds to transferred; `out` subtracts. Expected is
-  // untouched — adjustments don't represent orders, only real-world money movement.
+  // Client-side projection. `in` raises expected (Fallout's ledger); `out` lowers it.
+  // Actual is HCB's amount_cents — it never moves from an adjustment because an
+  // adjustment is a ledger-only record of something that already happened on HCB.
   const amountCents = Math.round((parseFloat(form.data.amount_dollars) || 0) * 100)
   const canProject = ledger?.found && amountCents > 0
-  const projectedTransferred = canProject
-    ? (ledger!.transferred_cents ?? 0) + (form.data.direction === 'in' ? amountCents : -amountCents)
-    : 0
-  const currentDelta = ledger?.found ? (ledger.expected_cents ?? 0) - (ledger.transferred_cents ?? 0) : 0
-  const projectedDelta = ledger?.found ? (ledger.expected_cents ?? 0) - projectedTransferred : 0
+  const currentActual = ledger?.actual_cents ?? 0
+  const currentExpected = ledger?.expected_cents ?? 0
+  const projectedExpected = canProject
+    ? currentExpected + (form.data.direction === 'in' ? amountCents : -amountCents)
+    : currentExpected
+  const currentGap = currentActual - currentExpected
+  const projectedGap = currentActual - projectedExpected
 
   return (
     <div className="max-w-xl">
@@ -291,11 +301,7 @@ export default function AdminProjectGrantsAdjustmentsNew({ prefill_user_id }: { 
                 {canProject ? (
                   <>
                     <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-stretch">
-                      <LedgerSnapshot
-                        label="Current"
-                        expected={ledger.expected_cents ?? 0}
-                        transferred={ledger.transferred_cents ?? 0}
-                      />
+                      <LedgerSnapshot label="Current" actual={currentActual} expected={currentExpected} />
                       <div className="flex flex-col items-center justify-center text-xs text-muted-foreground px-1">
                         <div className="text-[10px] uppercase tracking-wide">{form.data.direction}</div>
                         <div
@@ -308,41 +314,42 @@ export default function AdminProjectGrantsAdjustmentsNew({ prefill_user_id }: { 
                       </div>
                       <LedgerSnapshot
                         label="After this adjustment"
-                        expected={ledger.expected_cents ?? 0}
-                        transferred={projectedTransferred}
+                        actual={currentActual}
+                        expected={projectedExpected}
                         highlight
                       />
                     </div>
                     <div className="text-xs text-muted-foreground space-y-1">
                       <p>
-                        <strong>What this changes:</strong> <code>transferred</code>{' '}
+                        <strong>What this changes:</strong> <code>expected</code> (Fallout ledger){' '}
                         {form.data.direction === 'in' ? 'rises' : 'falls'} by {formatDollars(amountCents)}.{' '}
-                        <code>expected</code> is unchanged — adjustments don't represent orders, only real-world money
-                        movement.
+                        <code>actual</code> (HCB) is unchanged — adjustments record movement that already happened on
+                        HCB, they don't call the API.
                       </p>
-                      {form.data.direction === 'in' && projectedDelta < currentDelta && (
-                        <p>
-                          <strong>Effect on next topup:</strong> delta shrinks from {formatDollars(currentDelta)} to{' '}
-                          {formatDollars(projectedDelta)}. The next fulfillment will send less (or nothing, if delta ≤
-                          0).
+                      {currentGap !== 0 && projectedGap === 0 && (
+                        <p className="text-green-700">
+                          <strong>This adjustment closes the gap.</strong> After it lands, Fallout's ledger matches HCB
+                          exactly.
                         </p>
                       )}
-                      {form.data.direction === 'out' && (
-                        <p>
-                          <strong>Effect on next topup:</strong> delta grows from {formatDollars(currentDelta)} to{' '}
-                          {formatDollars(projectedDelta)}. The next fulfillment will send more to catch back up.
-                        </p>
-                      )}
-                      {projectedTransferred < 0 && (
+                      {currentGap === 0 && projectedGap !== 0 && (
                         <p className="text-red-700">
-                          <strong>⚠ transferred would go negative.</strong> That means more out-adjustments than in-
-                          topups on record — almost always a mistake. Double-check direction and amount.
+                          <strong>⚠ This will create a {formatDollars(Math.abs(projectedGap))} gap.</strong> Ledger and
+                          HCB currently match; this adjustment would push them out of sync. Only proceed if an
+                          out-of-band HCB event actually happened.
                         </p>
                       )}
-                      {projectedDelta < 0 && (
+                      {currentGap !== 0 && projectedGap !== 0 && Math.abs(projectedGap) > Math.abs(currentGap) && (
                         <p className="text-red-700">
-                          <strong>⚠ delta would go negative</strong> (over-transferred). Fallout will Sentry-warn and
-                          send no topups until <code>expected</code> catches up via new fulfilled orders.
+                          <strong>⚠ Gap grows:</strong> {formatDollars(Math.abs(currentGap))} →{' '}
+                          {formatDollars(Math.abs(projectedGap))}. This adjustment moves the ledger further from HCB,
+                          not closer. Double-check direction and amount.
+                        </p>
+                      )}
+                      {projectedExpected < 0 && (
+                        <p className="text-red-700">
+                          <strong>⚠ expected would go negative.</strong> That means more out-adjustments than in-topups
+                          on record — almost always a mistake.
                         </p>
                       )}
                     </div>
@@ -350,11 +357,7 @@ export default function AdminProjectGrantsAdjustmentsNew({ prefill_user_id }: { 
                 ) : (
                   <>
                     <div className="grid grid-cols-1">
-                      <LedgerSnapshot
-                        label="Current"
-                        expected={ledger.expected_cents ?? 0}
-                        transferred={ledger.transferred_cents ?? 0}
-                      />
+                      <LedgerSnapshot label="Current" actual={currentActual} expected={currentExpected} />
                     </div>
                     <p className="text-xs text-muted-foreground italic">
                       Enter an amount above to see how this adjustment will change the ledger.
