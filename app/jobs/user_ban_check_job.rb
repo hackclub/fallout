@@ -52,13 +52,19 @@ class UserBanCheckJob < ApplicationJob
     unless response.success?
       return :not_banned if response.status == 404 # user unknown to Hackatime = not banned
 
-      Rails.logger.error("Hackatime API returned #{response.status} for #{slack_id}")
-      ErrorReporter.capture_message("Hackatime API failed for #{slack_id}: #{response.status}")
+      Rails.logger.warn("Hackatime API returned #{response.status} for #{slack_id}")
+      # Transient upstream failure (e.g. 504 gateway timeout) — capture at warning so it doesn't alert as an unhandled error
+      ErrorReporter.capture_message("Hackatime API failed for #{slack_id}: #{response.status}", level: :warning)
       return :unknown
     end
 
     data = JSON.parse(response.body)
     data["trust_level"] == "red" ? :banned : :not_banned
+  rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
+    # Transient network errors to upstream Hackatime — warning level, leave ban state untouched
+    Rails.logger.warn("Hackatime ban check network error for #{slack_id}: #{e.message}")
+    ErrorReporter.capture_exception(e, level: :warning, contexts: { ban_check: { slack_id: slack_id } })
+    :unknown
   rescue => e
     Rails.logger.error("Hackatime ban check failed for #{slack_id}: #{e.message}")
     ErrorReporter.capture_exception(e, contexts: { ban_check: { slack_id: slack_id } })
