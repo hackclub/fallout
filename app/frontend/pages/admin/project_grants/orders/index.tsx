@@ -6,6 +6,7 @@ import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { hcbGrantUrl } from '@/lib/hcb'
+import TimeAgo from '@/components/shared/TimeAgo'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -106,6 +107,8 @@ export default function AdminProjectGrantsOrdersIndex({
   warnings,
   warnings_include_resolved,
   warning_kind_descriptions,
+  last_scan_at,
+  hcb_auth_status,
   rates,
   hours_configured,
   is_hcb,
@@ -119,6 +122,8 @@ export default function AdminProjectGrantsOrdersIndex({
   warnings: Warning[]
   warnings_include_resolved: boolean
   warning_kind_descriptions: Record<string, WarningKindDescription>
+  last_scan_at: string | null
+  hcb_auth_status: 'connected' | 'expired' | 'disconnected' | 'not_configured'
   rates: Rates
   hours_configured: boolean
   is_hcb: boolean
@@ -187,7 +192,38 @@ export default function AdminProjectGrantsOrdersIndex({
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Project Grants</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">Project Grants</h1>
+          {(() => {
+            const pill = {
+              connected: {
+                variant: 'default' as const,
+                label: 'HCB connected',
+                title: 'HCB OAuth connection is active and token is fresh',
+              },
+              expired: {
+                variant: 'destructive' as const,
+                label: 'HCB token expired',
+                title: 'Refresh required — HcbTokenRefreshJob usually handles this',
+              },
+              disconnected: {
+                variant: 'destructive' as const,
+                label: 'HCB disconnected',
+                title: 'No HCB OAuth session on record — connect from /auth/hcb/start',
+              },
+              not_configured: {
+                variant: 'outline' as const,
+                label: 'HCB not configured',
+                title: 'HCB_CLIENT_ID is not set; writes are stubbed',
+              },
+            }[hcb_auth_status]
+            return (
+              <Badge variant={pill.variant} title={pill.title} className="font-normal">
+                {pill.label}
+              </Badge>
+            )
+          })()}
+        </div>
         <div className="flex items-center gap-2">
           {is_hcb && (
             <Button asChild variant="outline" size="sm">
@@ -358,12 +394,28 @@ export default function AdminProjectGrantsOrdersIndex({
           "resolve" doesn't change any money state, it just marks the admin has handled it. */}
       <div className="mt-10">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xl font-semibold tracking-tight">
-            Warnings
-            {warnings.length > 0 && !warnings_include_resolved && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">({warnings.length} unresolved)</span>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold tracking-tight">
+              Warnings
+              {warnings.length > 0 && !warnings_include_resolved && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">({warnings.length} unresolved)</span>
+              )}
+            </h2>
+            {/* last_scan_at proxies "when did scan_all! last run" via the most recent
+                HcbGrantCard sync — the job fires scan_all! right after each sync cycle. */}
+            {last_scan_at ? (
+              <span
+                className="text-xs text-muted-foreground"
+                title={`HcbGrantCardSyncJob last ran ${new Date(last_scan_at).toLocaleString()}. Runs every ~15 minutes and triggers warning scan on completion.`}
+              >
+                scanned <TimeAgo datetime={last_scan_at} />
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground italic" title="No HCB grant cards have been synced yet">
+                never scanned
+              </span>
             )}
-          </h2>
+          </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowWarningDocs((s) => !s)}>
               {showWarningDocs ? 'Hide docs' : 'What are warnings?'}

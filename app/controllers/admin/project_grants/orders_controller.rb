@@ -31,6 +31,16 @@ class Admin::ProjectGrants::OrdersController < Admin::ApplicationController
     warnings_scope = warnings_scope.unresolved unless params[:include_resolved] == "1"
     @warnings = warnings_scope.order(resolved_at: :asc, last_detected_at: :desc).limit(100)
 
+    # Status pills in the header. last_scan_at is a proxy: HcbGrantCardSyncJob runs
+    # ProjectGrantWarning.scan_all! right after each card sync, so the newest card
+    # last_synced_at ≈ the last scan cycle.
+    conn = HcbConnection.current
+    hcb_auth_status = if !HcbService.configured? then "not_configured"
+    elsif conn.nil? || conn.access_token.blank? then "disconnected"
+    elsif conn.token_expired? then "expired"
+    else "connected"
+    end
+
     render inertia: "admin/project_grants/orders/index", props: {
       orders: @orders.map { |o| serialize_row(o, active_card_user_ids, transferred_by_user) },
       pagy: pagy_props(@pagy),
@@ -41,6 +51,8 @@ class Admin::ProjectGrants::OrdersController < Admin::ApplicationController
       warnings: @warnings.map { |w| serialize_warning(w) },
       warnings_include_resolved: params[:include_resolved] == "1",
       warning_kind_descriptions: ProjectGrantWarning::KIND_DESCRIPTIONS,
+      last_scan_at: HcbGrantCard.maximum(:last_synced_at)&.iso8601,
+      hcb_auth_status: hcb_auth_status,
       rates: rate_props,
       hours_configured: HcbGrantSetting.current.hours_rate_configured?,
       is_hcb: current_user.hcb? # Gates the Batch fulfill button — money movement requires the hcb role
