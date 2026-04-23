@@ -89,11 +89,16 @@ class JournalEntry < ApplicationRecord
 
   public
 
-  # Override Discardable#discard to also unclaim recordings so timelapses/videos can be reused
+  # Override Discardable#discard to also unclaim recordings so timelapses/videos can be reused.
+  # Both steps run in a single transaction so a partial failure can never leave the journal marked
+  # discarded while recordings still hold the (recordable_type, recordable_id) unique slot.
   def discard
     transaction do
       unclaim_recordings
       super
     end
+  rescue ActiveRecord::RecordNotDestroyed, ActiveRecord::RecordInvalid => e
+    ErrorReporter.capture_exception(e, level: :warning, contexts: { journal_entry: { id: id, project_id: project_id } })
+    false
   end
 end
