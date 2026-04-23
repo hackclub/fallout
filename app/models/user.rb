@@ -295,6 +295,13 @@ class User < ApplicationRecord
       raise StandardError, "HCA user has an invalid email: #{email.inspect}"
     end
 
+    if slack_id.blank?
+      ErrorReporter.capture_message("HCA identity missing linked Slack account", level: :warning, contexts: {
+        user_creation: { hca_id: identity["id"] }
+      })
+      raise StandardError, "HCA identity is missing a linked Slack account"
+    end
+
     Rails.logger.tagged("UserCreation") do
       Rails.logger.info({
         event: "hca_user_found",
@@ -500,6 +507,12 @@ class User < ApplicationRecord
     (median_hour - avg_duration_hours).clamp(6, 22)
   end
 
+  def normalized_slack_id
+    return slack_id unless Rails.env.development?
+
+    slack_id.delete_suffix("_DEV")
+  end
+
   private
 
   def get_timelapses_via_program_key
@@ -558,11 +571,5 @@ class User < ApplicationRecord
       ErrorReporter.capture_exception(e, level: :warning, contexts: { slack: { slack_id: slack_id } })
       nil
     end
-  end
-
-  def normalized_slack_id
-    return slack_id unless Rails.env.development?
-
-    slack_id.delete_suffix("_DEV")
   end
 end
