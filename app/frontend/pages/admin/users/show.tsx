@@ -431,17 +431,21 @@ function HcbGrantCardsSection({ cards }: { cards: AdminHcbGrantCard[] }) {
                       const actual = c.transferred_in_cents
                       const expected = c.amount_cents
                       const match = actual === expected
+                      const gapNote = match
+                        ? ''
+                        : ` — ${formatDollars(Math.abs(actual - expected))} ${actual > expected ? 'over' : 'short'}`
                       return (
-                        <span
-                          className={match ? '' : 'text-red-700'}
-                          title={
-                            match
-                              ? 'Ledger matches HCB'
-                              : `${formatDollars(actual - expected)} gap — ledger ${actual > expected ? 'exceeds' : 'is behind'} HCB`
-                          }
-                        >
-                          {formatDollars(actual)}
-                          <span className="text-muted-foreground"> / {formatDollars(expected)}</span>
+                        <span className={match ? '' : 'text-red-700'}>
+                          <span title={`Actual — Fallout's ledger net (in minus out) for this card${gapNote}`}>
+                            {formatDollars(actual)}
+                          </span>
+                          <span className="text-muted-foreground"> / </span>
+                          <span
+                            className="text-muted-foreground"
+                            title="Expected — HCB's authoritative amount_cents on the card"
+                          >
+                            {formatDollars(expected)}
+                          </span>
                         </span>
                       )
                     })()}
