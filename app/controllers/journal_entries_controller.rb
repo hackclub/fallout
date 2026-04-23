@@ -72,47 +72,51 @@ class JournalEntriesController < ApplicationController
     lookout_tokens = Array(params[:lookout_tokens]).map(&:to_s).uniq
     collaborator_ids = Array(params[:collaborator_ids]).map(&:to_i).uniq
 
-    ActiveRecord::Base.transaction do
-      @journal_entry.save!
+    begin
+      ActiveRecord::Base.transaction do
+        @journal_entry.save!
 
-      Array(params[:images]).each { |signed_id| @journal_entry.images.attach(signed_id) }
+        Array(params[:images]).each { |signed_id| @journal_entry.images.attach(signed_id) }
 
-      timelapse_ids.each do |tid|
-        timelapse = current_user.lapse_timelapses.find_or_create_by!(lapse_timelapse_id: tid)
-        timelapse.refetch_data! # Fetches from Lapse API to verify and populate cached fields
-        @journal_entry.recordings.create!(recordable: timelapse, user: current_user)
-      end
-
-      youtube_video_ids.each do |vid|
-        video = YouTubeVideo.find(vid)
-        # Refuse to attach a video already claimed by another user via a Recording.
-        # The unique constraint on (recordable_type, recordable_id) would reject the
-        # insert anyway, but we fail explicitly so attackers can't probe ID space.
-        if (existing = Recording.find_by(recordable: video)) && existing.user_id != current_user.id
-          raise ActiveRecord::RecordNotFound, "YouTube video not available"
+        timelapse_ids.each do |tid|
+          timelapse = current_user.lapse_timelapses.find_or_create_by!(lapse_timelapse_id: tid)
+          timelapse.refetch_data! # Fetches from Lapse API to verify and populate cached fields
+          @journal_entry.recordings.create!(recordable: timelapse, user: current_user)
         end
-        @journal_entry.recordings.create!(recordable: video, user: current_user)
-      end
 
-      lookout_tokens.each do |token|
-        raise ActiveRecord::RecordNotFound, "Token not in pending list" unless current_user.pending_lookout_tokens.include?(token)
+        youtube_video_ids.each do |vid|
+          video = YouTubeVideo.find(vid)
+          # Refuse to attach a video already claimed by another user via a Recording.
+          # The unique constraint on (recordable_type, recordable_id) would reject the
+          # insert anyway, but we fail explicitly so attackers can't probe ID space.
+          if (existing = Recording.find_by(recordable: video)) && existing.user_id != current_user.id
+            raise ActiveRecord::RecordNotFound, "YouTube video not available"
+          end
+          @journal_entry.recordings.create!(recordable: video, user: current_user)
+        end
 
-        lookout = current_user.lookout_timelapses.create!(session_token: token)
-        lookout.refetch_data!
-        @journal_entry.recordings.create!(recordable: lookout, user: current_user)
+        lookout_tokens.each do |token|
+          raise ActiveRecord::RecordNotFound, "Token not in pending list" unless current_user.pending_lookout_tokens.include?(token)
 
-        current_user.update!(pending_lookout_tokens: current_user.pending_lookout_tokens - [ token ])
-      end
+          lookout = current_user.lookout_timelapses.create!(session_token: token)
+          lookout.refetch_data!
+          @journal_entry.recordings.create!(recordable: lookout, user: current_user)
 
-      # Add journal entry collaborators — only project participants (owner + collaborators) minus the creator
-      if collaborators_enabled?
-        collaborator_ids.each do |uid|
-          collab_user = User.verified.kept.find_by(id: uid)
-          next unless collab_user && collab_user.id != current_user.id
-          next unless @project.owner_or_collaborator?(collab_user)
-          @journal_entry.collaborators.create!(user: collab_user)
+          current_user.update!(pending_lookout_tokens: current_user.pending_lookout_tokens - [ token ])
+        end
+
+        # Add journal entry collaborators — only project participants (owner + collaborators) minus the creator
+        if collaborators_enabled?
+          collaborator_ids.each do |uid|
+            collab_user = User.verified.kept.find_by(id: uid)
+            next unless collab_user && collab_user.id != current_user.id
+            next unless @project.owner_or_collaborator?(collab_user)
+            @journal_entry.collaborators.create!(user: collab_user)
+          end
         end
       end
+    rescue ActiveRecord::RecordInvalid => e
+      return render_journal_entry_error(friendly_journal_entry_error(e.record))
     end
 
     critter = maybe_award_critter(@journal_entry, current_user)
@@ -218,6 +222,26 @@ class JournalEntriesController < ApplicationController
       render json: { errors: { base: [ message ] } }, status: :unprocessable_entity
     else
       redirect_back fallback_location: projects_path, inertia: { errors: { base: [ message ] } }
+    end
+  end
+
+  def render_journal_entry_error(message)
+    fallback = @project ? new_project_journal_entry_path(@project) : new_journal_entry_path
+    if modal_json_request? || request.headers["X-Inertia"].present?
+      render json: { errors: { base: [ message ] } }, status: :unprocessable_entity
+    else
+      redirect_back fallback_location: fallback, inertia: { errors: { base: [ message ] } }
+    end
+  end
+
+  # Translate recording/timelapse uniqueness failures into a generic user-facing
+  # message without leaking which account already claimed the underlying asset.
+  def friendly_journal_entry_error(record)
+    case record
+    when Recording, LapseTimelapse, YouTubeVideo, LookoutTimelapse
+      "One of the selected recordings is already attached to another journal entry."
+    else
+      record.errors.full_messages.to_sentence.presence || "Unable to save journal entry."
     end
   end
 
