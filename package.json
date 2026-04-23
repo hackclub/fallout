@@ -23,7 +23,7 @@
     "@lookout/react": "file:packages/lookout-react",
     "@lookout/shared": "file:packages/lookout-shared",
     "@rails/actioncable": "^8.1.300",
-    "@rails/activestorage": "^8.1.200",
+    "@rails/activestorage": "^8.1.201",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
     "@sentry/react": "^10.43.0",
