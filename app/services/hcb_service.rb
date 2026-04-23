@@ -87,7 +87,8 @@ module HcbService
 
   def list_card_grants
     authenticated_connection.get(
-      "/api/v4/organizations/#{ORGANIZATION_ID}/card_grants"
+      "/api/v4/organizations/#{ORGANIZATION_ID}/card_grants",
+      { expand: "balance_cents" }
     ).body
   end
 
