@@ -1,0 +1,2 @@
+class TrialUserPolicy < UserPolicy
+end
