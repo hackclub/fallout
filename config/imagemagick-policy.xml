@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policymap [
+<!ELEMENT policymap (policy)+>
+<!ATTLIST policymap xmlns CDATA #FIXED ''>
+<!ELEMENT policy EMPTY>
+<!ATTLIST policy xmlns CDATA #FIXED '' domain NMTOKEN #REQUIRED
+  name NMTOKEN #IMPLIED pattern CDATA #IMPLIED rights NMTOKEN #IMPLIED
+  stealth NMTOKEN #IMPLIED value CDATA #IMPLIED>
+]>
+<!--
+  Hardened ImageMagick policy. Disables coders/paths historically used for
+  ImageTragick-class RCE (CVE-2016-3714 and descendants). Replaces the default
+  permissive policy shipped in Debian's imagemagick package.
+-->
+<policymap>
+  <!-- Disable coders that can execute commands, fetch URLs, or read/write arbitrary files -->
+  <policy domain="coder" rights="none" pattern="MVG" />
+  <policy domain="coder" rights="none" pattern="MSL" />
+  <policy domain="coder" rights="none" pattern="EPHEMERAL" />
+  <policy domain="coder" rights="none" pattern="URL" />
+  <policy domain="coder" rights="none" pattern="HTTPS" />
+  <policy domain="coder" rights="none" pattern="HTTP" />
+  <policy domain="coder" rights="none" pattern="FTP" />
+  <policy domain="coder" rights="none" pattern="LABEL" />
+  <policy domain="coder" rights="none" pattern="TEXT" />
+  <policy domain="coder" rights="none" pattern="SHOW" />
+  <policy domain="coder" rights="none" pattern="WIN" />
+  <policy domain="coder" rights="none" pattern="PLT" />
+  <policy domain="coder" rights="none" pattern="PS" />
+  <policy domain="coder" rights="none" pattern="PS2" />
+  <policy domain="coder" rights="none" pattern="PS3" />
+  <policy domain="coder" rights="none" pattern="EPS" />
+  <policy domain="coder" rights="none" pattern="PDF" />
+  <policy domain="coder" rights="none" pattern="XPS" />
+
+  <!-- Block @filename.svg-style indirection (CVE-2016-3717 family) -->
+  <policy domain="path" rights="none" pattern="@*" />
+
+  <!-- Conservative resource ceilings for heavy-worker jobs -->
+  <policy domain="resource" name="memory" value="512MiB" />
+  <policy domain="resource" name="map" value="1GiB" />
+  <policy domain="resource" name="width" value="16KP" />
+  <policy domain="resource" name="height" value="16KP" />
+  <policy domain="resource" name="area" value="128MP" />
+  <policy domain="resource" name="disk" value="2GiB" />
+</policymap>

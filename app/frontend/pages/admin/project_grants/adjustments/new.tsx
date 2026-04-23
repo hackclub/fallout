@@ -60,7 +60,13 @@ function LedgerSnapshot({
   )
 }
 
-export default function AdminProjectGrantsAdjustmentsNew({ prefill_user_id }: { prefill_user_id: string }) {
+export default function AdminProjectGrantsAdjustmentsNew({
+  prefill_user_id,
+  idempotency_key,
+}: {
+  prefill_user_id: string
+  idempotency_key: string
+}) {
   const { errors } = usePage<SharedProps>().props
   const form = useForm({
     user_id: prefill_user_id,
@@ -71,6 +77,8 @@ export default function AdminProjectGrantsAdjustmentsNew({ prefill_user_id }: { 
     // issued funding". Safer in both directions: if they forget, future orders
     // aren't accidentally reduced; if they check it, they've thought about it.
     counts_toward_funding: false,
+    // One-shot token consumed server-side to block duplicate submits.
+    idempotency_key,
   })
 
   // Debounced ledger fetch: as the admin types a user ID, we ask the server for that

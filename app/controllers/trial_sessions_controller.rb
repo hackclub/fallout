@@ -3,7 +3,7 @@ class TrialSessionsController < ApplicationController
   skip_onboarding_redirect only: %i[create] # Session creation happens before onboarding
   skip_after_action :verify_authorized # No authorizable resource on any action
   skip_after_action :verify_policy_scoped # No index action; no policy-scoped queries
-  rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to root_path, alert: "Try again later." }
+  # Rate limiting handled at the Rack::Attack layer — Redis-backed, consistent across Puma workers.
 
   def create
     redirect_to path_path and return if user_signed_in? && !current_user.trial? # Verified users cannot create trial sessions

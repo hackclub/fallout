@@ -17,7 +17,7 @@ export default function ReviewLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (auth.user) {
-      Sentry.setUser({ id: String(auth.user.id), email: auth.user.email })
+      Sentry.setUser({ id: String(auth.user.id) })
     } else {
       Sentry.setUser(null)
     }

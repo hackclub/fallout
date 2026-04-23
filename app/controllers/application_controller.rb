@@ -23,7 +23,6 @@ class ApplicationController < ActionController::Base
         {
           id: u.id,
           display_name: u.display_name,
-          email: u.email,
           avatar: u.avatar,
           roles: u.roles,
           is_admin: u.admin?,

@@ -9,10 +9,28 @@ FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 
 WORKDIR /rails
 
+# Pin media/system tools to current Debian 12 (bookworm) stable versions. Pins may need
+# updating when Debian rolls a point release — failing the build is preferable to
+# silently pulling in a new version that hasn't been reviewed.
+ARG CURL_VERSION=7.88.1-10+deb12u12
+ARG LIBJEMALLOC2_VERSION=5.3.0-1
+ARG LIBVIPS_VERSION=8.14.1-3+deb12u1
+ARG SQLITE3_VERSION=3.40.1-2+deb12u1
+ARG FFMPEG_VERSION=7:5.1.7-0+deb12u1
+ARG IMAGEMAGICK_VERSION=8:6.9.11.60+dfsg-1.6+deb12u3
+
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libjemalloc2 libvips sqlite3 \
-    ffmpeg imagemagick && \
+    apt-get install --no-install-recommends -y \
+      curl="${CURL_VERSION}" \
+      libjemalloc2="${LIBJEMALLOC2_VERSION}" \
+      libvips="${LIBVIPS_VERSION}" \
+      sqlite3="${SQLITE3_VERSION}" \
+      ffmpeg="${FFMPEG_VERSION}" \
+      imagemagick="${IMAGEMAGICK_VERSION}" && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+# Harden ImageMagick: disable coders/paths used for ImageTragick-class RCE.
+COPY config/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \

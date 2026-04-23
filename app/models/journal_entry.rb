@@ -45,6 +45,9 @@ class JournalEntry < ApplicationRecord
   validate :validate_image_sizes
   validate :validate_image_count
 
+  # Re-encode uploads to strip EXIF/GPS and defeat polyglots. Runs async to avoid blocking save.
+  after_commit :reprocess_images, on: [ :create, :update ]
+
   private
 
   def user_must_own_or_collaborate_on_project
@@ -72,6 +75,12 @@ class JournalEntry < ApplicationRecord
 
   def validate_image_count
     errors.add(:images, "cannot exceed 20") if images.size > 20
+  end
+
+  def reprocess_images
+    images.attachments.each do |attachment|
+      ReprocessJournalImageJob.perform_later(attachment.id)
+    end
   end
 
   def unclaim_recordings

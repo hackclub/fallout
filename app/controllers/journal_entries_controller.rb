@@ -85,6 +85,12 @@ class JournalEntriesController < ApplicationController
 
       youtube_video_ids.each do |vid|
         video = YouTubeVideo.find(vid)
+        # Refuse to attach a video already claimed by another user via a Recording.
+        # The unique constraint on (recordable_type, recordable_id) would reject the
+        # insert anyway, but we fail explicitly so attackers can't probe ID space.
+        if (existing = Recording.find_by(recordable: video)) && existing.user_id != current_user.id
+          raise ActiveRecord::RecordNotFound, "YouTube video not available"
+        end
         @journal_entry.recordings.create!(recordable: video, user: current_user)
       end
 

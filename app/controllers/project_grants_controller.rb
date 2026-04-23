@@ -31,7 +31,11 @@ class ProjectGrantsController < ApplicationController
     @order = ProjectGrantOrder.new(create_params.merge(user: current_user))
     authorize @order
 
-    if @order.save
+    # Serialize balance checks against concurrent shop orders / grant orders — both paths
+    # must take the user row lock before reading koi, or parallel requests can double-spend.
+    saved = current_user.with_lock { @order.save }
+
+    if saved
       redirect_to project_grants_path,
         notice: "Grant request submitted ($#{format('%.2f', @order.frozen_usd_cents / 100.0)}, #{@order.frozen_koi_amount} koi). Awaiting admin approval."
     else

@@ -68,8 +68,13 @@ type Field = (typeof FIELDS)[number]
 // ── Slack preview renderer ────────────────────────────────────────────────────
 
 function renderSlackMarkdown(text: string): string {
-  // Escape HTML first
-  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  // Escape HTML first — including quotes so URLs captured into href="..." can't inject attributes.
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 
   // Process line by line to handle block elements (lists, blockquotes)
   const lines = escaped.split('\n')

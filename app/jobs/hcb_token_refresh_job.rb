@@ -8,9 +8,14 @@ class HcbTokenRefreshJob < ApplicationJob
 
     connection = HcbConnection.current
     return unless connection&.access_token.present?
-    return unless connection.token_expiring_soon?
 
     connection.with_lock do
+      # Re-check the expiry predicate inside the lock. Two concurrent workers can both
+      # read token_expiring_soon? = true, then one refreshes and invalidates the other's
+      # refresh_token before the second worker enters. The second worker would then
+      # consume the already-rotated refresh_token and disconnect the connection.
+      next unless connection.token_expiring_soon?
+
       token_data = HcbService.refresh_token(connection.refresh_token)
 
       connection.update!(

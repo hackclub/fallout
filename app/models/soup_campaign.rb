@@ -35,6 +35,9 @@ class SoupCampaign < ApplicationRecord
 
   validates :name, :unsubscribe_label, presence: true
   validates :unsubscribe_token, presence: true, uniqueness: true
+  # Rendered into <img src>; restrict to https:// so javascript:/data: URLs can't reach the DOM.
+  # Anchored at both ends (\A and \z) and no newlines — required to pass brakeman's ValidationRegex.
+  validates :image_url, format: { with: /\Ahttps:\/\/[^\s]*\z/, message: "must start with https://" }, allow_blank: true
 
   before_validation :generate_unsubscribe_token, on: :create
 

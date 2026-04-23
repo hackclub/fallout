@@ -26,6 +26,10 @@
 #  fk_rails_...  (user_id => users.id)
 #
 class ShopOrder < ApplicationRecord
+  # Shipping PII of minors — encrypted at rest. Never queried, so non-deterministic.
+  encrypts :phone
+  encrypts :address
+
   belongs_to :user
   belongs_to :shop_item
 

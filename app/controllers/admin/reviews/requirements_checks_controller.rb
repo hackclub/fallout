@@ -130,7 +130,14 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
       return render json: { error: "Render failed: #{stderr.truncate(200)}" }, status: :internal_server_error
     end
 
-    render json: JSON.parse(stdout)
+    # Sanitize SVG server-side before handing to the admin frontend's dangerouslySetInnerHTML.
+    # Gerber zips are untrusted (pulled from submitter repos) and pcb-stackup passes SVG text
+    # through unchanged; a crafted file could embed <script> or foreignObject HTML.
+    parsed = JSON.parse(stdout)
+    render json: {
+      top: sanitize_svg(parsed["top"]),
+      bottom: sanitize_svg(parsed["bottom"])
+    }
   rescue => e
     render json: { error: e.message }, status: :internal_server_error
   end
@@ -151,6 +158,34 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
   end
 
   private
+
+  # Scrub untrusted SVG before handing to an admin's browser. pcb-stackup emits SVG text
+  # derived from submitter-supplied Gerber files — a hostile zip could inject <script>,
+  # event handlers, or <foreignObject> HTML. Tight allowlist of shape/text tags only.
+  SVG_ALLOWED_TAGS = %w[
+    svg g path circle rect line polyline polygon ellipse text tspan
+    defs clipPath mask pattern use symbol
+    linearGradient radialGradient stop
+    filter feGaussianBlur feOffset feBlend feFlood feComposite feColorMatrix feMerge feMergeNode
+    title desc
+  ].freeze
+
+  SVG_ALLOWED_ATTRS = %w[
+    d fill stroke stroke-width stroke-linecap stroke-linejoin stroke-miterlimit
+    fill-rule fill-opacity stroke-opacity opacity
+    viewBox width height x y x1 y1 x2 y2 cx cy r rx ry points
+    transform class id style
+    preserveAspectRatio xmlns xmlns:xlink version
+    gradientUnits gradientTransform offset stop-color stop-opacity
+    clip-path mask filter
+    font-family font-size font-weight text-anchor dominant-baseline
+    href xlink:href
+  ].freeze
+
+  def sanitize_svg(svg)
+    return nil if svg.blank?
+    Rails::Html::SafeListSanitizer.new.sanitize(svg, tags: SVG_ALLOWED_TAGS, attributes: SVG_ALLOWED_ATTRS)
+  end
 
   def review_model
     RequirementsCheckReview

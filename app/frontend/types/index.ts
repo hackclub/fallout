@@ -3,7 +3,6 @@ export type BanType = 'fallout' | 'hcb' | 'hardware' | 'age' | 'hackatime'
 export interface User {
   id: number
   display_name: string
-  email: string
   avatar: string
   roles: string[]
   is_admin: boolean

@@ -91,6 +91,8 @@ function renderSlackMarkdown(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
     .replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>')
     .replace(/_([^_\n]+)_/g, '<em>$1</em>')
     .replace(/~([^~\n]+)~/g, '<del>$1</del>')

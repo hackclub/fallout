@@ -44,6 +44,10 @@ module MarkdownHelper
 
     def link(href, title, content)
       href = href.to_s
+      # Whitelist allowed protocols — anything else (javascript:, data:, vbscript:, etc.)
+      # renders as inert text so autolinked malicious URLs can't reach the DOM as <a>.
+      return ERB::Util.html_escape(content) unless safe_href?(href)
+
       attrs = []
       attrs << %(href="#{ERB::Util.html_escape(href)}")
       attrs << %(title="#{ERB::Util.html_escape(title)}") if title
@@ -54,6 +58,12 @@ module MarkdownHelper
       end
 
       "<a #{attrs.join(' ')}>#{content}</a>"
+    end
+
+    def safe_href?(href)
+      href.start_with?("#", "/", "./", "../") ||
+        href.match?(/\Ahttps?:\/\//i) ||
+        href.match?(/\Amailto:/i)
     end
 
     def guide_internal_link?(href)
@@ -142,9 +152,19 @@ module MarkdownHelper
     end
 
     doc.css("a[href]").each do |a|
+      href = a["href"].to_s
+
+      # Strip links whose protocol isn't on the whitelist (javascript:, data:, etc.).
+      # Replace the element with its inner text so the payload shows as plain characters.
+      unless href.start_with?("#", "/", "./", "../") ||
+             href.match?(/\Ahttps?:\/\//i) ||
+             href.match?(/\Amailto:/i)
+        a.replace(Nokogiri::XML::Text.new(a.inner_text, doc))
+        next
+      end
+
       a["rel"] = "nofollow noopener"
 
-      href = a["href"].to_s
       if external_link?(href)
         a["target"] = a["target"].presence || "_blank"
       end

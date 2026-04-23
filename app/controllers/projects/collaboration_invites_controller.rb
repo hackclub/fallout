@@ -17,17 +17,9 @@ class Projects::CollaborationInvitesController < ApplicationController
       unless PendingCollaborationInvite.pending.exists?(project: @project, invitee_email: email)
         pending = @project.pending_collaboration_invites.build(inviter: current_user, invitee_email: email)
 
-        if pending.save
-          # If a verified user with this email exists, immediately claim (creates real invite + MailMessage)
-          invitee = User.verified.kept.find_by(email: email)
-          pending.claim!(invitee) if invitee
-
-          if invitee
-            CollaborationInviteMailer.with(pending_invite: pending, invitee: invitee).invite_existing_user.deliver_later
-          else
-            CollaborationInviteMailer.with(pending_invite: pending).invite_new_user.deliver_later
-          end
-        end
+        # Claim/mail branching happens in a background job so response timing doesn't
+        # reveal whether `email` maps to a verified user.
+        ProcessCollaborationInviteJob.perform_later(pending.id) if pending.save
       end
     end
 

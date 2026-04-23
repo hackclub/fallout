@@ -283,7 +283,7 @@ export default function RepoTree({
           transition: 'width 300ms cubic-bezier(0.19, 1, 0.22, 1), opacity 300ms cubic-bezier(0.19, 1, 0.22, 1)',
         }}
       >
-        {/* {selectedFile && (
+        {selectedFile && (
           <FilePreviewPanel
             filePath={selectedFile}
             fileSize={selectedSize}
@@ -292,7 +292,7 @@ export default function RepoTree({
             gerberZipFilesPath={gerberZipFilesPath}
             onClose={() => setSelectedFile(null)}
           />
-        )} */}
+        )}
       </div>
     </div>
   )

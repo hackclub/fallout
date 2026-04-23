@@ -13,8 +13,15 @@ class Admin::ProjectGrants::AdjustmentsController < Admin::ApplicationController
   def new
     authorize ProjectFundingTopup, :new?
 
+    # One-shot token to guard against duplicate submissions (browser back, double-click,
+    # network retry). Server keeps the last N issued tokens in session; create consumes
+    # the token so replays fail closed.
+    key = SecureRandom.uuid
+    session[:valid_adjustment_keys] = ((session[:valid_adjustment_keys] || []) + [ key ]).last(20)
+
     render inertia: "admin/project_grants/adjustments/new", props: {
-      prefill_user_id: params[:user_id].to_s
+      prefill_user_id: params[:user_id].to_s,
+      idempotency_key: key
     }
   end
 
@@ -45,6 +52,17 @@ class Admin::ProjectGrants::AdjustmentsController < Admin::ApplicationController
 
   def create
     authorize ProjectFundingTopup, :create?
+
+    # Consume the one-shot idempotency token before doing any work. A replay (browser
+    # back + submit, network retry) will miss — the session list no longer has the key.
+    key = adjustment_params[:idempotency_key].to_s
+    valid_keys = session[:valid_adjustment_keys] || []
+    unless valid_keys.include?(key)
+      redirect_to new_admin_project_grants_adjustment_path,
+        alert: "This form was already submitted or has expired. Please start a new adjustment."
+      return
+    end
+    session[:valid_adjustment_keys] = valid_keys - [ key ]
 
     user = User.find_by(id: adjustment_params[:user_id])
     unless user
@@ -104,6 +122,6 @@ class Admin::ProjectGrants::AdjustmentsController < Admin::ApplicationController
   private
 
   def adjustment_params
-    params.expect(project_grant_adjustment: [ :user_id, :direction, :amount_dollars, :note, :counts_toward_funding ])
+    params.expect(project_grant_adjustment: [ :user_id, :direction, :amount_dollars, :note, :counts_toward_funding, :idempotency_key ])
   end
 end

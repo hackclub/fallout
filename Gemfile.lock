@@ -564,56 +564,56 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  ahoy_matey
-  annotaterb
-  aws-sdk-s3
-  bootsnap
-  brakeman
-  bullet
-  capybara
+  ahoy_matey (~> 5.5)
+  annotaterb (~> 4.22)
+  aws-sdk-s3 (~> 1.219)
+  bootsnap (~> 1.23)
+  brakeman (~> 8.0)
+  bullet (~> 8.1)
+  capybara (~> 3.40)
   countries (~> 8.1)
-  debug
-  dotenv-rails
+  debug (~> 1.11)
+  dotenv-rails (~> 3.2)
   faraday (~> 2.13)
   flipper (~> 1.4)
   flipper-active_record (~> 1.3)
   flipper-ui (~> 1.4)
-  geocoder
+  geocoder (~> 1.8)
   image_processing (~> 1.2)
   inertia_rails (~> 3.20)
   inertia_rails-contrib (~> 0.5.2)
-  jbuilder
-  kamal
-  letter_opener
+  jbuilder (~> 2.14)
+  kamal (~> 2.10)
+  letter_opener (~> 1.10)
   mission_control-jobs (~> 1.1)
   pagy (~> 43.5)
   paper_trail (~> 17.0)
   pg (~> 1.5)
   pg_search (~> 2.3)
-  propshaft
+  propshaft (~> 1.3)
   puma (>= 5.0)
   pundit (~> 2.4)
   rack-attack (~> 6.7)
   rails (~> 8.1)
   redcarpet (~> 3.6)
   redis (~> 5.0)
-  rubocop-rails-omakase
+  rubocop-rails-omakase (~> 1.1)
   ruby_llm (~> 1.14)
   rubyzip (~> 3.0)
   scoped_search (~> 4.3)
-  selenium-webdriver
+  selenium-webdriver (~> 4.41)
   sentry-rails (~> 6.5)
   sentry-ruby (~> 6.5)
   skylight (~> 7.1)
   slack-ruby-client (~> 3.0)
-  solid_cable
-  solid_cache
-  solid_queue
+  solid_cable (~> 3.0)
+  solid_cache (~> 1.0)
+  solid_queue (~> 1.4)
   sqlite3 (>= 2.1)
-  thruster
+  thruster (~> 0.1)
   tzinfo-data
   vite_rails (~> 3.10)
-  web-console
+  web-console (~> 4.3)
 
 BUNDLED WITH
    2.6.9
