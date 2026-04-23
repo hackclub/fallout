@@ -4,6 +4,8 @@ require "json"
 module HcaService
   class Error < StandardError; end
 
+  TRANSIENT_NETWORK_ERRORS = [ Faraday::ConnectionFailed, Faraday::TimeoutError ].freeze
+
   module_function
 
   def host
@@ -58,8 +60,8 @@ module HcaService
     end
 
     JSON.parse(response.body)
-  rescue StandardError => e
-    ErrorReporter.capture_exception(e, contexts: { hca: { action: "token_exchange" } })
+  rescue *TRANSIENT_NETWORK_ERRORS => e
+    ErrorReporter.capture_exception(e, level: :warning, contexts: { hca: { action: "token_exchange" } })
     nil
   end
 
@@ -79,7 +81,7 @@ module HcaService
     end
 
     JSON.parse(response.body)
-  rescue StandardError => e
+  rescue *TRANSIENT_NETWORK_ERRORS => e
     ErrorReporter.capture_exception(e, level: :warning, contexts: { hca: { action: "me" } })
     nil
   end
