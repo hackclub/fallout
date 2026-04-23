@@ -27,7 +27,10 @@ class Admin::ProjectGrants::OrdersController < Admin::ApplicationController
 
     # Warnings: third section on the page. Unresolved only by default; admin can
     # include resolved via ?include_resolved=1 to review history.
-    warnings_scope = policy_scope(ProjectGrantWarning).includes(:user, :hcb_grant_card, :project_grant_order, :project_funding_topup, :resolved_by)
+    # Eager-load only the belongs_to we actually dereference in serialize_warning.
+    # project_grant_order and project_funding_topup are exposed as bare FK ids in the
+    # serialized output, so loading them is wasteful (bullet flagged it).
+    warnings_scope = policy_scope(ProjectGrantWarning).includes(:user, :hcb_grant_card, :resolved_by)
     warnings_scope = warnings_scope.unresolved unless params[:include_resolved] == "1"
     @warnings = warnings_scope.order(resolved_at: :asc, last_detected_at: :desc).limit(100)
 
@@ -41,6 +44,13 @@ class Admin::ProjectGrants::OrdersController < Admin::ApplicationController
     else "connected"
     end
 
+    # Header stats — cheap aggregate queries; cents summed so we can format client-side.
+    stats = {
+      issued_cents: HcbGrantCard.sum(:amount_cents),
+      active_cards: HcbGrantCard.where(status: "active").count,
+      transactions: HcbTransaction.count
+    }
+
     render inertia: "admin/project_grants/orders/index", props: {
       orders: @orders.map { |o| serialize_row(o, active_card_user_ids, transferred_by_user) },
       pagy: pagy_props(@pagy),
@@ -53,6 +63,7 @@ class Admin::ProjectGrants::OrdersController < Admin::ApplicationController
       warning_kind_descriptions: ProjectGrantWarning::KIND_DESCRIPTIONS,
       last_scan_at: HcbGrantCard.maximum(:last_synced_at)&.iso8601,
       hcb_auth_status: hcb_auth_status,
+      stats: stats,
       rates: rate_props,
       hours_configured: HcbGrantSetting.current.hours_rate_configured?,
       is_hcb: current_user.hcb? # Gates the Batch fulfill button — money movement requires the hcb role

@@ -388,6 +388,9 @@ function HcbGrantCardsSection({ cards }: { cards: AdminHcbGrantCard[] }) {
                 </th>
                 <th className="p-2">Expires</th>
                 <th className="p-2">Created</th>
+                <th className="p-2" title="Last successful HcbGrantCardSyncJob run — blank means never synced">
+                  Last synced
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -424,6 +427,7 @@ function HcbGrantCardsSection({ cards }: { cards: AdminHcbGrantCard[] }) {
                   <td className="p-2 font-mono">{c.balance_cents != null ? formatDollars(c.balance_cents) : '—'}</td>
                   <td className="p-2 text-muted-foreground">{c.expires_on ?? 'no expiry'}</td>
                   <td className="p-2 text-muted-foreground">{c.created_at}</td>
+                  <td className="p-2 text-muted-foreground text-xs">{c.last_synced_at ?? 'never'}</td>
                 </tr>
               ))}
             </tbody>

@@ -109,6 +109,7 @@ export default function AdminProjectGrantsOrdersIndex({
   warning_kind_descriptions,
   last_scan_at,
   hcb_auth_status,
+  stats,
   rates,
   hours_configured,
   is_hcb,
@@ -124,6 +125,7 @@ export default function AdminProjectGrantsOrdersIndex({
   warning_kind_descriptions: Record<string, WarningKindDescription>
   last_scan_at: string | null
   hcb_auth_status: 'connected' | 'expired' | 'disconnected' | 'not_configured'
+  stats: { issued_cents: number; active_cards: number; transactions: number }
   rates: Rates
   hours_configured: boolean
   is_hcb: boolean
@@ -237,6 +239,25 @@ export default function AdminProjectGrantsOrdersIndex({
               <Cog className="w-4 h-4 mr-1" /> Settings
             </Link>
           </Button>
+        </div>
+      </div>
+
+      {/* Top-level stats. Cheap aggregates from the controller — no deferred props. */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="rounded-md border border-border p-3">
+          <div className="text-xs text-muted-foreground uppercase tracking-wide">$ Issued</div>
+          <div className="text-2xl font-semibold font-mono mt-1">{formatDollars(stats.issued_cents)}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">sum of every HCB grant card's amount</div>
+        </div>
+        <div className="rounded-md border border-border p-3">
+          <div className="text-xs text-muted-foreground uppercase tracking-wide">Cards Active</div>
+          <div className="text-2xl font-semibold font-mono mt-1">{stats.active_cards}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">HcbGrantCard where status=active</div>
+        </div>
+        <div className="rounded-md border border-border p-3">
+          <div className="text-xs text-muted-foreground uppercase tracking-wide">Total transactions</div>
+          <div className="text-2xl font-semibold font-mono mt-1">{stats.transactions}</div>
+          <div className="text-[11px] text-muted-foreground mt-1">HcbTransaction rows synced from HCB</div>
         </div>
       </div>
 
