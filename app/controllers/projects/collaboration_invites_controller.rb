@@ -17,9 +17,15 @@ class Projects::CollaborationInvitesController < ApplicationController
       unless PendingCollaborationInvite.pending.exists?(project: @project, invitee_email: email)
         pending = @project.pending_collaboration_invites.build(inviter: current_user, invitee_email: email)
 
-        # Claim/mail branching happens in a background job so response timing doesn't
-        # reveal whether `email` maps to a verified user.
-        ProcessCollaborationInviteJob.perform_later(pending.id) if pending.save
+        begin
+          # Claim/mail branching happens in a background job so response timing doesn't
+          # reveal whether `email` maps to a verified user.
+          ProcessCollaborationInviteJob.perform_later(pending.id) if pending.save
+        rescue ActiveRecord::RecordInvalid
+          # Duplicate/invalid invites (TOCTOU race against the existence check above)
+          # must not 500 — swallow silently so we preserve the uniform response that
+          # prevents email enumeration.
+        end
       end
     end
 
