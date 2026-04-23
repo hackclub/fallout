@@ -18,7 +18,7 @@
     "@headlessui/react": "^2.1.0",
     "@heroicons/react": "^2.2.0",
     "@inertiajs/core": "^2.3.17",
-    "@inertiajs/react": "^2.3.15",
+    "@inertiajs/react": "^2.3.18",
     "@inertiaui/modal-react": "file:packages/inertiaui-modal-react",
     "@lookout/react": "file:packages/lookout-react",
     "@lookout/shared": "file:packages/lookout-shared",
