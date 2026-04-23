@@ -55,7 +55,6 @@ class ProjectGrantWarning < ApplicationRecord
   # (HCB + Fallout disagree) shows up scoped to what's most actionable.
   KINDS = %w[
     ledger_divergence
-    over_transferred_user
     negative_transferred
     pending_topup_stuck
     dangling_card
@@ -74,15 +73,6 @@ class ProjectGrantWarning < ApplicationRecord
       example: "Card shows $80 on HCB. Our ledger sums to $100. Someone withdrew $20 " \
                "on HCB without recording. Fix: record an `out` adjustment of $20, or " \
                "move the $20 back on HCB."
-    },
-    "over_transferred_user" => {
-      title: "User has received more than expected",
-      detail: "transferred > expected. We've sent more to the user's card than the sum " \
-              "of their fulfilled orders calls for. Most common cause: admin flipped a " \
-              "fulfilled order to rejected without recording an offsetting `out` adjustment.",
-      example: "User had order #1 fulfilled ($50 sent to card). Admin changed their mind " \
-               "and flipped order #1 to rejected. Now expected=$0 but transferred=$50. " \
-               "Fix: withdraw the $50 on HCB manually and record an `out` adjustment."
     },
     "negative_transferred" => {
       title: "Transferred net is below zero",
@@ -176,12 +166,13 @@ class ProjectGrantWarning < ApplicationRecord
       next if card.amount_cents == ledger_net
 
       gap = card.amount_cents - ledger_net
+      direction = gap.positive? ? "extra on HCB" : "missing from HCB"
       record!(
         kind: "ledger_divergence",
         hcb_grant_card: card,
         user: card.user,
-        message: "Card #{card.hcb_id || "(no hcb_id)"} shows #{format_dollars(card.amount_cents)} on HCB " \
-                 "but ledger nets to #{format_dollars(ledger_net)}. Gap: #{format_dollars(gap)}#{gap.positive? ? ' (card has more)' : ' (card has less)'}.",
+        message: "Card #{card.hcb_id || "(no hcb_id)"}: actual #{format_dollars(card.amount_cents)} (HCB) vs " \
+                 "expected #{format_dollars(ledger_net)} (Fallout ledger). Gap: #{format_dollars(gap.abs)} #{direction}.",
         details: { hcb_amount_cents: card.amount_cents, ledger_net_cents: ledger_net, gap_cents: gap }
       )
     end
@@ -216,36 +207,33 @@ class ProjectGrantWarning < ApplicationRecord
   end
 
   def self.scan_user_ledger_anomalies!
-    user_ids = ProjectGrantOrder.kept.distinct.pluck(:user_id) |
-      ProjectFundingTopup.kept.distinct.pluck(:user_id)
+    # The goal of the ledger scan is "does Fallout's ledger match HCB's view of
+    # reality?" — that comparison lives in scan_ledger_divergence! above. Manual
+    # adjustments are a legitimate ledger source (the whole point of the
+    # adjustments form is to backfill out-of-band HCB activity), so we do NOT
+    # flag transferred > fulfilled-orders as an anomaly. The only user-level
+    # check that remains is negative-ledger, which means more out-adjustments
+    # than in-topups — always a data-entry mistake.
+    user_ids = ProjectFundingTopup.kept.distinct.pluck(:user_id)
     User.where(id: user_ids).find_each do |user|
-      expected = ProjectFundingTopupService.expected_usd_cents(user)
       transferred = ProjectFundingTopupService.transferred_usd_cents(user)
+      next unless transferred.negative?
 
-      if transferred > expected
-        record!(
-          kind: "over_transferred_user",
-          user: user,
-          message: "Expected #{format_dollars(expected)} but transferred #{format_dollars(transferred)}. " \
-                   "Over by #{format_dollars(transferred - expected)}.",
-          details: { expected_cents: expected, transferred_cents: transferred, over_by_cents: transferred - expected }
-        )
-      end
-
-      if transferred.negative?
-        record!(
-          kind: "negative_transferred",
-          user: user,
-          message: "Net transferred is #{format_dollars(transferred)} — more out-adjustments than in-topups.",
-          details: { transferred_cents: transferred }
-        )
-      end
+      record!(
+        kind: "negative_transferred",
+        user: user,
+        message: "Net transferred is #{format_dollars(transferred)} — more out-adjustments than in-topups.",
+        details: { transferred_cents: transferred }
+      )
     end
   end
 
   def self.format_dollars(cents)
+    # Always two decimals (sprintf) — `.round(2).to_s` drops trailing zeros
+    # so $8.00 would render as "$8.0". Values are stored in cents everywhere;
+    # this is the only place we format for human display.
     sign = cents.negative? ? "-" : ""
-    "#{sign}$#{(cents.abs / 100.0).round(2)}"
+    format("%s$%.2f", sign, cents.abs / 100.0)
   end
   private_class_method :format_dollars
 end
