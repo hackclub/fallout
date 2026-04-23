@@ -5,6 +5,7 @@ class SlackMsgJob < ApplicationJob
   limits_concurrency to: 1, key: "slack_api" # Slack rate limit is ~1 msg/sec per workspace
 
   retry_on Slack::Web::Api::Errors::TooManyRequestsError, wait: :polynomially_longer, attempts: 5
+  retry_on Slack::Web::Api::Errors::TimeoutError, wait: :polynomially_longer, attempts: 3 # Transient upstream timeout — retry with backoff
 
   def perform(slack_id, message)
     client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))

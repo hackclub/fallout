@@ -541,7 +541,8 @@ class User < ApplicationRecord
 
     LapseService.find_timelapses_by_user(lapse_user["id"]) || []
   rescue StandardError => e
-    ErrorReporter.capture_exception(e, contexts: { lapse: { user_id: id, action: "program_key_fallback" } })
+    # Transient upstream Lapse failure — warning, return empty list so journal flow continues
+    ErrorReporter.capture_exception(e, level: :warning, contexts: { lapse: { user_id: id, action: "program_key_fallback" } })
     []
   end
 

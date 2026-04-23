@@ -178,7 +178,7 @@ module LapseService
   rescue Unauthorized
     raise
   rescue StandardError => e
-    ErrorReporter.capture_exception(e, contexts: { lapse: { action: "query_user_by_email" } })
+    ErrorReporter.capture_exception(e, level: :warning, contexts: { lapse: { action: "query_user_by_email" } })
     nil
   end
 
