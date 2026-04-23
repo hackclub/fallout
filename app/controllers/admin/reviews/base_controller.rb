@@ -3,14 +3,6 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   skip_after_action :verify_authorized
   skip_after_action :verify_policy_scoped
 
-  # Force HTML format on Inertia-rendering actions so Accept: application/json headers
-  # (from prefetchers, browser extensions, or misconfigured clients) don't trigger
-  # ActionView::MissingTemplate when Rails looks for an inertia.json.erb layout that
-  # doesn't exist. Inertia's XHR mode is controlled by the X-Inertia header, not Accept.
-  # Listed explicitly with `only:` so JSON actions (heartbeat, refresh_tree, gerber_zip_files)
-  # and redirect actions (next, update) are unaffected.
-  before_action :force_html_format, only: %i[ index show ]
-
   before_action :set_review, only: %i[ show update heartbeat ]
   before_action :release_all_review_claims, only: %i[ index ]
   before_action :claim_review!, only: %i[ show ]
@@ -44,12 +36,6 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   end
 
   private
-
-  # Inertia always renders HTML (inertia.html.erb); an Accept: application/json request
-  # would otherwise cause ActionView::MissingTemplate when looking up inertia.json.erb.
-  def force_html_format
-    request.format = :html unless request.format.html?
-  end
 
   def review_model
     raise NotImplementedError

@@ -20,6 +20,14 @@ class ApplicationController < ActionController::Base
 
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
 
+  # Non-HTML Accept headers (prefetchers, extensions, misbehaving bots) hitting Inertia pages
+  # would otherwise surface as noisy MissingTemplate errors. Real missing-template bugs on
+  # HTML requests still raise so we catch them in dev/Sentry.
+  rescue_from ActionView::MissingTemplate do |exception|
+    raise exception if request.format.html?
+    head :not_acceptable
+  end
+
   # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
   # allow_browser versions: :modern
 
