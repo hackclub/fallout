@@ -84,6 +84,15 @@ class JournalEntry < ApplicationRecord
   end
 
   def unclaim_recordings
+    # Restore Lookout session tokens to the user's pending list before destroying the recordings
+    # so the surviving LookoutTimelapse rows can be re-attached to a new journal entry.
+    # Lapse/YouTube don't need this — they're (re)claimed by id, not by consumable token.
+    lookout_tokens = recordings.includes(:recordable).filter_map do |r|
+      r.recordable.session_token if r.recordable.is_a?(LookoutTimelapse)
+    end
+    if lookout_tokens.any?
+      user.update!(pending_lookout_tokens: user.pending_lookout_tokens | lookout_tokens)
+    end
     recordings.destroy_all
   end
 

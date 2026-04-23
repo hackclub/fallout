@@ -98,7 +98,7 @@ class JournalEntriesController < ApplicationController
         lookout_tokens.each do |token|
           raise ActiveRecord::RecordNotFound, "Token not in pending list" unless current_user.pending_lookout_tokens.include?(token)
 
-          lookout = current_user.lookout_timelapses.create!(session_token: token)
+          lookout = current_user.lookout_timelapses.find_or_create_by!(session_token: token)
           lookout.refetch_data!
           @journal_entry.recordings.create!(recordable: lookout, user: current_user)
 
