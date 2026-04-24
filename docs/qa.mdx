@@ -1,0 +1,342 @@
+| title | Internal Q&A |
+| description | Comprehensive reference Q&A for Fallout — covers edge cases, policy nuance, and answers not in the public FAQ. |
+| priority | 999 |
+| unlisted | true |
+| --- | --- |
+
+# Internal Q&A
+
+This is the comprehensive Q&A reference — a living document for **staff and reviewers** to consistently answer user questions. Most users are better served by [FAQ](/docs/faq), which is the distilled public version.
+
+Questions are ordered by how often they come up in [#fallout-help](https://hackclub.enterprise.slack.com/archives/C0ACJ290090).
+
+<small>Note: This is a constantly changing document generated with the help of AI and verified by the HQ team.</small>
+
+## 1. Reviews & Approval
+
+**How long do reviews take?**
+We aim for under a week, but reviewers are volunteers and there's no guarantee. Users should **just wait**. After 2 weeks with no activity, they can post in [#fallout-help](https://hackclub.enterprise.slack.com/archives/C0ACJ290090) because it might be a bug. **Do not DM or ping staff individually** — it delays response times, not speeds them up.
+
+**Is there an expedited / priority lane?**
+No official lane right now. As we approach the deadline, we expect to prioritize folks near the 60-hour requirement so they can still qualify to attend.
+
+**Can a user request a "pre-review" before submission?**
+No formal pre-review option. Redirect them to:
+
+- [#fallout](https://hackclub.enterprise.slack.com/archives/C037157AL30) for general community sanity checks
+- [#electronics](https://hackclub.enterprise.slack.com/archives/C056AMWSFKJ) for electronics-specific help
+
+**Project approved but no koi / status stuck.**
+This is almost always a bug. Route them to [#fallout-help](https://hackclub.enterprise.slack.com/archives/C0ACJ290090).
+
+## 2. Tracking Hours & What Counts
+
+Full reference: [How to Timelapse](/docs/project-resources/how-to-timelapse).
+
+**AI usage**
+
+- Quick lookups (syntax, a part's spec, pinout) — **fine**.
+- **Hard ceiling: 30%.** The project must be the user's, not AI's.
+- AI-generated content (graphics, images, zine copy, polished README English, any code they'd have to "heavily modify") — **not allowed**. If they'd need to heavily modify it, they should just write it by hand.
+- Fully AI-generated zines / designs → potential permanent ban.
+
+**Tutorials**
+
+- **Step-by-step tutorial = no hours.** Users shouldn't be copying tutorials anyway; they must make meaningful changes to own the work.
+- Passively watching → no.
+- Reference-time → counts only when seeking specific info; general reference-checking doesn't.
+
+**Learning a new tool (KiCad, Python, Fusion, etc.)**
+
+- Counts only when learning **while applying** to the project.
+- Pre-learning a tool in isolation → doesn't count.
+
+**Firmware / software time**
+
+- Counts for Fallout if it's for the Fallout project.
+- **Cannot be double-submitted** to Hackatime / Horizons / other programs.
+
+**Non-electronics / physical-only projects**
+"Hardware" means physical — electronics aren't strictly required. But the project must orbit a technical goal.
+
+- Mounts, tools, enclosures with a purpose — count
+- Plush with hardware components — counts (grey area — ask if unsure)
+- 100 keychains with 100 company logos — no purpose, doesn't count
+- Knitting a sweater — not engineering-technical, doesn't count
+
+**README / BOM / zine writing time**
+Counts, per the DO track list. Normal AI / research rules still apply.
+
+**Idle / sleep time in recordings**
+Not stripped automatically — a human reviewer removes it during review. Users shouldn't panic about computer-sleep mid-recording, but the affected time won't count.
+
+**Stepping out of frame**
+Face isn't required. Reviewers need to tell **what** is being worked on, not just that someone is working. Quick off-camera moments = fine. Long unexplained gaps → reviewers deduct time at their discretion.
+
+**Using AI to polish English on README / zine**
+No — must be hand-written.
+
+**Guided projects**
+Count. They're structured so everything learned goes directly into the final product. **Not allowed as a direct copy** — users must make it their own.
+
+**Recording the act of journaling**
+Allowed — counts.
+
+**Timelapse recorded day A, journaled day B — which day gets the hour?**
+**Day B** (the journal's creation day). Recording timestamp is not used. Ref: [streak_service.rb:26-38](/app/services/streak_service.rb#L26-L38).
+
+## 3. Travel Stipends & Flights
+
+Full reference: [Travel Stipends](/docs/travel/travel-stipends).
+
+**Rate table**
+
+| Source                            | Rate                  | Requirements             |
+| --------------------------------- | --------------------- | ------------------------ |
+| Koi (design hours)                | $5 / hr               | None — no build required |
+| Gold (post-build)                 | $8 / hr               | Must ship the build      |
+| Need / merit-based flight stipend | Up to $1,500 / person | Case-by-case; form open  |
+
+Note on Koi → travel: this is _technically a loophole_ (users don't have to build IRL). We're accepting this deliberately — it's the primary path for non-attendees and for users who can't build.
+
+**Is the hourly stipend capped?**
+No. Separate from and additional to the $1,500 need/merit pool.
+
+**Need-based stipend form**
+[forms.hackclub.com/flyfallout](https://forms.hackclub.com/flyfallout) — open now. A booked flight isn't required; flight _plans_ are fine. We consider both need and merit factors.
+
+**Reimbursement timing**
+Most users: pay first, reimbursed **after the event**. Exceptions for people who genuinely cannot pay upfront — case-by-case, have them reach out.
+
+**What the stipend covers**
+Flights, trains, ferries directly to/from the event. Intra-China travel for **event purposes** covered by us. Sightseeing / unplanned travel → not covered.
+
+**Booked a flight and didn't qualify**
+Risk they accept. We cannot reimburse. Flag: they can still submit a project _after_ the event to collect the hourly stipend retroactively.
+
+## 4. Visas & Letters
+
+Full reference: [Visas](/docs/travel/visas).
+
+**Visa / invitation letter**
+Yes, we'll provide. Details still being finalized with our local partner in China. Scope: states we're inviting them to the event, brief description of why.
+
+**School excuse letter**
+Available once the user has logged **10 hours**.
+
+**"Do I need a visa?"**
+We can't answer per-user. Depends on citizenship, route, status. Redirect them to **official government sources**.
+
+**Visa form asks for hotel address**
+Still working with local partner. No answer yet — tell them to wait.
+
+**Passport application letter**
+We can only provide the visa/invitation letter for the event itself — not a general-purpose passport-application letter.
+
+## 5. Streaks
+
+(Implementation: [streak_service.rb](/app/services/streak_service.rb), [streak_day.rb](/app/models/streak_day.rb))
+
+**Day boundaries**
+Midnight–midnight in the **user's local timezone** (stored on `user.timezone`).
+
+**Minimum to keep streak active**
+**1 hour** (`STREAK_THRESHOLD_SECONDS = 1.hour`) of recording attached to a journal entry created that day.
+
+**Streak freezes**
+
+- Auto-applied when a day is missed. **No manual trigger, no opt-out.**
+- Max **5** stocked (`MAX_FREEZES = 5`).
+- Earned at milestones: **7, 14, 30, 60, 100** days (`MILESTONES`).
+- Also earned on streak-goal completion (if `user.streak_freezes < MAX_FREEZES`).
+
+**Streak goals (user-configurable) — koi rewards**
+
+| Goal length | Koi reward |
+| ----------- | ---------- |
+| 3 days      | 1          |
+| 5 days      | 2          |
+| 7 days      | 5          |
+| 14 days     | 10         |
+
+Plus a freeze on completion.
+
+## 6. Project Transfers
+
+**Blueprint → Fallout**
+
+- Form: [hack.club/crashout](https://hack.club/crashout).
+- Manual processing, no ETA.
+- Users can keep working in the meantime: tell them to create a Fallout project **under the same name** and we'll backfill.
+
+**Blueprint hours transfer rate**
+**Not 1:1.** We manually review each Blueprint project and deflate hours to what we deem fair.
+
+**Unfinished Blueprint projects**
+Transferable. Projects already built IRL in Blueprint are **not** transferable — but a submitted design (unbuilt) from Blueprint can move so the user can build it under Fallout.
+
+**Stasis → Fallout**
+**Not supported.** Stasis team disallows it.
+
+**Same project across programs / double-dipping**
+
+- **Hours can only be submitted to one program.** Period.
+- If a project is submitted to Fallout, it cannot go elsewhere.
+- If a project is never submitted to Fallout, the user is free to use it in other programs.
+
+## 7. Koi, Gold & Shop
+
+Full reference: [Project Funding](/docs/project-resources/project-funding).
+
+**Koi → Gold conversion**
+Automatic, triggered when the user ships their build.
+
+**Partner / collaborator splits**
+Hours are split between collaborators. (Not duplicated per-person.)
+
+**Gold-only shop items**
+Special prizes unlocked only by **building IRL**. Unrelated to event attendance. **Will be released after the IRL event** — we'll be too busy during the event to run that logistics.
+
+**Earning gold without attending the event**
+Allowed. Gold is tied to building, not attending.
+
+**Shop item suggestions**
+Canvas in [#fallout](https://hackclub.enterprise.slack.com/archives/C037157AL30).
+
+**Bug reports (koi not received, balance wrong, deducted too much)**
+Route to [#fallout-help](https://hackclub.enterprise.slack.com/archives/C0ACJ290090). Don't try to explain what's happening — let us fix the data.
+
+## 8. Timelapse Tools & Recording
+
+Full reference: [How to Timelapse](/docs/project-resources/how-to-timelapse).
+
+**Tool priority**
+
+1. **Lookout** — preferred
+2. **Lapse** — fallback if Lookout doesn't work
+3. **YouTube / OBS** — last resort only
+
+**Camera vs screen mode**
+
+- On-screen work (CAD, coding) → screen recording
+- Real-world work (soldering, assembling) → camera
+
+**YouTube copyright takedown**
+We need the video. Audio is optional — they can re-upload silent.
+
+**Switching tabs / windows mid-Lookout recording**
+Refresh the page or restart the app to switch what's being captured. Drafts save up to the last visible capture.
+
+**Lookout draft behavior**
+Saves automatically up to the last visible capture if the user exits mid-recording.
+
+**Two projects in one timelapse**
+Leave a note. Rare case — timelapses should normally be one project per recording.
+
+**Unlisted YouTube uploads**
+Fine.
+
+**Raw vs edited YouTube uploads**
+**Raw.** No pre-editing, speeding up, or cropping.
+
+**No visible system clock**
+Case-by-case — don't rely on leniency. Docs are explicit about the requirement.
+
+**Hackatime Desktop for Linux**
+Unrelated to Fallout — don't engage. Redirect to Hackatime's own support channels.
+
+## 9. BOM & Repo Requirements
+
+Full reference: [Making a BOM](/docs/general-resources/making-a-bom), [Submitting your Design](/docs/requirements/submitting-design).
+
+- **Shipping in BOM:** yes, include.
+- **3D-printed parts / filament:** include per-part material cost (pro-rated from a spool is fine).
+- **Already-owned parts:** include at actual price for reproducibility. Leave a note in the BOM. Reimbursement possible with proof of purchase.
+- **Accepted CAD formats:** `.step` + source (`.f3d`, `.f3z`, FCStd, or a _public_ Onshape link). **Blender does NOT count as CAD.**
+- **Firmware for design ship:** required if the final build expects firmware. Minimal is OK, but must be a good-faith attempt at actually working.
+- **Files >25 MB:** Git LFS required. Anything not in the repo "isn't real." Onshape public link is the only exception.
+- **EasyEDA PCB source files:** `.eprj` + gerbers is sufficient.
+- **Wiring diagrams:** must use a schematic capture tool. Hand-drawn / screenshot-with-lines is not acceptable.
+- **BOM vendor links:** must point to vendors that actually ship to the builder. Someone in Bangladesh linking LCSC when LCSC shipping is prohibitive → not OK.
+
+## 10. Event Logistics
+
+**Arrival / departure timing**
+
+- **Arrive:** aim for before the afternoon of **July 1**. Any time on July 1 is acceptable; won't miss much.
+- **Depart:** afternoon of **July 7** if possible. Earlier is OK; won't miss much.
+
+**Hotel check-in window**
+Guidance closer to the event. Don't commit to early-arrival plans yet.
+
+**Airport → venue**
+
+- One coordinated transfer from **HKG** in the afternoon/evening of July 1.
+- If missed, users handle their own travel to the venue.
+- Staff will also be at **Shenzhen airport** meeting attendees.
+
+**100-person cap**
+100 is an **estimate**. We're OK with more attending. **Not a competition, no waitlist.** Users qualify by hitting the requirement — there's no selection game.
+
+**Parents / guardians**
+Can travel with the attendee, but pay their own way. **Cannot be physically present at the event** due to safeguarding rules.
+
+**Non-attendee friends**
+Same as parents — no non-attendees on-site.
+
+**Demo location**
+Likely indoor, TBD.
+
+**Venue address**
+TBA closer to the event — still being finalized.
+
+**Room arrangement**
+Being finalized. Current plan: **same-sex rooms, 2 people / room, 2 beds**.
+
+## 11. Travel Specifics
+
+**HK routing (fly into HKG, MTR / ferry to Shenzhen)**
+User-specific answer — depends on citizenship, route, status. **We cannot provide per-user guidance.** Redirect to official sources.
+
+**Flying as a minor — airline's "arrival contact" question**
+More guidance coming. **Most airlines let you opt out of unaccompanied-minor service** — that's fully safe for attendees.
+
+**AliPay / WeChat**
+Not required. We cover food & activities. **Highly recommended** for souvenirs / extras attendees want on their own.
+
+**Arriving early / staying late**
+We cover lodging up to **1 day before and 1 day after** the event. Outside that window, the user is on their own.
+
+**Coordinated / group flights**
+None — attendees book their own. Coordination between attendees is up to them.
+
+## 12. Non-Attendance Path
+
+**Certificate without attending**
+Yes — a certificate is issued regardless of event attendance.
+
+**Grants / koi / gold without attending**
+All available. Koi isn't wasted — exchangeable for grants or prizes.
+
+**Shop items without attending**
+Most items work. Some merch items are given **only at the IRL event**.
+
+**Items that require attendance**
+No _prizes_ require attendance. Some **logistics items** (early accommodation, SIM cards) aren't useful / obtainable if the user isn't going — we'll make this clear on the shop page.
+
+**Do users have to build IRL to qualify?**
+No — design-only qualifies. But we **expect** users to build their projects if they're able to.
+
+## Appendix — Triage routing cheatsheet
+
+| Situation                           | Route to                                                                                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| Review waiting > 2 weeks            | [#fallout-help](https://hackclub.enterprise.slack.com/archives/C0ACJ290090) (might be a bug) |
+| Approved but no koi / status stuck  | [#fallout-help](https://hackclub.enterprise.slack.com/archives/C0ACJ290090) (bug)            |
+| Project sanity check                | [#fallout](https://hackclub.enterprise.slack.com/archives/C037157AL30)                       |
+| Electronics help                    | [#electronics](https://hackclub.enterprise.slack.com/archives/C056AMWSFKJ)                   |
+| Lapse-specific bugs                 | [#lapse-help](https://hackclub.enterprise.slack.com/archives/C09NVLWU61E)                    |
+| Blueprint transfer request          | [hack.club/crashout](https://hack.club/crashout)                                             |
+| Need-based flight stipend           | [forms.hackclub.com/flyfallout](https://forms.hackclub.com/flyfallout)                       |
+| Visa/personal travel questions      | Official government sources                                                                  |
+| Hackatime desktop / unrelated tools | Hackatime's own channels                                                                     |
