@@ -136,8 +136,10 @@ function placeCritters(count: number, groundW: number, groundH: number, iconShif
 
 type CritterItem = {
   id: number
+  variant: string
   image_path: string
   created_at: string
+  count: number
 }
 
 type PageProps = {
@@ -248,7 +250,7 @@ export default function ClearingIndex({ critters }: PageProps) {
                 <Link
                   key={critter.id}
                   href={`/spin/${critter.id}`}
-                  className="absolute w-28 xs:w-32 sm:w-40"
+                  className="group absolute w-28 xs:w-32 sm:w-40"
                   style={{
                     left: '50%',
                     top: '50%',
@@ -256,6 +258,9 @@ export default function ClearingIndex({ critters }: PageProps) {
                     zIndex: Math.round(pos.y + 1000),
                   }}
                 >
+                  <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 -top-9 bg-brown text-light-brown border-2 border-dark-brown px-2 py-0.5 text-xs font-bold whitespace-nowrap">
+                    {critter.variant} x{critter.count}
+                  </div>
                   <img src={critter.image_path} alt="Critter" className="w-full h-full object-contain" />
                   {DEBUG && (
                     <div
