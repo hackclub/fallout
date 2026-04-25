@@ -6,7 +6,7 @@
 #  address      :text
 #  admin_note   :text
 #  frozen_price :integer          not null
-#  phone        :string
+#  phone        :text
 #  quantity     :integer          default(1), not null
 #  state        :string           default("pending"), not null
 #  created_at   :datetime         not null

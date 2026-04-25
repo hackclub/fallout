@@ -1,3 +1,22 @@
+# == Schema Information
+#
+# Table name: bulletin_events
+#
+#  id          :bigint           not null, primary key
+#  description :text             not null
+#  ends_at     :datetime
+#  image_url   :string
+#  schedulable :boolean          default(TRUE), not null
+#  starts_at   :datetime
+#  title       :string           not null
+#  created_at  :datetime         not null
+#  updated_at  :datetime         not null
+#
+# Indexes
+#
+#  index_bulletin_events_on_ends_at    (ends_at)
+#  index_bulletin_events_on_starts_at  (starts_at)
+#
 require "test_helper"
 
 class BulletinEventTest < ActiveSupport::TestCase
