@@ -49,7 +49,7 @@ class YouTubeVideo < ApplicationRecord
 
   def refetch_data!
     attrs = YouTubeService.fetch_video_data(video_id)
-    raise ActiveRecord::RecordNotFound, "YouTube video #{video_id} not found" unless attrs
+    raise YouTubeService::Error, "YouTube video #{video_id} not found" unless attrs
 
     update!(attrs.except(:video_id).merge(last_refreshed_at: Time.current))
   end

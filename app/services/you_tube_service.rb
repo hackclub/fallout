@@ -16,7 +16,7 @@ module YouTubeService
 
     video = YouTubeVideo.find_by(video_id: video_id)
     if video
-      refetch_duration_if_missing(video)
+      YouTubeVideoRefetchJob.perform_later(video.id) if video.duration_seconds.nil?
       return video
     end
 
@@ -48,6 +48,8 @@ module YouTubeService
     video = YouTubeVideo.create!(attrs.merge(last_refreshed_at: Time.current))
     YouTubeVideoRefetchJob.perform_later(video.id) if video.duration_seconds.nil?
     video
+  rescue Faraday::Error
+    nil
   rescue ActiveRecord::RecordNotUnique
     YouTubeVideo.find_by(video_id: video_id)
   end
@@ -102,6 +104,8 @@ module YouTubeService
       tags: snippet["tags"],
       category_id: snippet["categoryId"]
     }
+  rescue Faraday::Error
+    raise # let the job retry on transient network failures
   rescue StandardError => e
     ErrorReporter.capture_exception(e, level: :warning, contexts: { youtube: { action: "fetch_video_data_from_api", video_id: video_id } })
     nil
@@ -140,6 +144,8 @@ module YouTubeService
       tags: nil,
       category_id: nil
     }
+  rescue Faraday::Error
+    raise # let the job retry on transient network failures
   rescue StandardError => e
     ErrorReporter.capture_exception(e, level: :warning, contexts: { youtube: { action: "fetch_video_data_from_oembed", video_id: video_id } })
     nil
@@ -172,12 +178,5 @@ module YouTubeService
       f.options.open_timeout = 5
       f.options.timeout = 10
     end
-  end
-
-  def refetch_duration_if_missing(video)
-    return unless video.duration_seconds.nil?
-    video.refetch_data!
-  rescue StandardError
-    nil
   end
 end
