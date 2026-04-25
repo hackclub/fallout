@@ -87,6 +87,16 @@ export default function BulletinBoardIndex({ events, featured, explore, is_modal
       ),
     [liveEvents, now],
   )
+  const hasEventCounts = eventCounts.happening > 0 || eventCounts.upcoming > 0
+  const [displayedEventCounts, setDisplayedEventCounts] = useState(eventCounts)
+
+  useEffect(() => {
+    if (!hasEventCounts) return
+
+    setDisplayedEventCounts((counts) =>
+      counts.happening === eventCounts.happening && counts.upcoming === eventCounts.upcoming ? counts : eventCounts,
+    )
+  }, [eventCounts, hasEventCounts])
 
   // Happening events first (scheduled-end sorted by end time asc, manual live sorted
   // by start time asc so longer-running comes first); then upcoming sorted by start time asc.
@@ -170,7 +180,6 @@ export default function BulletinBoardIndex({ events, featured, explore, is_modal
     </Link>
   )
 
-  const hasEventCounts = eventCounts.happening > 0 || eventCounts.upcoming > 0
   const eventCountLabel = [
     eventCounts.happening > 0
       ? `${eventCounts.happening} ${eventCounts.happening === 1 ? 'event' : 'events'} happening now`
@@ -198,68 +207,63 @@ export default function BulletinBoardIndex({ events, featured, explore, is_modal
             <motion.div layout className={styles.eventsHeader}>
               <h2 className={styles.sectionHeading}>Events</h2>
 
-              <AnimatePresence initial={false}>
-                {hasEventCounts && (
-                  <motion.div
-                    key="event-counts"
-                    layout
-                    aria-label={eventCountLabel}
-                    className={styles.eventCountLine}
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={EVENT_COUNT_TRANSITION}
-                  >
-                    <AnimatePresence initial={false} mode="popLayout">
-                      {eventCounts.happening > 0 && (
-                        <motion.span
-                          key="happening"
-                          layout
-                          className={styles.eventCountSegment}
-                          initial={{ opacity: 0, y: -2 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -2 }}
-                          transition={EVENT_COUNT_TRANSITION}
-                        >
-                          <SlidingNumber value={eventCounts.happening} />
-                          <TextMorph as="span" transition={EVENT_COUNT_TRANSITION}>
-                            {eventCounts.happening === 1 ? 'event happening now' : 'events happening now'}
-                          </TextMorph>
-                        </motion.span>
-                      )}
-                      {eventCounts.happening > 0 && eventCounts.upcoming > 0 && (
-                        <motion.span
-                          key="separator"
-                          layout
-                          className={styles.eventCountSeparator}
-                          initial={{ opacity: 0, y: -2 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -2 }}
-                          transition={EVENT_COUNT_TRANSITION}
-                        >
-                          •
-                        </motion.span>
-                      )}
-                      {eventCounts.upcoming > 0 && (
-                        <motion.span
-                          key="upcoming"
-                          layout
-                          className={styles.eventCountSegment}
-                          initial={{ opacity: 0, y: -2 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -2 }}
-                          transition={EVENT_COUNT_TRANSITION}
-                        >
-                          <SlidingNumber value={eventCounts.upcoming} />
-                          <TextMorph as="span" transition={EVENT_COUNT_TRANSITION}>
-                            {eventCounts.upcoming === 1 ? 'upcoming event' : 'upcoming events'}
-                          </TextMorph>
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <motion.div
+                layout
+                aria-hidden={!hasEventCounts}
+                aria-label={hasEventCounts ? eventCountLabel : undefined}
+                className={styles.eventCountLine}
+                initial={false}
+                animate={{ opacity: hasEventCounts ? 1 : 0, y: hasEventCounts ? 0 : -4 }}
+                transition={EVENT_COUNT_TRANSITION}
+              >
+                <AnimatePresence initial={false} mode="popLayout">
+                  {displayedEventCounts.happening > 0 && (
+                    <motion.span
+                      key="happening"
+                      layout
+                      className={styles.eventCountSegment}
+                      initial={{ opacity: 0, y: -2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -2 }}
+                      transition={EVENT_COUNT_TRANSITION}
+                    >
+                      <SlidingNumber value={displayedEventCounts.happening} />
+                      <TextMorph as="span" transition={EVENT_COUNT_TRANSITION}>
+                        {displayedEventCounts.happening === 1 ? 'event happening now' : 'events happening now'}
+                      </TextMorph>
+                    </motion.span>
+                  )}
+                  {displayedEventCounts.happening > 0 && displayedEventCounts.upcoming > 0 && (
+                    <motion.span
+                      key="separator"
+                      layout
+                      className={styles.eventCountSeparator}
+                      initial={{ opacity: 0, y: -2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -2 }}
+                      transition={EVENT_COUNT_TRANSITION}
+                    >
+                      •
+                    </motion.span>
+                  )}
+                  {displayedEventCounts.upcoming > 0 && (
+                    <motion.span
+                      key="upcoming"
+                      layout
+                      className={styles.eventCountSegment}
+                      initial={{ opacity: 0, y: -2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -2 }}
+                      transition={EVENT_COUNT_TRANSITION}
+                    >
+                      <SlidingNumber value={displayedEventCounts.upcoming} />
+                      <TextMorph as="span" transition={EVENT_COUNT_TRANSITION}>
+                        {displayedEventCounts.upcoming === 1 ? 'upcoming event' : 'upcoming events'}
+                      </TextMorph>
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.div>
             </motion.div>
 
             <motion.div layout className={styles.eventsArea}>

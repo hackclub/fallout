@@ -265,6 +265,11 @@ Rails.application.routes.draw do
 
       # Staff-readable index; controller enforces admin-only for mutations.
       resources :bulletin_events, only: [ :index, :create, :update, :destroy ] do
+        collection do
+          delete :bulk_destroy
+          delete :destroy_expired
+        end
+
         member do
           patch :start_now
           patch :force_start_now

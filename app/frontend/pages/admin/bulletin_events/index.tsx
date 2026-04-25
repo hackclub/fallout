@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { router, usePage } from '@inertiajs/react'
 import type { SharedProps } from '@/types'
@@ -33,7 +33,11 @@ type TabKey = 'upcoming' | 'all' | 'expired'
 type PageProps = {
   events: SerializedBulletinEvent[]
   current_tab: TabKey
-  counts: { upcoming: number; all: number; expired: number }
+}
+
+type EventWithStatus = {
+  event: SerializedBulletinEvent
+  status: BulletinEventStatus
 }
 
 const STATUS_LABEL: Record<BulletinEventStatus, string> = {
@@ -50,27 +54,97 @@ const STATUS_CLASS: Record<BulletinEventStatus, string> = {
   expired: 'bg-slate-200 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300',
 }
 
-export default function AdminBulletinEventsIndex({ events, current_tab, counts }: PageProps) {
+export default function AdminBulletinEventsIndex({ events, current_tab }: PageProps) {
   const { admin_permissions } = usePage<SharedProps & { admin_permissions?: { is_admin: boolean } }>().props
   const canModify = admin_permissions?.is_admin ?? false
 
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [editing, setEditing] = useState<SerializedBulletinEvent | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<SerializedBulletinEvent | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState<'selected' | 'all' | null>(null)
+  const [selectedExpiredIds, setSelectedExpiredIds] = useState<Set<number>>(() => new Set())
 
-  const liveProps = useLiveReload<PageProps>({ stream: 'bulletin_events', only: ['events', 'counts'] })
-  const now = useNowTick()
+  const liveProps = useLiveReload<Pick<PageProps, 'events'>>({ stream: 'bulletin_events', only: ['events'] })
+  const now = useNowTick(1000)
   const liveEvents = liveProps?.events ?? events
-  const liveCounts = liveProps?.counts ?? counts
+
+  const eventsWithStatus = useMemo<EventWithStatus[]>(
+    () => liveEvents.map((event) => ({ event, status: computeBulletinEventStatus(event, now) })),
+    [liveEvents, now],
+  )
+  const liveCounts = useMemo(
+    () =>
+      eventsWithStatus.reduce(
+        (counts, { status }) => {
+          counts.all += 1
+          if (status === 'expired') {
+            counts.expired += 1
+          } else {
+            counts.upcoming += 1
+          }
+          return counts
+        },
+        { upcoming: 0, all: 0, expired: 0 },
+      ),
+    [eventsWithStatus],
+  )
+  const visibleEvents = useMemo(() => {
+    if (current_tab === 'all') return eventsWithStatus
+    if (current_tab === 'expired') return eventsWithStatus.filter(({ status }) => status === 'expired')
+    return eventsWithStatus.filter(({ status }) => status !== 'expired')
+  }, [current_tab, eventsWithStatus])
+  const expiredEvents = useMemo(() => eventsWithStatus.filter(({ status }) => status === 'expired'), [eventsWithStatus])
+  const selectedExpiredEvents = useMemo(
+    () => expiredEvents.filter(({ event }) => selectedExpiredIds.has(event.id)),
+    [expiredEvents, selectedExpiredIds],
+  )
+  const selectedExpiredCount = selectedExpiredEvents.length
+  const visibleExpiredIds = useMemo(
+    () => visibleEvents.filter(({ status }) => status === 'expired').map(({ event }) => event.id),
+    [visibleEvents],
+  )
+  const allVisibleExpiredSelected =
+    visibleExpiredIds.length > 0 && visibleExpiredIds.every((id) => selectedExpiredIds.has(id))
+  const showExpiredSelection = canModify && current_tab === 'expired'
+  const tableColSpan = showExpiredSelection ? 8 : 7
+  const editing = editingId == null ? null : liveEvents.find((event) => event.id === editingId) || null
+  const confirmDelete =
+    confirmDeleteId == null ? null : liveEvents.find((event) => event.id === confirmDeleteId) || null
+
+  useEffect(() => {
+    setSelectedExpiredIds((previous) => {
+      const expiredIds = new Set(expiredEvents.map(({ event }) => event.id))
+      const next = new Set([...previous].filter((id) => expiredIds.has(id)))
+      return next.size === previous.size ? previous : next
+    })
+  }, [expiredEvents])
+
+  useEffect(() => {
+    if (sheetOpen && editingId != null && !editing) {
+      setSheetOpen(false)
+      setEditingId(null)
+    }
+  }, [editing, editingId, sheetOpen])
+
+  useEffect(() => {
+    if (confirmDeleteId != null && !confirmDelete) {
+      setConfirmDeleteId(null)
+    }
+  }, [confirmDelete, confirmDeleteId])
 
   function openNew() {
-    setEditing(null)
+    setEditingId(null)
     setSheetOpen(true)
   }
 
   function openEdit(event: SerializedBulletinEvent) {
-    setEditing(event)
+    setEditingId(event.id)
     setSheetOpen(true)
+  }
+
+  function setSheet(open: boolean) {
+    setSheetOpen(open)
+    if (!open) setEditingId(null)
   }
 
   function switchTab(tab: string) {
@@ -81,11 +155,54 @@ export default function AdminBulletinEventsIndex({ events, current_tab, counts }
     router.patch(`/admin/bulletin_events/${event.id}/${path}`, { tab: current_tab }, { preserveScroll: true })
   }
 
+  function toggleExpiredSelection(eventId: number, checked: boolean) {
+    setSelectedExpiredIds((previous) => {
+      const next = new Set(previous)
+      if (checked) {
+        next.add(eventId)
+      } else {
+        next.delete(eventId)
+      }
+      return next
+    })
+  }
+
+  function toggleVisibleExpiredSelection(checked: boolean) {
+    setSelectedExpiredIds((previous) => {
+      const next = new Set(previous)
+      visibleExpiredIds.forEach((id) => {
+        if (checked) {
+          next.add(id)
+        } else {
+          next.delete(id)
+        }
+      })
+      return next
+    })
+  }
+
   function doDelete(event: SerializedBulletinEvent) {
     router.delete(`/admin/bulletin_events/${event.id}`, {
       data: { tab: current_tab },
       preserveScroll: true,
-      onFinish: () => setConfirmDelete(null),
+      onFinish: () => setConfirmDeleteId(null),
+    })
+  }
+
+  function doBulkDelete(mode: 'selected' | 'all') {
+    const data =
+      mode === 'selected'
+        ? { ids: selectedExpiredEvents.map(({ event }) => event.id), tab: current_tab }
+        : { tab: current_tab }
+    const url = mode === 'selected' ? '/admin/bulletin_events/bulk_destroy' : '/admin/bulletin_events/destroy_expired'
+
+    router.delete(url, {
+      data,
+      preserveScroll: true,
+      onFinish: () => {
+        setConfirmBulkDelete(null)
+        setSelectedExpiredIds(new Set())
+      },
     })
   }
 
@@ -99,7 +216,16 @@ export default function AdminBulletinEventsIndex({ events, current_tab, counts }
             local timezone.
           </p>
         </div>
-        {canModify && <Button onClick={openNew}>+ New event</Button>}
+        {canModify && (
+          <div className="flex items-center gap-2">
+            {liveCounts.expired > 0 && (
+              <Button variant="destructive" onClick={() => setConfirmBulkDelete('all')}>
+                <Trash2 className="size-3.5" /> Clear all expired
+              </Button>
+            )}
+            <Button onClick={openNew}>+ New event</Button>
+          </div>
+        )}
       </div>
 
       <Tabs value={current_tab} onValueChange={switchTab}>
@@ -116,10 +242,39 @@ export default function AdminBulletinEventsIndex({ events, current_tab, counts }
         </TabsList>
 
         <TabsContent value={current_tab}>
+          {showExpiredSelection && liveCounts.expired > 0 && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-border bg-muted px-3 py-2">
+              <span className="text-sm text-muted-foreground">
+                {selectedExpiredCount > 0
+                  ? `${selectedExpiredCount} expired ${selectedExpiredCount === 1 ? 'event' : 'events'} selected`
+                  : 'Select expired events to delete them in bulk.'}
+              </span>
+              <Button
+                variant="destructive"
+                disabled={selectedExpiredCount === 0}
+                onClick={() => setConfirmBulkDelete('selected')}
+              >
+                <Trash2 className="size-3.5" /> Delete selected
+              </Button>
+            </div>
+          )}
+
           <div className="rounded-md border border-border overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
+                  {showExpiredSelection && (
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleExpiredSelected}
+                        disabled={visibleExpiredIds.length === 0}
+                        onChange={(e) => toggleVisibleExpiredSelection(e.currentTarget.checked)}
+                        aria-label="Select all expired events"
+                        className="size-4 accent-primary"
+                      />
+                    </TableHead>
+                  )}
                   <TableHead className="w-14">Image</TableHead>
                   <TableHead className="min-w-48">Title</TableHead>
                   <TableHead>Mode</TableHead>
@@ -130,22 +285,32 @@ export default function AdminBulletinEventsIndex({ events, current_tab, counts }
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {liveEvents.length === 0 ? (
+                {visibleEvents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={tableColSpan} className="h-24 text-center text-muted-foreground">
                       {current_tab === 'upcoming' && 'No upcoming events. Click "+ New event" to add one.'}
                       {current_tab === 'all' && 'No events yet.'}
                       {current_tab === 'expired' && 'No expired events.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  liveEvents.map((event) => {
-                    const liveStatus = computeBulletinEventStatus(event, now)
+                  visibleEvents.map(({ event, status: liveStatus }) => {
                     const isManualDraft = !event.schedulable && liveStatus === 'draft'
                     const isScheduledUpcoming = event.schedulable && liveStatus === 'upcoming'
                     const isActive = liveStatus === 'happening'
                     return (
                       <TableRow key={event.id}>
+                        {showExpiredSelection && (
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              checked={selectedExpiredIds.has(event.id)}
+                              onChange={(e) => toggleExpiredSelection(event.id, e.currentTarget.checked)}
+                              aria-label={`Select ${event.title}`}
+                              className="size-4 accent-primary"
+                            />
+                          </TableCell>
+                        )}
                         <TableCell>
                           {event.image_url ? (
                             // eslint-disable-next-line jsx-a11y/img-redundant-alt
@@ -217,7 +382,7 @@ export default function AdminBulletinEventsIndex({ events, current_tab, counts }
                               <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                onClick={() => setConfirmDelete(event)}
+                                onClick={() => setConfirmDeleteId(event.id)}
                                 title="Delete"
                                 className="text-destructive hover:text-destructive"
                               >
@@ -238,9 +403,14 @@ export default function AdminBulletinEventsIndex({ events, current_tab, counts }
         </TabsContent>
       </Tabs>
 
-      <EventFormSheet open={sheetOpen} onOpenChange={setSheetOpen} event={editing} currentTab={current_tab} />
+      <EventFormSheet
+        open={sheetOpen && (editingId == null || !!editing)}
+        onOpenChange={setSheet}
+        event={editing}
+        currentTab={current_tab}
+      />
 
-      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete event?</AlertDialogTitle>
@@ -251,6 +421,35 @@ export default function AdminBulletinEventsIndex({ events, current_tab, counts }
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={() => confirmDelete && doDelete(confirmDelete)}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!confirmBulkDelete} onOpenChange={(o) => !o && setConfirmBulkDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmBulkDelete === 'all' ? 'Clear all expired events?' : 'Delete selected expired events?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmBulkDelete === 'all'
+                ? `This will permanently delete ${liveCounts.expired} expired ${
+                    liveCounts.expired === 1 ? 'event' : 'events'
+                  }. This action cannot be undone.`
+                : `This will permanently delete ${selectedExpiredCount} selected expired ${
+                    selectedExpiredCount === 1 ? 'event' : 'events'
+                  }. This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => confirmBulkDelete && doBulkDelete(confirmBulkDelete)}
+              disabled={confirmBulkDelete === 'selected' && selectedExpiredCount === 0}
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

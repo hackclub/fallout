@@ -11,6 +11,28 @@ class Admin::BulletinEventsControllerTest < ActionController::TestCase
     @request.session[:user_id] = @admin.id
   end
 
+  test "index returns all events for each tab" do
+    now = Time.zone.local(2026, 4, 25, 12, 0, 0)
+
+    travel_to now do
+      expired = create_event(schedulable: true, starts_at: 2.hours.ago, ends_at: 1.hour.ago)
+      happening = create_event(schedulable: true, starts_at: 1.hour.ago, ends_at: 1.hour.from_now)
+      upcoming = create_event(schedulable: true, starts_at: 1.hour.from_now, ends_at: 2.hours.from_now)
+      draft = create_event(schedulable: false, starts_at: nil, ends_at: nil)
+      expected_ids = [ expired, happening, upcoming, draft ].map(&:id)
+
+      %w[upcoming expired all].each do |tab|
+        inertia_get_index(tab: tab)
+
+        props = inertia_props
+        assert_response :success
+        assert_equal tab, props.fetch("current_tab")
+        assert_equal expected_ids, props.fetch("events").map { |event| event.fetch("id") }
+        refute props.key?("counts")
+      end
+    end
+  end
+
   test "manual running update preserves lifecycle when blank timestamps are submitted" do
     starts_at = Time.zone.local(2026, 4, 25, 10, 0, 0)
     event = create_event(schedulable: false, starts_at: starts_at, ends_at: nil)
@@ -26,6 +48,42 @@ class Admin::BulletinEventsControllerTest < ActionController::TestCase
     assert_equal starts_at.to_i, event.starts_at.to_i
     assert_nil event.ends_at
     assert_equal :happening, event.status
+  end
+
+  test "bulk destroy deletes only requested expired events" do
+    now = Time.zone.local(2026, 4, 25, 12, 0, 0)
+
+    travel_to now do
+      expired = create_event(schedulable: true, starts_at: 2.hours.ago, ends_at: 1.hour.ago)
+      active = create_event(schedulable: true, starts_at: 1.hour.ago, ends_at: 1.hour.from_now)
+
+      assert_difference "BulletinEvent.count", -1 do
+        delete :bulk_destroy, params: { ids: [ expired.id, active.id ], tab: "expired" }
+      end
+
+      assert_redirected_to admin_bulletin_events_path(tab: "expired")
+      assert_nil BulletinEvent.find_by(id: expired.id)
+      assert_not_nil BulletinEvent.find_by(id: active.id)
+    end
+  end
+
+  test "destroy expired deletes all expired events only" do
+    now = Time.zone.local(2026, 4, 25, 12, 0, 0)
+
+    travel_to now do
+      expired = create_event(schedulable: true, starts_at: 2.hours.ago, ends_at: 1.hour.ago)
+      manual_expired = create_event(schedulable: false, starts_at: 2.hours.ago, ends_at: 1.hour.from_now)
+      active = create_event(schedulable: true, starts_at: 1.hour.ago, ends_at: 1.hour.from_now)
+
+      assert_difference "BulletinEvent.count", -2 do
+        delete :destroy_expired, params: { tab: "expired" }
+      end
+
+      assert_redirected_to admin_bulletin_events_path(tab: "expired")
+      assert_nil BulletinEvent.find_by(id: expired.id)
+      assert_nil BulletinEvent.find_by(id: manual_expired.id)
+      assert_not_nil BulletinEvent.find_by(id: active.id)
+    end
   end
 
   test "manual expired update preserves lifecycle when blank timestamps are submitted" do
@@ -153,5 +211,14 @@ class Admin::BulletinEventsControllerTest < ActionController::TestCase
 
   def manual_mode_payload(event)
     old_manual_payload(event, image_url: event.image_url)
+  end
+
+  def inertia_get_index(tab:)
+    @request.headers["X-Inertia"] = "true"
+    get :index, params: { tab: tab }
+  end
+
+  def inertia_props
+    JSON.parse(response.body).fetch("props")
   end
 end

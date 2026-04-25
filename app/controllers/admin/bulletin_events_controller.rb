@@ -9,22 +9,11 @@ class Admin::BulletinEventsController < Admin::ApplicationController
     tab = TABS.include?(params[:tab]) ? params[:tab] : "upcoming"
 
     scope = policy_scope(BulletinEvent)
-    filtered = case tab
-    when "upcoming" then scope.upcoming_or_happening
-    when "expired" then scope.expired
-    else scope
-    end
-
-    events = filtered.order(Arel.sql("COALESCE(starts_at, '9999-01-01') ASC")).to_a
+    events = scope.order(Arel.sql("COALESCE(starts_at, '9999-01-01') ASC")).to_a
 
     render inertia: "admin/bulletin_events/index", props: {
       events: events.map { |e| serialize_bulletin_event(e) },
-      current_tab: tab,
-      counts: {
-        upcoming: scope.upcoming_or_happening.count,
-        all: scope.count,
-        expired: scope.expired.count
-      }
+      current_tab: tab
     }
   end
 
@@ -64,6 +53,24 @@ class Admin::BulletinEventsController < Admin::ApplicationController
     end
   end
 
+  def bulk_destroy
+    authorize BulletinEvent
+
+    events = policy_scope(BulletinEvent).where(id: bulk_destroy_ids).expired.to_a
+    deleted_count = destroy_events(events)
+
+    redirect_to admin_bulletin_events_path(tab: params[:tab].presence), notice: bulk_destroy_notice(deleted_count)
+  end
+
+  def destroy_expired
+    authorize BulletinEvent
+
+    events = policy_scope(BulletinEvent).expired.to_a
+    deleted_count = destroy_events(events)
+
+    redirect_to admin_bulletin_events_path(tab: params[:tab].presence), notice: bulk_destroy_notice(deleted_count)
+  end
+
   def start_now
     @event = BulletinEvent.find(params[:id])
     authorize @event
@@ -89,6 +96,20 @@ class Admin::BulletinEventsController < Admin::ApplicationController
 
   def event_params
     params.expect(bulletin_event: [ :title, :description, :image_url, :schedulable, :starts_at, :ends_at ])
+  end
+
+  def bulk_destroy_ids
+    Array(params[:ids]).filter_map { |id| Integer(id, exception: false) }
+  end
+
+  def destroy_events(events)
+    events.sum { |event| event.destroy ? 1 : 0 }
+  end
+
+  def bulk_destroy_notice(count)
+    return "No expired events deleted." if count.zero?
+
+    "#{count} expired #{'event'.pluralize(count)} deleted."
   end
 
   def normalized_event_params

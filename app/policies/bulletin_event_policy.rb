@@ -21,6 +21,14 @@ class BulletinEventPolicy < ApplicationPolicy
     admin? # Only admins can delete events
   end
 
+  def bulk_destroy?
+    admin? # Only admins can bulk-delete expired events
+  end
+
+  def destroy_expired?
+    admin? # Only admins can clear expired events
+  end
+
   def start_now?
     admin? # Only admins can start a manual-mode event
   end
