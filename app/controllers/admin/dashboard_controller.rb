@@ -80,14 +80,12 @@ class Admin::DashboardController < Admin::ApplicationController
     terminal_statuses = %w[approved returned rejected]
 
     raw_duration_sql = <<~SQL.squish
-      COALESCE(SUM(
-        CASE recordings.recordable_type
-          WHEN 'LapseTimelapse'   THEN (SELECT duration FROM lapse_timelapses WHERE id = recordings.recordable_id)
-          WHEN 'LookoutTimelapse' THEN (SELECT duration FROM lookout_timelapses WHERE id = recordings.recordable_id)
-          WHEN 'YouTubeVideo'     THEN (SELECT duration_seconds * stretch_multiplier FROM you_tube_videos WHERE id = recordings.recordable_id)
-          ELSE 0
-        END
-      ), 0)
+      CASE recordings.recordable_type
+        WHEN 'LapseTimelapse'   THEN (SELECT duration FROM lapse_timelapses WHERE id = recordings.recordable_id)
+        WHEN 'LookoutTimelapse' THEN (SELECT duration FROM lookout_timelapses WHERE id = recordings.recordable_id)
+        WHEN 'YouTubeVideo'     THEN (SELECT duration_seconds * stretch_multiplier FROM you_tube_videos WHERE id = recordings.recordable_id)
+        ELSE 0
+      END
     SQL
 
     # Raw recording seconds attributed to ship creation date
