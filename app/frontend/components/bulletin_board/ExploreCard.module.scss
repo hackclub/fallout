@@ -1,0 +1,263 @@
+$sm: 640px;
+$md: 768px;
+$lg: 1024px;
+
+// Vellum / aged-butter card surface — analogous to the page's dusty rose,
+// shifted toward yellow so cards sit in the same warm family but pop via luminance.
+$card-bg: #f4dfc0;
+$card-border: rgba(94, 66, 55, 0.18);
+$card-border-hover: rgba(94, 66, 55, 0.32);
+$card-divider: rgba(94, 66, 55, 0.16);
+
+// Ink ramp — deep walnut on vellum, like a 60s travel poster.
+$ink-primary: #4a3120;
+$ink-secondary: #7a5945;
+$ink-muted: #a08266;
+
+// Saturated accents on the muted card ground.
+$avatar-bg: #9f715d;
+$avatar-text: #fff4d9;
+
+$tag-bg: #e8c887;
+$tag-text: #5c3f2f;
+
+$heart-color: #d94b3d;
+$chat-color: #6b4233;
+
+$readmore-rest: #8b5e44;
+$readmore-hover: #4a3120;
+$readmore-underline: #d94b3d;
+
+// Sunset gradient stops — peach to gold to cream.
+$sunset-peach: #ff9c7a;
+$sunset-coral: #ff8e6f;
+$sunset-amber: #ffb888;
+$sunset-gold: #ffd99b;
+$sunset-cream: #ffe1a8;
+
+$shadow-rest:
+  0 1px 3px rgba(58, 36, 25, 0.12),
+  0 6px 18px rgba(58, 36, 25, 0.16);
+
+$shadow-hover:
+  0 3px 6px rgba(58, 36, 25, 0.18),
+  0 16px 36px rgba(58, 36, 25, 0.26);
+
+.cardWrap {
+  width: 100%;
+  margin-bottom: 1.25rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+  background-color: $card-bg;
+  border: 1px solid $card-border;
+  border-radius: 0.875rem;
+  box-shadow: $shadow-rest;
+  text-decoration: none;
+  color: $ink-primary;
+  transition:
+    box-shadow 220ms ease-out,
+    border-color 220ms ease-out;
+
+  &:hover {
+    box-shadow: $shadow-hover;
+    border-color: $card-border-hover;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #8b5e44;
+    outline-offset: 3px;
+  }
+}
+
+.media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-top-left-radius: 0.875rem;
+  border-top-right-radius: 0.875rem;
+  overflow: hidden;
+}
+
+.mediaImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+// Sunset over kraft paper — vibrant peach top-left fading to gold bottom-right
+// with a buttery cream highlight in the upper-right corner.
+.mediaGradient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(80% 60% at 85% 8%, $sunset-cream 0%, transparent 60%),
+    radial-gradient(95% 70% at 5% 100%, $sunset-peach 0%, transparent 65%),
+    linear-gradient(135deg, $sunset-coral 0%, $sunset-amber 50%, $sunset-gold 100%);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1rem 1.125rem 1.125rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: $avatar-bg;
+  color: $avatar-text;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.username {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $ink-primary;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date {
+  font-size: 0.75rem;
+  color: $ink-muted;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: $ink-primary;
+  margin: 0;
+}
+
+.content {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: $ink-primary;
+  margin: 0;
+}
+
+.description {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: $ink-secondary;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  list-style: none;
+  padding: 0;
+  margin: 0.125rem 0 0;
+}
+
+.tag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  background-color: $tag-bg;
+  color: $tag-text;
+  letter-spacing: 0.01em;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid $card-divider;
+}
+
+.counts {
+  display: flex;
+  gap: 0.875rem;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: $ink-secondary;
+}
+
+.iconHeart,
+.iconChat {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.iconHeart {
+  color: $heart-color;
+}
+
+.iconChat {
+  color: $chat-color;
+}
+
+.readMore {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: $readmore-rest;
+  position: relative;
+  transition: color 160ms ease-out;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 100%;
+    bottom: -2px;
+    height: 1.5px;
+    background-color: $readmore-underline;
+    transition: right 200ms ease-out;
+  }
+}
+
+.card:hover .readMore {
+  color: $readmore-hover;
+}
+
+.card:hover .readMore::after {
+  right: 0;
+}

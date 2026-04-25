@@ -43,11 +43,14 @@ class BulletinBoardController < ApplicationController
 
   def placeholder_explore
     # TODO: search/sort real projects (params[:q], params[:sort]) once Project data is wired up.
+    # Picsum seeds give a deterministic image per project_name; entries without :image fall
+    # back to the gradient placeholder in ExploreCard so both states are exercised.
     [
       {
         username: "Alex Tran",
         date: "April 3, 2026",
         project_name: "Biblical Keyboard",
+        image: "https://picsum.photos/seed/biblical-keyboard/800/500",
         content: "Shipped the first prototype — all 72 keys wired and responsive.",
         description: "A keyboard with biblically accurate layouts and angelic key travel.",
         tags: [ "hardware", "keyboard", "retro" ],
@@ -68,6 +71,7 @@ class BulletinBoardController < ApplicationController
         username: "Cyao",
         date: "April 1, 2026",
         project_name: "Icepi Zero",
+        image: "https://picsum.photos/seed/icepi-zero/800/500",
         content: "Got the custom PCB back from fab. All traces check out.",
         description: "A Raspberry Pi Zero form-factor board with integrated display.",
         tags: [ "hardware", "pcb" ],
@@ -78,6 +82,7 @@ class BulletinBoardController < ApplicationController
         username: "Antush",
         date: "March 30, 2026",
         project_name: "Split Wave",
+        image: "https://picsum.photos/seed/split-wave/800/500",
         content: "First sound test — split keyboard now produces chords.",
         description: "An ergonomic split keyboard that doubles as a MIDI controller.",
         tags: [ "keyboard", "music" ],

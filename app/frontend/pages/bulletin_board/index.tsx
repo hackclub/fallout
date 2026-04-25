@@ -10,6 +10,8 @@ import { DateTime } from 'luxon'
 import MarqueeText from '@/components/shared/MarqueeText'
 import { SlidingNumber } from '@/components/shared/SlidingNumber'
 import EventCard from '@/components/bulletin_board/EventCard'
+import ExploreCard from '@/components/bulletin_board/ExploreCard'
+import Masonry from 'react-masonry-css'
 import { computeBulletinEventStatus, type SerializedBulletinEvent } from '@/lib/bulletinEventStatus'
 import { useLiveReload } from '@/lib/useLiveReload'
 import { useNowTick } from '@/lib/useNowTick'
@@ -24,6 +26,7 @@ type Explore = {
   username: string
   date: string
   project_name: string
+  image?: string
   content: string
   description: string
   tags: string[]
@@ -360,52 +363,23 @@ export default function BulletinBoardIndex({ events, featured, explore, is_modal
             </div>
 
             <div className={styles.exploreScroll}>
-              <div className={styles.exploreGrid}>
-                {isSearching ? (
-                  <div className={styles.exploreLoading} role="status" aria-label="Loading projects">
-                    <div className={styles.spinner} aria-hidden />
-                  </div>
-                ) : exploreList.length === 0 ? (
-                  <div className={styles.emptyState}>{query.trim() ? 'no projects found' : 'no projects yet'}</div>
-                ) : (
-                  exploreList.map((entry, i) => (
-                    <div key={i} className={styles.exploreCard}>
-                      <div className={styles.exploreBody}>
-                        <div className={styles.exploreUserRow}>
-                          <div className={styles.exploreAvatar} aria-hidden />
-                          <span className={styles.exploreUsername}>{entry.username}</span>
-                        </div>
-
-                        <div className={styles.explorePhoto}>photo of journal</div>
-
-                        <div className={styles.exploreMetaRow}>
-                          <span className={styles.exploreDate}>{entry.date}</span>
-                          <Link href="#" className={styles.exploreProjectLink}>
-                            {entry.project_name}
-                          </Link>
-                        </div>
-
-                        <p className={styles.exploreContent}>{entry.content}</p>
-                        <p className={styles.exploreDescription}>{entry.description}</p>
-
-                        <button className={styles.exploreExpand}>Expand</button>
-                      </div>
-
-                      <div className={styles.exploreFooter}>
-                        <div className={styles.exploreTags}>
-                          {entry.tags.map((tag) => (
-                            <span key={tag}>#{tag}</span>
-                          ))}
-                        </div>
-                        <div className={styles.exploreCounts}>
-                          <span>{entry.likes}</span>
-                          <span>{entry.comments}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              {isSearching ? (
+                <div className={styles.exploreLoading} role="status" aria-label="Loading projects">
+                  <div className={styles.spinner} aria-hidden />
+                </div>
+              ) : exploreList.length === 0 ? (
+                <div className={styles.exploreEmpty}>{query.trim() ? 'no projects found' : 'no projects yet'}</div>
+              ) : (
+                <Masonry
+                  breakpointCols={{ default: 3, 1023: 2, 767: 1 }}
+                  className={styles.exploreMasonry}
+                  columnClassName={styles.exploreMasonryColumn}
+                >
+                  {exploreList.map((entry, i) => (
+                    <ExploreCard key={i} entry={entry} />
+                  ))}
+                </Masonry>
+              )}
             </div>
           </motion.section>
         </div>
