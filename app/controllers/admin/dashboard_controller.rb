@@ -79,16 +79,25 @@ class Admin::DashboardController < Admin::ApplicationController
 
     terminal_statuses = %w[approved returned rejected]
 
-    # Hours attributed to ship creation date (using eventual approved_seconds)
-    hours_added_by_day = TimeAuditReview
-      .where(status: terminal_statuses)
-      .where.not(approved_seconds: nil)
-      .joins(:ship)
+    raw_duration_sql = <<~SQL.squish
+      COALESCE(SUM(
+        CASE recordings.recordable_type
+          WHEN 'LapseTimelapse'   THEN (SELECT duration FROM lapse_timelapses WHERE id = recordings.recordable_id)
+          WHEN 'LookoutTimelapse' THEN (SELECT duration FROM lookout_timelapses WHERE id = recordings.recordable_id)
+          WHEN 'YouTubeVideo'     THEN (SELECT duration_seconds * stretch_multiplier FROM you_tube_videos WHERE id = recordings.recordable_id)
+          ELSE 0
+        END
+      ), 0)
+    SQL
+
+    # Raw recording seconds attributed to ship creation date
+    hours_added_by_day = Ship
+      .joins(journal_entries: :recordings)
       .where("ships.created_at < ?", end_date.end_of_day)
       .group("ships.created_at::date")
-      .sum("time_audit_reviews.approved_seconds")
+      .sum(Arel.sql(raw_duration_sql))
 
-    # Hours removed on the date a TA review reached terminal status
+    # Audited seconds removed on the date TA review reached terminal status
     hours_removed_by_day = TimeAuditReview
       .where(status: terminal_statuses)
       .where.not(approved_seconds: nil)
@@ -96,12 +105,10 @@ class Admin::DashboardController < Admin::ApplicationController
       .group("time_audit_reviews.updated_at::date")
       .sum("time_audit_reviews.approved_seconds")
 
-    cumulative_added = TimeAuditReview
-      .where(status: terminal_statuses)
-      .where.not(approved_seconds: nil)
-      .joins(:ship)
+    cumulative_added = Ship
+      .joins(journal_entries: :recordings)
       .where("ships.created_at < ?", start_date)
-      .sum("time_audit_reviews.approved_seconds")
+      .sum(Arel.sql(raw_duration_sql))
 
     cumulative_removed = TimeAuditReview
       .where(status: terminal_statuses)
@@ -112,7 +119,7 @@ class Admin::DashboardController < Admin::ApplicationController
     (start_date..end_date).map do |date|
       cumulative_added += hours_added_by_day[date].to_i
       cumulative_removed += hours_removed_by_day[date].to_i
-      { date: date.iso8601, hours: [ cumulative_added - cumulative_removed, 0 ].max }
+      { date: date.iso8601, hours: [ (cumulative_added - cumulative_removed) / 3600.0, 0 ].max.round(1) }
     end
   end
 
