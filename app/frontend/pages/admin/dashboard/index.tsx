@@ -255,10 +255,7 @@ export default function AdminDashboardIndex() {
                   axisLine={false}
                   tickMargin={8}
                   allowDecimals={false}
-                  tickFormatter={(v: number) => {
-                    const h = Math.floor(v / 3600)
-                    return `${h}h`
-                  }}
+                  tickFormatter={(v: number) => `${v}h`}
                 />
                 <ChartTooltip
                   content={
@@ -272,8 +269,8 @@ export default function AdminDashboardIndex() {
                         })
                       }}
                       formatter={(value: unknown) => {
-                        const secs = value as number
-                        return [formatDuration(secs), 'Unaudited hours']
+                        const h = value as number
+                        return [`${h}h`, 'Unaudited hours']
                       }}
                     />
                   }
