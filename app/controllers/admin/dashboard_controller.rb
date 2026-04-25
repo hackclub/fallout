@@ -20,7 +20,8 @@ class Admin::DashboardController < Admin::ApplicationController
           **time_audited_stats(completed_ta_week)
         }
       },
-      backlog_chart: backlog_by_day
+      backlog_chart: backlog_by_day,
+      unaudited_hours_chart: unaudited_hours_by_day
     }
   end
 
@@ -71,6 +72,49 @@ class Admin::DashboardController < Admin::ApplicationController
   end
 
   private
+
+  def unaudited_hours_by_day
+    start_date = Date.new(2026, 4, 7)
+    end_date = Date.today
+
+    terminal_statuses = %w[approved returned rejected]
+
+    # Hours attributed to ship creation date (using eventual approved_seconds)
+    hours_added_by_day = TimeAuditReview
+      .where(status: terminal_statuses)
+      .where.not(approved_seconds: nil)
+      .joins(:ship)
+      .where("ships.created_at < ?", end_date.end_of_day)
+      .group("ships.created_at::date")
+      .sum("time_audit_reviews.approved_seconds")
+
+    # Hours removed on the date a TA review reached terminal status
+    hours_removed_by_day = TimeAuditReview
+      .where(status: terminal_statuses)
+      .where.not(approved_seconds: nil)
+      .where("time_audit_reviews.updated_at < ?", end_date.end_of_day)
+      .group("time_audit_reviews.updated_at::date")
+      .sum("time_audit_reviews.approved_seconds")
+
+    cumulative_added = TimeAuditReview
+      .where(status: terminal_statuses)
+      .where.not(approved_seconds: nil)
+      .joins(:ship)
+      .where("ships.created_at < ?", start_date)
+      .sum("time_audit_reviews.approved_seconds")
+
+    cumulative_removed = TimeAuditReview
+      .where(status: terminal_statuses)
+      .where.not(approved_seconds: nil)
+      .where("time_audit_reviews.updated_at < ?", start_date)
+      .sum("time_audit_reviews.approved_seconds")
+
+    (start_date..end_date).map do |date|
+      cumulative_added += hours_added_by_day[date].to_i
+      cumulative_removed += hours_removed_by_day[date].to_i
+      { date: date.iso8601, hours: [ cumulative_added - cumulative_removed, 0 ].max }
+    end
+  end
 
   def backlog_by_day
     start_date = Date.new(2026, 4, 7)
