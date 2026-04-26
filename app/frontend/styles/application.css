@@ -790,6 +790,121 @@ textarea:focus {
   }
 }
 
+/* Doc Search — light mode */
+.doc-search-trigger {
+  color: #9f715d;
+  border: 1px solid #c5a080;
+  background: #fffcf5;
+  transition: background 0.15s;
+}
+.doc-search-trigger:hover {
+  background: #fcf1e5;
+}
+.doc-search-kbd {
+  background: #f5e8d5;
+  border: 1px solid #c5a080;
+  color: #9f715d;
+}
+.doc-search-backdrop {
+  background: rgba(97, 69, 58, 0.45);
+}
+.doc-search-panel {
+  background: #fffcf5;
+  border: 1.5px solid #9f715d;
+  box-shadow: 0 24px 80px rgba(97, 69, 58, 0.22), 0 2px 8px rgba(97, 69, 58, 0.1);
+}
+.doc-search-input-row {
+  border-bottom: 1px solid #edd1b0;
+}
+.doc-search-input {
+  color: #61453a;
+}
+.doc-search-input::placeholder {
+  color: #9f715d;
+}
+.doc-search-icon {
+  color: #9f715d;
+}
+.doc-search-empty {
+  color: #9f715d;
+}
+.doc-search-result {
+  background: transparent;
+  transition: background 0.08s;
+}
+.doc-search-result[data-active='true'] {
+  background: #edd1b0;
+}
+.doc-search-result-title {
+  color: #61453a;
+}
+.doc-search-result-excerpt {
+  color: #9f715d;
+}
+.doc-search-result mark {
+  background: #ffebad;
+  color: #61453a;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .docs-page .doc-search-trigger {
+    color: #b89a85;
+    border-color: rgba(237, 209, 176, 0.2);
+    background: #1e1613;
+  }
+  .docs-page .doc-search-trigger:hover {
+    background: #2a1e19;
+  }
+  .docs-page .doc-search-kbd {
+    background: #2a1e19;
+    border-color: rgba(237, 209, 176, 0.2);
+    color: #b89a85;
+  }
+  .doc-search-backdrop {
+    background: rgba(0, 0, 0, 0.6);
+  }
+  .doc-search-panel {
+    background: #1e1613;
+    border-color: rgba(237, 209, 176, 0.2);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  .doc-search-input-row {
+    border-bottom-color: rgba(237, 209, 176, 0.12);
+  }
+  .doc-search-input {
+    color: #e8d5c4;
+  }
+  .doc-search-input::placeholder {
+    color: #7a5a4a;
+  }
+  .doc-search-icon {
+    color: #7a5a4a;
+  }
+  .doc-search-empty {
+    color: #7a5a4a;
+  }
+  .doc-search-result[data-active='true'] {
+    background: #2e1f18;
+  }
+  .doc-search-result-title {
+    color: #e8d5c4;
+  }
+  .doc-search-result-excerpt {
+    color: #b89a85;
+  }
+  .doc-search-result mark {
+    background: rgba(255, 235, 173, 0.2);
+    color: #e8d5c4;
+  }
+  .doc-search-kbd {
+    background: #2a1e19;
+    border-color: rgba(237, 209, 176, 0.2);
+    color: #b89a85;
+  }
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Geist Variable', sans-serif;

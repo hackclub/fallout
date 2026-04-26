@@ -352,6 +352,16 @@ module MarkdownHelper
     docs_metadata(base: base, url_prefix: "/docs", default_index_title: "Docs")
   end
 
+  def docs_search_index
+    base = Rails.root.join("docs")
+    paths = Dir.glob(base.join("**/*.{md,mdx}").to_s)
+    return build_docs_search_index(paths) if Rails.env.development?
+
+    stats = paths.map { |p| [ p, File.mtime(p).to_i ] }.sort_by(&:first)
+    stats_digest = Digest::SHA256.hexdigest(stats.flatten.join("|"))
+    Rails.cache.fetch([ "docs_search_index", stats_digest ]) { build_docs_search_index(paths) }
+  end
+
   def docs_menu_items
     docs_section_metadata
       .reject { |i| i[:slug].blank? || i[:unlisted] }
@@ -423,8 +433,37 @@ module MarkdownHelper
 
   private
 
-  def load_section_metadata(section_key)
-    path = Rails.root.join("docs", section_key, "metadata.yml")
+  def build_docs_search_index(paths)
+    base = Rails.root.join("docs")
+    paths.filter_map do |p|
+      meta = parse_guide_metadata(p)
+      next if meta[:unlisted]
+
+      rel = Pathname.new(p).relative_path_from(base).to_s
+      slug = rel.sub(/\.mdx?\z/, "")
+      slug = File.dirname(slug) if File.basename(slug) == "index"
+      slug = "" if slug == "."
+      path = slug.blank? ? "/docs" : "/docs/#{slug}"
+
+      raw = File.read(p)
+      body = strip_front_matter_table(raw)
+      # Strip markdown syntax to plain text for search
+      excerpt = body
+        .gsub(/^#+\s+/, "")         # headings
+        .gsub(/\[([^\]]+)\]\([^)]+\)/, '\1') # links
+        .gsub(/[*_`~]/, "")         # emphasis/code/strike
+        .gsub(/\s+/, " ")
+        .strip
+        .slice(0, 500)
+
+      title = meta[:title].presence || (slug.blank? ? "Docs" : slug.tr("-_/", " ").split.map(&:capitalize).join(" "))
+      { title: title, path: path, excerpt: excerpt }
+    rescue Errno::ENOENT
+      nil
+    end
+  end
+
+  def load_section_metadata(section_key)    path = Rails.root.join("docs", section_key, "metadata.yml")
     return { title: nil, priority: nil } unless File.exist?(path)
 
     data = YAML.safe_load(File.read(path)) || {}

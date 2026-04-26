@@ -4,6 +4,7 @@ import { usePage } from '@inertiajs/react'
 import * as Sentry from '@sentry/react'
 import FlashMessages from '@/components/FlashMessages'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import AdminCommandPalette from '@/components/admin/AdminCommandPalette'
 import type { SharedProps } from '@/types'
 import '@/styles/admin.css'
 
@@ -25,6 +26,7 @@ export default function AdminLayout({ children, flush }: { children: ReactNode; 
   return (
     <div className="admin bg-background text-foreground min-h-screen flex">
       <AdminSidebar />
+      <AdminCommandPalette />
 
       <div className="flex-1 min-w-0">
         <FlashMessages />

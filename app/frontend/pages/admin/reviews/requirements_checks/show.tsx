@@ -33,6 +33,7 @@ import {
   GlobeIcon,
   ChevronDownIcon,
   RefreshCwIcon,
+  ArrowUpRightIcon,
 } from 'lucide-react'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import RepoTree from '@/components/admin/RepoTree'
@@ -731,19 +732,31 @@ export default function RequirementsChecksShow({
                 ' files'
               }
               trailing={
-                handleRefreshTree && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRefreshTree()
-                    }}
-                    disabled={refreshingTree}
-                    title="Refresh tree"
-                    className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`https://hurt-xi.vercel.app/?repo=${encodeURIComponent(project.repo_link)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
                   >
-                    <RefreshCwIcon className={`size-3.5 ${refreshingTree ? 'animate-spin' : ''}`} />
-                  </button>
-                )
+                    Open in HURT
+                    <ArrowUpRightIcon className="size-3" />
+                  </a>
+                  {handleRefreshTree && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRefreshTree()
+                      }}
+                      disabled={refreshingTree}
+                      title="Refresh tree"
+                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCwIcon className={`size-3.5 ${refreshingTree ? 'animate-spin' : ''}`} />
+                    </button>
+                  )}
+                </div>
               }
             >
               <RepoTree data={repo_tree} repoLink={project.repo_link} bare gerberZipFilesPath={gerber_zip_files_path} />
