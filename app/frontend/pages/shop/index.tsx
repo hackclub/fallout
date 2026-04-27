@@ -1,11 +1,12 @@
-import { Modal } from '@inertiaui/modal-react'
 import { useRef, useState, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { ArrowLeftIcon } from '@heroicons/react/20/solid'
 import { Link, usePage } from '@inertiajs/react'
-import Frame from '@/components/shared/Frame'
+import { Modal } from '@inertiaui/modal-react'
 import { gsap } from 'gsap'
-import { Flip } from 'gsap/Flip'
+import { Flip } from 'gsap/dist/Flip'
+import Frame from '@/components/shared/Frame'
+import ImagePlaceholder from '@/components/shared/ImagePlaceholder'
 import PathDialogOverlay from '@/components/path/PathDialogOverlay'
 import type { DialogScript } from '@/components/path/PathDialogOverlay'
 import type { SharedProps } from '@/types'
@@ -365,7 +366,7 @@ export default function ShopIndex({
                 </span>
 
                 <div className="w-full h-50 p-4 rounded-sm border-3 border-dark-brown bg-beige relative overflow-hidden flex items-center justify-center">
-                  {item.image_url && (
+                  {item.image_url ? (
                     <img
                       src={item.image_url}
                       alt={item.name}
@@ -373,6 +374,8 @@ export default function ShopIndex({
                       onError={(e) => (e.currentTarget.style.display = 'none')}
                       className="group-hover:scale-105 transition-transform duration-300 w-full h-full object-contain"
                     />
+                  ) : (
+                    <ImagePlaceholder text="Image coming soon" />
                   )}
                 </div>
                 <div className="py-1 flex items-start justify-between gap-4">

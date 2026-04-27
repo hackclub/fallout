@@ -3,7 +3,7 @@
 class JournalEntryPolicy < ApplicationPolicy
   def create?
     return false unless user.present?
-    return true if record.project&.user == user # Project owner can always create (preserves trial user behavior)
+    return true if record.project&.user_id == user.id # Project owner can always create (preserves trial user behavior)
     collaborators_enabled? && !user.trial? && record.project&.collaborator?(user) # Collaborators must be verified and flag-gated
   end
 
@@ -12,9 +12,9 @@ class JournalEntryPolicy < ApplicationPolicy
   end
 
   def update?
-    return true if admin?
     return false unless owner?
-    record.project&.user == user || (collaborators_enabled? && record.project&.owner_or_collaborator?(user)) # Collaborator edit access is flag-gated
+
+    record.project&.user_id == user.id || (collaborators_enabled? && record.project&.owner_or_collaborator?(user)) # Collaborator edit access is flag-gated
   end
 
   def switch_project?
@@ -23,10 +23,10 @@ class JournalEntryPolicy < ApplicationPolicy
   end
 
   def destroy?
-    return true if admin?
     return false unless owner?
     return false if record.project&.ships&.approved&.exists? # Preserve submission history on approved projects
-    record.project&.user == user || (collaborators_enabled? && record.project&.owner_or_collaborator?(user)) # Collaborator delete access is flag-gated
+
+    record.project&.user_id == user.id || (collaborators_enabled? && record.project&.owner_or_collaborator?(user)) # Collaborator delete access is flag-gated
   end
 
   class Scope < ApplicationPolicy::Scope

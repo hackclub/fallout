@@ -9,8 +9,10 @@ import PathNode from '@/components/path/PathNode'
 import SignUpCta from '@/components/path/SignUpCta'
 import BgmPlayer from '@/components/path/BgmPlayer'
 import Header from '@/components/path/Header'
+import AnnouncementsBar from '@/components/announcements/AnnouncementsBar'
 import FlashMessages from '@/components/FlashMessages'
 import { notify } from '@/lib/notifications'
+import { useLiveReload } from '@/lib/useLiveReload'
 import { consumePathEntryTransition } from '@/lib/pathTransition'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
 import PathDialogOverlay from '@/components/path/PathDialogOverlay'
@@ -18,6 +20,7 @@ import type { DialogScript } from '@/components/path/PathDialogOverlay'
 
 type PageProps = {
   user: {
+    id: number
     display_name: string
     email: string
     koi: number
@@ -28,7 +31,6 @@ type PageProps = {
   critter_variants: (string | null)[]
   pending_dialog: string | null
   mail_intro_id: number | null
-  show_feedback_banner: boolean
 }
 
 const PATH_ENTRY_HUD_DELAY_MS = 420
@@ -118,22 +120,25 @@ export default function PathIndex() {
     critter_variants,
     pending_dialog,
     mail_intro_id,
-    show_feedback_banner,
     has_unread_mail,
     features,
     auth: { user: authUser },
     sign_in_path,
   } = usePage<PageProps & SharedProps>().props
+  // Refresh path progression props when journal entries, critters, projects, or collaborations
+  // change in another tab/client for this user. Path is a top-level page (no modal ancestor), so
+  // useLiveReload falls through to router.reload({ only }), which re-hydrates these props in place.
+  useLiveReload({
+    stream: `path_user_${user.id}`,
+    only: ['user', 'has_projects', 'journal_entry_count', 'critter_variants', 'pending_dialog'],
+  })
+
   const [notPressed] = useState<boolean>(true)
   const [loggedIn] = useState(false)
   const [activeDialog, setActiveDialog] = useState<DialogScript | null>(null)
   const isDialogOverlayOpen = activeDialog !== null
 
   const { visitModal, stack } = useModalStack()
-
-  const [showBanner, setShowBanner] = useState(
-    () => show_feedback_banner && localStorage.getItem('feedback_banner_dismissed') !== 'true',
-  )
 
   const modalOpen = stack.length > 0
 
@@ -410,6 +415,7 @@ export default function PathIndex() {
         style={{ pointerEvents: pathIntro.hudVisible ? 'auto' : 'none' }}
       >
         <Header koiBalance={user.koi} avatar={user.avatar} displayName={user.display_name} />
+        <AnnouncementsBar />
       </motion.div>
 
       <motion.div

@@ -115,6 +115,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_23_120000) do
     t.index ["status"], name: "index_build_reviews_on_status"
   end
 
+  create_table "bulletin_events", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description", null: false
+    t.datetime "ends_at"
+    t.string "image_url"
+    t.boolean "schedulable", default: true, null: false
+    t.datetime "starts_at"
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ends_at"], name: "index_bulletin_events_on_ends_at"
+    t.index ["starts_at"], name: "index_bulletin_events_on_starts_at"
+  end
+
   create_table "collaboration_invites", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "discarded_at"
@@ -637,6 +650,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_23_120000) do
     t.index ["shop_item_id"], name: "index_shop_orders_on_shop_item_id"
     t.index ["state"], name: "index_shop_orders_on_state"
     t.index ["user_id"], name: "index_shop_orders_on_user_id"
+  end
+
+  create_table "solid_cable_messages", force: :cascade do |t|
+    t.binary "channel", null: false
+    t.bigint "channel_hash", null: false
+    t.datetime "created_at", null: false
+    t.binary "payload", null: false
+    t.index ["channel"], name: "index_solid_cable_messages_on_channel"
+    t.index ["channel_hash"], name: "index_solid_cable_messages_on_channel_hash"
+    t.index ["created_at"], name: "index_solid_cable_messages_on_created_at"
   end
 
   create_table "solid_queue_blocked_executions", force: :cascade do |t|

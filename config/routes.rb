@@ -262,6 +262,20 @@ Rails.application.routes.draw do
       resources :users, only: [ :index, :show ]
 
       resources :ships, only: [ :index, :show ], path: "reviews"
+
+      # Staff-readable index; controller enforces admin-only for mutations.
+      resources :bulletin_events, only: [ :index, :create, :update, :destroy ] do
+        collection do
+          delete :bulk_destroy
+          delete :destroy_expired
+        end
+
+        member do
+          patch :start_now
+          patch :force_start_now
+          patch :end_now
+        end
+      end
     end
   end
 
@@ -338,6 +352,9 @@ Rails.application.routes.draw do
   post "onboarding" => "onboarding#update"
 
   get "path" => "path#index", as: :path
+  get "bulletin_board" => "bulletin_board#index", as: :bulletin_board
+  get "bulletin_board/search" => "bulletin_board#search", as: :bulletin_board_search # JSON endpoint for debounced explore search; stays on the page instead of re-rendering via Inertia
+  get "bulletin_board/events/:id" => "bulletin_board#event", as: :bulletin_board_event
 
   resource :streak_goal, only: [ :show, :create, :destroy ]
 

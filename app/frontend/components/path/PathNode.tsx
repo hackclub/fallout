@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useContext } from 'react'
 import { Link, usePage } from '@inertiajs/react'
-// @ts-expect-error useModalStack lacks type declarations in this beta package
 import { ModalLink, useModalStack } from '@inertiaui/modal-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
 import { PathCenterContext, ScrollToNodeContext } from '@/components/path/Path'

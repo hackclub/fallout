@@ -76,7 +76,7 @@ class JournalEntriesController < ApplicationController
       ActiveRecord::Base.transaction do
         @journal_entry.save!
 
-        Array(params[:images]).each { |signed_id| @journal_entry.images.attach(signed_id) }
+        journal_image_signed_ids.each { |signed_id| @journal_entry.images.attach(signed_id) }
 
         timelapse_ids.each do |tid|
           timelapse = current_user.lapse_timelapses.find_or_create_by!(lapse_timelapse_id: tid)
@@ -175,6 +175,22 @@ class JournalEntriesController < ApplicationController
   end
 
   private
+
+  def journal_image_signed_ids
+    submitted = Array(params[:images]).map(&:to_s)
+    (submitted + markdown_image_signed_ids(params[:content].to_s)).filter_map(&:presence).uniq
+  end
+
+  def markdown_image_signed_ids(content)
+    prefix = Regexp.escape(Rails.application.config.active_storage.routes_prefix)
+    content.scan(%r{#{prefix}/blobs/(?:redirect/|proxy/)?([^)\s"'<>/]+)}).flatten.filter_map do |signed_id|
+      signed_id = Rack::Utils.unescape_path(signed_id)
+      blob = ActiveStorage::Blob.find_signed(signed_id)
+      blob&.image? ? signed_id : nil
+    rescue ActiveSupport::MessageVerifier::InvalidSignature, ArgumentError
+      nil
+    end
+  end
 
   def maybe_award_critter(journal_entry, user)
     return nil unless user.can_earn_critter?

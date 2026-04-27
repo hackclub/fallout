@@ -345,17 +345,17 @@ function PosterCollage({ className }: { className: string }) {
   return (
     <div className={className}>
       <img
-        src="/onboarding/icepizero.png"
+        src="/magazine/icepizero.webp"
         alt=""
         className="absolute bottom-0 left-0 w-[45%] rotate-[-20deg] rounded shadow-md z-0"
       />
       <img
-        src="/onboarding/jesuskeyboard.png"
+        src="/magazine/jesuskeyboard.webp"
         alt=""
         className="absolute bottom-[10%] left-[25%] w-[45%] rotate-[2deg] rounded shadow-lg z-10"
       />
       <img
-        src="/onboarding/minimaimai.png"
+        src="/magazine/minimaimai.webp"
         alt=""
         className="absolute top-0 right-0 w-[45%] rotate-[18deg] rounded shadow-xl z-20"
       />

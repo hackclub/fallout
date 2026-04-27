@@ -1,5 +1,7 @@
 class ProjectsController < ApplicationController
+  allow_unauthenticated_access only: %i[show] # Listed project details are public from Explore and the public API.
   allow_trial_access only: %i[index show new create edit update destroy onboarding] # Trial users can manage their single project
+  skip_onboarding_redirect only: %i[show] # Public project details must stay viewable before account onboarding.
   before_action :set_project, only: %i[show edit update destroy]
 
   def onboarding
@@ -11,7 +13,7 @@ class ProjectsController < ApplicationController
   end
 
   def index
-    scope = policy_scope(Project).where(user: current_user)
+    scope = policy_scope(Project).kept.where(user: current_user)
     if collaborators_enabled?
       collaborated_ids = Collaborator.kept.where(user: current_user, collaboratable_type: "Project").select(:collaboratable_id)
       scope = scope.or(Project.kept.where(id: collaborated_ids))
@@ -27,6 +29,10 @@ class ProjectsController < ApplicationController
       projects: @projects.map { |p| serialize_project_card(p) },
       pagy: pagy_props(@pagy),
       query: params[:query].to_s,
+      # Independent of the search filter — drives whether "New Project" runs the onboarding flow
+      has_any_project: current_user.projects.kept.exists? ||
+        (collaborators_enabled? && Collaborator.kept.where(user: current_user, collaboratable_type: "Project").exists?),
+      can_create_project: policy(Project.new(user: current_user)).create?,
       is_modal: request.headers["X-InertiaUI-Modal"].present?
     }
   end
@@ -35,28 +41,35 @@ class ProjectsController < ApplicationController
     authorize @project
 
     journal_entries = @project.journal_entries.kept
-      .includes(:user, :recordings, :collaborator_users, images_attachments: :blob)
+      .includes(:user, :collaborator_users, { recordings: :recordable }, images_attachments: :blob)
       .order(created_at: :desc)
+      .to_a
 
     collab_enabled = collaborators_enabled?
+    project_policy = policy(@project)
+    highlighted_journal_entry_id = highlighted_journal_entry_id(journal_entries)
 
     render inertia: {
       project: serialize_project_detail(@project),
       journal_entries: journal_entries.map { |je| serialize_journal_entry_card(je) },
       switchable_projects_for_journal: switchable_projects_for_journal,
-      collaborators: collab_enabled ? @project.collaborators.includes(:user).map { |c|
-        { id: c.id, user_id: c.user.id, display_name: c.user.display_name, avatar: c.user.avatar }
-      } : [],
+      collaborators: @project.collaborators.includes(:user).map { |c| serialize_project_collaborator(c) },
       ships: @project.ships.order(created_at: :desc).map { |s|
         { id: s.id, status: s.status, feedback: s.feedback, created_at_iso: s.created_at.iso8601, updated_at_iso: s.updated_at.iso8601 }
       },
       can: {
-        update: policy(@project).update?,
-        destroy: policy(@project).destroy?,
-        ship: policy(@project).ship?,
-        manage_collaborators: collab_enabled && policy(@project).manage_collaborators?,
-        create_journal_entry: JournalEntryPolicy.new(current_user, @project.journal_entries.build(user: current_user)).create?
+        update: project_policy.update?,
+        destroy: project_policy.destroy?,
+        ship: project_policy.ship?,
+        manage_collaborators: collab_enabled && project_policy.manage_collaborators?,
+        create_journal_entry: JournalEntryPolicy.new(current_user, @project.journal_entries.build(user: current_user)).create?,
+        # Trial collaborator who would gain create access on verifying — drives the "locked" feather button.
+        # Owners are already allowed to create regardless of trial state, so they fall under create_journal_entry.
+        # Strangers (incl. unauthenticated visitors on the public project page) get false and see no button.
+        create_journal_entry_locked_for_trial: current_user&.trial? && collab_enabled && @project.collaborator?(current_user)
       },
+      initial_tab: highlighted_journal_entry_id ? "journal" : "timeline",
+      highlight_journal_entry_id: highlighted_journal_entry_id,
       is_modal: request.headers["X-InertiaUI-Modal"].present?
     }
   end
@@ -158,7 +171,9 @@ class ProjectsController < ApplicationController
   private
 
   def set_project
-    @project = Project.kept.find(params[:id])
+    scope = Project.kept
+    scope = scope.includes(:user) if action_name == "show"
+    @project = scope.find(params[:id])
   end
 
   def project_params
@@ -196,7 +211,7 @@ class ProjectsController < ApplicationController
       created_at: project.created_at.strftime("%B %d, %Y"),
       created_at_iso: project.created_at.iso8601,
       time_logged: project.time_logged,
-      journal_entries_count: project.kept_journal_entries.size
+      journal_entries_count: project.kept_journal_entries.count
     }
   end
 
@@ -206,6 +221,7 @@ class ProjectsController < ApplicationController
       content_html: helpers.render_user_markdown(journal_entry.content.to_s),
       images: journal_entry.images.map { |img| url_for(img) },
       recordings_count: journal_entry.recordings.size,
+      recordings: journal_entry.recordings.filter_map { |recording| serialize_journal_recording(recording) },
       created_at: journal_entry.created_at.strftime("%B %d, %Y"),
       created_at_iso: journal_entry.created_at.iso8601,
       author_display_name: journal_entry.user.display_name,
@@ -223,11 +239,49 @@ class ProjectsController < ApplicationController
     }
   end
 
+  def serialize_journal_recording(recording)
+    recordable = recording.recordable
+    return unless recordable.is_a?(YouTubeVideo)
+
+    {
+      id: recording.id,
+      type: "youtube",
+      title: recordable.title.presence || "YouTube recording",
+      thumbnail_url: recordable.thumbnail_url.presence || recordable.thumbnail_url_for(quality: "hqdefault"),
+      embed_url: "https://www.youtube-nocookie.com/embed/#{recordable.video_id}"
+    }
+  end
+
+  def serialize_project_collaborator(collaborator)
+    data = {
+      display_name: collaborator.user.display_name,
+      avatar: collaborator.user.avatar
+    }
+
+    if policy(@project).manage_collaborators?
+      data[:id] = collaborator.id
+      data[:user_id] = collaborator.user.id
+    end
+
+    data
+  end
+
+  def highlighted_journal_entry_id(journal_entries)
+    requested_id = params[:journal_entry_id].presence&.to_i
+    return nil unless requested_id
+    return requested_id if journal_entries.any? { |entry| entry.id == requested_id }
+
+    nil
+  end
+
   def switchable_projects_for_journal
+    return [] unless current_user
+
     scope = Project.kept.where(user: current_user)
     if collaborators_enabled?
       collaborated_ids = Collaborator.kept.where(user: current_user, collaboratable_type: "Project").select(:collaboratable_id)
       scope = scope.or(Project.kept.where(id: collaborated_ids))
+      scope = scope.includes(:collaborator_users)
     end
 
     unshipped_ids = Project.kept

@@ -473,6 +473,9 @@ module MarkdownHelper
   end
 
   def external_link?(href)
+    # Protocol-relative URLs (//host/path) resolve cross-origin in the browser; treat them as
+    # external so allowed_image_host? gates them and they don't slip past the host allowlist.
+    return true if href.start_with?("//")
     return false if href.start_with?("#", "/", "./", "../")
     return false unless href =~ /\Ahttps?:\/\//i
 

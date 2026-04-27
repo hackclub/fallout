@@ -20,10 +20,6 @@ class ShopItemsController < ApplicationController
 
     render inertia: "shop/show", props: {
       shop_item: serialize_shop_item(@shop_item),
-      can: {
-        update: policy(@shop_item).update?,
-        destroy: policy(@shop_item).destroy?
-      },
       is_modal: request.headers["X-InertiaUI-Modal"].present?
     }
   end

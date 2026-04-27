@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { router } from '@inertiajs/react'
-// @ts-expect-error useModalStack lacks type declarations in this beta package
 import { useModalStack, Modal, useModal } from '@inertiaui/modal-react'
 import Frame from '@/components/shared/Frame'
 import Button from '@/components/shared/Button'

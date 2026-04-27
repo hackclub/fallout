@@ -34,7 +34,7 @@ class Projects::CollaborationInvitesController < ApplicationController
 
   def destroy
     invite = @project.collaboration_invites.find(params[:id])
-    authorize invite, :revoke? # Only inviter/admin can revoke a pending invite
+    authorize invite, :revoke? # Only the inviter can revoke a pending invite from the user-facing project page
     invite.revoked!
 
     # Also revoke the associated pending invite so the email link shows "withdrawn"

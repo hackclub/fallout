@@ -41,6 +41,7 @@ export interface SharedProps {
   current_streak: number
   streak_freezes: number
   identity_gate: IdentityGate | null
+  show_feedback_banner: boolean
   errors: Record<string, string[]>
   [key: string]: unknown
 }
@@ -78,8 +79,8 @@ export interface PagyProps {
 }
 
 export interface CollaboratorInfo {
-  id: number
-  user_id: number
+  id?: number
+  user_id?: number
   display_name: string
   avatar: string
 }
@@ -135,6 +136,13 @@ export interface JournalEntryCard {
   content_html: string
   images: string[]
   recordings_count: number
+  recordings: {
+    id: number
+    type: 'youtube'
+    title: string
+    thumbnail_url: string | null
+    embed_url: string
+  }[]
   created_at: string
   created_at_iso: string
   author_display_name: string

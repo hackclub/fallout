@@ -1,0 +1,617 @@
+$md: 768px;
+$panel-border: rgba(94, 66, 55, 0.18);
+$ink-primary: #4a3120;
+$ink-secondary: #7a5945;
+$ink-muted: #a08266;
+$timer-bg: #6b4a3c;
+$timer-text: #fff4d9;
+$timer-stripe-soft: rgba(255, 244, 217, 0.035);
+$timer-stripe-strong: rgba(255, 244, 217, 0.095);
+$timer-progress-track: #80604f;
+
+$placeholder-gradient: linear-gradient(
+  160deg,
+  color-mix(in oklab, var(--color-brown) 28%, var(--color-light-brown)) 0%,
+  color-mix(in oklab, var(--color-brown) 60%, var(--color-light-brown)) 100%
+);
+$panel-shadow:
+  0 1px 2px rgba(58, 36, 25, 0.06),
+  0 4px 12px rgba(58, 36, 25, 0.08);
+
+.container {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.inner {
+  flex: 1;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+
+  padding: 0.4rem;
+
+  @media (min-width: $md) {
+    gap: 1rem;
+    padding: 0.75rem 1rem 1rem;
+  }
+}
+
+.backButton {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  z-index: 1;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+
+  border: none;
+  border-radius: 9999px;
+
+  background-color: color-mix(in oklab, var(--color-dark-brown) 40%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  color: var(--color-light-brown);
+
+  cursor: pointer;
+
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+
+  transition: background-color 160ms ease-out;
+
+  &:hover {
+    background-color: color-mix(in oklab, var(--color-dark-brown) 55%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-light-brown);
+    outline-offset: 2px;
+  }
+}
+
+.backIcon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+
+  padding-right: 0.25rem;
+
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, $ink-secondary 60%, transparent) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, $ink-secondary 60%, transparent);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  @media (min-width: $md) {
+    gap: 1rem;
+  }
+}
+
+.hero {
+  position: relative;
+  flex-shrink: 0;
+
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+
+  border: 1px solid $panel-border;
+  border-radius: 0.875rem;
+
+  background: $placeholder-gradient;
+  isolation: isolate;
+}
+
+.heroImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.heroPlaceholder {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: $placeholder-gradient;
+}
+
+.heroPlaceholderIcon {
+  width: 4rem;
+  height: 4rem;
+
+  color: $ink-muted;
+
+  opacity: 0.55;
+  stroke-width: 1.25;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--color-dark-brown) 92%, transparent) 0%,
+    color-mix(in oklab, var(--color-dark-brown) 55%, transparent) 38%,
+    transparent 72%
+  );
+}
+
+.heroStatus {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  z-index: 1;
+  isolation: isolate;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  max-width: 55%;
+  padding: 0.35rem 0.75rem;
+
+  border-radius: 9999px;
+
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.heroStatusHappening::after {
+  --happening-now-spread: 42px;
+  --happening-now-shimmer: color-mix(in oklab, var(--color-beige) 30%, transparent);
+
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    108deg,
+    transparent calc(50% - var(--happening-now-spread)),
+    var(--happening-now-shimmer),
+    transparent calc(50% + var(--happening-now-spread))
+  );
+  background-repeat: no-repeat;
+  background-size: 250% 100%;
+  background-position: 100% center;
+  animation: happeningNowGlint 4.8s linear infinite;
+}
+
+@keyframes happeningNowGlint {
+  0% {
+    background-position: 100% center;
+  }
+  100% {
+    background-position: 0% center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroStatusHappening::after {
+    animation: none;
+    background-position: 0% center;
+  }
+}
+
+.heroStatusMuted {
+  background-color: color-mix(in oklab, $timer-bg 75%, transparent);
+  color: $timer-text;
+  backdrop-filter: blur(6px);
+}
+
+.heroStatusDot {
+  width: 0.45rem;
+  height: 0.45rem;
+
+  border-radius: 9999px;
+
+  background-color: currentColor;
+
+  animation: liveDotPulse 1.4s ease-in-out infinite;
+}
+
+.heroTitle {
+  position: absolute;
+  left: 1.25rem;
+  right: 1.25rem;
+  bottom: 1rem;
+  z-index: 1;
+
+  margin: 0;
+  padding-right: 5rem;
+
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+
+  color: var(--color-light-brown);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+
+  @media (min-width: $md) {
+    font-size: 2.25rem;
+    left: 1.5rem;
+    right: 1.5rem;
+    bottom: 1.25rem;
+    padding-right: 5.5rem;
+    -webkit-line-clamp: 3;
+  }
+}
+
+.timer {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  isolation: isolate;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+
+  padding: 0.9rem 1.1rem;
+
+  border-radius: 0.75rem;
+
+  background-color: $timer-bg;
+  color: $timer-text;
+
+  @media (min-width: $md) {
+    padding: 1rem 1.25rem;
+  }
+}
+
+.timerHappening {
+  background-color: $timer-bg;
+}
+
+.timerStripes {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
+  background-image: repeating-linear-gradient(
+    -45deg,
+    $timer-stripe-soft,
+    $timer-stripe-soft 12px,
+    $timer-stripe-strong 12px,
+    $timer-stripe-strong 24px
+  );
+  background-size: 33.94px 33.94px;
+
+  animation: timerStripe 1.6s linear infinite;
+}
+
+@keyframes timerStripe {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 33.94px 0;
+  }
+}
+
+.timerLabel {
+  display: inline-flex;
+  align-items: center;
+
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.timerLabelText {
+  opacity: 0.85;
+}
+
+.liveDotWrap {
+  display: inline-flex;
+  align-items: center;
+  transform-origin: center;
+}
+
+.liveDot {
+  width: 0.55rem;
+  height: 0.55rem;
+
+  border-radius: 9999px;
+
+  background-color: var(--color-coral);
+  box-shadow:
+    0 0 0.55rem var(--color-coral),
+    0 0 1.1rem color-mix(in oklab, var(--color-coral) 60%, transparent);
+
+  flex-shrink: 0;
+
+  animation: liveDotPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes liveDotPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.35);
+  }
+}
+
+.timerDigits {
+  display: flex;
+  align-items: baseline;
+
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+
+  font-size: 1.35rem;
+
+  @media (min-width: $md) {
+    font-size: 1.6rem;
+  }
+}
+
+.timerUnit {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.timerUnitLabel {
+  padding-left: 0.08em;
+
+  font-size: 0.58em;
+  font-weight: 600;
+
+  opacity: 0.55;
+}
+
+.timerSep {
+  padding: 0 0.3em;
+
+  opacity: 0.4;
+}
+
+.timerStatic {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+
+  font-size: 1.35rem;
+
+  @media (min-width: $md) {
+    font-size: 1.6rem;
+  }
+}
+
+.progressTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  height: 4px;
+  overflow: hidden;
+
+  background-color: $timer-progress-track;
+}
+
+.progressFill {
+  width: 100%;
+  height: 100%;
+
+  background-color: var(--color-coral);
+  transform-origin: left;
+}
+
+.infoGrid {
+  flex-shrink: 0;
+
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+
+  @media (min-width: $md) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.infoCard {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+
+  min-width: 0;
+
+  padding: 0.85rem 1rem;
+
+  background-color: transparent;
+  border: 1px solid $panel-border;
+  border-radius: 0.75rem;
+  box-shadow: $panel-shadow;
+}
+
+.infoIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+
+  width: 2.25rem;
+  height: 2.25rem;
+
+  border-radius: 0.5rem;
+
+  background-color: $timer-bg;
+  color: $timer-text;
+
+  svg {
+    width: 1.2rem;
+    height: 1.2rem;
+    stroke-width: 1.75;
+  }
+}
+
+.infoText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+
+  flex: 1;
+  min-width: 0;
+}
+
+.infoLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+
+  color: $ink-muted;
+}
+
+.infoValue {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
+
+  color: $ink-primary;
+
+  overflow-wrap: anywhere;
+}
+
+.descSection {
+  flex-shrink: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  padding: 0.95rem 1.1rem;
+
+  background-color: transparent;
+  border: 1px solid $panel-border;
+  border-radius: 0.75rem;
+  box-shadow: $panel-shadow;
+}
+
+.descHeading {
+  margin: 0;
+
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+
+  color: $ink-muted;
+}
+
+.descBody {
+  margin: 0;
+
+  font-size: 0.95rem;
+  line-height: 1.55;
+
+  color: $ink-primary;
+
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+
+  @media (min-width: $md) {
+    font-size: 0.975rem;
+  }
+}
+
+.descBodyClamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.descToggle {
+  align-self: flex-start;
+
+  margin-top: 0.15rem;
+  padding: 0;
+
+  border: none;
+  background: none;
+
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+
+  color: $ink-secondary;
+
+  cursor: pointer;
+
+  transition: color 120ms ease-out;
+
+  &:hover {
+    color: $ink-primary;
+  }
+}

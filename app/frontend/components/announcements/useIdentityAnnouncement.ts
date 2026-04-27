@@ -1,14 +1,13 @@
 import { usePage } from '@inertiajs/react'
 import type { SharedProps } from '@/types'
+import type { Announcement } from './types'
 
-export default function IdentityBanner() {
+export function useIdentityAnnouncement(): Announcement | null {
   const { identity_gate } = usePage<SharedProps>().props
-
   if (!identity_gate || identity_gate.state === 'verified_with_address') return null
 
   const { state, verify_url, address_url } = identity_gate
-
-  const { message, href } = (() => {
+  const config = (() => {
     switch (state) {
       case 'unverified':
         return {
@@ -29,14 +28,11 @@ export default function IdentityBanner() {
     }
   })()
 
-  return (
-    <div className="fixed top-2 inset-x-2 z-30 flex pointer-events-none">
-      <a
-        href={href}
-        className="pointer-events-auto bg-brown text-beige py-2 px-3 lg:px-6 text-sm sm:text-lg w-full xs:w-fit mx-auto hover:bg-light-brown border border-dark-brown hover:border-2 rounded-xs hover:text-dark-brown transition-all text-center font-medium underline"
-      >
-        {message}
-      </a>
-    </div>
-  )
+  return {
+    id: `identity:${state}`,
+    kind: 'critical',
+    message: config.message,
+    href: config.href,
+    dismissible: false,
+  }
 }

@@ -5,7 +5,6 @@ class PathController < ApplicationController
 
   def index
     mail_intro_id = deliver_mail_intro
-    show_feedback_banner = !feedback_form_filled?(current_user.email)
 
     # Include both owned and collaborated journal entries for path progression
     owned = current_user.journal_entries.kept
@@ -20,6 +19,7 @@ class PathController < ApplicationController
 
     render inertia: {
       user: {
+        id: current_user.id, # Used by the frontend to subscribe to the per-user live-update stream
         display_name: current_user.display_name,
         email: current_user.email,
         koi: current_user.koi,
@@ -30,8 +30,7 @@ class PathController < ApplicationController
       # Critter variant per journal entry (by creation order), nil if no critter was awarded
       critter_variants: journal_entries.map { |je| je.critters.find { |c| c.user_id == current_user.id }&.variant },
       pending_dialog: pending_dialog_key(journal_entries),
-      mail_intro_id: mail_intro_id,
-      show_feedback_banner: show_feedback_banner
+      mail_intro_id: mail_intro_id
     }
   end
 
@@ -50,30 +49,6 @@ class PathController < ApplicationController
     mail = MailDeliveryService.mail_intro(current_user)
     current_user.mail_interactions.create!(mail_message: mail, read_at: Time.current) # Pre-read so it doesn't trigger the unread badge
     mail.id
-  end
-
-  def feedback_form_filled?(email)
-    api_key = ENV["AIRTABLE_API_KEY"]
-    base_id = ENV["AIRTABLE_BASE_ID"]
-    return false unless api_key && base_id
-
-    filled = Rails.cache.fetch("feedback_form_filled:#{email}", expires_in: 1.hour) do
-      safe_email = email.gsub("'", "\\\\'")
-      encoded_formula = CGI.escape("{email}='#{safe_email}'")
-      uri = URI("https://api.airtable.com/v0/#{base_id}/tblVadboSQpgeJpTL?filterByFormula=#{encoded_formula}&fields[]=email&maxRecords=1")
-      response = Net::HTTP.get_response(uri, "Authorization" => "Bearer #{api_key}")
-      if response.is_a?(Net::HTTPSuccess)
-        records = JSON.parse(response.body)["records"]
-        records.is_a?(Array) && records.any?
-      else
-        Rails.logger.error("Airtable feedback_form check error: #{response.code}")
-        false
-      end
-    end
-
-    # Promote to a permanent cache entry once filled — this state never reverts
-    Rails.cache.write("feedback_form_filled:#{email}", true) if filled
-    filled
   end
 
   def pending_dialog_key(journal_entries)

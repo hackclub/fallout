@@ -26,6 +26,7 @@ import {
   Fish,
   Soup,
   ReceiptText,
+  Megaphone,
 } from 'lucide-react'
 
 interface AdminStats {
@@ -117,6 +118,7 @@ function buildNavSections(): { items: NavItem[] }[] {
     },
     {
       items: [
+        { label: 'Bulletin Events', href: '/admin/bulletin_events', icon: Megaphone, statKey: null },
         { label: 'Shop Items', href: '/admin/shop_items', icon: Store, statKey: null, requirePermission: 'is_admin' },
         {
           label: 'Shop Orders',

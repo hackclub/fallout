@@ -184,6 +184,12 @@
 .im-modal-wrapper {
   @apply h-full! min-w-full! p-8;
 }
+.im-modal-wrapper:has(> .bulletin-board-modal-panel) {
+  @apply py-0!;
+}
+.im-modal-wrapper:has(> .event-detail-modal-panel) {
+  @apply flex items-center justify-center;
+}
 
 img {
   @apply select-none;
@@ -1027,5 +1033,8 @@ textarea:focus {
 }
 .perf-badges-hidden #db-query-badge,
 .perf-badges-hidden .profiler-results {
+  display: none !important;
+}
+.announcements-hidden .announcements-bar {
   display: none !important;
 }
