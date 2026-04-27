@@ -29,6 +29,7 @@
 class Project < ApplicationRecord
   include Discardable
   include PgSearch::Model
+  include MeiliSearch::Rails
   include Broadcastable
 
   has_paper_trail
@@ -38,8 +39,23 @@ class Project < ApplicationRecord
   broadcasts_updates_to { "path_user_#{user_id}" }
   # Dirty-only public stats refresh; payload intentionally omits project IDs.
   after_commit :broadcast_bulletin_explore_update
+  after_commit :enqueue_meilisearch_reindex
 
   pg_search_scope :search, against: [ :name, :description ], using: { tsearch: { prefix: true } }
+
+  meilisearch auto_index: false, auto_remove: false do
+    attribute :name, :description, :tags
+    attribute :created_at do
+      created_at.to_i
+    end
+    attribute :journal_count do
+      kept_journal_entries.count
+    end
+    searchable_attributes %w[name description tags]
+    ranking_rules %w[words typo proximity attribute sort exactness]
+    sortable_attributes %w[journal_count created_at]
+    filterable_attributes %w[is_unlisted]
+  end
 
   scoped_search on: :id
   scoped_search on: :name
@@ -172,6 +188,10 @@ class Project < ApplicationRecord
   end
 
   private
+
+  def enqueue_meilisearch_reindex
+    MeilisearchReindexJob.perform_later(self.class.name, id)
+  end
 
   def broadcast_bulletin_explore_update
     return unless bulletin_explore_stats_changed?

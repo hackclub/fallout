@@ -49,6 +49,19 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     apt-get install --no-install-recommends -y nodejs && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
+# Download s6-overlay (process supervisor for running Meilisearch alongside Rails)
+ARG S6_VERSION=3.2.2.0
+RUN curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-noarch.tar.xz" \
+      -o /tmp/s6-noarch.tar.xz && \
+    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" \
+      -o /tmp/s6-arch.tar.xz
+
+# Download Meilisearch binary
+ARG MEILISEARCH_VERSION=1.42.1
+RUN curl -fsSL "https://github.com/meilisearch/meilisearch/releases/download/v${MEILISEARCH_VERSION}/meilisearch-linux-aarch64" \
+      -o /usr/local/bin/meilisearch && \
+    chmod +x /usr/local/bin/meilisearch
+
 # Install application gems
 COPY Gemfile Gemfile.lock ./
 RUN bundle install && \
@@ -84,9 +97,41 @@ FROM base
 ARG SENTRY_RELEASE=""
 ENV SENTRY_RELEASE=${SENTRY_RELEASE}
 
+# Install s6-overlay into the final image
+COPY --from=build /tmp/s6-noarch.tar.xz /tmp/s6-noarch.tar.xz
+COPY --from=build /tmp/s6-arch.tar.xz /tmp/s6-arch.tar.xz
+RUN tar -C / -Jxpf /tmp/s6-noarch.tar.xz && \
+    tar -C / -Jxpf /tmp/s6-arch.tar.xz && \
+    rm /tmp/s6-noarch.tar.xz /tmp/s6-arch.tar.xz
+
+# Copy Meilisearch binary
+COPY --from=build /usr/local/bin/meilisearch /usr/local/bin/meilisearch
+
 # Copy built artifacts: gems, application
 COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
 COPY --from=build /rails /rails
+
+# s6 service: Meilisearch
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/meilisearch && \
+    printf '#!/command/execlineb -P\n\
+/usr/local/bin/meilisearch \\\n\
+  --db-path /rails/storage/meilisearch \\\n\
+  --http-addr 127.0.0.1:7700 \\\n\
+  --no-analytics\n' > /etc/s6-overlay/s6-rc.d/meilisearch/run && \
+    chmod +x /etc/s6-overlay/s6-rc.d/meilisearch/run && \
+    echo "longrun" > /etc/s6-overlay/s6-rc.d/meilisearch/type && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/meilisearch
+
+# s6 service: Rails (wraps the original entrypoint logic + server start)
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/rails && \
+    printf '#!/command/execlineb -P\n\
+/rails/bin/docker-entrypoint ./bin/thrust ./bin/rails server\n' \
+      > /etc/s6-overlay/s6-rc.d/rails/run && \
+    chmod +x /etc/s6-overlay/s6-rc.d/rails/run && \
+    echo "longrun" > /etc/s6-overlay/s6-rc.d/rails/type && \
+    mkdir -p /etc/s6-overlay/s6-rc.d/rails/dependencies.d && \
+    touch /etc/s6-overlay/s6-rc.d/rails/dependencies.d/meilisearch && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/rails
 
 # Run and own only the runtime files as a non-root user for security
 RUN groupadd --system --gid 1000 rails && \
@@ -94,9 +139,6 @@ RUN groupadd --system --gid 1000 rails && \
     chown -R rails:rails db log storage tmp
 USER 1000:1000
 
-# Entrypoint prepares the database.
-ENTRYPOINT ["/rails/bin/docker-entrypoint"]
-
-# Start server via Thruster by default, this can be overwritten at runtime
+# s6-overlay takes over as PID 1 and supervises both Meilisearch and Rails
+ENTRYPOINT ["/init"]
 EXPOSE 80
-CMD ["./bin/thrust", "./bin/rails", "server"]

@@ -46,11 +46,6 @@ const EXPLORE_FADE_TRANSITION: Transition = {
   duration: 0.18,
   ease: 'easeOut',
 }
-const EXPLORE_CARD_TRANSITION = {
-  layout: EXPLORE_POSITION_TRANSITION,
-  opacity: EXPLORE_FADE_TRANSITION,
-  y: EXPLORE_FADE_TRANSITION,
-}
 
 type Featured = { image: string; title: string; username: string }
 type ExploreProject = {
@@ -509,6 +504,7 @@ const EventsSection = memo(function EventsSection({ events }: EventsSectionProps
 
 type FeaturedSectionProps = {
   featured: Featured[]
+  activeLightbox: string | null
   onImageOpen: (image: string) => void
 }
 
@@ -516,7 +512,7 @@ type FeaturedSectionProps = {
 // motion.section layout measurements or MarqueeText ResizeObservers. `featured` comes from a
 // static controller payload and `onImageOpen` is a stable useState setter, so memo's default
 // referential check is sufficient.
-const FeaturedSection = memo(function FeaturedSection({ featured, onImageOpen }: FeaturedSectionProps) {
+const FeaturedSection = memo(function FeaturedSection({ featured, activeLightbox, onImageOpen }: FeaturedSectionProps) {
   return (
     <motion.section layout className={styles.section}>
       <h2 className={styles.sectionHeading}>Featured</h2>
@@ -532,7 +528,15 @@ const FeaturedSection = memo(function FeaturedSection({ featured, onImageOpen }:
                 onClick={() => onImageOpen(item.image)}
                 aria-label={`View ${item.title} full size`}
               >
-                <img src={item.image} alt={item.title} className={styles.featuredImage} loading="lazy" />
+                <motion.img
+                  layoutId={`featured-img-${item.image}`}
+                  src={item.image}
+                  alt={item.title}
+                  className={styles.featuredImage}
+                  loading="lazy"
+                  style={{ opacity: activeLightbox === item.image ? 0 : 1 }}
+                  transition={{ type: 'spring', stiffness: 340, damping: 30, mass: 0.8 }}
+                />
               </button>
               <div className={styles.featuredMeta}>
                 <div className={styles.featuredText}>
@@ -587,6 +591,7 @@ type ExploreSectionProps = {
 // the back button, sticky header, EventsSection, and FeaturedSection are not touched.
 const ExploreSection = memo(function ExploreSection({ explore, exploreStats, innerRef }: ExploreSectionProps) {
   const exploreSectionRef = useRef<HTMLElement | null>(null)
+  const exploreViewportRef = useRef<HTMLDivElement | null>(null)
   const exploreControlsRef = useRef<HTMLDivElement | null>(null)
   const exploreJumpLayerRef = useRef<HTMLDivElement | null>(null)
   const exploreMeasuredRef = useRef<HTMLDivElement | null>(null)
@@ -601,6 +606,7 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
   const [isSearching, setIsSearching] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [exploreViewportHeight, setExploreViewportHeight] = useState<number | 'auto'>('auto')
+  const exploreViewportMinHeightRef = useRef<number | null>(null)
   const [exploreVisibleWindow, setExploreVisibleWindow] = useState(() => ({
     key: exploreBucketKey(
       explore.default_category,
@@ -747,7 +753,25 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
       ? 'no projects yet'
       : 'no journals yet'
 
+  function snapshotViewportFloor() {
+    if (!exploreViewportRef.current) return
+    const viewport = exploreViewportRef.current
+    const scrollParent = nearestScrollParent(viewport)
+    const scrollBottom = isWindowScrollParent(scrollParent)
+      ? window.scrollY + window.innerHeight
+      : scrollParent.scrollTop + scrollParent.clientHeight
+    const viewportTop = isWindowScrollParent(scrollParent)
+      ? viewport.getBoundingClientRect().top + window.scrollY
+      : viewport.getBoundingClientRect().top - scrollParent.getBoundingClientRect().top + scrollParent.scrollTop
+    const floor = Math.max(0, scrollBottom - viewportTop)
+    exploreViewportMinHeightRef.current = floor
+    // Set immediately so the useLayoutEffect that fires on key change starts from
+    // this floor rather than 'auto', preventing the momentary height collapse.
+    setExploreViewportHeight((h) => (typeof h === 'number' ? Math.max(h, floor) : floor))
+  }
+
   function resetExploreVisibleWindow(key: string) {
+    snapshotViewportFloor()
     exploreRequestSeq.current += 1
     exploreLoadInFlightRef.current = false
     setIsLoadingMore(false)
@@ -947,11 +971,20 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
     const measured = exploreMeasuredRef.current
     if (!measured) return
 
+    // Clear the floor once real results are in the DOM; while pending keep the floor
+    // so the viewport doesn't collapse before new content arrives.
+    if (!isExploreBucketPending) {
+      exploreViewportMinHeightRef.current = null
+      setExploreViewportHeight('auto')
+    }
+
     const updateHeight = () => {
       const nextHeight = Math.ceil(measured.getBoundingClientRect().height)
       if (nextHeight <= 0) return
 
-      setExploreViewportHeight((height) => (height === nextHeight ? height : nextHeight))
+      const floor = exploreViewportMinHeightRef.current
+      const clampedHeight = floor !== null ? Math.max(nextHeight, floor) : nextHeight
+      setExploreViewportHeight((height) => (height === clampedHeight ? height : clampedHeight))
       scheduleExploreLoadCheckRef.current()
     }
 
@@ -960,7 +993,7 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
     observer.observe(measured)
 
     return () => observer.disconnect()
-  }, [activeExploreKey])
+  }, [activeExploreKey, isExploreBucketPending])
 
   useEffect(() => {
     const sentinel = exploreSentinelRef.current
@@ -1191,7 +1224,7 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
           </motion.div>
 
           <AnimatePresence initial={false} mode="popLayout">
-            {category === 'projects' && (
+            {category === 'projects' && !activeQuery && (
               <motion.div
                 key="project-sort"
                 transition={EXPLORE_POSITION_TRANSITION}
@@ -1249,10 +1282,11 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
 
       <motion.div layout="position" transition={EXPLORE_POSITION_TRANSITION} className={styles.exploreScroll}>
         <motion.div
+          ref={exploreViewportRef}
           className={styles.exploreViewport}
           initial={false}
           animate={{ height: exploreViewportHeight }}
-          transition={EXPLORE_POSITION_TRANSITION}
+          transition={{ duration: 0, ease: 'linear' }}
           onUpdate={() => scheduleExploreLoadCheckRef.current()}
           onAnimationComplete={() => scheduleExploreLoadCheckRef.current()}
         >
@@ -1264,7 +1298,7 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
             )}
             aria-busy={isSearching || isExploreBucketPending}
           >
-            <AnimatePresence initial={false} mode="wait">
+            <AnimatePresence initial={false} mode="popLayout">
               {isExploreBucketPending ? (
                 <motion.div
                   key={exploreStateKey}
@@ -1294,33 +1328,36 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
                   exit={{ opacity: 0 }}
                   transition={EXPLORE_FADE_TRANSITION}
                 >
-                  <LayoutGroup id={`explore-${activeExploreKey}`}>
-                    <Masonry
-                      breakpointCols={{ default: 3, 1023: 2, 767: 1 }}
-                      className={styles.exploreMasonry}
-                      columnClassName={styles.exploreMasonryColumn}
-                    >
-                      {exploreList.map((entry) => {
-                        const entryKey = exploreEntryKey(entry)
-                        const isEntering = enteringExploreEntryKeys.has(entryKey)
+                  <Masonry
+                    breakpointCols={{ default: 3, 1023: 2, 767: 1 }}
+                    className={styles.exploreMasonry}
+                    columnClassName={styles.exploreMasonryColumn}
+                  >
+                    {exploreList.map((entry, index) => {
+                      const entryKey = exploreEntryKey(entry)
+                      const isEntering = enteringExploreEntryKeys.has(entryKey)
 
-                        return (
-                          <motion.div
-                            key={entryKey}
-                            layout="position"
-                            layoutId={entryKey}
-                            className={styles.exploreCardMotion}
-                            initial={isEntering ? { opacity: 0, y: 8 } : false}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0 }}
-                            transition={EXPLORE_CARD_TRANSITION}
-                          >
-                            <ExploreCard entry={entry} now={exploreNow} />
-                          </motion.div>
-                        )
-                      })}
-                    </Masonry>
-                  </LayoutGroup>
+                      return (
+                        <motion.div
+                          key={entryKey}
+                          className={styles.exploreCardMotion}
+                          initial={isEntering ? { opacity: 0, scale: 0.96 } : false}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{
+                            opacity: {
+                              duration: 0.45,
+                              ease: [0.19, 1, 0.22, 1],
+                              delay: isEntering ? index * 0.04 : 0,
+                            },
+                            scale: { duration: 0.45, ease: [0.19, 1, 0.22, 1], delay: isEntering ? index * 0.04 : 0 },
+                          }}
+                        >
+                          <ExploreCard entry={entry} now={exploreNow} highlightQuery={activeQuery || null} />
+                        </motion.div>
+                      )
+                    })}
+                  </Masonry>
 
                   {hasMoreExplore && (
                     <div ref={exploreSentinelRef} className={styles.loadMoreRow}>
@@ -1400,7 +1437,7 @@ export default function BulletinBoardIndex({ events, featured, explore, explore_
         <div ref={innerRef} className={styles.inner}>
           <EventsSection events={events} />
 
-          <FeaturedSection featured={featured} onImageOpen={setLightbox} />
+          <FeaturedSection featured={featured} activeLightbox={lightbox} onImageOpen={setLightbox} />
 
           <ExploreSection explore={explore} exploreStats={explore_stats} innerRef={innerRef} />
         </div>
@@ -1409,35 +1446,56 @@ export default function BulletinBoardIndex({ events, featured, explore, explore_
   )
 
   const lightboxEl =
-    lightbox && typeof document !== 'undefined'
+    typeof document !== 'undefined'
       ? createPortal(
-          <div className={styles.lightbox} onClick={() => setLightbox(null)} role="dialog" aria-modal="true">
-            <img src={lightbox} alt="" className={styles.lightboxImage} />
-          </div>,
+          <AnimatePresence>
+            {lightbox && (
+              <motion.div
+                className={styles.lightbox}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                onClick={() => setLightbox(null)}
+                role="dialog"
+                aria-modal="true"
+              >
+                <motion.img
+                  layoutId={`featured-img-${lightbox}`}
+                  src={lightbox}
+                  alt=""
+                  className={styles.lightboxImage}
+                  transition={{ type: 'spring', stiffness: 340, damping: 30, mass: 0.8 }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )
       : null
 
   if (is_modal) {
     return (
-      <Modal
-        ref={modalRef}
-        panelClasses={clsx('bulletin-board-modal-panel', styles.modalPanel)}
-        paddingClasses=""
-        closeButton={false}
-        maxWidth="7xl"
-      >
-        {content}
-        {lightboxEl}
-      </Modal>
+      <LayoutGroup id="bulletin-board">
+        <Modal
+          ref={modalRef}
+          panelClasses={clsx('bulletin-board-modal-panel', styles.modalPanel)}
+          paddingClasses=""
+          closeButton={false}
+          maxWidth="7xl"
+        >
+          {content}
+          {lightboxEl}
+        </Modal>
+      </LayoutGroup>
     )
   }
 
   return (
-    <>
+    <LayoutGroup id="bulletin-board">
       {content}
       {lightboxEl}
-    </>
+    </LayoutGroup>
   )
 }
 

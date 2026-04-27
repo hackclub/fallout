@@ -100,6 +100,7 @@ gem "aws-sdk-s3", "~> 1.219", require: false
 
 gem "pagy", "~> 43.5"
 gem "pg_search", "~> 2.3"
+gem "meilisearch-rails", "~> 0.13"
 
 gem "inertia_rails", "~> 3.20"
 

@@ -27,6 +27,7 @@
 class JournalEntry < ApplicationRecord
   include Discardable
   include PgSearch::Model
+  include MeiliSearch::Rails
   include Broadcastable
 
   has_paper_trail
@@ -35,6 +36,24 @@ class JournalEntry < ApplicationRecord
                   against: :content,
                   associated_against: { project: %i[name description] },
                   using: { tsearch: { prefix: true } }
+
+  meilisearch auto_index: false, auto_remove: false do
+    attribute :content
+    attribute :project_name do
+      project.name
+    end
+    attribute :project_description do
+      project.description
+    end
+    attribute :created_at do
+      created_at.to_i
+    end
+    attribute :project_id
+    searchable_attributes %w[content project_name project_description]
+    ranking_rules %w[words typo proximity attribute sort exactness]
+    sortable_attributes %w[created_at]
+    filterable_attributes %w[project_id]
+  end
 
   # Live-update the owner's path page on create/update/destroy. Discards are updates
   # (set discarded_at), so the owner's star count recomputes when entries are discarded.
@@ -61,6 +80,7 @@ class JournalEntry < ApplicationRecord
   after_commit :reprocess_images, on: [ :create, :update ]
   # Dirty-only public stats refresh; payload intentionally omits journal IDs.
   after_commit :broadcast_bulletin_explore_update
+  after_commit :enqueue_meilisearch_reindex
 
   # Public Explore feed: kept entries on kept + listed projects. Re-evaluated per request,
   # so a project flipping to is_unlisted or being discarded immediately removes its entries.
@@ -101,6 +121,10 @@ class JournalEntry < ApplicationRecord
     images.attachments.each do |attachment|
       ReprocessJournalImageJob.perform_later(attachment.id)
     end
+  end
+
+  def enqueue_meilisearch_reindex
+    MeilisearchReindexJob.perform_later(self.class.name, id)
   end
 
   def broadcast_bulletin_explore_update

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { ModalLink } from '@inertiaui/modal-react'
 import { Play } from 'lucide-react'
 import { motion, type Transition } from 'motion/react'
@@ -6,6 +7,24 @@ import { SlidingNumber } from '@/components/shared/SlidingNumber'
 import TextMorph from '@/components/shared/TextMorph'
 import { relativeAgeParts } from '@/lib/relativeAge'
 import styles from './ExploreCard.module.scss'
+
+function highlight(text: string, query: string | null): ReactNode {
+  if (!query) return text
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escaped})`, 'gi')
+  const parts = text.split(regex)
+  if (parts.length === 1) return text
+  const matchRe = new RegExp(`^${escaped}$`, 'i')
+  return parts.map((part, i) =>
+    matchRe.test(part) ? (
+      <mark key={i} className={styles.highlight}>
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  )
+}
 
 const JOURNAL_AGE_TRANSITION: Transition = { type: 'spring', stiffness: 260, damping: 34, mass: 0.35 }
 const CARD_WRAP_TRANSITION: Transition = { type: 'spring', stiffness: 320, damping: 26, mass: 0.5 }
@@ -37,6 +56,7 @@ export type ExploreEntry = {
 type Props = {
   entry: ExploreEntry
   now: Date
+  highlightQuery: string | null
 }
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' }
@@ -125,7 +145,7 @@ function renderJournalMedia(entry: ExploreEntry) {
   ) : null
 }
 
-export default function ExploreCard({ entry, now }: Props) {
+export default function ExploreCard({ entry, now, highlightQuery }: Props) {
   const initial = entry.username.trim().charAt(0).toUpperCase() || '?'
   const projectDescription = entry.project_description ?? ''
   const hasDescription = projectDescription.trim().length > 0
@@ -172,9 +192,13 @@ export default function ExploreCard({ entry, now }: Props) {
             {dateLabel && <span className={styles.date}>{dateLabel}</span>}
           </header>
 
-          <h3 className={styles.title}>{entry.project_name}</h3>
-          {entry.type === 'project' && hasDescription && <p className={styles.description}>{projectDescription}</p>}
-          {entry.type === 'journal' && hasJournalExcerpt && <p className={styles.content}>{entry.excerpt}</p>}
+          <h3 className={styles.title}>{highlight(entry.project_name, highlightQuery)}</h3>
+          {entry.type === 'project' && hasDescription && (
+            <p className={styles.description}>{highlight(projectDescription, highlightQuery)}</p>
+          )}
+          {entry.type === 'journal' && hasJournalExcerpt && (
+            <p className={styles.content}>{highlight(entry.excerpt ?? '', highlightQuery)}</p>
+          )}
 
           {entry.type === 'project' && hasLatestJournal && (
             <div className={styles.latestJournal}>
@@ -187,7 +211,7 @@ export default function ExploreCard({ entry, now }: Props) {
                   </span>
                 )}
               </div>
-              <p className={styles.content}>{entry.latest_journal_excerpt}</p>
+              <p className={styles.content}>{highlight(entry.latest_journal_excerpt ?? '', highlightQuery)}</p>
             </div>
           )}
 

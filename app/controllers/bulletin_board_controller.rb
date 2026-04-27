@@ -96,10 +96,13 @@ class BulletinBoardController < ApplicationController
 
   def explore_payload(category:, sort:, query:, cursor:, limit: EXPLORE_LIMIT)
     query = query.to_s.strip.presence
+    # For search queries, load all results in one shot — Meilisearch caps at 500 IDs so
+    # pagination would be meaningless without a cursor, and relevance order is already ranked.
+    effective_limit = query.present? ? EXPLORE_LIMIT_MAX : limit
     entries, next_cursor, has_more = if category == "journals"
-      journal_explore_entries(query: query, cursor: cursor, limit: limit)
+      journal_explore_entries(query: query, cursor: cursor, limit: effective_limit)
     else
-      project_explore_entries(sort: sort, query: query, cursor: cursor, limit: limit)
+      project_explore_entries(sort: sort, query: query, cursor: cursor, limit: effective_limit)
     end
 
     {
@@ -114,7 +117,25 @@ class BulletinBoardController < ApplicationController
 
   def project_explore_entries(sort:, query:, cursor:, limit: EXPLORE_LIMIT)
     scope = policy_scope(Project).public_for_explore
-    scope = search_projects_for_explore(scope, query) if query.present?
+
+    if query.present?
+      ranked_ids = search_projects_for_explore(query)
+      return [ [], nil, false ] if ranked_ids.empty?
+
+      # Preserve Meilisearch relevance order via array_position.
+      # Cursor pagination doesn't apply when sorting by relevance.
+      projects = scope.where(id: ranked_ids)
+                      .order(Arel.sql("array_position(ARRAY[#{ranked_ids.join(',')}]::bigint[], projects.id)"))
+                      .limit(limit + 1)
+                      .preload(:user)
+                      .to_a
+      has_more = projects.size > limit
+      projects = projects.first(limit)
+      preload_project_explore_context(projects)
+
+      return [ projects.map { |p| serialize_project_for_explore(p) }, nil, has_more ]
+    end
+
     scope = order_projects_for_explore(scope, sort)
     scope = apply_project_cursor(scope, sort: sort, cursor: cursor)
 
@@ -130,15 +151,28 @@ class BulletinBoardController < ApplicationController
     ]
   end
 
-  def search_projects_for_explore(scope, query)
-    project_matches = Project.public_for_explore.search(query).select(:id)
-    journal_matches = JournalEntry.public_for_explore.search(query).select(:project_id)
-    scope.where(id: project_matches).or(scope.where(id: journal_matches))
+  def search_projects_for_explore(query)
+    project_ids = meilisearch_project_ids(query)
+    journal_project_ids = meilisearch_journal_project_ids(query)
+    # Direct project matches (name/description) rank first, then journal-only matches.
+    # Both groups preserve Meilisearch's own score order within themselves.
+    (project_ids + (journal_project_ids - project_ids)).uniq
+  rescue Meilisearch::ApiError, Errno::ECONNREFUSED
+    project_matches = Project.public_for_explore.search(query).select(:id).map(&:id)
+    journal_matches = JournalEntry.public_for_explore.search(query).select(:project_id).map(&:project_id)
+    (project_matches + (journal_matches - project_matches)).uniq
   end
 
   def journal_explore_entries(query:, cursor:, limit: EXPLORE_LIMIT)
     scope = JournalEntry.public_for_explore
-    scope = scope.search(query) if query.present?
+    if query.present?
+      begin
+        matching_ids = JournalEntry.ms_search(query, sort: ["created_at:desc"], limit: 500).map(&:id)
+        scope = scope.where(id: matching_ids)
+  rescue Meilisearch::ApiError, Errno::ECONNREFUSED
+        scope = scope.search(query)
+      end
+    end
 
     latest_ids = scope
       .select("DISTINCT ON (journal_entries.project_id) journal_entries.id")
@@ -428,6 +462,14 @@ class BulletinBoardController < ApplicationController
     return src if src.match?(%r{\Ahttps?://}i) || src.start_with?("/", "./", "../")
 
     nil
+  end
+
+  def meilisearch_project_ids(query)
+    Project.ms_search(query, filter: "is_unlisted = false", sort: ["journal_count:desc", "created_at:desc"], limit: 500).map(&:id)
+  end
+
+  def meilisearch_journal_project_ids(query)
+    JournalEntry.ms_search(query, sort: ["created_at:desc"], limit: 500).map(&:project_id).uniq
   end
 
   def plain_text_excerpt(markdown_doc, length)

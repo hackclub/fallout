@@ -10,9 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_23_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_27_062137) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+  enable_extension "pg_trgm"
 
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
@@ -328,6 +329,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_23_120000) do
     t.bigint "ship_id"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index ["content"], name: "index_journal_entries_on_content_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["discarded_at"], name: "index_journal_entries_on_discarded_at"
     t.index ["project_id"], name: "index_journal_entries_on_project_id"
     t.index ["ship_id"], name: "index_journal_entries_on_ship_id"
@@ -550,8 +552,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_23_120000) do
     t.string "tags", default: [], null: false, array: true
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index ["description"], name: "index_projects_on_description_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["discarded_at"], name: "index_projects_on_discarded_at"
     t.index ["is_unlisted"], name: "index_projects_on_is_unlisted"
+    t.index ["name"], name: "index_projects_on_name_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["tags"], name: "index_projects_on_tags", using: :gin
     t.index ["user_id"], name: "index_projects_on_user_id"
   end
@@ -953,7 +957,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_23_120000) do
   add_foreign_key "critters", "users"
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
-  add_foreign_key "dialog_campaigns", "users"
+  add_foreign_key "dialog_campaigns", "users", name: "dialog_campaigns_user_id_fkey"
   add_foreign_key "gold_transactions", "users"
   add_foreign_key "gold_transactions", "users", column: "actor_id"
   add_foreign_key "hcb_connections", "users", column: "connected_by_id"

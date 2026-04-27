@@ -325,3 +325,10 @@ $shadow-hover:
 .card:hover .readMore::after {
   right: 0;
 }
+
+.highlight {
+  background-color: var(--color-yellow);
+  color: var(--color-dark-brown);
+  border-radius: 2px;
+  padding: 0 1px;
+}
