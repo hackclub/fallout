@@ -97,10 +97,13 @@ FROM base
 ARG SENTRY_RELEASE=""
 ENV SENTRY_RELEASE=${SENTRY_RELEASE}
 
-# Install s6-overlay into the final image
+# Install s6-overlay into the final image (xz-utils required for -J flag on slim base)
 COPY --from=build /tmp/s6-noarch.tar.xz /tmp/s6-noarch.tar.xz
 COPY --from=build /tmp/s6-arch.tar.xz /tmp/s6-arch.tar.xz
-RUN tar -C / -Jxpf /tmp/s6-noarch.tar.xz && \
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y xz-utils && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives && \
+    tar -C / -Jxpf /tmp/s6-noarch.tar.xz && \
     tar -C / -Jxpf /tmp/s6-arch.tar.xz && \
     rm /tmp/s6-noarch.tar.xz /tmp/s6-arch.tar.xz
 
