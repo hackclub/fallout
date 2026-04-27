@@ -119,19 +119,15 @@ COPY --from=build /rails /rails
 
 # s6 service: Meilisearch
 RUN mkdir -p /etc/s6-overlay/s6-rc.d/meilisearch && \
-    printf '#!/command/execlineb -P\n\
-/usr/local/bin/meilisearch \\\n\
-  --db-path /rails/storage/meilisearch \\\n\
-  --http-addr 127.0.0.1:7700 \\\n\
-  --no-analytics\n' > /etc/s6-overlay/s6-rc.d/meilisearch/run && \
+    printf '#!/bin/sh\nexec /usr/local/bin/meilisearch --db-path /rails/storage/meilisearch --http-addr 127.0.0.1:7700 --no-analytics\n' \
+      > /etc/s6-overlay/s6-rc.d/meilisearch/run && \
     chmod +x /etc/s6-overlay/s6-rc.d/meilisearch/run && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/meilisearch/type && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/meilisearch
 
 # s6 service: Rails (wraps the original entrypoint logic + server start)
 RUN mkdir -p /etc/s6-overlay/s6-rc.d/rails && \
-    printf '#!/command/execlineb -P\n\
-/rails/bin/docker-entrypoint ./bin/thrust ./bin/rails server\n' \
+    printf '#!/bin/sh\ncd /rails\nexec /rails/bin/docker-entrypoint ./bin/thrust ./bin/rails server\n' \
       > /etc/s6-overlay/s6-rc.d/rails/run && \
     chmod +x /etc/s6-overlay/s6-rc.d/rails/run && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/rails/type && \
