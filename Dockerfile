@@ -126,14 +126,19 @@ RUN mkdir -p /etc/s6-overlay/s6-rc.d/meilisearch && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/meilisearch
 
 # s6 service: Rails (wraps the original entrypoint logic + server start)
-RUN mkdir -p /etc/s6-overlay/s6-rc.d/rails && \
-    printf '#!/bin/sh\ncd /rails\nexec /rails/bin/docker-entrypoint ./bin/thrust ./bin/rails server\n' \
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/rails/env && \
+    printf '#!/bin/sh\nexec /rails/bin/docker-entrypoint ./bin/thrust ./bin/rails server\n' \
       > /etc/s6-overlay/s6-rc.d/rails/run && \
     chmod +x /etc/s6-overlay/s6-rc.d/rails/run && \
     echo "longrun" > /etc/s6-overlay/s6-rc.d/rails/type && \
     mkdir -p /etc/s6-overlay/s6-rc.d/rails/dependencies.d && \
     touch /etc/s6-overlay/s6-rc.d/rails/dependencies.d/meilisearch && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/rails
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/rails && \
+    printf '/rails\n' > /etc/s6-overlay/s6-rc.d/rails/env/PWD && \
+    printf 'production\n' > /etc/s6-overlay/s6-rc.d/rails/env/RAILS_ENV && \
+    printf '/usr/local/bundle\n' > /etc/s6-overlay/s6-rc.d/rails/env/BUNDLE_PATH && \
+    printf '1\n' > /etc/s6-overlay/s6-rc.d/rails/env/BUNDLE_DEPLOYMENT && \
+    printf 'development\n' > /etc/s6-overlay/s6-rc.d/rails/env/BUNDLE_WITHOUT
 
 # Run and own only the runtime files as a non-root user for security
 RUN groupadd --system --gid 1000 rails && \
