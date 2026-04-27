@@ -50,15 +50,18 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Download s6-overlay (process supervisor for running Meilisearch alongside Rails)
+# TARGETARCH is set automatically by Docker buildx (amd64 or arm64).
 ARG S6_VERSION=3.2.2.0
-RUN curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-noarch.tar.xz" \
+RUN ARCH=$([ "$(uname -m)" = "aarch64" ] && echo "aarch64" || echo "x86_64") && \
+    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-noarch.tar.xz" \
       -o /tmp/s6-noarch.tar.xz && \
-    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-aarch64.tar.xz" \
+    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-${ARCH}.tar.xz" \
       -o /tmp/s6-arch.tar.xz
 
 # Download Meilisearch binary
 ARG MEILISEARCH_VERSION=1.42.1
-RUN curl -fsSL "https://github.com/meilisearch/meilisearch/releases/download/v${MEILISEARCH_VERSION}/meilisearch-linux-aarch64" \
+RUN ARCH=$([ "$(uname -m)" = "aarch64" ] && echo "aarch64" || echo "amd64") && \
+    curl -fsSL "https://github.com/meilisearch/meilisearch/releases/download/v${MEILISEARCH_VERSION}/meilisearch-linux-${ARCH}" \
       -o /usr/local/bin/meilisearch && \
     chmod +x /usr/local/bin/meilisearch
 
