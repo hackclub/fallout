@@ -1,0 +1,233 @@
+| title | Public API |
+| description | Build things with Fallout's public API. |
+| priority | 1 |
+| --- | --- |
+
+# Public API
+
+Fallout has a public read-only API so you can build your own tools, bots, visualizations, or integrations on top of the community's work. No API key needed for any of the endpoints listed here.
+
+The base URL is `https://fallout.hackclub.com/api/v1`.
+
+---
+
+## Projects
+
+### List projects
+
+```
+GET /api/v1/projects
+```
+
+Returns a paginated list of all public, listed projects.
+
+**Query parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `query` | string | Search projects by name, description, or journal content. |
+| `cursor` | string | Opaque cursor returned from a previous response to get the next page. |
+| `limit` | number | Results per page. Between 1 and 100, defaults to 50. |
+
+**Response**
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "My Project",
+      "description": "A short description.",
+      "tags": ["electronics", "firmware"],
+      "demo_link": "https://example.com",
+      "repo_link": "https://github.com/...",
+      "is_unlisted": false,
+      "owner": { "id": 42, "display_name": "Alex", "avatar": "https://..." },
+      "cover_image_url": "https://...",
+      "journal_entries_count": 7,
+      "recordings_count": 4,
+      "time_logged": 18300,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-02-01T00:00:00Z"
+    }
+  ],
+  "pagination": {
+    "limit": 50,
+    "next_cursor": "eyJfcm...",
+    "has_more": true
+  }
+}
+```
+
+`time_logged` is in seconds.
+
+---
+
+### Get a project
+
+```
+GET /api/v1/projects/:id
+```
+
+Returns full detail for a single project, including all journal entries and ships.
+
+**Response**
+
+Same fields as the list endpoint, plus:
+
+```json
+{
+  "data": {
+    "collaborators": [
+      { "id": 43, "display_name": "Sam", "avatar": "https://..." }
+    ],
+    "journal_entries": [
+      {
+        "id": 10,
+        "project_id": 1,
+        "content": "Raw markdown...",
+        "content_html": "<p>Rendered HTML...</p>",
+        "images": ["https://..."],
+        "recordings_count": 2,
+        "time_logged": 5400,
+        "author": { "id": 42, "display_name": "Alex", "avatar": "https://..." },
+        "collaborators": [],
+        "created_at": "2026-01-15T00:00:00Z",
+        "updated_at": "2026-01-15T00:00:00Z"
+      }
+    ],
+    "ships": [
+      {
+        "id": 3,
+        "status": "approved",
+        "feedback": "Looks great!",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+Returns `404` if the project does not exist or is unlisted.
+
+---
+
+## Explore feed
+
+The explore feed is what you see on the community page. It powers the browsable grid of projects and journals, with sorting, search, and cursor pagination.
+
+### Browse projects
+
+```
+GET /api/v1/explore/projects
+```
+
+**Query parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `sort` | string | `active` (default) sorts by latest journal activity. `newest` sorts by creation date. |
+| `query` | string | Full-text search across project names, descriptions, and journal content. |
+| `cursor` | string | Opaque cursor from a previous response. |
+| `limit` | number | Between 1 and 50, defaults to 20. |
+
+**Response**
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "My Project",
+      "description": "A short description.",
+      "tags": ["electronics"],
+      "cover_image_url": "https://...",
+      "owner": { "id": 42, "display_name": "Alex", "avatar": "https://..." },
+      "journal_entries_count": 7,
+      "latest_journal_excerpt": "Today I finished the PCB layout...",
+      "latest_journal_date": "2026-02-10T00:00:00Z",
+      "last_activity_at": "2026-02-10T00:00:00Z",
+      "created_at": "2026-01-01T00:00:00Z",
+      "url": "https://fallout.hackclub.com/projects/1"
+    }
+  ],
+  "pagination": {
+    "next_cursor": "eyJfcm...",
+    "has_more": true
+  },
+  "meta": {
+    "category": "projects",
+    "sort": "active",
+    "query": ""
+  }
+}
+```
+
+---
+
+### Browse journals
+
+```
+GET /api/v1/explore/journals
+```
+
+Returns one journal entry per project (the most recent one), sorted newest first. Good for a live feed of what people are working on.
+
+**Query parameters**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `query` | string | Full-text search across journal content. |
+| `cursor` | string | Opaque cursor from a previous response. |
+| `limit` | number | Between 1 and 50, defaults to 20. |
+
+**Response**
+
+```json
+{
+  "data": [
+    {
+      "id": 10,
+      "project_id": 1,
+      "project_name": "My Project",
+      "excerpt": "Today I finished the PCB layout...",
+      "cover_image_url": "https://...",
+      "tags": ["electronics"],
+      "author": { "id": 42, "display_name": "Alex", "avatar": "https://..." },
+      "date": "2026-02-10T00:00:00Z",
+      "url": "https://fallout.hackclub.com/projects/1?journal_entry_id=10"
+    }
+  ],
+  "pagination": {
+    "next_cursor": "eyJfcm...",
+    "has_more": true
+  },
+  "meta": {
+    "category": "journals",
+    "sort": "newest",
+    "query": ""
+  }
+}
+```
+
+---
+
+## Pagination
+
+All list endpoints use cursor-based pagination. When `has_more` is `true`, pass the `next_cursor` value as the `cursor` parameter on your next request to get the next page.
+
+Cursors are opaque strings. Do not try to parse or construct them.
+
+---
+
+## Errors
+
+| Status | Meaning |
+| --- | --- |
+| `400` | Bad request, usually an invalid cursor. |
+| `404` | Resource not found. |
+
+---
+
+Have a question or built something cool? Share it in [#fallout](https://hackclub.enterprise.slack.com/archives/C037157AL30).

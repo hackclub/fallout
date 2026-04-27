@@ -427,6 +427,10 @@ Rails.application.routes.draw do
     namespace :v1 do
       resources :projects, only: [ :index, :show ]
       resources :users, only: [ :index, :show ], param: :id
+      scope :explore do
+        get :projects, to: "explore#projects", as: :explore_projects
+        get :journals, to: "explore#journals", as: :explore_journals
+      end
     end
   end
 end
