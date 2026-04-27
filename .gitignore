@@ -62,3 +62,6 @@ docs/plans
 
 .idea/
 *.iml
+
+# Meilisearch local data
+/data.ms/
