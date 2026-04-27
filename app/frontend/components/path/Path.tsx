@@ -168,8 +168,8 @@ function Path({ nodes, introTransition }: PathProps) {
   const rafRef = useRef(0)
   const backBillboardRefs = useRef<(HTMLDivElement | null)[]>([])
   const frontBillboardRefs = useRef<(HTMLDivElement | null)[]>([])
-  const backBoardRef = useRef<HTMLDivElement | null>(null)
-  const frontBoardRef = useRef<HTMLDivElement | null>(null)
+  const backBoardRefs = useRef<(HTMLDivElement | null)[]>([])
+  const frontBoardRefs = useRef<(HTMLDivElement | null)[]>([])
   const backCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const frontCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const backCtxRef = useRef<CanvasRenderingContext2D | null>(null)
@@ -245,9 +245,20 @@ function Path({ nodes, introTransition }: PathProps) {
 
   const firstBillboardY = billboards[0].y
   const lastBillboardY = billboards[billboards.length - 1].y
-  const boardY = lastBillboardY + BILLBOARD_SPACING * 1.4
-  const boardLeftPct = -35
   const boardWidthPct = 60
+  const boards = useMemo(() => {
+    const result: { y: number; leftPct: number }[] = []
+    let i = billboards.length - 1 // start at the star end
+    while (i >= 0) {
+      const n = result.length
+      result.push({
+        y: billboards[i].y + BILLBOARD_SPACING * 0.7,
+        leftPct: n % 2 === 0 ? -35 : 75,
+      })
+      i -= n === 0 ? 12 : 14
+    }
+    return result
+  }, [billboards])
 
   const grass = useMemo(() => {
     const grassMinY = firstBillboardY - bottomGroundY
@@ -409,24 +420,31 @@ function Path({ nodes, introTransition }: PathProps) {
       prevHigh = highIdx
 
       {
-        const rawY = boardY + scrollOffset
-        const effectiveY = Math.max(0, rawY)
-        const curveZ = effectiveY * effectiveY * invTwoR
-        const pastInflection = effectiveY >= inflectionGroundY
-        const bottom = `${rawY}px`
-        const transform = `translateZ(${-curveZ}px) rotateX(-${GROUND_ANGLE}deg)`
-        const back = backBoardRef.current
-        if (back) {
-          back.style.bottom = bottom
-          back.style.transform = transform
-          back.style.visibility = pastInflection ? 'visible' : 'hidden'
-        }
-        const front = frontBoardRef.current
-        if (front) {
-          front.style.bottom = bottom
-          front.style.transform = transform
-          front.style.visibility = pastInflection ? 'hidden' : 'visible'
-        }
+        boards.forEach((board, bi) => {
+          const rawY = board.y + scrollOffset
+          const effectiveY = Math.max(0, rawY)
+          const curveZ = effectiveY * effectiveY * invTwoR
+          const pastInflection = effectiveY >= inflectionGroundY
+          const bottom = `${rawY}px`
+          const transform = `translateZ(${-curveZ}px) rotateX(-${GROUND_ANGLE}deg)`
+          // Fade out when the next board toward the viewer (higher index, lower y) enters the foreground
+          const nextRawY = bi + 1 < boards.length ? boards[bi + 1].y + scrollOffset : -Infinity
+          const opacity = nextRawY > 0 && nextRawY < inflectionGroundY ? '0' : '1'
+          const back = backBoardRefs.current[bi]
+          if (back) {
+            back.style.bottom = bottom
+            back.style.transform = transform
+            back.style.visibility = pastInflection ? 'visible' : 'hidden'
+            back.style.opacity = opacity
+          }
+          const front = frontBoardRefs.current[bi]
+          if (front) {
+            front.style.bottom = bottom
+            front.style.transform = transform
+            front.style.visibility = pastInflection ? 'hidden' : 'visible'
+            front.style.opacity = opacity
+          }
+        })
       }
 
       if (backCtxRef.current) drawGrass(backCtxRef.current, scrollOffset, true)
@@ -477,7 +495,7 @@ function Path({ nodes, introTransition }: PathProps) {
     }
   }, [
     billboards,
-    boardY,
+    boards,
     firstBillboardY,
     grass,
     inflectionGroundY,
@@ -698,28 +716,32 @@ function Path({ nodes, introTransition }: PathProps) {
                 transform: `rotateX(${GROUND_ANGLE}deg)`,
               }}
             >
-              <div
-                ref={backBoardRef}
-                style={{
-                  position: 'absolute',
-                  left: `${boardLeftPct}%`,
-                  width: `${boardWidthPct}%`,
-                  height: 'auto',
-                  transformOrigin: 'bottom center',
-                }}
-              >
-                <ModalLink
-                  href="/bulletin_board"
-                  panelClasses="bulletin-board-modal-panel min-h-screen max-md:w-full max-md:max-w-none"
-                  paddingClasses="p-0 md:max-w-6xl md:mx-auto"
-                  closeButton={false}
-                  maxWidth="7xl"
-                  className="block cursor-pointer"
-                  style={{ pointerEvents: 'auto', transform: `translateY(${BILLBOARD_Y_OFFSET}px)` }}
+              {boards.map((board, bi) => (
+                <div
+                  key={bi}
+                  ref={(el) => { backBoardRefs.current[bi] = el }}
+                  style={{
+                    position: 'absolute',
+                    left: `${board.leftPct}%`,
+                    width: `${boardWidthPct}%`,
+                    height: 'auto',
+                    transformOrigin: 'bottom center',
+                    transition: 'opacity 0.5s ease',
+                  }}
                 >
-                  <img src="/path/board.svg" alt="Bulletin board" style={{ width: '100%', display: 'block' }} />
-                </ModalLink>
-              </div>
+                  <ModalLink
+                    href="/bulletin_board"
+                    panelClasses="bulletin-board-modal-panel min-h-screen max-md:w-full max-md:max-w-none"
+                    paddingClasses="p-0 md:max-w-6xl md:mx-auto"
+                    closeButton={false}
+                    maxWidth="7xl"
+                    className="block cursor-pointer"
+                    style={{ pointerEvents: 'auto', transform: `translateY(${BILLBOARD_Y_OFFSET}px)` }}
+                  >
+                    <img src="/path/board.svg" alt="Bulletin board" style={{ width: '100%', display: 'block' }} />
+                  </ModalLink>
+                </div>
+              ))}
               {billboards.map((b, i) => (
                 <div
                   key={b.id}
@@ -807,28 +829,32 @@ function Path({ nodes, introTransition }: PathProps) {
                 transform: `rotateX(${GROUND_ANGLE}deg)`,
               }}
             >
-              <div
-                ref={frontBoardRef}
-                style={{
-                  position: 'absolute',
-                  left: `${boardLeftPct}%`,
-                  width: `${boardWidthPct}%`,
-                  height: 'auto',
-                  transformOrigin: 'bottom center',
-                }}
-              >
-                <ModalLink
-                  href="/bulletin_board"
-                  panelClasses="bulletin-board-modal-panel min-h-screen max-md:w-full max-md:max-w-none"
-                  paddingClasses="p-0 md:max-w-6xl md:mx-auto"
-                  closeButton={false}
-                  maxWidth="7xl"
-                  className="block cursor-pointer"
-                  style={{ pointerEvents: 'auto', transform: `translateY(${BILLBOARD_Y_OFFSET}px)` }}
+              {boards.map((board, bi) => (
+                <div
+                  key={bi}
+                  ref={(el) => { frontBoardRefs.current[bi] = el }}
+                  style={{
+                    position: 'absolute',
+                    left: `${board.leftPct}%`,
+                    width: `${boardWidthPct}%`,
+                    height: 'auto',
+                    transformOrigin: 'bottom center',
+                    transition: 'opacity 0.5s ease',
+                  }}
                 >
-                  <img src="/path/board.svg" alt="Bulletin board" style={{ width: '100%', display: 'block' }} />
-                </ModalLink>
-              </div>
+                  <ModalLink
+                    href="/bulletin_board"
+                    panelClasses="bulletin-board-modal-panel min-h-screen max-md:w-full max-md:max-w-none"
+                    paddingClasses="p-0 md:max-w-6xl md:mx-auto"
+                    closeButton={false}
+                    maxWidth="7xl"
+                    className="block cursor-pointer"
+                    style={{ pointerEvents: 'auto', transform: `translateY(${BILLBOARD_Y_OFFSET}px)` }}
+                  >
+                    <img src="/path/board.svg" alt="Bulletin board" style={{ width: '100%', display: 'block' }} />
+                  </ModalLink>
+                </div>
+              ))}
               {billboards.map((b, i) => (
                 <div
                   key={b.id}
