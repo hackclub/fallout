@@ -585,23 +585,25 @@ function ProfileShow({
         <div className="flex flex-col sm:flex-row h-full w-full gap-2 rounded-md mt-">
           <div className="flex flex-col gap-2">
             <div
-              className="relative rounded-lg grow aspect-square border-2 border-dark-brown shrink-0 w-full sm:h-80"
+              className="relative rounded-lg grow aspect-square border-2 border-dark-brown shrink-0 w-full  sm:h-80"
               style={
                 selectedBg
                   ? { backgroundImage: `url(${selectedBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }
                   : { backgroundColor: 'white' }
               }
             >
+              
+              {selectedEar && <img src={selectedEar} alt="" className="absolute inset-0 w-full h-full object-cover" />}
               {selectedBody && (
                 <img src={selectedBody} alt="" className="absolute inset-0 w-full h-full object-cover" />
               )}
-              {selectedEar && <img src={selectedEar} alt="" className="absolute inset-0 w-full h-full object-cover" />}
               {selectedTie && (
                 <img src={selectedTie} alt="" className="absolute -top-3 inset-0 w-full h-full object-cover" />
               )}
               {selectedCheek && (
                 <img src={selectedCheek} alt="" className="absolute inset-0 w-full h-full object-cover" />
               )}
+              
               {selectedMouth && (
                 <img src={selectedMouth} alt="" className="absolute inset-0 w-full h-full object-cover" />
               )}
@@ -681,8 +683,8 @@ function ProfileShow({
               </div>
             </div>
           </div>
-          <div className="h-48 sm:h-full overflow-y-auto">
-            <div className="grow grid grid-cols-4 sm:grid-cols-3 gap-1">
+          <div className="h-48 sm:h-full overflow-y-auto w-full">
+            <div className="grow grid grid-cols-4 sm:grid-cols-3 gap-1 sm:max-h-80">
               {imagesByTab[activeTab].map((src) => {
                 const selected = selectedByTab[activeTab] === src
                 return (
