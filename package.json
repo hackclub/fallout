@@ -3,7 +3,7 @@
   "type": "module",
   "devDependencies": {
     "@types/luxon": "^3.7.1",
-    "@types/node": "^25.3.1",
+    "@types/node": "^25.5.2",
     "@types/three": "^0.184.0",
     "prettier": "^3.8.1",
     "react-scan": "^0.5.3",
