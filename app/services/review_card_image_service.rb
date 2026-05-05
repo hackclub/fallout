@@ -7,6 +7,8 @@
 #
 # Returns nil if no source image is available or compositing fails.
 class ReviewCardImageService
+  require "addressable/uri"
+
   OVERLAY_DIR = Rails.root.join("public", "review_overlays")
 
   OVERLAYS = {
@@ -82,12 +84,13 @@ class ReviewCardImageService
       return nil
     end
 
-    ext = File.extname(URI.parse(url).path).downcase.presence || ".png"
+    encoded_url = Addressable::URI.parse(url).normalize.to_s
+    ext = File.extname(URI.parse(encoded_url).path).downcase.presence || ".png"
     tmp = Tempfile.new([ "zine_source", ext ])
     tmp.binmode
 
     require "open-uri"
-    URI.open(url, read_timeout: 10) { |io| tmp.write(io.read) } # rubocop:disable Security/Open
+    URI.open(encoded_url, read_timeout: 10) { |io| tmp.write(io.read) } # rubocop:disable Security/Open
     tmp.flush
     tmp
   rescue StandardError => e

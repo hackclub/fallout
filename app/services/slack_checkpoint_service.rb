@@ -34,7 +34,22 @@ class SlackCheckpointService
       message_ts: message.ts
     )
     permalink_response.permalink
-  rescue Slack::Web::Api::Errors::SlackError, Faraday::Error
+  rescue Slack::Web::Api::Errors::SlackError, Faraday::Error => e
+    Rails.logger.warn(
+      "SlackCheckpointService.post_review_thread failed: #{e.class}: #{e.message} " \
+      "(channel=#{CHANNEL_ID}, thread_ts=#{message_ts}, ship_id=#{ship.id}, review_type=#{review_type})"
+    )
+    ErrorReporter.capture_exception(
+      e,
+      contexts: {
+        slack_checkpoint_thread: {
+          channel: CHANNEL_ID,
+          thread_ts: message_ts,
+          ship_id: ship.id,
+          review_type: review_type
+        }
+      }
+    )
     nil
   end
 

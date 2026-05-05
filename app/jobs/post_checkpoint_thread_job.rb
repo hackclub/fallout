@@ -1,6 +1,23 @@
 class PostCheckpointThreadJob < ApplicationJob
   queue_as :default
 
+  rescue_from(StandardError) do |exception|
+    Rails.logger.error(
+      "PostCheckpointThreadJob failed: #{exception.class}: #{exception.message} " \
+      "(job_id=#{job_id}, arguments=#{arguments.inspect})"
+    )
+    ErrorReporter.capture_exception(
+      exception,
+      contexts: {
+        post_checkpoint_thread_job: {
+          job_id: job_id,
+          arguments: arguments
+        }
+      }
+    )
+    raise exception
+  end
+
   def perform(message_ts:, ship_id:, review_type:, review_status:, base_url:, project_url:, repo_url:)
     ship = Ship.includes(
       :time_audit_review,
