@@ -16,7 +16,6 @@ default: &default
     - queues: [heavy]
       threads: 4
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 4) %>
-      polling_interval: 0.5
 development:
   <<: *default
 
