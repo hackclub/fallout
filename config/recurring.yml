@@ -19,11 +19,6 @@ production:
     queue: uptime
     schedule: every minute
 
-  uptime_ping_heavy:
-    class: UptimePingHeavyJob
-    queue: heavy
-    schedule: every minute
-
   airtable_sync:
     class: AirtableSyncJob
     queue: background
