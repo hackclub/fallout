@@ -63,7 +63,7 @@ module YouTubeService
 
     response = google_connection.get("/youtube/v3/videos") do |req|
       req.headers["Accept"] = "application/json"
-      req.params["part"] = "snippet,contentDetails"
+      req.params["part"] = "snippet,contentDetails,liveStreamingDetails"
       req.params["id"] = video_id
       req.params["key"] = youtube_api_key
     end
@@ -81,12 +81,16 @@ module YouTubeService
 
     snippet = item["snippet"]
     content = item["contentDetails"]
+    streaming = item["liveStreamingDetails"]
 
     duration = parse_iso8601_duration(content["duration"])
-    is_live = snippet["liveBroadcastContent"] != "none"
+    # `liveBroadcastContent` is "live"/"upcoming" only while the stream is active;
+    # finished live streams return "none". `liveStreamingDetails.actualStartTime`
+    # is set on any video that was ever a live broadcast (past or present).
+    was_live = snippet["liveBroadcastContent"] != "none" || streaming&.dig("actualStartTime").present?
 
     # Reject Shorts — very short videos that aren't live streams
-    return nil if duration.present? && duration <= 60 && !is_live
+    return nil if duration.present? && duration <= 60 && !was_live
 
     {
       video_id: video_id,
@@ -99,7 +103,7 @@ module YouTubeService
       published_at: snippet["publishedAt"],
       definition: content["definition"],
       caption: content["caption"] == "true",
-      was_live: snippet["liveBroadcastContent"] == "live",
+      was_live: was_live,
       live_broadcast_content: snippet["liveBroadcastContent"],
       tags: snippet["tags"],
       category_id: snippet["categoryId"]
