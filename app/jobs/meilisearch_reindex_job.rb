@@ -1,5 +1,5 @@
 class MeilisearchReindexJob < ApplicationJob
-  queue_as :default
+  queue_as :meilisearch
 
   def perform(model_class_name, record_id)
     record = model_class_name.constantize.find_by(id: record_id)
