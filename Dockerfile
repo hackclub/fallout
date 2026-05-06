@@ -56,22 +56,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     apt-get install --no-install-recommends -y nodejs && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
-# Download s6-overlay (process supervisor for running Meilisearch alongside Rails)
-# TARGETARCH is set automatically by Docker buildx (amd64 or arm64).
-ARG S6_VERSION=3.2.2.0
-RUN ARCH=$([ "$(uname -m)" = "aarch64" ] && echo "aarch64" || echo "x86_64") && \
-    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-noarch.tar.xz" \
-      -o /tmp/s6-noarch.tar.xz && \
-    curl -fsSL "https://github.com/just-containers/s6-overlay/releases/download/v${S6_VERSION}/s6-overlay-${ARCH}.tar.xz" \
-      -o /tmp/s6-arch.tar.xz
-
-# Download Meilisearch binary
-ARG MEILISEARCH_VERSION=1.42.1
-RUN ARCH=$([ "$(uname -m)" = "aarch64" ] && echo "aarch64" || echo "amd64") && \
-    curl -fsSL "https://github.com/meilisearch/meilisearch/releases/download/v${MEILISEARCH_VERSION}/meilisearch-linux-${ARCH}" \
-      -o /usr/local/bin/meilisearch && \
-    chmod +x /usr/local/bin/meilisearch
-
 # Install application gems
 COPY Gemfile Gemfile.lock ./
 RUN bundle install && \
@@ -107,47 +91,9 @@ FROM base
 ARG SENTRY_RELEASE=""
 ENV SENTRY_RELEASE=${SENTRY_RELEASE}
 
-# Install s6-overlay into the final image (xz-utils required for -J flag on slim base)
-COPY --from=build /tmp/s6-noarch.tar.xz /tmp/s6-noarch.tar.xz
-COPY --from=build /tmp/s6-arch.tar.xz /tmp/s6-arch.tar.xz
-RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y xz-utils && \
-    rm -rf /var/lib/apt/lists /var/cache/apt/archives && \
-    tar -C / -Jxpf /tmp/s6-noarch.tar.xz && \
-    tar -C / -Jxpf /tmp/s6-arch.tar.xz && \
-    rm /tmp/s6-noarch.tar.xz /tmp/s6-arch.tar.xz
-
-# Copy Meilisearch binary
-COPY --from=build /usr/local/bin/meilisearch /usr/local/bin/meilisearch
-
 # Copy built artifacts: gems, application
 COPY --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
 COPY --from=build /rails /rails
-
-# s6 service: Meilisearch
-RUN mkdir -p /etc/s6-overlay/s6-rc.d/meilisearch && \
-    printf '#!/bin/sh\nexec /usr/local/bin/meilisearch --db-path /rails/storage/meilisearch --http-addr 127.0.0.1:7700 --no-analytics\n' \
-      > /etc/s6-overlay/s6-rc.d/meilisearch/run && \
-    chmod +x /etc/s6-overlay/s6-rc.d/meilisearch/run && \
-    echo "longrun" > /etc/s6-overlay/s6-rc.d/meilisearch/type && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/meilisearch
-
-# s6 service: Rails (wraps the original entrypoint logic + server start)
-# with-contenv loads the full container environment (DATABASE_URL, RAILS_MASTER_KEY, etc.)
-# injected by Coolify at runtime — without it those vars never reach the Rails process.
-RUN mkdir -p /etc/s6-overlay/s6-rc.d/rails/env && \
-    printf '#!/command/with-contenv /bin/sh\ncd /rails && exec /rails/bin/docker-entrypoint /rails/bin/thrust /rails/bin/rails server\n' \
-      > /etc/s6-overlay/s6-rc.d/rails/run && \
-    chmod +x /etc/s6-overlay/s6-rc.d/rails/run && \
-    echo "longrun" > /etc/s6-overlay/s6-rc.d/rails/type && \
-    mkdir -p /etc/s6-overlay/s6-rc.d/rails/dependencies.d && \
-    touch /etc/s6-overlay/s6-rc.d/rails/dependencies.d/meilisearch && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/rails && \
-    printf '/rails\n' > /etc/s6-overlay/s6-rc.d/rails/env/PWD && \
-    printf 'production\n' > /etc/s6-overlay/s6-rc.d/rails/env/RAILS_ENV && \
-    printf '/usr/local/bundle\n' > /etc/s6-overlay/s6-rc.d/rails/env/BUNDLE_PATH && \
-    printf '1\n' > /etc/s6-overlay/s6-rc.d/rails/env/BUNDLE_DEPLOYMENT && \
-    printf 'development\n' > /etc/s6-overlay/s6-rc.d/rails/env/BUNDLE_WITHOUT
 
 # Run and own only the runtime files as a non-root user for security
 RUN groupadd --system --gid 1000 rails && \
@@ -155,6 +101,6 @@ RUN groupadd --system --gid 1000 rails && \
     chown -R rails:rails db log storage tmp
 USER 1000:1000
 
-# s6-overlay takes over as PID 1 and supervises both Meilisearch and Rails
-ENTRYPOINT ["/init"]
+ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 EXPOSE 80
+CMD ["./bin/thrust", "./bin/rails", "server"]

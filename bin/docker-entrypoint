@@ -9,7 +9,6 @@ fi
 # If running the rails server then create or migrate existing database
 if [ "${@: -2:1}" == "/rails/bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
   ./bin/rails db:prepare
-  ./bin/rails runner 'Project.ms_reindex!; JournalEntry.ms_reindex!'
 fi
 
 exec "${@}"
