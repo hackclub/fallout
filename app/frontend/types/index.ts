@@ -1,12 +1,14 @@
+export type BanType = 'fallout' | 'hcb' | 'hardware' | 'age' | 'hackatime'
+
 export interface User {
   id: number
   display_name: string
-  email: string
   avatar: string
   roles: string[]
   is_admin: boolean
   is_staff: boolean
   is_banned: boolean
+  ban_type: BanType | null
   is_trial: boolean
   is_onboarded: boolean
 }
@@ -16,6 +18,15 @@ export type FlashData = Record<string, string>
 export interface Features {
   collaborators?: boolean
   shop?: boolean
+  grant_fulfillment?: boolean
+}
+
+export type IdentityGateState = 'unverified' | 'pending' | 'verified_no_address' | 'verified_with_address'
+
+export interface IdentityGate {
+  state: IdentityGateState
+  verify_url: string
+  address_url: string
 }
 
 export interface SharedProps {
@@ -27,6 +38,10 @@ export interface SharedProps {
   trial_session_path: string
   rsvp_path: string
   has_unread_mail: boolean
+  current_streak: number
+  streak_freezes: number
+  identity_gate: IdentityGate | null
+  show_feedback_banner: boolean
   errors: Record<string, string[]>
   [key: string]: unknown
 }
@@ -37,6 +52,7 @@ export interface MailItem {
   pinned: boolean
   dismissable: boolean
   action_url: string | null
+  action_label: string | null
   is_read: boolean
   source_type: string | null
   invite_id?: number
@@ -50,6 +66,7 @@ export interface MailDetail {
   pinned: boolean
   dismissable: boolean
   action_url: string | null
+  action_label: string | null
   source_type: string | null
   created_at: string
 }
@@ -64,8 +81,8 @@ export interface PagyProps {
 }
 
 export interface CollaboratorInfo {
-  id: number
-  user_id: number
+  id?: number
+  user_id?: number
   display_name: string
   avatar: string
 }
@@ -121,12 +138,28 @@ export interface JournalEntryCard {
   content_html: string
   images: string[]
   recordings_count: number
+  recordings: {
+    id: number
+    type: 'youtube'
+    title: string
+    thumbnail_url: string | null
+    embed_url: string
+  }[]
   created_at: string
   created_at_iso: string
   author_display_name: string
   author_avatar: string
   time_logged: number
   collaborators: { display_name: string; avatar: string }[]
+  can_switch_project: boolean
+  can_delete: boolean
+  is_blueprint_transfer: boolean
+  blueprint_hours: number | null
+}
+
+export interface JournalSwitchableProject {
+  id: number
+  name: string
 }
 
 export interface ShipEvent {
@@ -134,6 +167,11 @@ export interface ShipEvent {
   status: string
   feedback: string | null
   created_at_iso: string
+  updated_at_iso: string
+  reviewer_display_name: string | null
+  time_audit_status: string | null
+  requirements_check_status: string | null
+  design_review_status: string | null
 }
 
 export interface ProjectForm {
@@ -158,15 +196,43 @@ export interface AdminUserDetail {
   id: number
   display_name: string
   email?: string
+  pronouns?: string | null
+  bio?: string | null
   avatar: string
   slack_id: string | null
   roles: string[]
   projects_count: number
   timezone: string
   is_banned: boolean
+  ban_type: BanType | null
+  ban_reason: string | null
   is_discarded: boolean
   discarded_at: string | null
   created_at: string
+}
+
+export interface AdminStreakDay {
+  date: string
+  status: 'pending' | 'active' | 'frozen' | 'missed'
+}
+
+export interface AdminStreakGoal {
+  id: number
+  target_days: number
+  started_on: string
+  progress: number
+  completed: boolean
+  broken: boolean
+  restorable: boolean
+}
+
+export interface AdminStreakData {
+  current_streak: number
+  longest_streak: number
+  total_active_days: number
+  freezes_remaining: number
+  days: AdminStreakDay[]
+  goals: AdminStreakGoal[]
 }
 
 export interface AdminProjectData {
@@ -204,6 +270,7 @@ export interface AdminProjectDetail {
   user_avatar: string
   journal_entries_count: number
   hours_tracked: number
+  manual_hours: number
   last_entry_at: string | null
   created_at: string
   collaborators: { id: number; display_name: string; avatar: string }[]
@@ -305,6 +372,8 @@ export interface ReviewRow {
   created_at: string
   is_claimed: boolean
   claimed_by_display_name: string | null
+  sibling_approved: boolean
+  requirements_check_reviewer_display_name: string | null
 }
 
 export interface TimeAuditReviewDetail {
@@ -324,6 +393,7 @@ export interface TimeAuditAnnotations {
     {
       description?: string
       segments?: TimeAuditSegment[]
+      stretch_multiplier?: number
     }
   >
 }
@@ -350,7 +420,9 @@ export interface ReviewRecording {
   name: string
   playback_url?: string
   thumbnail_url?: string
+  recordable_id?: number
   video_id?: string
+  yt_duration_seconds?: number
   inactive_segments?: InactiveSegment[]
   inactive_percentage?: number
   activity_checked?: boolean
@@ -384,6 +456,7 @@ export interface ReviewProjectContext {
   user_id: number
   user_display_name: string
   user_avatar: string
+  user_slack_id: string | null
 }
 
 export interface RequirementsCheckProjectContext extends ReviewProjectContext {
@@ -398,6 +471,79 @@ export interface RequirementsCheckProjectContext extends ReviewProjectContext {
   frozen_demo_link: string | null
   waiting_since: string
   first_submitted_at: string | null
+}
+
+export interface UnifiedInspectStage {
+  key: string
+  label: string
+  status: string
+  actor: string | null
+  at: string | null
+  feedback?: string | null
+  internal_notes?: string | null
+}
+
+export interface UnifiedInspectShip {
+  id: number
+  ship_type: string
+  status: string
+  project_name: string
+  project_description: string | null
+  owner_display_name: string
+  owner_email: string | null
+  owner_slack_id: string | null
+  public_hours: number | null
+  internal_hours: number | null
+  koi_awarded: number
+  frozen_repo_link: string | null
+  frozen_demo_link: string | null
+  submitted_at: string | null
+  approved_at: string | null
+}
+
+export interface UnifiedInspectSegment {
+  type: 'removed' | 'deflated'
+  start_seconds: number
+  end_seconds: number
+  deflated_percent?: number | null
+  reason?: string | null
+}
+
+export interface UnifiedInspectRecording {
+  id: number
+  type: 'LookoutTimelapse' | 'LapseTimelapse' | 'YouTubeVideo'
+  name: string
+  original_seconds: number
+  approved_seconds: number
+  segments: UnifiedInspectSegment[]
+  description: string | null
+  stretch_multiplier: number
+  playback_url?: string | null
+  thumbnail_url?: string | null
+  video_id?: string
+  yt_duration_seconds?: number
+}
+
+export interface UnifiedInspectJournalEntry {
+  id: number
+  position: number
+  created_at: string | null
+  content_html: string
+  recordings: UnifiedInspectRecording[]
+}
+
+export interface UnifiedInspectTimeAudit {
+  original_seconds: number
+  approved_seconds: number
+  reviewer: string | null
+  feedback: string | null
+  entries: UnifiedInspectJournalEntry[]
+}
+
+export interface UnifiedInspectData {
+  ship: UnifiedInspectShip
+  timeline: UnifiedInspectStage[]
+  time_audit: UnifiedInspectTimeAudit | null
 }
 
 export interface SiblingStatuses {
@@ -439,6 +585,7 @@ export interface RequirementsCheckReviewDetail {
   user_display_name: string
   preflight_results: PreflightCheck[] | null
   created_at: string
+  checkpoint_message_url: string | null
 }
 
 export interface DesignReviewDetail {
@@ -455,6 +602,7 @@ export interface DesignReviewDetail {
   user_display_name: string
   preflight_results: PreflightCheck[] | null
   created_at: string
+  checkpoint_message_url: string | null
 }
 
 export interface BuildReviewDetail {

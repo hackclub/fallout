@@ -19,11 +19,17 @@ class Admin::ApplicationController < ApplicationController
       # Role-based access for sidebar and frontend gating
       admin_permissions: {
         is_admin: current_user&.admin? || false,
+        is_hcb: current_user&.hcb? || false, # Gates money-moving controls in the project grants UI
         can_review_time_audits: current_user&.can_review?(:time_audit) || false,
         can_review_requirements_checks: current_user&.can_review?(:requirements_check) || false,
         can_review_design_reviews: current_user&.can_review?(:design_review) || false,
-        can_review_build_reviews: current_user&.can_review?(:build_review) || false
-      }
+        can_review_build_reviews: current_user&.can_review?(:build_review) || false,
+        # Performance dashboard needs Redis to render — hide the link in dev where REDIS_URL is unset
+        performance_enabled: (current_user&.admin? && ENV["REDIS_URL"].present?) || false
+      },
+      # Base URL for deep-linking to HCB resources (e.g. /grants/:hcb_id for card grants).
+      # Driven by HCB_OAUTH_HOST so dev/staging/prod all link to the right place.
+      hcb_host: HcbService.host
     }
   end
 
@@ -39,12 +45,22 @@ class Admin::ApplicationController < ApplicationController
 
   CENSORED_FIELD_PATTERNS = %w[secret token key password encrypted].freeze
 
-  def serialize_audit_log(record)
-    versions = record.versions.order(created_at: :desc).to_a
+  ENUM_MAPPINGS = {
+    "StreakDay" => {
+      "status" => StreakDay.statuses.invert.transform_values(&:to_s)
+    }
+  }.freeze
+
+  def serialize_audit_log(record, extra_versions: [])
+    versions = record.versions.order(created_at: :desc).to_a + extra_versions
+    versions.sort_by! { |v| v.created_at }.reverse!
     return [] if versions.empty?
 
     whodunnit_ids = versions.map(&:whodunnit).compact.uniq
     users_by_id = User.where(id: whodunnit_ids).index_by { |u| u.id.to_s }
+
+    streak_day_ids = versions.select { |v| v.item_type == "StreakDay" }.map(&:item_id).uniq
+    streak_day_dates = streak_day_ids.any? ? StreakDay.where(id: streak_day_ids).pluck(:id, :date).to_h : {}
 
     versions.map do |version|
       changes = if version.event == "update" && version.object_changes.present?
@@ -52,19 +68,30 @@ class Admin::ApplicationController < ApplicationController
           next if key == "updated_at"
 
           censored = CENSORED_FIELD_PATTERNS.any? { |p| key.include?(p) }
+          enum_map = ENUM_MAPPINGS.dig(version.item_type, key)
           {
             field: key,
-            before: censored ? "[HIDDEN]" : format_audit_value(values[0]),
-            after: censored ? "[HIDDEN]" : format_audit_value(values[1])
+            before: censored ? "[HIDDEN]" : format_audit_value(enum_map ? enum_map[values[0]] || values[0] : values[0]),
+            after: censored ? "[HIDDEN]" : format_audit_value(enum_map ? enum_map[values[1]] || values[1] : values[1])
           }
         end
       else
         []
       end
 
+      label = version.item_type
+      if version.item_type == "StreakDay"
+        date = version.object_changes&.dig("date")&.last || streak_day_dates[version.item_id]
+        label = "Streak Day#{date ? " (#{date})" : ""}"
+      elsif version.item_type == "StreakGoal"
+        target = version.object_changes&.dig("target_days")&.last
+        label = "Streak Goal#{target ? " (#{target}-day)" : ""}"
+      end
+
       {
         id: version.id,
         event: version.event,
+        item_label: label,
         whodunnit_name: users_by_id[version.whodunnit]&.display_name,
         created_at: version.created_at.strftime("%b %d, %Y at %l:%M %p"),
         changes: changes

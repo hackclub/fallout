@@ -30,18 +30,19 @@ interface ProjectNotesWindowProps {
   shipId: number
   reviewStage: string
   onClose: () => void
+  setNotes: (value: ((prevState: ReviewerNote[]) => ReviewerNote[]) | ReviewerNote[]) => void
 }
 
 export default function ProjectNotesWindow({
-  notes: initialNotes,
+  notes,
   notesPath,
   shipId,
   reviewStage,
   onClose,
+  setNotes,
 }: ProjectNotesWindowProps) {
   const { auth } = usePage<SharedProps>().props
   const currentUserId = auth.user?.id
-  const [notes, setNotes] = useState<ReviewerNote[]>(initialNotes)
   const [newBody, setNewBody] = useState('')
   const [posting, setPosting] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)

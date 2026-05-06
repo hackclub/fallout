@@ -1,7 +1,7 @@
 class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
   def index
     base = policy_scope(TimeAuditReview)
-      .includes(ship: [ :project, project: :user ], reviewer: [])
+      .includes(ship: [ :project, :requirements_check_review, project: :user ], reviewer: [])
 
     pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).order(created_at: :asc).load
     @pagy, @all_reviews = pagy(base.order(created_at: :desc))
@@ -50,7 +50,7 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
   def update
     authorize @review
 
-    if @review.update(review_params)
+    if @review.update(stamp_annotation_reviewer(review_params))
       respond_to do |format|
         format.json { render json: { ok: true } }
         format.html do
@@ -78,6 +78,15 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
     TimeAuditReview
   end
 
+  # Time audit frontend handles stretch_multiplier itself — keep raw video duration here to avoid double-counting
+  def recording_duration(recording)
+    case recording.recordable
+    when LookoutTimelapse, LapseTimelapse then recording.recordable.duration.to_i
+    when YouTubeVideo then recording.recordable.duration_seconds.to_i
+    else 0
+    end
+  end
+
   def review_params
     permitted = params.require(:time_audit_review).permit(:status, :feedback, :approved_seconds)
     if params.dig(:time_audit_review, :annotations)
@@ -85,7 +94,23 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
       # Only allow the expected { "recordings" => { "<id>" => { ... } } } structure
       permitted[:annotations] = raw.is_a?(Hash) ? raw.slice("recordings") : nil
     end
-    permitted
+    permitted.to_h
+  end
+
+  # Stamp the current reviewer's id on each recording annotation that doesn't already
+  # have one, so the dashboard leaderboard can attribute hours to the correct reviewer
+  # rather than crediting all hours to whoever submits/approves the review.
+  def stamp_annotation_reviewer(permitted_params)
+    recordings = permitted_params.dig(:annotations, "recordings")
+    return permitted_params unless recordings.is_a?(Hash)
+
+    existing = @review.annotations&.dig("recordings") || {}
+    recordings.each do |rec_id, data|
+      next if existing.dig(rec_id, "reviewer_id").present? # preserve original annotator
+      data["reviewer_id"] = current_user.id
+    end
+
+    permitted_params
   end
 
   def serialize_review_detail(review)
@@ -156,9 +181,10 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
       base.merge(playback_url: recordable.playback_url, thumbnail_url: recordable.thumbnail_url)
     when YouTubeVideo
       base.merge(
-        playback_url: "https://www.youtube.com/watch?v=#{recordable.video_id}",
+        recordable_id: recordable.id, # YouTubeVideo record id for admin refetch action
+        video_id: recordable.video_id,
         thumbnail_url: recordable.thumbnail_url,
-        video_id: recordable.video_id
+        yt_duration_seconds: recordable.duration_seconds # used as timeline fallback before YT player loads
       )
     else
       base

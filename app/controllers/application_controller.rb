@@ -6,6 +6,13 @@ class ApplicationController < ActionController::Base
   include InertiaPagination
 
   before_action :set_paper_trail_whodunnit # Track who made changes in PaperTrail audit log
+  before_action :sync_browser_timezone
+  before_action :allow_profiler # rack-mini-profiler badge + ?pp=* tools — admin-gated in prod
+  before_action :bullet_for_admins # Hide Bullet N+1 footer from non-admins in prod
+  before_action :initialize_cache_counters # Reset Thread.current cache counters for the admin perf badge
+  before_action :track_request # Increment RequestCounter for req/sec stat
+  before_action :track_active_user # Mark this user/session as active for the active-users stat
+  after_action :expose_query_count # X-Perf-Stats header for the admin top-right badge
   after_action :track_page_view
 
   after_action :verify_authorized, except: :index
@@ -22,12 +29,12 @@ class ApplicationController < ActionController::Base
         {
           id: u.id,
           display_name: u.display_name,
-          email: u.email,
           avatar: u.avatar,
           roles: u.roles,
           is_admin: u.admin?,
           is_staff: u.staff?,
           is_banned: u.is_banned,
+          ban_type: u.ban_type,
           is_trial: u.trial?,
           is_onboarded: u.onboarded?
         }
@@ -43,7 +50,8 @@ class ApplicationController < ActionController::Base
     next {} unless current_user && !current_user.trial?
     {
       collaborators: Flipper.enabled?(:collaborators, current_user),
-      shop: Flipper.enabled?(:shop, current_user)
+      shop: Flipper.enabled?(:shop, current_user),
+      grant_fulfillment: Flipper.enabled?(:grant_fulfillment, current_user)
     }
   }
   inertia_share has_unread_mail: -> { # Drives the envelope badge on the path page
@@ -51,6 +59,28 @@ class ApplicationController < ActionController::Base
     MailMessage.visible_to(current_user)
               .where.not(id: current_user.mail_interactions.read.select(:mail_message_id))
               .exists?
+  }
+  inertia_share current_streak: -> { # Read-only — reconciliation happens in StreakReconciliationJob and StreakService.record_activity
+    next 0 unless current_user && !current_user.trial?
+    StreakDay.current_streak(current_user)
+  }
+  inertia_share streak_freezes: -> {
+    next 0 unless current_user && !current_user.trial?
+    current_user.streak_freezes
+  }
+  # Powers the global AnnouncementsBar identity card. nil for unauth'd + trial users (no HCA account to link to).
+  inertia_share identity_gate: -> {
+    next nil unless current_user && !current_user.trial?
+    {
+      state: current_user.identity_gate_state,
+      verify_url: HcaService.verify_portal_url(return_to: request.url),
+      address_url: HcaService.address_portal_url(return_to: request.url)
+    }
+  }
+  # Powers the global AnnouncementsBar feedback Post-it. Shown to full-account users; dismissed per-browser
+  # via localStorage in app/frontend/components/announcements/storage.ts (no server state).
+  inertia_share show_feedback_banner: -> {
+    current_user.present? && !current_user.trial? && current_user.email.present?
   }
 
   private
@@ -79,8 +109,52 @@ class ApplicationController < ActionController::Base
   end
   helper_method :collaborators_enabled? # Available in views/Inertia props
 
+  def sync_browser_timezone
+    return unless current_user
+
+    browser_tz = request.headers["X-Browser-Timezone"]
+    return if browser_tz.blank?
+    return if browser_tz == current_user.timezone
+    return unless ActiveSupport::TimeZone[browser_tz] # Only accept valid IANA zone names
+
+    current_user.update_column(:timezone, browser_tz) # Skip callbacks/validations — just a timezone sync
+  end
+
   def user_not_authorized
     flash[:alert] = "You are not authorized to perform this action."
     redirect_back(fallback_location: root_path)
+  end
+
+  def allow_profiler
+    return unless defined?(Rack::MiniProfiler)
+    if current_user&.admin? || Rails.env.development?
+      Rack::MiniProfiler.authorize_request # Gates the badge + ?pp=flamegraph/profile-* params
+    end
+  end
+
+  def bullet_for_admins
+    return unless defined?(Bullet)
+    Bullet.add_footer = current_user&.admin? || Rails.env.development?
+  end
+
+  def initialize_cache_counters
+    Thread.current[:cache_hits] = 0
+    Thread.current[:cache_misses] = 0
+  end
+
+  def track_request
+    RequestCounter.increment
+  end
+
+  def track_active_user
+    ActiveUserTracker.track(user_id: current_user&.id, session_id: session.id.to_s)
+  end
+
+  # Compose perf badge strings and ship them via response headers (short + expanded).
+  # Same gate as the layout render + rack-mini-profiler: admins only in prod, all users in dev.
+  def expose_query_count
+    return unless current_user&.admin? || Rails.env.development?
+    response.set_header("X-Perf-Stats", AdminPerfStats.compose)
+    response.set_header("X-Perf-Stats-Long", AdminPerfStats.compose_long)
   end
 end

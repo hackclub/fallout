@@ -137,9 +137,9 @@ export default function AdminUsersIndex({
         </Badge>
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
-        <form onSubmit={search} className="flex gap-2">
-          <InputGroup className="w-100">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <form onSubmit={search} className="flex gap-2 flex-1 min-w-0">
+          <InputGroup className="flex-1 min-w-0">
             <InputGroupAddon align="inline-start">
               <SearchIcon />
             </InputGroupAddon>
@@ -150,7 +150,7 @@ export default function AdminUsersIndex({
               placeholder="Search users..."
             />
           </InputGroup>
-          <Button type="submit" variant="outline">
+          <Button type="submit" variant="outline" className="hidden sm:flex">
             Search
           </Button>
         </form>

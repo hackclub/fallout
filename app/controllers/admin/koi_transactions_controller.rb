@@ -48,7 +48,7 @@ class Admin::KoiTransactionsController < Admin::ApplicationController
     {
       id: txn.id,
       user: { id: txn.user.id, display_name: txn.user.display_name },
-      actor: { id: txn.actor.id, display_name: txn.actor.display_name },
+      actor: txn.actor ? { id: txn.actor.id, display_name: txn.actor.display_name } : nil,
       amount: txn.amount,
       reason: txn.reason,
       description: txn.description,

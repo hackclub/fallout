@@ -89,15 +89,20 @@ class Projects::ShipsController < ApplicationController
     # Snapshot current results — cache has the most up-to-date checks during a run
     snapshot = cached ? cached[:checks] : (preflight_run.all_results || [])
 
+    # Hold submissions out of the reviewer queue until the user is HCA-verified with an address.
+    # They still get to "ship" in the UX sense; HcaIdentityRefreshJob promotes to :pending once gated.
+    initial_status = current_user.fully_identity_gated? ? :pending : :awaiting_identity
+
     ship = @project.ships.build(
       preflight_run: preflight_run,
       frozen_demo_link: @project.demo_link,
       frozen_repo_link: @project.repo_link,
-      preflight_results: snapshot
+      preflight_results: snapshot,
+      status: initial_status
     )
 
     if ship.save
-      render json: { submitted: true }
+      render json: { submitted: true, awaiting_identity: ship.awaiting_identity? }
     else
       render json: { errors: ship.errors.messages }, status: :unprocessable_entity
     end

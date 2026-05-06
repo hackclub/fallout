@@ -34,7 +34,8 @@ module ShipChecks
     def file_content(path)
       data = github_api("/repos/#{github_nwo}/contents/#{path}")
       return nil unless data&.key?("content")
-      Base64.decode64(data["content"]).force_encoding("UTF-8")
+      # Scrub invalid byte sequences so downstream regex/string ops don't raise on non-UTF-8 repo files
+      Base64.decode64(data["content"]).force_encoding("UTF-8").scrub("")
     end
 
     # Vision LLM descriptions of README images, memoized for downstream checks
@@ -73,6 +74,10 @@ module ShipChecks
       project.repo_link.present? && github_nwo.nil?
     end
 
+    def github_rate_limited?
+      @github_rate_limited || false
+    end
+
     private
 
     def github_api(path)
@@ -85,7 +90,12 @@ module ShipChecks
       request = Net::HTTP::Get.new(uri)
       request["Accept"] = "application/vnd.github.v3+json"
       request["User-Agent"] = "Fallout-Preflight"
+      request["Authorization"] = "Bearer #{ENV['GITHUB_TOKEN']}" if ENV["GITHUB_TOKEN"].present?
       response = http.request(request)
+      if response.code == "429" || (response.code == "403" && response["x-ratelimit-remaining"] == "0")
+        @github_rate_limited = true
+        return nil
+      end
       return nil unless response.is_a?(Net::HTTPSuccess)
       JSON.parse(response.body)
     rescue StandardError
@@ -101,14 +111,40 @@ module ShipChecks
       return nil unless repo_meta
       branch = repo_meta["default_branch"] || "main"
       data = github_api("/repos/#{github_nwo}/git/trees/#{branch}?recursive=1")
-      data&.dig("tree")&.map { |f| f["path"] }
+      return nil unless data
+      entries = data["tree"] || []
+      paths = entries.map { |f| f["path"] }
+
+      # Submodules appear as type "commit" — fetch their trees too
+      submodule_nwos = fetch_submodule_nwos
+      submodule_nwos.each do |nwo|
+        sub_meta = github_api("/repos/#{nwo}")
+        next unless sub_meta
+        sub_branch = sub_meta["default_branch"] || "main"
+        sub_data = github_api("/repos/#{nwo}/git/trees/#{sub_branch}?recursive=1")
+        next unless sub_data
+        sub_paths = (sub_data["tree"] || []).map { |f| f["path"] }
+        paths.concat(sub_paths)
+      end
+
+      paths
+    end
+
+    def fetch_submodule_nwos
+      data = github_api("/repos/#{github_nwo}/contents/.gitmodules")
+      return [] unless data&.key?("content")
+      content = Base64.decode64(data["content"]).force_encoding("UTF-8").scrub("")
+      content.scan(%r{url\s*=\s*.*github\.com[:/]([^/\s]+/[^\s.]+)}).flatten
+    rescue StandardError
+      []
     end
 
     def fetch_readme_content
       return nil unless repo_meta
       data = github_api("/repos/#{github_nwo}/readme")
       return nil unless data&.key?("content")
-      Base64.decode64(data["content"]).force_encoding("UTF-8")
+      # Scrub invalid byte sequences so downstream regex/string ops don't raise on non-UTF-8 README bytes
+      Base64.decode64(data["content"]).force_encoding("UTF-8").scrub("")
     end
 
     def fetch_bom_content
@@ -117,7 +153,8 @@ module ShipChecks
       return nil unless bom_path
       data = github_api("/repos/#{github_nwo}/contents/#{bom_path}")
       return nil unless data&.key?("content")
-      Base64.decode64(data["content"]).force_encoding("UTF-8")
+      # Scrub invalid byte sequences so downstream regex/string ops don't raise on non-UTF-8 BOM bytes
+      Base64.decode64(data["content"]).force_encoding("UTF-8").scrub("")
     end
 
     def find_bom_path

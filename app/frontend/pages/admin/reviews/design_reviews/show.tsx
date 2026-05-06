@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback, memo } from 'react'
+import { useState, useMemo, useCallback, useEffect, memo } from 'react'
 import type { ReactNode } from 'react'
-import { Link, router } from '@inertiajs/react'
+import { Link, router, usePage } from '@inertiajs/react'
 import { useReviewHeartbeat } from '@/hooks/useReviewHeartbeat'
 import ReviewLayout from '@/layouts/ReviewLayout'
 import HoursDisplay from '@/components/admin/HoursDisplay'
@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import RepoTree from '@/components/admin/RepoTree'
+import { notify } from '@/lib/notifications'
 import type {
   DesignReviewDetail,
   RequirementsCheckJournalEntry,
@@ -490,6 +491,8 @@ export default function DesignReviewsShow({
   const isTerminal = review.status !== 'pending'
   useReviewHeartbeat(heartbeat_path)
 
+  const { errors } = usePage<{ errors?: Record<string, string[]> }>().props
+
   const [feedback, setFeedback] = useState(review.feedback || '')
   const [internalReason, setInternalReason] = useState(review.internal_reason || '')
   const [hoursAdjInput, setHoursAdjInput] = useState(
@@ -500,6 +503,13 @@ export default function DesignReviewsShow({
   const [notesOpen, setNotesOpen] = useState(false)
   const [flagging, setFlagging] = useState(false)
   const [isFlagged, setIsFlagged] = useState(project_flagged)
+  const [notes, setNotes] = useState<ReviewerNote[]>(reviewer_notes ?? [])
+  const [checkpointLinkInput, setCheckpointLinkInput] = useState('')
+  const [pendingStatus, setPendingStatus] = useState<'approved' | 'returned' | null>(null)
+
+  useEffect(() => {
+    if (reviewer_notes) setNotes(reviewer_notes)
+  }, [reviewer_notes])
 
   const userFacingHours = project.approved_public_hours ?? project.logged_hours
   const hoursAdj = hoursAdjInput !== '' ? parseFloat(hoursAdjInput) || 0 : 0
@@ -561,8 +571,9 @@ export default function DesignReviewsShow({
   )
 
   const handleSubmit = useCallback(
-    (status: 'approved' | 'returned') => {
+    (status: 'approved' | 'returned', checkpointMessageUrl?: string) => {
       setSubmitting(true)
+      setPendingStatus(status)
       const url = skip
         ? `/admin/reviews/design_reviews/${review.id}?skip=${skip}`
         : `/admin/reviews/design_reviews/${review.id}`
@@ -578,357 +589,423 @@ export default function DesignReviewsShow({
             internal_reason: internalReason.trim() || null,
             hours_adjustment: hoursAdjSeconds,
             koi_adjustment: koiAdjValue,
+            ...(checkpointMessageUrl ? { checkpoint_message_url: checkpointMessageUrl } : {}),
           } as any,
         },
-        { onFinish: () => setSubmitting(false) },
+        {
+          onSuccess: () => {
+            setFeedback('')
+            setInternalReason('')
+            setPendingStatus(null)
+          },
+          onError: (errs) => {
+            // The checkpoint_message_url error is handled by the AlertDialog below — don't double-notify.
+            const entries = Object.entries(errs as Record<string, string | string[]>).filter(
+              ([k]) => k !== 'checkpoint_message_url',
+            )
+            if (entries.length === 0) return
+            const message = entries
+              .map(([field, val]) => {
+                const msg = Array.isArray(val) ? val.join(', ') : val
+                const label = field.replace(/_/g, ' ')
+                return `${label}: ${msg}`
+              })
+              .join('; ')
+            notify('alert', `Could not submit review — ${message}`)
+          },
+          onFinish: () => setSubmitting(false),
+        },
       )
     },
     [review.id, feedback, internalReason, hoursAdjInput, koiAdjInput, skip],
   )
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden border-t-3 border-purple-500">
-      <TopBar
-        project={project}
-        notesCount={reviewer_notes?.length ?? 0}
-        projectFlagged={isFlagged}
-        flagging={flagging}
-        onSkip={handleSkip}
-        onToggleNotes={() => setNotesOpen((v) => !v)}
-        onFlag={handleFlag}
-      />
-
-      {notesOpen && reviewer_notes && (
-        <ProjectNotesWindow
-          notes={reviewer_notes}
-          notesPath={reviewer_notes_path}
-          shipId={review.ship_id}
-          reviewStage="design_review"
-          onClose={() => setNotesOpen(false)}
+    <>
+      <div className="h-screen flex flex-col overflow-hidden border-t-3 border-purple-500">
+        <TopBar
+          project={project}
+          notesCount={notes.length}
+          projectFlagged={isFlagged}
+          flagging={flagging}
+          onSkip={handleSkip}
+          onToggleNotes={() => setNotesOpen((v) => !v)}
+          onFlag={handleFlag}
         />
-      )}
 
-      <div className="flex-1 min-h-0 flex">
-        {/* Left: project info + preflight + journal */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Project overview */}
-          <div className="rounded-md border border-border overflow-hidden">
-            <div className="p-3 space-y-1">
-              <h1 className="text-base font-semibold leading-snug">
-                <a
-                  href={`/admin/projects/${project.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:underline"
+        {notesOpen && reviewer_notes && (
+          <ProjectNotesWindow
+            notes={notes}
+            setNotes={setNotes}
+            notesPath={reviewer_notes_path}
+            shipId={review.ship_id}
+            reviewStage="design_review"
+            onClose={() => setNotesOpen(false)}
+          />
+        )}
+
+        <div className="flex-1 min-h-0 flex">
+          {/* Left: project info + preflight + journal */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Project overview */}
+            <div className="rounded-md border border-border overflow-hidden">
+              <div className="p-3 space-y-1">
+                <h1 className="text-base font-semibold leading-snug">
+                  <a
+                    href={`/admin/projects/${project.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline"
+                  >
+                    {project.name}
+                  </a>
+                </h1>
+                {project.description && (
+                  <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
+                )}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                  <img src={project.user_avatar} alt="" className="size-4 rounded-full" />
+                  <span className="text-foreground">{project.user_display_name}</span>
+                  <span>|</span>
+                  <span>{project.created_at}</span>
+                  {project.tags.length > 0 && (
+                    <>
+                      <span>|</span>
+                      <span className="text-foreground">{project.tags.join(', ')}</span>
+                    </>
+                  )}
+                  <span>|</span>
+                  <WaitingLabel waitingSince={project.waiting_since} firstSubmittedAt={project.first_submitted_at} />
+                </div>
+              </div>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
+                <div className="px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-0.5">Type</p>
+                  <p className="text-sm font-medium capitalize">{project.ship_type}</p>
+                </div>
+                <div className="px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-0.5">Hours Approved</p>
+                  <p className="text-sm">
+                    <HoursDisplay
+                      publicHours={project.approved_public_hours}
+                      internalHours={project.approved_internal_hours}
+                    />
+                  </p>
+                </div>
+                <div className="px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-0.5">Entries</p>
+                  <p className="text-sm font-mono">{project.entry_count}</p>
+                </div>
+              </div>
+
+              {/* Links row */}
+              {(isSafeUrl(project.frozen_repo_link) || isSafeUrl(project.frozen_demo_link)) && (
+                <div
+                  className={`grid divide-x divide-border border-t border-border ${
+                    isSafeUrl(project.frozen_repo_link) && isSafeUrl(project.frozen_demo_link)
+                      ? 'grid-cols-2'
+                      : 'grid-cols-1'
+                  }`}
                 >
-                  {project.name}
-                </a>
-              </h1>
-              {project.description && (
-                <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
+                  {isSafeUrl(project.frozen_repo_link) && (
+                    <div className="px-3 py-2">
+                      <p className="text-xs text-muted-foreground mb-0.5">Repository</p>
+                      <a
+                        href={project.frozen_repo_link!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
+                      >
+                        {project.frozen_repo_link}
+                      </a>
+                    </div>
+                  )}
+                  {isSafeUrl(project.frozen_demo_link) && (
+                    <div className="px-3 py-2">
+                      <p className="text-xs text-muted-foreground mb-0.5">Demo</p>
+                      <a
+                        href={project.frozen_demo_link!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
+                      >
+                        {project.frozen_demo_link}
+                      </a>
+                    </div>
+                  )}
+                </div>
               )}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                <img src={project.user_avatar} alt="" className="size-4 rounded-full" />
-                <span className="text-foreground">{project.user_display_name}</span>
-                <span>|</span>
-                <span>{project.created_at}</span>
-                {project.tags.length > 0 && (
-                  <>
-                    <span>|</span>
-                    <span className="text-foreground">{project.tags.join(', ')}</span>
-                  </>
-                )}
-                <span>|</span>
-                <WaitingLabel waitingSince={project.waiting_since} firstSubmittedAt={project.first_submitted_at} />
+
+              {/* Sibling review statuses */}
+              <div className="px-3 py-2 border-t border-border flex items-center gap-3 text-xs">
+                <span className="text-muted-foreground">Reviews:</span>
+                <SiblingBadge label="Time Audit" status={sibling_statuses.time_audit} />
+                <SiblingBadge label="Requirements" status={sibling_statuses.requirements_check} />
+                <SiblingBadge label="Design" status={sibling_statuses.design_review} />
+                <SiblingBadge label="Build" status={sibling_statuses.build_review} />
               </div>
             </div>
 
-            {/* Stats row */}
-            <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
-              <div className="px-3 py-2">
-                <p className="text-xs text-muted-foreground mb-0.5">Type</p>
-                <p className="text-sm font-medium capitalize">{project.ship_type}</p>
-              </div>
-              <div className="px-3 py-2">
-                <p className="text-xs text-muted-foreground mb-0.5">Hours Approved</p>
-                <p className="text-sm">
-                  <HoursDisplay
-                    publicHours={project.approved_public_hours}
-                    internalHours={project.approved_internal_hours}
-                  />
-                </p>
-              </div>
-              <div className="px-3 py-2">
-                <p className="text-xs text-muted-foreground mb-0.5">Entries</p>
-                <p className="text-sm font-mono">{project.entry_count}</p>
-              </div>
-            </div>
+            {/* Preflight checks */}
+            {preflight.length > 0 && <PreflightResults checks={preflight} />}
 
-            {/* Links row */}
-            {(isSafeUrl(project.frozen_repo_link) || isSafeUrl(project.frozen_demo_link)) && (
-              <div
-                className={`grid divide-x divide-border border-t border-border ${
-                  isSafeUrl(project.frozen_repo_link) && isSafeUrl(project.frozen_demo_link)
-                    ? 'grid-cols-2'
-                    : 'grid-cols-1'
-                }`}
+            {/* Repo tree — GitHub projects only */}
+            {repo_tree && repo_tree.entries?.length > 0 && project.repo_link && (
+              <CollapsibleCard
+                title="Repository"
+                storageKey="design-repo"
+                summary={
+                  repo_tree.entries.filter((e) => e.type === 'tree').length +
+                  ' dirs | ' +
+                  repo_tree.entries.filter((e) => e.type === 'blob').length +
+                  ' files'
+                }
               >
-                {isSafeUrl(project.frozen_repo_link) && (
-                  <div className="px-3 py-2">
-                    <p className="text-xs text-muted-foreground mb-0.5">Repository</p>
-                    <a
-                      href={project.frozen_repo_link!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
-                    >
-                      {project.frozen_repo_link}
-                    </a>
-                  </div>
-                )}
-                {isSafeUrl(project.frozen_demo_link) && (
-                  <div className="px-3 py-2">
-                    <p className="text-xs text-muted-foreground mb-0.5">Demo</p>
-                    <a
-                      href={project.frozen_demo_link!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
-                    >
-                      {project.frozen_demo_link}
-                    </a>
-                  </div>
-                )}
-              </div>
+                <RepoTree data={repo_tree} repoLink={project.repo_link} bare />
+              </CollapsibleCard>
             )}
 
-            {/* Sibling review statuses */}
-            <div className="px-3 py-2 border-t border-border flex items-center gap-3 text-xs">
-              <span className="text-muted-foreground">Reviews:</span>
-              <SiblingBadge label="Time Audit" status={sibling_statuses.time_audit} />
-              <SiblingBadge label="Requirements" status={sibling_statuses.requirements_check} />
-              <SiblingBadge label="Design" status={sibling_statuses.design_review} />
-              <SiblingBadge label="Build" status={sibling_statuses.build_review} />
-            </div>
+            {/* Journal — all entries shown inline */}
+            {allEntries.length > 0 && (
+              <CollapsibleCard
+                title="Journal"
+                storageKey="design-journal"
+                summary={
+                  <>
+                    Count: {allEntries.length}
+                    {' | '}Total: {(allEntries.reduce((s, e) => s + e.total_duration, 0) / 3600).toFixed(1)}h{' | '}Avg:{' '}
+                    {(allEntries.reduce((s, e) => s + e.total_duration, 0) / allEntries.length / 3600).toFixed(2)}h
+                    {' | '}
+                    Range: {(Math.min(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h –{' '}
+                    {(Math.max(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h
+                  </>
+                }
+                defaultOpen
+              >
+                <JournalEntriesList entries={allEntries} />
+              </CollapsibleCard>
+            )}
           </div>
 
-          {/* Preflight checks */}
-          {preflight.length > 0 && <PreflightResults checks={preflight} />}
+          {/* Divider */}
+          <div className="w-px shrink-0 bg-border" />
 
-          {/* Repo tree — GitHub projects only */}
-          {repo_tree && repo_tree.entries?.length > 0 && project.repo_link && (
-            <CollapsibleCard
-              title="Repository"
-              storageKey="design-repo"
-              summary={
-                repo_tree.entries.filter((e) => e.type === 'tree').length +
-                ' dirs | ' +
-                repo_tree.entries.filter((e) => e.type === 'blob').length +
-                ' files'
-              }
-            >
-              <RepoTree data={repo_tree} repoLink={project.repo_link} bare />
-            </CollapsibleCard>
-          )}
-
-          {/* Journal — all entries shown inline */}
-          {allEntries.length > 0 && (
-            <CollapsibleCard
-              title="Journal"
-              storageKey="design-journal"
-              summary={
-                <>
-                  Count: {allEntries.length}
-                  {' | '}Total: {(allEntries.reduce((s, e) => s + e.total_duration, 0) / 3600).toFixed(1)}h{' | '}Avg:{' '}
-                  {(allEntries.reduce((s, e) => s + e.total_duration, 0) / allEntries.length / 3600).toFixed(2)}h{' | '}
-                  Range: {(Math.min(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h –{' '}
-                  {(Math.max(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h
-                </>
-              }
-              defaultOpen
-            >
-              <JournalEntriesList entries={allEntries} />
-            </CollapsibleCard>
-          )}
-        </div>
-
-        {/* Divider */}
-        <div className="w-px shrink-0 bg-border" />
-
-        {/* Right: review form / read-only summary */}
-        <div className="w-80 shrink-0 overflow-y-auto p-4 space-y-4">
-          {isTerminal ? (
-            <>
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Review Complete</h3>
-                <Badge
-                  className={
-                    review.status === 'approved'
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                      : review.status === 'returned'
-                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
-                        : review.status === 'rejected'
-                          ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
-                          : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                  }
-                >
-                  {review.status}
-                </Badge>
-                {review.reviewer_display_name && (
-                  <p className="text-xs text-muted-foreground">by {review.reviewer_display_name}</p>
+          {/* Right: review form / read-only summary */}
+          <div className="w-80 shrink-0 overflow-y-auto p-4 space-y-4">
+            {isTerminal ? (
+              <>
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Review Complete
+                  </h3>
+                  <Badge
+                    className={
+                      review.status === 'approved'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                        : review.status === 'returned'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                          : review.status === 'rejected'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
+                            : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                    }
+                  >
+                    {review.status}
+                  </Badge>
+                  {review.reviewer_display_name && (
+                    <p className="text-xs text-muted-foreground">by {review.reviewer_display_name}</p>
+                  )}
+                </div>
+                {review.internal_reason && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Internal Reason</label>
+                    <p className="text-sm whitespace-pre-wrap">{review.internal_reason}</p>
+                  </div>
                 )}
-              </div>
-              {review.internal_reason && (
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Internal Reason</label>
-                  <p className="text-sm whitespace-pre-wrap">{review.internal_reason}</p>
-                </div>
-              )}
-              {review.feedback && (
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Feedback</label>
-                  <p className="text-sm whitespace-pre-wrap">{review.feedback}</p>
-                </div>
-              )}
-              {(review.hours_adjustment != null || review.koi_adjustment != null) && (
-                <div className="space-y-1.5 pt-1">
-                  {review.hours_adjustment != null && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-muted-foreground">Hours adj:</span>
-                      <span className="font-mono">
-                        {review.hours_adjustment >= 0 ? '+' : ''}
-                        {(review.hours_adjustment / 3600).toFixed(1)}h
-                      </span>
-                    </div>
-                  )}
-                  {review.koi_adjustment != null && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-muted-foreground">Koi adj:</span>
-                      <span className="font-mono">
-                        {review.koi_adjustment >= 0 ? '+' : ''}
-                        {review.koi_adjustment}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Submit Review</h3>
+                {review.feedback && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Feedback</label>
+                    <p className="text-sm whitespace-pre-wrap">{review.feedback}</p>
+                  </div>
+                )}
+                {(review.hours_adjustment != null || review.koi_adjustment != null) && (
+                  <div className="space-y-1.5 pt-1">
+                    {review.hours_adjustment != null && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Hours adj:</span>
+                        <span className="font-mono">
+                          {review.hours_adjustment >= 0 ? '+' : ''}
+                          {(review.hours_adjustment / 3600).toFixed(1)}h
+                        </span>
+                      </div>
+                    )}
+                    {review.koi_adjustment != null && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Koi adj:</span>
+                        <span className="font-mono">
+                          {review.koi_adjustment >= 0 ? '+' : ''}
+                          {review.koi_adjustment}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Submit Review</h3>
 
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">
-                  Internal Reason <span className="text-muted-foreground/60">(not shown to user)</span>
-                </label>
-                <Textarea
-                  value={internalReason}
-                  onChange={(e) => setInternalReason(e.target.value)}
-                  placeholder="Justify your decision..."
-                  className="h-20 text-sm resize-y"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">
-                  Feedback <span className="text-muted-foreground/60">(shown to user)</span>
-                </label>
-                <Textarea
-                  value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  placeholder="Feedback for the project author..."
-                  className="h-20 text-sm resize-y"
-                />
-              </div>
-
-              <Separator />
-
-              <div className="space-y-3">
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">
-                    Modify Hours <span className="text-muted-foreground/60">(not shown to user)</span>
+                    Internal Reason <span className="text-muted-foreground/60">(not shown to user)</span>
                   </label>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground font-mono whitespace-nowrap">
-                      {userFacingHours.toFixed(1)}h
-                    </span>
-                    <span className="text-muted-foreground">→</span>
-                    <Input
-                      type="number"
-                      step="0.5"
-                      value={hoursAdjInput}
-                      onChange={(e) => setHoursAdjInput(e.target.value)}
-                      placeholder="0"
-                      className="h-8 text-sm font-mono w-20 text-center"
-                    />
-                    <span className="text-muted-foreground">→</span>
-                    <span
-                      className={`font-mono whitespace-nowrap ${hoursAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
-                    >
-                      {internalHours.toFixed(1)}h
-                    </span>
+                  <Textarea
+                    value={internalReason}
+                    onChange={(e) => setInternalReason(e.target.value)}
+                    placeholder="Justify your decision..."
+                    className="h-20 text-sm resize-y"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">
+                    Feedback <span className="text-muted-foreground/60">(shown to user)</span>
+                  </label>
+                  <Textarea
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                    placeholder="Feedback for the project author..."
+                    className="h-20 text-sm resize-y"
+                  />
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">
+                      Modify Hours <span className="text-muted-foreground/60">(not shown to user)</span>
+                    </label>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground font-mono whitespace-nowrap">
+                        {userFacingHours.toFixed(1)}h
+                      </span>
+                      <span className="text-muted-foreground">→</span>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        value={hoursAdjInput}
+                        onChange={(e) => setHoursAdjInput(e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm font-mono w-20 text-center"
+                      />
+                      .<span className="text-muted-foreground">→</span>
+                      <span
+                        className={`font-mono whitespace-nowrap ${hoursAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
+                      >
+                        {internalHours.toFixed(1)}h
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">
+                      Modify Koi <span className="text-muted-foreground/60">(shown to user)</span>
+                    </label>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground font-mono whitespace-nowrap">
+                        {baseKoi}
+                        <span className="text-[10px] ml-0.5 opacity-60">{userFacingHours}h×7</span>
+                      </span>
+                      <span className="text-muted-foreground">→</span>
+                      <Input
+                        type="number"
+                        step="1"
+                        value={koiAdjInput}
+                        onChange={(e) => setKoiAdjInput(e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm font-mono w-20 text-center"
+                      />
+                      <span className="text-muted-foreground">→</span>
+                      <span
+                        className={`font-mono whitespace-nowrap ${koiAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
+                      >
+                        {finalKoi}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">
-                    Modify Koi <span className="text-muted-foreground/60">(shown to user)</span>
-                  </label>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground font-mono whitespace-nowrap">
-                      {baseKoi}
-                      <span className="text-[10px] ml-0.5 opacity-60">{userFacingHours}h×7</span>
-                    </span>
-                    <span className="text-muted-foreground">→</span>
-                    <Input
-                      type="number"
-                      step="1"
-                      value={koiAdjInput}
-                      onChange={(e) => setKoiAdjInput(e.target.value)}
-                      placeholder="0"
-                      className="h-8 text-sm font-mono w-20 text-center"
-                    />
-                    <span className="text-muted-foreground">→</span>
-                    <span
-                      className={`font-mono whitespace-nowrap ${koiAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
-                    >
-                      {finalKoi}
-                    </span>
-                  </div>
+                <div className="space-y-2 pt-2">
+                  <Button
+                    className="w-full"
+                    variant="default"
+                    disabled={submitting || !internalReason.trim()}
+                    onClick={() => handleSubmit('approved')}
+                    title={!internalReason.trim() ? 'Internal reason is required when approving' : undefined}
+                  >
+                    {submitting ? (
+                      <LoaderIcon className="size-4 animate-spin mr-1" />
+                    ) : (
+                      <CheckIcon data-icon="inline-start" />
+                    )}
+                    Approve
+                  </Button>
+
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    disabled={submitting || !feedback.trim()}
+                    onClick={() => handleSubmit('returned')}
+                    title={!feedback.trim() ? 'Feedback is required when returning' : undefined}
+                  >
+                    Return (Needs Changes)
+                  </Button>
                 </div>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <Button
-                  className="w-full"
-                  variant="default"
-                  disabled={submitting || !internalReason.trim()}
-                  onClick={() => handleSubmit('approved')}
-                  title={!internalReason.trim() ? 'Internal reason is required when approving' : undefined}
-                >
-                  {submitting ? (
-                    <LoaderIcon className="size-4 animate-spin mr-1" />
-                  ) : (
-                    <CheckIcon data-icon="inline-start" />
-                  )}
-                  Approve
-                </Button>
-
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  disabled={submitting || !feedback.trim()}
-                  onClick={() => handleSubmit('returned')}
-                  title={!feedback.trim() ? 'Feedback is required when returning' : undefined}
-                >
-                  Return (Needs Changes)
-                </Button>
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Checkpoint message dialog — shown when backend finds no #fallout-checkpoint message */}
+      <AlertDialog open={!!errors?.checkpoint_message_url && !!pendingStatus}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Checkpoint message required</AlertDialogTitle>
+            <AlertDialogDescription>
+              {errors?.checkpoint_message_url?.[0] ?? 'No checkpoint message found.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={checkpointLinkInput}
+            onChange={(e) => setCheckpointLinkInput(e.target.value)}
+            placeholder="https://hackclub.enterprise.slack.com/archives/..."
+            className="mt-2"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setPendingStatus(null)
+                setCheckpointLinkInput('')
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!checkpointLinkInput.trim()}
+              onClick={() => {
+                if (pendingStatus) handleSubmit(pendingStatus, checkpointLinkInput.trim())
+                setCheckpointLinkInput('')
+              }}
+            >
+              Submit with link
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 

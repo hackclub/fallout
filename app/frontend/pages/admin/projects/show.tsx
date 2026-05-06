@@ -1,16 +1,52 @@
 import type { ReactNode } from 'react'
-import { Deferred, Link } from '@inertiajs/react'
+import { useState } from 'react'
+import { Deferred, Link, usePage, router } from '@inertiajs/react'
 import type { ColumnDef } from '@tanstack/react-table'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { Card, CardContent } from '@/components/admin/ui/card'
+import { Input } from '@/components/admin/ui/input'
 import { DataTable } from '@/components/admin/DataTable'
 import HoursDisplay from '@/components/admin/HoursDisplay'
 import AuditLog, { AuditLogLoading } from '@/components/admin/AuditLog'
 import type { AuditLogEntry } from '@/components/admin/AuditLog'
 import { ChevronLeftIcon, ExternalLinkIcon, ClockIcon } from 'lucide-react'
-import type { AdminProjectDetail, PagyProps, SiblingStatuses } from '@/types'
+import type { AdminProjectDetail, PagyProps, SiblingStatuses, SharedProps } from '@/types'
+
+function ManualHoursForm({ projectId, initialHours }: { projectId: number; initialHours: number }) {
+  const [hours, setHours] = useState(String(initialHours))
+  const [saving, setSaving] = useState(false)
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    router.patch(
+      `/admin/projects/${projectId}/update_manual_seconds`,
+      { manual_hours: hours },
+      {
+        preserveScroll: true,
+        onFinish: () => setSaving(false),
+      },
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex items-center gap-2 mt-1">
+      <Input
+        type="number"
+        min="0"
+        step="0.01"
+        value={hours}
+        onChange={(e) => setHours(e.target.value)}
+        className="h-7 w-24 text-sm"
+      />
+      <Button type="submit" size="sm" variant="outline" className="h-7 text-xs" disabled={saving}>
+        {saving ? 'Saving…' : 'Save'}
+      </Button>
+    </form>
+  )
+}
 
 interface JournalEntry {
   id: number
@@ -187,6 +223,8 @@ export default function AdminProjectsShow({
   pagy_entries: PagyProps
   audit_log?: AuditLogEntry[]
 }) {
+  const { auth } = usePage<SharedProps>().props
+  const isAdmin = auth.user?.is_admin ?? false
   return (
     <div>
       <button
@@ -274,6 +312,11 @@ export default function AdminProjectsShow({
               )}
             </Field>
             <Field label="Hrs Tracked">{project.hours_tracked}</Field>
+            {isAdmin && (
+              <Field label="+ Manual Hrs">
+                <ManualHoursForm projectId={project.id} initialHours={project.manual_hours} />
+              </Field>
+            )}
             <Field label="Last Entry">
               {project.last_entry_at ?? <span className="text-muted-foreground">—</span>}
             </Field>

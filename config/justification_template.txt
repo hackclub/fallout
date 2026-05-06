@@ -1,0 +1,170 @@
+---
+This is a comment section — everything between the two --- markers is
+ignored when the template is rendered. Use it to document variables,
+note constraints, or leave editing notes for maintainers.
+
+Body rules:
+  - Body starts after the closing --- and runs to end of file.
+  - Whitespace immediately after the closing --- and at end of file is
+    trimmed before substitution.
+  - Variables use {UPPER_SNAKE_CASE}. Unknown variables render as
+    literal "{NAME}" so typos don't silently disappear.
+
+  Fallback syntax (|):
+    Chain alternatives with | to use the first non-blank value. Quoted
+    strings are taken literally. Chains can be any length.
+
+      {REPO_URL|DEMO_URL}            REPO_URL, else DEMO_URL, else "{REPO_URL|DEMO_URL}"
+      {INTERNAL_NOTES|"No notes."}   INTERNAL_NOTES, else the literal "No notes."
+      {DEMO_URL|REPO_URL|"n/a"}      DEMO_URL, else REPO_URL, else "n/a"
+
+    A variable is "blank" if it's nil or an empty string after rendering.
+    Use this to gate optional fields without leaving holes in the prose.
+
+Glossary:
+  Ship cycle — the window between two successive approvals on a project.
+    Starts after the previous approved ship's `created_at`. If there's no
+    prior approval (first-time approval), the cycle stretches all the way
+    back to the project's earliest history — every ship the project has
+    ever had is part of that first cycle. Ends when one ship in the
+    window reaches :approved. Includes every attempt in that window
+    (pending/returned/rejected/approved). Re-ships after a prior approval
+    open a fresh cycle — counters and hours reset. Full definition in
+    agents-docs/arch-ship-and-koi.md §2 ("Ship cycle (definition)").
+    Anything below tagged "current cycle" or "this cycle" follows that
+    scope.
+
+Variables:
+
+  All variables below are scoped to the **current ship cycle only** (see
+  Glossary). Re-ships after a prior approval start a fresh cycle — every
+  count, hour, reviewer, timestamp, link, and note resets to that cycle's
+  values. Project-level lifetime aggregates are not exposed here.
+
+  Identity
+    {USER_NAME}             User's HCA display name (or email handle if HCA unavailable)
+    {PROJECT_NAME}          Project's name at ship time
+    {PROJECT_DESCRIPTION}   Project's description text at ship time
+    {SHIP_ID}               Integer ship id (e.g. 25)
+
+  Hours (see arch-ship-and-koi.md §7 for the three-flavor distinction)
+    {LOGGED_HOURS}          Raw timelapsed hours, 1 decimal (e.g. 18.5)
+    {APPROVED_HOURS}        TA-approved user-facing hours, 1 decimal
+    {INTERNAL_HOURS}        APPROVED_HOURS + DR/BR hours_adjustment, 1 decimal
+    {TOTAL_DEFLATION}       Sum of hours REMOVED across TA and Phase 2.
+                            Renders "no" when zero, else "X.Xh" — designed to
+                            slot into "<value> deflation was applied", giving
+                            either "no deflation was applied" or
+                            "3.4h deflation was applied". Components:
+                              - TA: max(0, LOGGED_HOURS - APPROVED_HOURS)
+                                    (TA approving MORE than logged contributes 0)
+                              - DR/BR: max(0, -hours_adjustment) per review
+                                    (Phase 2 adding hours contributes 0)
+                            Examples: "no", "0.5h", "3.4h"
+
+  Activity
+    {JOURNAL_COUNT}         Journal entries claimed by this ship cycle
+    {RECORDING_COUNT}       Recordings (Lapse + Lookout + YouTube) across those
+                            journal entries
+
+  Time tracking
+    {TIMETRACKING_METHODS}  Methods actually used in this cycle's recordings,
+                            joined with Oxford-style grammar; ordered as
+                            Lapse → Lookout → YouTube upload. Methods with
+                            zero recordings are skipped. Examples:
+                              "Lapse"
+                              "Lapse and Lookout"
+                              "Lapse, Lookout and YouTube upload"
+
+  Review pipeline (each reviewer formatted as "displayName (email)")
+    {SHIP_TYPE}             "design" or "build"
+    {TIME_AUDITOR}          Time Audit reviewer, e.g. "samliu (samliu@hackclub.com)"
+    {REQUIREMENTS_CHECKER}  Requirements Check reviewer, same format
+    {2ND_PASS_REVIEWER}     Phase 2 (Design or Build) reviewer, same format
+
+  Timestamps (ISO 8601)
+    {SUBMITTED_AT}          When *this* ship was created (status went to :pending
+                            or :awaiting_identity). For multi-attempt cycles
+                            this is the most recent re-submission; use
+                            FIRST_SUBMITTED_AT for the cycle's earliest entry.
+    {FIRST_SUBMITTED_AT}    When the *first* ship in this cycle was created —
+                            i.e. when the user originally submitted, before any
+                            re-submissions. Equals SUBMITTED_AT for first-try
+                            approvals. Excludes awaiting_identity ships.
+    {APPROVED_AT}           When the ship reached :approved — sourced from the
+                            PaperTrail version that recorded the transition,
+                            so it's stable against later attribute writes
+                            (e.g. screenshot caching)
+
+  Lifecycle
+    {SHIP_TYPE_MSG}         Pre-formatted phrase positioning this ship in the
+                            project's design/build progression. Choice of
+                            phrase depends on (a) current ship_type and
+                            (b) whether the project has prior approved ships
+                            of the same and/or other type. Examples:
+                              "first design ship"
+                                  (no prior approval, current=design)
+                              "first build ship"
+                                  (no prior approval, current=build)
+                              "update to a design"
+                                  (prior approved design, current=design)
+                              "update to their build"
+                                  (prior approved build, current=build)
+                              "first build ship of their prior design"
+                                  (prior approved design only, current=build)
+                              "first design ship of their prior build"
+                                  (prior approved build only, current=design — rare)
+
+    {ATTEMPTS_MSG}          Pre-formatted phrase about attempts in *this*
+                            approval cycle (counter resets after each prior
+                            approval). Re-ships after approval start a fresh
+                            cycle. The approving attempt itself isn't a
+                            "round of feedback" — rounds = (attempts in cycle
+                            − 1). Singular vs plural is auto-pluralized.
+                            Examples:
+                              "without needing additional feedback"
+                                  (1 attempt — approved on first try)
+                              "after 1 additional round of feedback"
+                                  (2 attempts — 1 return then approved)
+                              "after 4 additional rounds of feedback"
+                                  (5 attempts — 4 returns then approved)
+
+  Economy
+    {KOI_AWARDED}           Koi credited to the user for this ship
+
+  Internal context
+    {INTERNAL_NOTES}        Free-text internal notes from the Phase 2 reviewer
+                            (DR or BR `internal_reason`). May be empty.
+
+  Links
+    {REPO_URL}              Frozen repo link at ship time
+    {DEMO_URL}              Frozen demo link at ship time (may be empty)
+    {INSPECT_URL}           Presigned URL to /admin/unified_inspect/:ship_id with
+                            an HMAC token (signed by EXTERNAL_API_KEY) so YSWS
+                            auditors can see the full review timeline + reviewer
+                            attribution behind this approval. Token is path-scoped
+                            to this ship_id; rotating EXTERNAL_API_KEY invalidates
+                            all previously-issued URLs.
+---
+
+This is the {SHIP_TYPE_MSG} of "{PROJECT_NAME}" for Fallout. Submitted {FIRST_SUBMITTED_AT}. 
+
+Time was logged via screen/camera recording using {TIMETRACKING_METHODS} ({RECORDING_COUNT} recordings) in combination with journaling ({JOURNAL_COUNT} entries).
+
+This project was approved at {APPROVED_AT} {ATTEMPTS_MSG}:
+
+1. Recording time was verified/deflated by {TIME_AUDITOR} to ensure it matches our policy of what is allowed. Inactive and unrelated time was stripped according to our policy publicly available at here: https://fallout.hackclub.com/docs/project-resources/how-to-timelapse
+
+2. The project was then checked by {REQUIREMENTS_CHECKER} to ensure it meets our requirements of a "shipped" hardware project, which is publicly available here: https://fallout.hackclub.com/docs/requirements/submitting-design & https://fallout.hackclub.com/docs/requirements/submitting-build
+
+3. A final check was done by {2ND_PASS_REVIEWER}, who is knowledgeable in hardware, to ensure nothing was missed prior, and that the projects meets our standards in terms of quality.
+
+In total, {TOTAL_DEFLATION} deflation was applied. 
+
+The final reviewer was asked to justify why this ship meets the standards of the Unified DB:
+
+{INTERNAL_NOTES|"(no notes)"}
+
+!! To inspect the full review for this ship, including timelapses & journals, see: {INSPECT_URL}
+
+For any questions, please reach out to samliu@hackclub.com.

@@ -59,6 +59,7 @@ class MailsController < ApplicationController
       pinned: mail.pinned,
       dismissable: mail.dismissable,
       action_url: mail.action_url,
+      action_label: mail.action_label,
       is_read: read_ids.include?(mail.id),
       source_type: mail.source_type,
       created_at: mail.created_at.strftime("%b %d, %Y")
@@ -77,6 +78,7 @@ class MailsController < ApplicationController
       pinned: mail.pinned,
       dismissable: mail.dismissable,
       action_url: mail.action_url,
+      action_label: mail.action_label,
       source_type: mail.source_type,
       created_at: mail.created_at.strftime("%B %d, %Y")
     }

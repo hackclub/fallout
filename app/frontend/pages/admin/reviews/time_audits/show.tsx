@@ -1,6 +1,11 @@
 import { useState, useMemo, useCallback, useRef, useEffect, memo } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { Link, router } from '@inertiajs/react'
+import { createPlayer } from '@videojs/react'
+import { MinimalVideoSkin, Video, videoFeatures } from '@videojs/react/video'
+import '@videojs/react/video/minimal-skin.css'
+import { selectPlaybackRate } from '@videojs/core/dom'
 import { useReviewHeartbeat } from '@/hooks/useReviewHeartbeat'
 import ReviewLayout from '@/layouts/ReviewLayout'
 import { Badge } from '@/components/admin/ui/badge'
@@ -42,6 +47,8 @@ import {
   SparklesIcon,
   MessageSquareTextIcon,
   FlagIcon,
+  PlayIcon,
+  PauseIcon,
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/admin/ui/tooltip'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
@@ -136,40 +143,42 @@ function ReviewTopBar({
   const [flagReason, setFlagReason] = useState('')
 
   return (
-    <div className="z-50 bg-muted/40 border-b border-border px-4 py-2 flex items-center gap-3 shrink-0">
-      <Button variant="outline" size="sm" asChild>
-        <Link href="/admin/reviews/time_audits">End Session</Link>
-      </Button>
-      {!isTerminal && (
-        <Button variant="ghost" size="sm" onClick={onSkip}>
-          Skip
+    <div className="z-50 bg-muted/40 border-b border-border px-4 py-2 flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/admin/reviews/time_audits">End Session</Link>
         </Button>
-      )}
+        {!isTerminal && (
+          <Button variant="ghost" size="sm" onClick={onSkip}>
+            Skip
+          </Button>
+        )}
 
-      <Separator orientation="vertical" className="h-6" />
+        <Separator orientation="vertical" className="h-6" />
 
-      <a
-        href={`/admin/projects/${project.id}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="font-semibold truncate hover:underline"
-      >
-        {project.name}
-      </a>
-      <a
-        href={`/admin/projects/${project.id}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-muted-foreground text-sm hover:underline"
-      >
-        (#{project.id})
-      </a>
-      <span className="text-sm text-muted-foreground">
-        {totalEntries} {totalEntries === 1 ? 'entry' : 'entries'} to review ({formatDuration(approvedSeconds)} /{' '}
-        {formatDuration(totalDuration)})
-      </span>
+        <a
+          href={`/admin/projects/${project.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold truncate hover:underline"
+        >
+          {project.name}
+        </a>
+        <a
+          href={`/admin/projects/${project.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-muted-foreground text-sm hover:underline"
+        >
+          (#{project.id})
+        </a>
+        <span className="text-sm text-muted-foreground">
+          {totalEntries} {totalEntries === 1 ? 'entry' : 'entries'} to review ({formatDuration(approvedSeconds)} /{' '}
+          {formatDuration(totalDuration)})
+        </span>
+      </div>
 
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
         <Button variant="outline" size="sm" asChild>
           <a href={`/admin/users/${project.user_id}`} target="_blank" rel="noopener noreferrer">
             <UserIcon data-icon="inline-start" />
@@ -470,7 +479,7 @@ function AnnotationTimeline({
           <span className="flex items-center gap-1">
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-purple-500/60" /> Inactive
           </span>
-        ) : !checked ? (
+        ) : !checked && recording.type !== 'YouTubeVideo' ? (
           <span className="flex items-center gap-1">
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-muted" /> Not analyzed
           </span>
@@ -561,6 +570,7 @@ function DeflationInputs({
 function SegmentEditor({
   recording,
   segments,
+  multiplier,
   onAdd,
   onRemove,
   currentTime,
@@ -569,6 +579,7 @@ function SegmentEditor({
 }: {
   recording: ReviewRecording
   segments: TimeAuditSegment[]
+  multiplier: number
   onAdd: (seg: TimeAuditSegment) => void
   onRemove: (index: number) => void
   currentTime: number
@@ -635,14 +646,15 @@ function SegmentEditor({
     setDeflatedPercent(50)
   }
 
-  // Segments are in video seconds; multiply by 60 to get real-time equivalents for display
+  // Segments are in video seconds; multiply by multiplier to get real-time equivalents for display
+  const scale = multiplier
   const removedRealSec = segments
     .filter((s) => s.type === 'removed')
-    .reduce((sum, s) => sum + (s.end_seconds - s.start_seconds) * 60, 0)
+    .reduce((sum, s) => sum + (s.end_seconds - s.start_seconds) * scale, 0)
   const deflatedRealSec = segments
     .filter((s) => s.type === 'deflated')
-    .reduce((sum, s) => sum + ((s.end_seconds - s.start_seconds) * 60 * (s.deflated_percent ?? 0)) / 100, 0)
-  const approvedSec = Math.max(0, recording.duration * 60 - removedRealSec - deflatedRealSec)
+    .reduce((sum, s) => sum + ((s.end_seconds - s.start_seconds) * scale * (s.deflated_percent ?? 0)) / 100, 0)
+  const approvedSec = Math.max(0, recording.duration * scale - removedRealSec - deflatedRealSec)
 
   return (
     <div className="space-y-2">
@@ -668,7 +680,8 @@ function SegmentEditor({
             .sort((a, b) => a.seg.start_seconds - b.seg.start_seconds)
             .map(({ seg, origIndex: i }) => {
               const videoRange = seg.end_seconds - seg.start_seconds
-              const rangeMin = Math.round(videoRange * 10) / 10 // 1 video sec ≈ 1 real min
+              const rangeRealSec = videoRange * scale
+              const rangeMin = Math.round((rangeRealSec / 60) * 10) / 10
               const deflatedToMin =
                 seg.type === 'deflated' && seg.deflated_percent
                   ? Math.round(((rangeMin * (100 - seg.deflated_percent)) / 100) * 10) / 10
@@ -854,49 +867,169 @@ function SegmentEditor({
   )
 }
 
+const AuditPlayer = createPlayer({ features: videoFeatures })
+
+const AUDIT_PLAYBACK_RATES = [0.5, 1, 1.5, 2, 3, 4]
+const PLAYBACK_RATE_KEY = 'audit_playback_rate'
+
+function PlayerConfig({ videoContainerRef }: { videoContainerRef: React.RefObject<HTMLDivElement | null> }) {
+  const store = AuditPlayer.usePlayer()
+  const rate = AuditPlayer.usePlayer(selectPlaybackRate)
+
+  // Patch available playback rates — no public setter exists, patch internal state directly
+  useEffect(() => {
+    ;(store.$state as { patch?: (p: object) => void }).patch?.({ playbackRates: AUDIT_PLAYBACK_RATES })
+  }, [store])
+
+  // Apply saved rate once the player has a target
+  useEffect(() => {
+    const saved = parseFloat(localStorage.getItem(PLAYBACK_RATE_KEY) ?? '')
+    if (!AUDIT_PLAYBACK_RATES.includes(saved)) return
+    try {
+      rate.setPlaybackRate(saved)
+    } catch {
+      // Player not attached yet — loadedmetadata handler below will cover it
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Re-apply saved rate after browser resets playbackRate on source load
+  useEffect(() => {
+    const attach = () => {
+      const video = videoContainerRef.current?.querySelector('video')
+      if (!video) return false
+      const onLoaded = () => {
+        const saved = parseFloat(localStorage.getItem(PLAYBACK_RATE_KEY) ?? '')
+        if (AUDIT_PLAYBACK_RATES.includes(saved)) {
+          try {
+            rate.setPlaybackRate(saved)
+          } catch {
+            video.playbackRate = saved
+          }
+        }
+      }
+      video.addEventListener('loadedmetadata', onLoaded)
+      return () => video.removeEventListener('loadedmetadata', onLoaded)
+    }
+    let cleanup = attach()
+    if (!cleanup) {
+      const interval = setInterval(() => {
+        cleanup = attach()
+        if (cleanup) clearInterval(interval)
+      }, 100)
+      return () => {
+        clearInterval(interval)
+        if (typeof cleanup === 'function') cleanup()
+      }
+    }
+    return cleanup
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Persist rate change and broadcast to other player instances on the page
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    localStorage.setItem(PLAYBACK_RATE_KEY, String(rate.playbackRate))
+    // storage event only fires in other tabs; dispatch manually for same-page sync
+    window.dispatchEvent(new StorageEvent('storage', { key: PLAYBACK_RATE_KEY, newValue: String(rate.playbackRate) }))
+  }, [rate.playbackRate])
+
+  // Sync when another player on the page changes the rate
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== PLAYBACK_RATE_KEY || !e.newValue) return
+      const next = parseFloat(e.newValue)
+      if (AUDIT_PLAYBACK_RATES.includes(next) && next !== rate.playbackRate) {
+        try {
+          rate.setPlaybackRate(next)
+        } catch {
+          /* player not yet attached */
+        }
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [rate])
+
+  return null
+}
+
 // --- Single Recording Block ---
 
 function RecordingBlock({
   recording,
   description,
   segments,
+  multiplier,
   saved,
   readOnly,
   onDescriptionChange,
   onSegmentAdd,
   onSegmentRemove,
+  onStretchChange,
   onSave,
   saving,
 }: {
   recording: ReviewRecording
   description: string
   segments: TimeAuditSegment[]
+  multiplier: number
   saved: boolean
   readOnly?: boolean
   onDescriptionChange: (description: string) => void
   onSegmentAdd: (seg: TimeAuditSegment) => void
   onSegmentRemove: (index: number) => void
+  onStretchChange: (multiplier: number) => void
   onSave: () => void
   saving: boolean
 }) {
   const hasInactiveData = recording.activity_checked
   const inactivePct = recording.inactive_percentage ?? 0
 
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const videoContainerRef = useRef<HTMLDivElement>(null)
   const [currentTime, setCurrentTime] = useState(0) // video seconds
   const [videoDuration, setVideoDuration] = useState<number | null>(null)
   const [preview, setPreview] = useState<{ start: number; end: number; type: 'removed' | 'deflated' } | null>(null)
+  const [sliderTrackEl, setSliderTrackEl] = useState<Element | null>(null)
+
+  const isYouTube = recording.type === 'YouTubeVideo'
+  const hasPlaybackUrl = !!recording.playback_url
+  const isMissingDuration = isYouTube && recording.duration === 0
+  const [refetching, setRefetching] = useState(false)
+  const [scrubbing, setScrubbing] = useState(false)
+  const [ytPlaying, setYtPlaying] = useState(false)
+  const ytPlayRafRef = useRef<number>(0)
+  const ytPlayLastTimeRef = useRef<number>(0)
+
+  async function handleRefetch() {
+    if (!recording.recordable_id) return
+    setRefetching(true)
+    try {
+      const res = await fetch(`/admin/you_tube_videos/${recording.recordable_id}/refetch`, {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken(), Accept: 'application/json' },
+      })
+      if (res.ok) router.reload()
+    } finally {
+      setRefetching(false)
+    }
+  }
 
   // API time = recording.duration (real tracked seconds, source of truth for billing)
   // Video time = videoDuration (playback seconds, what the timeline follows)
   // timeMultiplier = apiTime / videoTime (for converting video ranges to real deductions)
+  // For YouTube, the multiplier is controlled by the reviewer (stretch_multiplier). For timelapse types, 1 video second ≈ 60 real seconds.
   const apiTime = recording.duration
-  const timeMultiplier = videoDuration && videoDuration > 0 ? apiTime / videoDuration : 60
-  const videoRealTime = videoDuration ? videoDuration * 60 : apiTime // expected real time from video at 60x
-  const hasTimeMismatch = videoDuration !== null && Math.abs(apiTime - videoRealTime) / apiTime > 0.1
+  const timeMultiplier = videoDuration && videoDuration > 0 ? apiTime / videoDuration : isYouTube ? multiplier : 60
+  const videoRealTime = videoDuration ? videoDuration * (isYouTube ? 1 : 60) : apiTime
+  const hasTimeMismatch = videoDuration !== null && apiTime > 0 && Math.abs(apiTime - videoRealTime) / apiTime > 0.1
 
   // Timeline operates in video seconds
-  const timelineDuration = videoDuration ?? apiTime / 60 // fallback before video loads
+  const timelineDuration = videoDuration ?? (isYouTube ? (recording.yt_duration_seconds ?? apiTime) : apiTime / 60) // fallback before video loads
   const granularity = useMemo(() => 1, []) // 1 video second
   const snapPoints = useMemo(
     () => computeSnapPoints(recording, segments, timelineDuration),
@@ -904,56 +1037,239 @@ function RecordingBlock({
   )
   const snapThreshold = useMemo(() => Math.max(timelineDuration * 0.015, 3), [timelineDuration])
 
-  const handleLoadedMetadata = useCallback(() => {
-    const vid = videoRef.current
-    if (vid && vid.duration > 0) {
-      setVideoDuration(vid.duration)
-    }
-  }, [])
+  // 120x custom playback for YouTube: advance timeline cursor smoothly, seek iframe every 250ms
+  const timelineDurationRef = useRef(timelineDuration)
+  timelineDurationRef.current = timelineDuration
+  const ytPlayingRef = useRef(ytPlaying)
+  ytPlayingRef.current = ytPlaying
+  const lastSeekRef = useRef(0)
+  useEffect(() => {
+    if (!isYouTube || !ytPlaying) return
+    ytPlayLastTimeRef.current = performance.now()
+    lastSeekRef.current = 0
 
-  // Poll video.currentTime via rAF for smooth cursor tracking
+    const tick = (now: number) => {
+      const elapsed = (now - ytPlayLastTimeRef.current) / 1000
+      ytPlayLastTimeRef.current = now
+      setCurrentTime((prev) => {
+        const next = prev + elapsed * 120
+        if (next >= timelineDurationRef.current) {
+          setYtPlaying(false)
+          return timelineDurationRef.current
+        }
+        // Only seek iframe every 250ms so it has time to decode/respond
+        if (now - lastSeekRef.current > 250) {
+          lastSeekRef.current = now
+          iframeRef.current?.contentWindow?.postMessage(
+            JSON.stringify({ event: 'command', func: 'seekTo', args: [next, true] }),
+            '*',
+          )
+        }
+        return next
+      })
+      ytPlayRafRef.current = requestAnimationFrame(tick)
+    }
+
+    ytPlayRafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(ytPlayRafRef.current)
+  }, [isYouTube, ytPlaying])
+
+  // Poll the underlying <video> element for currentTime via rAF
   const rafRef = useRef<number>(0)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
+    if (!isYouTube) return
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    // Use postMessage to communicate with the YouTube iframe (enablejsapi=1)
+    function sendCommand(func: string, args: unknown[] = []) {
+      iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*')
+    }
+
+    // Listen for getCurrentTime responses
+    function onMessage(e: MessageEvent) {
+      if (e.source !== iframe?.contentWindow) return
+      try {
+        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+        if (data?.event === 'infoDelivery' && data?.info) {
+          if (typeof data.info.currentTime === 'number') setCurrentTime(data.info.currentTime)
+          if (typeof data.info.duration === 'number' && data.info.duration > 0 && videoDuration === null) {
+            setVideoDuration(data.info.duration)
+          }
+        }
+      } catch {}
+    }
+
+    window.addEventListener('message', onMessage)
+
+    // Request info updates at ~4Hz
+    const interval = setInterval(() => sendCommand('getVideoData'), 250)
+
+    return () => {
+      window.removeEventListener('message', onMessage)
+      clearInterval(interval)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isYouTube, videoDuration])
+
+  // Keep the iframe paused whenever our 60x player is active
+  useEffect(() => {
+    if (!isYouTube) return
+    const cmd = ytPlaying ? 'pauseVideo' : null
+    if (cmd) {
+      iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: cmd, args: [] }), '*')
+    }
+  }, [isYouTube, ytPlaying])
+
+  useEffect(() => {
+    if (isYouTube) return
     const tick = () => {
-      if (videoRef.current) {
-        setCurrentTime(videoRef.current.currentTime)
+      const video = videoContainerRef.current?.querySelector('video')
+      if (video) {
+        setCurrentTime(video.currentTime)
+        if (video.duration > 0 && videoDuration === null) {
+          setVideoDuration(video.duration)
+        }
       }
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [])
 
-  const seekTo = useCallback((videoSeconds: number) => {
-    setCurrentTime(videoSeconds)
-    if (videoRef.current) {
-      videoRef.current.currentTime = videoSeconds
+    // video.js TimeSliderRoot only seeks on pointer-up (onValueCommit). To get live seeking during
+    // drag, intercept pointermove on the slider track and seek directly while the pointer is held down.
+    let sliderEl: Element | null = null
+    let dragging = false
+
+    const seekFromEvent = (e: PointerEvent) => {
+      const video = videoContainerRef.current?.querySelector('video')
+      if (!video || !sliderEl) return
+      const rect = sliderEl.getBoundingClientRect()
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+      video.currentTime = pct * video.duration
+      setCurrentTime(video.currentTime)
     }
-  }, [])
+
+    const onPointerDown = (e: PointerEvent) => {
+      dragging = true
+      seekFromEvent(e)
+    }
+    const onPointerMove = (e: PointerEvent) => {
+      if (dragging) seekFromEvent(e)
+    }
+    const onPointerUp = () => {
+      dragging = false
+    }
+
+    const attach = () => {
+      sliderEl = videoContainerRef.current?.querySelector('.media-slider') ?? null
+      if (!sliderEl) return false
+      sliderEl.addEventListener('pointerdown', onPointerDown as EventListener)
+      sliderEl.addEventListener('pointermove', onPointerMove as EventListener)
+      window.addEventListener('pointerup', onPointerUp)
+      return true
+    }
+
+    // The slider may not be in the DOM yet (video.js renders async); retry until found
+    if (!attach()) {
+      const retryInterval = setInterval(() => {
+        if (attach()) clearInterval(retryInterval)
+      }, 100)
+    }
+
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      sliderEl?.removeEventListener('pointerdown', onPointerDown as EventListener)
+      sliderEl?.removeEventListener('pointermove', onPointerMove as EventListener)
+      window.removeEventListener('pointerup', onPointerUp)
+    }
+  }, [isYouTube, videoDuration])
+
+  // Find the video.js slider track element once the skin mounts, so we can portal inactive markers into it
+  useEffect(() => {
+    if (isYouTube) return
+    const find = () => {
+      const el = videoContainerRef.current?.querySelector('.media-slider__track')
+      if (el) {
+        setSliderTrackEl(el)
+        return true
+      }
+      return false
+    }
+    if (!find()) {
+      const interval = setInterval(() => {
+        if (find()) clearInterval(interval)
+      }, 100)
+      return () => clearInterval(interval)
+    }
+  }, [isYouTube])
+
+  const seekTo = useCallback(
+    (videoSeconds: number) => {
+      setCurrentTime(videoSeconds)
+      if (isYouTube) {
+        iframeRef.current?.contentWindow?.postMessage(
+          JSON.stringify({ event: 'command', func: 'seekTo', args: [videoSeconds, true] }),
+          '*',
+        )
+      } else {
+        const video = videoContainerRef.current?.querySelector('video')
+        if (video) video.currentTime = videoSeconds
+      }
+    },
+    [isYouTube],
+  )
 
   return (
     <div className="space-y-3">
       {/* Video */}
-      <div className="border border-border rounded-lg overflow-hidden">
-        {recording.playback_url && recording.type !== 'YouTubeVideo' ? (
-          <video
-            ref={videoRef}
-            src={recording.playback_url}
-            controls
-            muted
-            preload="metadata"
-            className="w-full aspect-video bg-black"
-            poster={recording.thumbnail_url}
-            onLoadedMetadata={handleLoadedMetadata}
-          />
-        ) : recording.type === 'YouTubeVideo' && recording.video_id ? (
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${recording.video_id}?mute=1`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="w-full aspect-video"
-          />
+      <div ref={videoContainerRef} className="border border-border rounded-lg overflow-hidden">
+        {isYouTube ? (
+          <div className="relative w-full aspect-video">
+            <iframe
+              ref={iframeRef}
+              src={`https://www.youtube.com/embed/${recording.video_id}?enablejsapi=1`}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+            {/* Blocks YouTube's seek overlay from showing while scrubbing our timeline */}
+            {scrubbing && <div className="absolute inset-0" />}
+          </div>
+        ) : hasPlaybackUrl ? (
+          <AuditPlayer.Provider>
+            <PlayerConfig videoContainerRef={videoContainerRef} />
+            <MinimalVideoSkin style={{ width: '100%', height: '100%' }}>
+              <Video
+                src={recording.playback_url!}
+                muted
+                playsInline
+                autoPlay={false}
+                poster={recording.thumbnail_url}
+                className="w-full aspect-video bg-black rounded-none"
+              />
+            </MinimalVideoSkin>
+            {sliderTrackEl &&
+              recording.activity_checked &&
+              recording.inactive_segments &&
+              createPortal(
+                <>
+                  {recording.inactive_segments.map((seg, i) => {
+                    const startPct = (seg.start_min / timelineDuration) * 100
+                    const widthPct = (seg.duration_min / timelineDuration) * 100
+                    return (
+                      <div
+                        key={i}
+                        className="absolute top-0 h-full bg-purple-500/40 rounded-full pointer-events-none"
+                        style={{ left: `${startPct}%`, width: `${Math.max(widthPct, 0.3)}%` }}
+                      />
+                    )
+                  })}
+                </>,
+                sliderTrackEl,
+              )}
+          </AuditPlayer.Provider>
         ) : null}
       </div>
 
@@ -982,6 +1298,36 @@ function RecordingBlock({
             {inactivePct.toFixed(0)}% inactive
           </Badge>
         )}
+        {isYouTube && !readOnly && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-muted-foreground">×</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    step={1}
+                    value={multiplier}
+                    onChange={(e) => {
+                      const v = Number(e.target.value)
+                      if (v >= 1) onStretchChange(v)
+                    }}
+                    className="w-14 h-6 rounded border border-input bg-background px-1.5 text-xs"
+                    title="Stretch multiplier"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>
+                  Stretch multiplier: 1 video second = {multiplier} real second{multiplier !== 1 ? 's' : ''}
+                </p>
+                <p className="text-muted-foreground text-xs">Set to 60 for a timelapse uploaded to YouTube</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         <span className="flex-1" />
         <span className="text-muted-foreground">
           {formatDuration(apiTime)}
@@ -989,27 +1335,55 @@ function RecordingBlock({
             <span className="text-muted-foreground/60"> ({formatDuration(Math.round(videoRealTime))} video)</span>
           )}
         </span>
+        {isMissingDuration && (
+          <Button variant="outline" size="sm" className="text-xs" disabled={refetching} onClick={handleRefetch}>
+            {refetching ? <LoaderIcon className="size-3 animate-spin mr-1" /> : null}
+            Refetch metadata
+          </Button>
+        )}
       </div>
 
       {/* Timeline — follows video time */}
-      <AnnotationTimeline
-        recording={{ ...recording, duration: timelineDuration }}
-        segments={segments}
-        currentTime={currentTime}
-        onSeek={seekTo}
-        snapPoints={snapPoints}
-        snapThreshold={snapThreshold}
-        granularity={granularity}
-        onInteractionEnd={() => videoRef.current?.focus({ preventScroll: true })}
-        preview={preview}
-        readOnly={readOnly}
-      />
+      <div className="flex items-center gap-2">
+        {isYouTube && (
+          <button
+            onClick={() => setYtPlaying((p) => !p)}
+            className="shrink-0 size-7 flex items-center justify-center rounded border border-input hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            title={ytPlaying ? 'Pause 120× preview' : 'Play at 120×'}
+          >
+            {ytPlaying ? <PauseIcon className="size-3.5" /> : <PlayIcon className="size-3.5" />}
+          </button>
+        )}
+        <div className="flex-1">
+          <AnnotationTimeline
+            recording={{ ...recording, duration: timelineDuration }}
+            segments={segments}
+            currentTime={currentTime}
+            onSeek={(t) => {
+              setYtPlaying(false)
+              setScrubbing(true)
+              seekTo(t)
+            }}
+            snapPoints={[]}
+            snapThreshold={0}
+            granularity={granularity}
+            onInteractionEnd={() => {
+              setScrubbing(false)
+              const video = videoContainerRef.current?.querySelector('video')
+              video?.focus({ preventScroll: true })
+            }}
+            preview={preview}
+            readOnly={readOnly}
+          />
+        </div>
+      </div>
 
       {/* Segment editor — operates in video time, multiplier converts to API time */}
       {!readOnly && (
         <SegmentEditor
           recording={{ ...recording, duration: timelineDuration }}
           segments={segments}
+          multiplier={multiplier}
           onAdd={onSegmentAdd}
           onRemove={onSegmentRemove}
           currentTime={currentTime}
@@ -1070,6 +1444,7 @@ const EntrySection = memo(
     onSegmentAdd,
     onSegmentRemove,
     onSave,
+    onStretchChange,
     savingRecording,
   }: {
     entry: ReviewJournalEntry
@@ -1083,6 +1458,7 @@ const EntrySection = memo(
     onSegmentAdd: (recordingId: number, seg: TimeAuditSegment) => void
     onSegmentRemove: (recordingId: number, index: number) => void
     onSave: (recordingId: number) => void
+    onStretchChange: (recordingId: number, multiplier: number) => void
     savingRecording: number | null
   }) {
     const allSaved =
@@ -1094,11 +1470,17 @@ const EntrySection = memo(
       })
 
     const entryApprovedSeconds = useMemo(() => {
-      let total = entry.total_duration
+      // Recompute base: replace each YouTube recording's duration with duration * stretch_multiplier
+      let total = 0
+      for (const rec of entry.recordings) {
+        const recData = annotations.recordings?.[String(rec.id)]
+        const multiplier = rec.type === 'YouTubeVideo' ? (recData?.stretch_multiplier ?? 1) : 1
+        total += rec.duration * multiplier
+      }
       for (const rec of entry.recordings) {
         const recData = annotations.recordings?.[String(rec.id)]
         if (!recData?.segments) continue
-        const multiplier = 60
+        const multiplier = rec.type === 'YouTubeVideo' ? (recData.stretch_multiplier ?? 1) : 60
         for (const seg of recData.segments) {
           const videoRange = seg.end_seconds - seg.start_seconds
           const realRange = videoRange * multiplier
@@ -1125,7 +1507,7 @@ const EntrySection = memo(
     }, [allSaved, isLast])
 
     return (
-      <div className="flex flex-col snap-start" style={expanded ? { height: 'calc(100vh - 45px)' } : undefined}>
+      <div className={`flex flex-col snap-start ${expanded ? 'md:h-[calc(100vh-45px)]' : ''}`}>
         {/* Entry header */}
         <button
           onClick={() => setExpanded((e) => !e)}
@@ -1168,9 +1550,9 @@ const EntrySection = memo(
 
         {/* Body */}
         {expanded && (
-          <div className="flex flex-1 min-h-0">
+          <div className="flex flex-col-reverse md:flex-row md:flex-1 md:min-h-0">
             {/* Left — videos */}
-            <div className="w-1/2 overflow-y-auto p-4 space-y-6">
+            <div className="md:w-1/2 md:overflow-y-auto p-4 space-y-6">
               {entry.recordings.map((rec) => {
                 const recId = String(rec.id)
                 const recAnnotation = annotations.recordings?.[recId]
@@ -1180,11 +1562,13 @@ const EntrySection = memo(
                     recording={rec}
                     description={recAnnotation?.description ?? ''}
                     segments={recAnnotation?.segments ?? []}
+                    multiplier={rec.type === 'YouTubeVideo' ? (recAnnotation?.stretch_multiplier ?? 1) : 60}
                     saved={savedRecordings.has(recId)}
                     readOnly={readOnly}
                     onDescriptionChange={(d) => onDescriptionChange(rec.id, d)}
                     onSegmentAdd={(seg) => onSegmentAdd(rec.id, seg)}
                     onSegmentRemove={(i) => onSegmentRemove(rec.id, i)}
+                    onStretchChange={(m) => onStretchChange(rec.id, m)}
                     onSave={() => onSave(rec.id)}
                     saving={savingRecording === rec.id}
                   />
@@ -1194,10 +1578,11 @@ const EntrySection = memo(
             </div>
 
             {/* Center divider — 5px scrollable gutter */}
-            <div className="w-1.5 shrink-0 bg-border" />
+            <div className="md:hidden h-px shrink-0 bg-border" />
+            <div className="hidden md:block w-1.5 shrink-0 bg-border" />
 
             {/* Right — journal */}
-            <div className="w-1/2 overflow-y-auto p-4 text-xs">
+            <div className="md:w-1/2 md:overflow-y-auto p-4 text-xs">
               <div
                 className="markdown-content max-w-none"
                 style={{ zoom: 0.75 }}
@@ -1331,6 +1716,11 @@ export default function TimeAuditsShow({
   const [notesOpen, setNotesOpen] = useState(false)
   const [flagging, setFlagging] = useState(false)
   const [isFlagged, setIsFlagged] = useState(project_flagged)
+  const [notes, setNotesState] = useState<ReviewerNote[]>(reviewer_notes ?? [])
+
+  useEffect(() => {
+    if (reviewer_notes) setNotesState(reviewer_notes)
+  }, [reviewer_notes])
 
   // totalDuration = sum of API times (real tracked seconds, source of truth)
   const totalDuration = useMemo(() => new_entries.reduce((sum, e) => sum + e.total_duration, 0), [new_entries])
@@ -1360,6 +1750,24 @@ export default function TimeAuditsShow({
         [String(recordingId)]: {
           ...prev.recordings?.[String(recordingId)],
           description,
+        },
+      },
+    }))
+    setSavedRecordings((prev) => {
+      const next = new Set(prev)
+      next.delete(String(recordingId))
+      return next
+    })
+  }, [])
+
+  const handleStretchChange = useCallback((recordingId: number, newMultiplier: number) => {
+    setAnnotations((prev) => ({
+      ...prev,
+      recordings: {
+        ...prev.recordings,
+        [String(recordingId)]: {
+          ...prev.recordings?.[String(recordingId)],
+          stretch_multiplier: newMultiplier,
         },
       },
     }))
@@ -1459,14 +1867,20 @@ export default function TimeAuditsShow({
     let total = 0
     for (const entry of new_entries) {
       if (!entryReviewedCheck(entry)) continue
-      let entryTime = entry.total_duration
+      // Recompute base: replace each YouTube recording's duration with duration * stretch_multiplier
+      let entryTime = 0
+      for (const rec of entry.recordings) {
+        const recData = annotations.recordings?.[String(rec.id)]
+        const baseMultiplier = rec.type === 'YouTubeVideo' ? (recData?.stretch_multiplier ?? 1) : 1
+        entryTime += rec.duration * baseMultiplier
+      }
       const recs = annotations.recordings
       if (recs) {
-        const multiplier = 60
         for (const rec of entry.recordings) {
-          const data = recs[String(rec.id)]
-          if (!data?.segments) continue
-          for (const seg of data.segments) {
+          const recData = recs[String(rec.id)]
+          const multiplier = rec.type === 'YouTubeVideo' ? (recData?.stretch_multiplier ?? 1) : 60
+          if (!recData?.segments) continue
+          for (const seg of recData.segments) {
             const videoRange = seg.end_seconds - seg.start_seconds
             const realRange = videoRange * multiplier
             if (seg.type === 'removed') {
@@ -1512,7 +1926,7 @@ export default function TimeAuditsShow({
         totalDuration={totalDuration}
         submitting={submitting}
         allReviewed={allReviewed}
-        notesCount={reviewer_notes?.length ?? 0}
+        notesCount={notes.length}
         projectFlagged={isFlagged}
         flagging={flagging}
         reviewStatus={review.status}
@@ -1524,7 +1938,8 @@ export default function TimeAuditsShow({
 
       {notesOpen && reviewer_notes && (
         <ProjectNotesWindow
-          notes={reviewer_notes}
+          setNotes={setNotesState}
+          notes={notes}
           notesPath={reviewer_notes_path}
           shipId={review.ship_id}
           reviewStage="time_audit"
@@ -1547,6 +1962,7 @@ export default function TimeAuditsShow({
             onSegmentAdd={handleSegmentAdd}
             onSegmentRemove={handleSegmentRemove}
             onSave={handleSaveRecording}
+            onStretchChange={handleStretchChange}
             savingRecording={savingRecording}
           />
         ))}

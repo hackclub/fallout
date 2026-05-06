@@ -77,5 +77,14 @@ class PendingCollaborationInvitesController < ApplicationController
 
     invite = @pending_invite.claim!(current_user)
     redirect_to collaboration_invite_path(invite), notice: "You have a collaboration invite!"
+  rescue ActiveRecord::RecordInvalid
+    # Invitee already has a pending invite (or is already a collaborator) for this project —
+    # surface a friendly message rather than a 500.
+    existing = @pending_invite.project.collaboration_invites.pending.find_by(invitee: current_user)
+    if existing
+      redirect_to collaboration_invite_path(existing), notice: "You have a collaboration invite!"
+    else
+      redirect_to root_path, alert: "You are already a collaborator on this project."
+    end
   end
 end

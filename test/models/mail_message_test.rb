@@ -2,20 +2,22 @@
 #
 # Table name: mail_messages
 #
-#  id          :bigint           not null, primary key
-#  action_url  :string
-#  content     :text
-#  dismissable :boolean          default(TRUE), not null
-#  expires_at  :datetime
-#  filters     :jsonb            not null
-#  pinned      :boolean          default(FALSE), not null
-#  source_type :string
-#  summary     :string           not null
-#  created_at  :datetime         not null
-#  updated_at  :datetime         not null
-#  author_id   :bigint
-#  source_id   :bigint
-#  user_id     :bigint
+#  id           :bigint           not null, primary key
+#  action_label :string
+#  action_url   :string
+#  auto_open    :boolean
+#  content      :text
+#  dismissable  :boolean          default(TRUE), not null
+#  expires_at   :datetime
+#  filters      :jsonb            not null
+#  pinned       :boolean          default(FALSE), not null
+#  source_type  :string
+#  summary      :string           not null
+#  created_at   :datetime         not null
+#  updated_at   :datetime         not null
+#  author_id    :bigint
+#  source_id    :bigint
+#  user_id      :bigint
 #
 # Indexes
 #

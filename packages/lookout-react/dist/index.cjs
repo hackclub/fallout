@@ -124,9 +124,8 @@ function createLookoutClient(options) {
     async getStatus() {
       return fetchJson(await sessionUrl("/status"));
     },
-    async getVideo(options2) {
-      const q = options2?.format ? `?format=${options2.format}` : "";
-      return fetchJson(await sessionUrl(`/video${q}`));
+    async getVideo() {
+      return fetchJson(await sessionUrl("/video"));
     }
   };
 }
@@ -1553,10 +1552,12 @@ function styleInject(css, { insertAt } = {}) {
 }
 
 // src/components/VideoPlayer.css
-styleInject(".lookout-video-player .media-button--mute,\n.lookout-video-player .media-slider--volume {\n  display: none !important;\n}\n.lookout-video-player.platform-windows .media-button--pip,\n.lookout-video-player.platform-mac .media-button--pip,\n.lookout-video-player.platform-linux .media-button--pip {\n  display: none !important;\n}\n.lookout-video-player.platform-linux .media-button--fullscreen {\n  display: none !important;\n}\n.lookout-video-player {\n  --media-border-radius: 8px;\n  --media-video-border-radius: 8px;\n}\n.lookout-video-player * {\n  --media-border-radius: 8px;\n}\n");
+styleInject(".lookout-video-player .media-button--mute,\n.lookout-video-player .media-slider--volume {\n  display: none !important;\n}\n.lookout-video-player.platform-windows .media-button--pip,\n.lookout-video-player.platform-mac .media-button--pip,\n.lookout-video-player.platform-linux .media-button--pip {\n  display: none !important;\n}\n.lookout-video-player.platform-linux .media-button--fullscreen {\n  display: none !important;\n}\n.lookout-video-player {\n  --media-border-radius: 8px;\n  --media-video-border-radius: 8px;\n}\n.lookout-video-player * {\n  --media-border-radius: 8px;\n}\n.lookout-video-player__error {\n  position: absolute;\n  inset: 0;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 8px;\n  padding: 24px;\n  text-align: center;\n  background: rgba(11, 13, 18, 0.92);\n  color: #f4f5f7;\n  border-radius: 8px;\n  z-index: 2;\n}\n.lookout-video-player__error h3 {\n  margin: 0;\n  font-size: 18px;\n  font-weight: 600;\n}\n.lookout-video-player__error p {\n  margin: 0;\n  max-width: 480px;\n  font-size: 14px;\n  line-height: 1.5;\n  color: #c8ccd4;\n}\n.lookout-video-player__error-note {\n  font-size: 13px;\n  color: #9aa0aa;\n}\n.lookout-video-player__error a {\n  color: #6ea8ff;\n  text-decoration: underline;\n}\n");
 var Player = react$1.createPlayer({ features: video.videoFeatures });
 function VideoPlayer({ src }) {
   const [platform, setPlatform] = react.useState("");
+  const [error, setError] = react.useState(null);
+  const wrapperRef = react.useRef(null);
   react.useEffect(() => {
     if (typeof navigator !== "undefined") {
       const ua = navigator.userAgent.toLowerCase();
@@ -1569,7 +1570,75 @@ function VideoPlayer({ src }) {
       }
     }
   }, []);
-  return /* @__PURE__ */ jsxRuntime.jsx("div", { className: `lookout-video-player platform-${platform}`, style: { width: "100%", height: "100%", display: "flex", "--media-border-radius": "8px", "--media-video-border-radius": "8px" }, children: /* @__PURE__ */ jsxRuntime.jsx(Player.Provider, { children: /* @__PURE__ */ jsxRuntime.jsx(video.VideoSkin, { style: { width: "100%", height: "100%" }, children: /* @__PURE__ */ jsxRuntime.jsx(video.Video, { src, muted: true, playsInline: true, autoPlay: false }) }) }) });
+  react.useEffect(() => {
+    setError(null);
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const onVideoError = (event) => {
+      const el = event.target;
+      const code = el?.error?.code;
+      if (code === 4 || code === 3) {
+        setError({
+          kind: "codec",
+          detail: "Your system can't decode this video (H.264). On Linux, install gst-plugins-bad / OpenH264 to enable playback."
+        });
+      } else if (code === 2) {
+        setError({
+          kind: "network",
+          detail: "Network error while loading the video. Check your connection and retry."
+        });
+      } else {
+        setError({
+          kind: "unknown",
+          detail: el?.error?.message || "Playback failed for an unknown reason."
+        });
+      }
+    };
+    let videoEl = wrapper.querySelector("video");
+    if (videoEl) videoEl.addEventListener("error", onVideoError, true);
+    const observer = new MutationObserver(() => {
+      const next = wrapper.querySelector("video");
+      if (next && next !== videoEl) {
+        if (videoEl) videoEl.removeEventListener("error", onVideoError, true);
+        videoEl = next;
+        videoEl.addEventListener("error", onVideoError, true);
+      }
+    });
+    observer.observe(wrapper, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      if (videoEl) videoEl.removeEventListener("error", onVideoError, true);
+    };
+  }, [src]);
+  return /* @__PURE__ */ jsxRuntime.jsxs(
+    "div",
+    {
+      ref: wrapperRef,
+      className: `lookout-video-player platform-${platform}`,
+      style: {
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        position: "relative",
+        "--media-border-radius": "8px",
+        "--media-video-border-radius": "8px"
+      },
+      children: [
+        /* @__PURE__ */ jsxRuntime.jsx(Player.Provider, { children: /* @__PURE__ */ jsxRuntime.jsx(video.VideoSkin, { style: { width: "100%", height: "100%" }, children: /* @__PURE__ */ jsxRuntime.jsx(video.Video, { src, muted: true, playsInline: true, autoPlay: false }) }) }),
+        error && /* @__PURE__ */ jsxRuntime.jsxs("div", { className: "lookout-video-player__error", role: "alert", children: [
+          /* @__PURE__ */ jsxRuntime.jsx("h3", { children: "Can't play this timelapse" }),
+          /* @__PURE__ */ jsxRuntime.jsx("p", { children: error.detail }),
+          /* @__PURE__ */ jsxRuntime.jsxs("p", { className: "lookout-video-player__error-note", children: [
+            "Your timelapse saved successfully. You can",
+            " ",
+            /* @__PURE__ */ jsxRuntime.jsx("a", { href: src, target: "_blank", rel: "noopener noreferrer", children: "download the file" }),
+            " ",
+            "and play it in another app."
+          ] })
+        ] })
+      ]
+    }
+  );
 }
 function ProcessingState({ status, trackedSeconds, videoUrl, error, onVideoLoaded }) {
   const containerStyle = {
@@ -1832,11 +1901,7 @@ function ResultView({ status, trackedSeconds }) {
   const [error, setError] = react.useState(null);
   react.useEffect(() => {
     if (status === "complete") {
-      let format = "mp4";
-      if (typeof navigator !== "undefined" && navigator.userAgent.toLowerCase().includes("linux") && !navigator.userAgent.toLowerCase().includes("android")) {
-        format = "webm";
-      }
-      client.getVideo({ format }).then((data) => {
+      client.getVideo().then((data) => {
         if (data.videoUrl && !data.videoUrl.startsWith("https://")) {
           throw new Error("Invalid video URL: must be HTTPS.");
         }
@@ -2082,10 +2147,13 @@ var addButtonStyle = {
   height: 36,
   padding: 0
 };
-function GalleryHeader({ onAdd }) {
+function GalleryHeader({ onAdd, onSettings }) {
   return /* @__PURE__ */ jsxRuntime.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: spacing.lg, paddingBottom: 0, flexShrink: 0 }, children: [
     /* @__PURE__ */ jsxRuntime.jsx("h2", { style: { fontSize: fontSize.heading, fontWeight: fontWeight.bold, color: colors.text.primary, margin: 0 }, children: "Your Timelapses" }),
-    onAdd && /* @__PURE__ */ jsxRuntime.jsx(Button, { variant: "ghost", size: "sm", onClick: onAdd, title: "Add session", style: addButtonStyle, children: "+" })
+    /* @__PURE__ */ jsxRuntime.jsxs("div", { style: { display: "flex", alignItems: "center", gap: spacing.xs }, children: [
+      onSettings && /* @__PURE__ */ jsxRuntime.jsx(Button, { variant: "ghost", size: "sm", onClick: onSettings, title: "Filter Apps", "aria-label": "Filter Apps", style: addButtonStyle, children: /* @__PURE__ */ jsxRuntime.jsx("svg", { width: "26", height: "26", viewBox: "0 0 32 32", fill: "currentColor", xmlns: "http://www.w3.org/2000/svg", "aria-hidden": "true", children: /* @__PURE__ */ jsxRuntime.jsx("path", { d: "M1.64062 15.9375C1.64062 13.9271 2.00521 12.0573 2.73438 10.3281C3.46354 8.58854 4.47396 7.07292 5.76562 5.78125C7.06771 4.47917 8.58333 3.46354 10.3125 2.73438C12.0521 2.00521 13.9219 1.64062 15.9219 1.64062V30.2188C13.9219 30.2188 12.0521 29.8542 10.3125 29.125C8.58333 28.4062 7.06771 27.3958 5.76562 26.0938C4.47396 24.7917 3.46354 23.276 2.73438 21.5469C2.00521 19.8177 1.64062 17.9479 1.64062 15.9375ZM15.125 3.23438V1.1875H20.6875V3.23438H15.125ZM15.125 6.59375V4.85938H26.4375V6.59375H15.125ZM15.125 9.9375V8.20312H28.6719V9.9375H15.125ZM15.125 13.2969V11.5625H30.3438V13.2969H15.125ZM15.125 16.6406V14.9062H30.3438V16.6406H15.125ZM15.125 20V18.2656H30.3438V20H15.125ZM15.125 23.3594V21.625H28.6719V23.3594H15.125ZM15.125 27.0156V24.9688H26.4375V27.0156H15.125ZM15.125 30.6875V28.6406H20.6875V30.6875H15.125ZM15.9375 31.875C13.7396 31.875 11.6771 31.4583 9.75 30.625C7.82292 29.8021 6.13021 28.6615 4.67188 27.2031C3.21354 25.7448 2.06771 24.0521 1.23438 22.125C0.411458 20.1979 0 18.1354 0 15.9375C0 13.7396 0.411458 11.6771 1.23438 9.75C2.06771 7.82292 3.21354 6.13021 4.67188 4.67188C6.13021 3.20312 7.82292 2.05729 9.75 1.23438C11.6771 0.411458 13.7396 0 15.9375 0C18.1354 0 20.1979 0.411458 22.125 1.23438C24.0521 2.05729 25.7448 3.20312 27.2031 4.67188C28.6615 6.13021 29.8021 7.82292 30.625 9.75C31.4583 11.6771 31.875 13.7396 31.875 15.9375C31.875 18.1354 31.4583 20.1979 30.625 22.125C29.8021 24.0521 28.6615 25.7448 27.2031 27.2031C25.7448 28.6615 24.0521 29.8021 22.125 30.625C20.1979 31.4583 18.1354 31.875 15.9375 31.875ZM15.9375 29.2188C17.7708 29.2188 19.4896 28.875 21.0938 28.1875C22.6979 27.5 24.1094 26.5469 25.3281 25.3281C26.5469 24.1094 27.5 22.6979 28.1875 21.0938C28.875 19.4896 29.2188 17.7708 29.2188 15.9375C29.2188 14.1042 28.875 12.3854 28.1875 10.7812C27.5 9.16667 26.5469 7.75521 25.3281 6.54688C24.1094 5.32812 22.6979 4.375 21.0938 3.6875C19.4896 3 17.7708 2.65625 15.9375 2.65625C14.1042 2.65625 12.3854 3 10.7812 3.6875C9.17708 4.375 7.76562 5.32812 6.54688 6.54688C5.32812 7.75521 4.375 9.16667 3.6875 10.7812C3 12.3854 2.65625 14.1042 2.65625 15.9375C2.65625 17.7708 3 19.4896 3.6875 21.0938C4.375 22.6979 5.32812 24.1094 6.54688 25.3281C7.76562 26.5469 9.17708 27.5 10.7812 28.1875C12.3854 28.875 14.1042 29.2188 15.9375 29.2188Z" }) }) }),
+      onAdd && /* @__PURE__ */ jsxRuntime.jsx(Button, { variant: "ghost", size: "sm", onClick: onAdd, title: "Start", style: addButtonStyle, children: "+" })
+    ] })
   ] });
 }
 var galleryScrollPosition = 0;
@@ -2096,7 +2164,8 @@ function Gallery({
   onSessionClick,
   onArchive,
   onRefresh,
-  onAdd
+  onAdd,
+  onSettings
 }) {
   const scrollRef = react.useRef(null);
   const [showTopMask, setShowTopMask] = react.useState(false);
@@ -2124,7 +2193,7 @@ function Gallery({
   }
   if (error && sessions.length === 0) {
     return /* @__PURE__ */ jsxRuntime.jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%" }, children: [
-      /* @__PURE__ */ jsxRuntime.jsx(GalleryHeader, { onAdd }),
+      /* @__PURE__ */ jsxRuntime.jsx(GalleryHeader, { onAdd, onSettings }),
       /* @__PURE__ */ jsxRuntime.jsxs("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: spacing.xxl }, children: [
         /* @__PURE__ */ jsxRuntime.jsx(ErrorDisplay, { error, variant: "inline" }),
         onRefresh && /* @__PURE__ */ jsxRuntime.jsx(Button, { variant: "primary", size: "md", onClick: onRefresh, style: { marginTop: spacing.md }, children: "Retry" })
@@ -2133,7 +2202,7 @@ function Gallery({
   }
   if (sessions.length === 0) {
     return /* @__PURE__ */ jsxRuntime.jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%" }, children: [
-      /* @__PURE__ */ jsxRuntime.jsx(GalleryHeader, { onAdd }),
+      /* @__PURE__ */ jsxRuntime.jsx(GalleryHeader, { onAdd, onSettings }),
       /* @__PURE__ */ jsxRuntime.jsxs("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: spacing.xxl }, children: [
         /* @__PURE__ */ jsxRuntime.jsx("p", { style: { marginBottom: spacing.md }, children: /* @__PURE__ */ jsxRuntime.jsxs("svg", { width: "48", height: "48", viewBox: "0 0 24 24", fill: "none", stroke: colors.text.primary, strokeWidth: "1.5", style: { opacity: 0.2 }, children: [
           /* @__PURE__ */ jsxRuntime.jsx("rect", { x: "2", y: "3", width: "20", height: "14", rx: "2", ry: "2" }),
@@ -2146,7 +2215,7 @@ function Gallery({
     ] });
   }
   return /* @__PURE__ */ jsxRuntime.jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%" }, children: [
-    /* @__PURE__ */ jsxRuntime.jsx(GalleryHeader, { onAdd }),
+    /* @__PURE__ */ jsxRuntime.jsx(GalleryHeader, { onAdd, onSettings }),
     /* @__PURE__ */ jsxRuntime.jsx(
       "div",
       {
@@ -2222,11 +2291,7 @@ ${body.slice(0, 500)}`);
       setStatus(data);
       if (data.status === "complete" && !videoUrl) {
         try {
-          let format = "mp4";
-          if (typeof navigator !== "undefined" && navigator.userAgent.toLowerCase().includes("linux") && !navigator.userAgent.toLowerCase().includes("android")) {
-            format = "webm";
-          }
-          const vRes = await fetch(`${apiBaseUrl}/api/sessions/${token}/video?format=${format}`);
+          const vRes = await fetch(`${apiBaseUrl}/api/sessions/${token}/video`);
           if (vRes.ok) {
             const v = await vRes.json();
             setVideoUrl(v.videoUrl);
@@ -2609,6 +2674,8 @@ function parseHash(hash) {
   const params = new URLSearchParams(queryStr ?? "");
   const token = params.get("token") ?? "";
   if (path === "add") return { page: "add" };
+  if (path === "settings") return { page: "settings" };
+  if (path === "tray") return { page: "tray" };
   if (path === "record" && token) return { page: "record", token };
   if (path === "session" && token) return { page: "session", token };
   return { page: "gallery" };
@@ -2619,6 +2686,10 @@ function routeToHash(route) {
       return "#/";
     case "add":
       return "#/add";
+    case "settings":
+      return "#/settings";
+    case "tray":
+      return "#/tray";
     case "record":
       return `#/record?token=${route.token}`;
     case "session":

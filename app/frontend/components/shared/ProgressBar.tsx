@@ -2,7 +2,10 @@ import { type CSSProperties, useEffect, useRef, useState } from 'react'
 
 type ProgressBarProps = {
   progress: number
+  secondaryProgress?: number
   className?: string
+  striped?: boolean
+  trackClassName?: string
   animateAcrossVisitsKey?: string
   visitStepIndex?: number
   visitTotalSteps?: number
@@ -106,7 +109,10 @@ function loadRememberedProgress(
 
 const ProgressBar = ({
   progress,
+  secondaryProgress,
   className = '',
+  striped = true,
+  trackClassName = '',
   animateAcrossVisitsKey,
   visitStepIndex,
   visitTotalSteps,
@@ -114,6 +120,7 @@ const ProgressBar = ({
   completionKey,
   onCompleteVisualsFinished,
 }: ProgressBarProps) => {
+  const clampedSecondaryProgress = secondaryProgress !== undefined ? clampProgress(secondaryProgress) : undefined
   const clampedProgress = clampProgress(progress)
   const [animatedProgress, setAnimatedProgress] = useState(() =>
     animateAcrossVisitsKey
@@ -234,20 +241,28 @@ const ProgressBar = ({
       `}</style>
 
       <div className="w-full max-w-4xl mx-auto relative">
-        <div className="h-8 bg-white rounded-full border-3 border-gray-950 border-b-[6px] overflow-hidden relative">
+        <div className={`h-8 bg-white rounded-full border-3 border-gray-950 border-b-[6px] overflow-hidden relative ${trackClassName}`}>
+          {clampedSecondaryProgress !== undefined && (
+            <div
+              className="absolute inset-y-0 left-0 transition-all duration-500 bg-light-blue"
+              style={{ width: `${clampedSecondaryProgress}%` }}
+            />
+          )}
           <div
             className={`h-full transition-all duration-500 relative rounded-full ${endColorActive ? 'bg-green' : 'bg-blue'}`}
             style={{ width: `${animatedProgress}%` }}
           >
-            <div
-              className="absolute inset-0 opacity-30 mix-blend-overlay"
-              style={{
-                backgroundImage:
-                  'repeating-linear-gradient(-45deg, transparent, transparent 15px, white 15px, white 30px)',
-                backgroundSize: '42.43px 42.43px',
-                animation: 'progress-stripe 1.5s linear infinite',
-              }}
-            />
+            {striped && (
+              <div
+                className="absolute inset-0 opacity-30 mix-blend-overlay"
+                style={{
+                  backgroundImage:
+                    'repeating-linear-gradient(-45deg, transparent, transparent 15px, white 15px, white 30px)',
+                  backgroundSize: '42.43px 42.43px',
+                  animation: 'progress-stripe 1.5s linear infinite',
+                }}
+              />
+            )}
           </div>
         </div>
 

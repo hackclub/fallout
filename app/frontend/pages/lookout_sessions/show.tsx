@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { router, Link } from '@inertiajs/react'
 import { LookoutProvider, useLookout, formatTime } from '@lookout/react'
 import type { LookoutCallbacks } from '@lookout/react'
+import * as Sentry from '@sentry/react'
 import Button from '@/components/shared/Button'
 import Input from '@/components/shared/Input'
 
@@ -596,4 +597,4 @@ function DesktopModeUI({
   )
 }
 
-export default LookoutSessionShow
+export default Sentry.withProfiler(LookoutSessionShow, { name: 'LookoutSessionShow' })

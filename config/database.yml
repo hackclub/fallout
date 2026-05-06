@@ -2,7 +2,7 @@
 default: &default
   adapter: postgresql
   encoding: unicode
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 20 } %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 30 } %>
 
 development:
   <<: *default

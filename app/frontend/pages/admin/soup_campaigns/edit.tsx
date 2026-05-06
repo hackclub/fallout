@@ -1,0 +1,2 @@
+import SoupCampaignCollaborativeEditor from './CollaborativeEditor'
+export default SoupCampaignCollaborativeEditor

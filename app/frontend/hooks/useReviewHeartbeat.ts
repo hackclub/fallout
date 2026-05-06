@@ -14,7 +14,7 @@ function csrfToken(): string {
  */
 export function useReviewHeartbeat(heartbeatPath: string) {
   const failCount = useRef(0)
-  const intervalRef = useRef<ReturnType<typeof setInterval>>()
+  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
   const beat = useCallback(async () => {
     try {

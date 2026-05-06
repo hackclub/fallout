@@ -4,18 +4,22 @@ import { twMerge } from 'tailwind-merge'
 const Frame = ({
   children,
   className,
+  innerClassName,
   showBorderOnMobile = false,
 }: {
   children: ReactNode
   className?: string
+  innerClassName?: string
   showBorderOnMobile?: boolean
 }) => {
   const bp = showBorderOnMobile ? 'block' : 'hidden md:block'
   const pad = showBorderOnMobile ? 'pl-4.25 pt-3.75 pr-6.25 pb-5.5' : 'md:pl-4.25 md:pt-3.75 md:pr-6.25 md:pb-5.5'
 
   return (
-    <div className={twMerge(`relative ${pad}`, className)}>
-      <div className="bg-light-brown h-full w-full p-4 md:p-3 flex flex-col">{children}</div>
+    <div className={twMerge(`relative ${pad} flex flex-col`, className)}>
+      <div className={twMerge('bg-light-brown flex-1 w-full min-h-0 min-w-0 p-4 md:p-3 flex flex-col overflow-hidden', innerClassName)}>
+        {children}
+      </div>
       <img
         className={`${bp} absolute top-0 left-0 w-22.5 h-20 pointer-events-none z-10`}
         src="/border/top_left.webp"

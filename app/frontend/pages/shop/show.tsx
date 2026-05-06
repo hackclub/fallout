@@ -1,7 +1,6 @@
 import { useRef } from 'react'
-import { Modal, ModalLink } from '@inertiaui/modal-react'
+import { Modal } from '@inertiaui/modal-react'
 import BookLayout from '@/components/shared/BookLayout'
-import Button from '@/components/shared/Button'
 
 type ShopItem = {
   id: number
@@ -11,11 +10,9 @@ type ShopItem = {
 
 export default function ShopShow({
   shop_item,
-  can,
   is_modal,
 }: {
   shop_item: ShopItem
-  can: { update: boolean; destroy: boolean }
   is_modal?: boolean
 }) {
   const modalRef = useRef<{ close: () => void }>(null)
@@ -27,25 +24,16 @@ export default function ShopShow({
 
         {shop_item.description && <p className="text-dark-brown mb-4">{shop_item.description}</p>}
 
-        <div className="flex gap-4 mt-auto pt-6 flex-wrap">
-          {is_modal && (
+        {is_modal && (
+          <div className="flex gap-4 mt-auto pt-6 flex-wrap">
             <button
               onClick={() => modalRef.current?.close()}
               className="xl:hidden py-2 px-6 text-sm border-2 font-bold uppercase cursor-pointer bg-transparent text-dark-brown border-dark-brown"
             >
               Back
             </button>
-          )}
-          {can.update && (
-            <ModalLink
-              href={`/shop/${shop_item.id}/edit`}
-              replace
-              className="bg-brown text-light-brown border-2 border-dark-brown px-6 py-2 font-bold uppercase hover:opacity-80 flex items-center justify-center text-sm"
-            >
-              Edit
-            </ModalLink>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

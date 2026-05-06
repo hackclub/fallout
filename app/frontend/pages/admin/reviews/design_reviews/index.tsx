@@ -9,6 +9,13 @@ import type { ReviewRow, PagyProps } from '@/types'
 
 const BASE_PATH = '/admin/reviews/design_reviews'
 
+const reqCheckColumn = {
+  accessorKey: 'requirements_check_reviewer_display_name',
+  header: 'Req. Check By',
+  cell: ({ row }: { row: { original: ReviewRow } }) =>
+    row.original.requirements_check_reviewer_display_name ?? <span className="text-muted-foreground">—</span>,
+}
+
 export default function DesignReviewsIndex({
   pending_reviews,
   all_reviews,
@@ -41,12 +48,21 @@ export default function DesignReviewsIndex({
             </Button>
           )}
         </div>
-        <DataTable columns={buildPendingColumns(BASE_PATH)} data={pending_reviews} noun="pending reviews" />
+        <DataTable
+          columns={buildPendingColumns(BASE_PATH, undefined, [reqCheckColumn])}
+          data={pending_reviews}
+          noun="pending reviews"
+        />
       </div>
 
       <div>
         <h2 className="text-lg font-semibold tracking-tight mb-3">All Design Reviews</h2>
-        <DataTable columns={buildAllColumns(isAdmin, BASE_PATH)} data={all_reviews} pagy={pagy} noun="reviews" />
+        <DataTable
+          columns={buildAllColumns(isAdmin, BASE_PATH, [reqCheckColumn])}
+          data={all_reviews}
+          pagy={pagy}
+          noun="reviews"
+        />
       </div>
     </div>
   )

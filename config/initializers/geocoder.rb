@@ -1,3 +1,5 @@
+require Rails.root.join("lib/geocoder/lookup/hack_club")
+
 if defined?(Geocoder::Request::GEOCODER_CANDIDATE_HEADERS)
   Geocoder::Request::GEOCODER_CANDIDATE_HEADERS.unshift(
     "HTTP_CF_CONNECTING_IP",

@@ -20,6 +20,13 @@ module ShipChecks
         )
       end
 
+      if ctx.github_rate_limited?
+        return ShipCheckService::CheckResult.new(
+          key: "repo_is_public", label: DEFINITION[:label],
+          status: :warn, message: "GitHub rate limit reached — please try again in a moment", visibility: :user
+        )
+      end
+
       passed = ctx.repo_meta.present?
       ShipCheckService::CheckResult.new(
         key: "repo_is_public",

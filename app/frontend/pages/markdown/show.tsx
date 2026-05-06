@@ -2,6 +2,8 @@ import { type ReactNode, useEffect, useRef } from 'react'
 import { Head } from '@inertiajs/react'
 import { router } from '@inertiajs/react'
 import MarkdownLayout from '@/layouts/MarkdownLayout'
+import DocVideo from '@/components/docs/DocVideo'
+import { createRoot } from 'react-dom/client'
 
 function MarkdownShow({ content_html, page_title }: { content_html: string; page_title: string }) {
   const contentRef = useRef<HTMLDivElement>(null)
@@ -10,6 +12,7 @@ function MarkdownShow({ content_html, page_title }: { content_html: string; page
     const container = contentRef.current
     if (!container) return
 
+    // Inertia-navigate internal doc links
     const links = container.querySelectorAll('a')
     const controllers: AbortController[] = []
 
@@ -32,7 +35,23 @@ function MarkdownShow({ content_html, page_title }: { content_html: string; page
       controllers.push(controller)
     })
 
-    return () => controllers.forEach((c) => c.abort())
+    // Mount DocVideo into each <video> placeholder. Uses createRoot because
+    // dangerouslySetInnerHTML content is outside React's tree — portals don't work.
+    const roots: ReturnType<typeof createRoot>[] = []
+    container.querySelectorAll<HTMLVideoElement>('video').forEach((video) => {
+      const src = video.dataset.src || video.getAttribute('src') || ''
+      if (!src) return
+      const wrapper = document.createElement('div')
+      video.replaceWith(wrapper)
+      const root = createRoot(wrapper)
+      root.render(<DocVideo src={src} />)
+      roots.push(root)
+    })
+
+    return () => {
+      controllers.forEach((c) => c.abort())
+      roots.forEach((r) => r.unmount())
+    }
   }, [content_html])
 
   return (

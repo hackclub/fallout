@@ -25,6 +25,7 @@ steps:
       - 'Slack'
       - 'Email'
       - 'School'
+      - 'FIRST Robotics'
       - 'Other'
 
   - key: experience
@@ -35,4 +36,3 @@ steps:
       - "I've made guided projects!"
       - "I've made projects beyond guides!"
       - 'I live and breathe hardware'
-      

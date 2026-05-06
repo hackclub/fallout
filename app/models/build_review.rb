@@ -30,4 +30,16 @@
 #
 class BuildReview < ApplicationRecord
   include Reviewable
+
+  def self.review_id_prefix
+    "BR"
+  end
+
+  def self.extra_review_field_mappings
+    {
+      "Internal Reason" => :internal_reason,
+      "Hours Adjustment" => :hours_adjustment,
+      "Koi Adjustment" => :koi_adjustment
+    }
+  end
 end

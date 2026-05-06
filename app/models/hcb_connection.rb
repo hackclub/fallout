@@ -25,7 +25,9 @@ class HcbConnection < ApplicationRecord
   encrypts :access_token
   encrypts :refresh_token
 
-  has_paper_trail
+  # Skip tokens in audit log — even encrypted, there's no reason to version them and
+  # the ciphertext bloats the versions table.
+  has_paper_trail skip: [ :access_token, :refresh_token ]
 
   belongs_to :connected_by, class_name: "User"
 

@@ -52,6 +52,67 @@ module Reviewable
   end
 
   class_methods do
+    # All four review types sync to a single unified Airtable table — rows are
+    # disambiguated by a prefixed "Review ID" (TA12, RC12, DR12, BR12). Each
+    # review subclass must define `review_id_prefix`; type-specific columns are
+    # contributed via `extra_review_field_mappings`.
+    AIRTABLE_REVIEWS_TABLE_ID = "tblH5ENbMHrWR6hyd"
+    AIRTABLE_REVIEWS_SYNC_ID = "J3D2bzea"
+
+    def airtable_sync_table_id
+      AIRTABLE_REVIEWS_TABLE_ID
+    end
+
+    def airtable_sync_sync_id
+      AIRTABLE_REVIEWS_SYNC_ID
+    end
+
+    def airtable_should_batch
+      true
+    end
+
+    def airtable_batch_size
+      2000
+    end
+
+    def airtable_sync_preload(records)
+      ship_ids = records.map(&:ship_id).compact.uniq
+      # user_id lives on projects, not ships — join and use Arel.sql for the
+      # qualified column (bare strings in pluck go through attribute-name
+      # resolution in Rails 8.1).
+      ships_by_id = Ship.where(id: ship_ids).joins(:project)
+                        .pluck(:id, :project_id, Arel.sql("projects.user_id"))
+                        .to_h { |id, pid, uid| [ id, [ pid, uid ] ] }
+      { ships: ships_by_id }
+    end
+
+    def airtable_sync_field_mappings
+      base_review_field_mappings.merge(extra_review_field_mappings)
+    end
+
+    def review_id_prefix
+      raise NotImplementedError, "#{name} must define review_id_prefix"
+    end
+
+    def extra_review_field_mappings
+      {}
+    end
+
+    def base_review_field_mappings
+      {
+        "Review ID" => ->(r) { "#{r.class.review_id_prefix}#{r.id}" },
+        "Review Type" => ->(r) { r.class.name },
+        "Ship ID" => :ship_id,
+        "Project ID" => ->(r, pre) { pre[:ships][r.ship_id]&.first },
+        "User ID" => ->(r, pre) { pre[:ships][r.ship_id]&.last },
+        "Reviewer ID" => :reviewer_id,
+        "Status" => ->(r) { r.status },
+        "Feedback" => :feedback,
+        "Created At" => ->(r) { r.created_at&.iso8601 },
+        "Updated At" => ->(r) { r.updated_at&.iso8601 }
+      }
+    end
+
     # Atomic claim: single UPDATE with WHERE guard prevents race conditions.
     # Returns true if the claim was acquired, false if someone else holds it.
     def atomic_claim!(review_id, user)

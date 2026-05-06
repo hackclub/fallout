@@ -81,7 +81,7 @@ export default function AdminShopOrdersIndex({
     <div>
       <h1 className="text-2xl font-semibold tracking-tight mb-4">Shop Orders</h1>
 
-      <div className="flex gap-1.5 mb-4">
+      <div className="flex flex-wrap gap-1.5 mb-4">
         {STATES.map((s) => (
           <Button
             key={s}

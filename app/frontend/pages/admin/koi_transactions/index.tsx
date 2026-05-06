@@ -10,7 +10,7 @@ import type { PagyProps } from '@/types'
 type Transaction = {
   id: number
   user: { id: number; display_name: string }
-  actor: { id: number; display_name: string }
+  actor: { id: number; display_name: string } | null
   amount: number
   reason: string
   description: string
@@ -37,7 +37,7 @@ const columns: ColumnDef<Transaction>[] = [
   {
     accessorKey: 'actor',
     header: 'By',
-    cell: ({ row }) => row.original.actor.display_name,
+    cell: ({ row }) => row.original.actor?.display_name ?? 'System',
   },
   { accessorKey: 'created_at', header: 'Date' },
 ]

@@ -6,12 +6,12 @@ set -euo pipefail
 # Builds each package after downloading since dist/ is not committed to the repo.
 #
 # Usage:
-#   bin/update-lookout          # install pinned version (v0.0.25)
-#   bin/update-lookout v0.0.26  # install specific version tag
+#   bin/update-lookout          # install pinned version (v0.2.0)
+#   bin/update-lookout v0.2.1   # install specific version tag
 #   bin/update-lookout main     # install from branch (for development)
 
 REPO="hackclub/lookout"
-PINNED_VERSION="main"
+PINNED_VERSION="v0.2.0"
 REF="${1:-$PINNED_VERSION}"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGES_DIR="$ROOT_DIR/packages"

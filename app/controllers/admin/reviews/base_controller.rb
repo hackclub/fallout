@@ -142,6 +142,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
 
   def serialize_review_row(review, flagged_project_ids: Set.new)
     ship = review.ship
+    sibling = review.is_a?(TimeAuditReview) ? ship.requirements_check_review : ship.time_audit_review
     {
       id: review.id,
       ship_id: ship.id,
@@ -152,7 +153,9 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       reviewer_display_name: review.reviewer&.display_name,
       created_at: review.created_at.strftime("%b %d, %Y"),
       is_claimed: review.claimed?,
-      claimed_by_display_name: review.claimed? ? review.reviewer&.display_name : nil
+      claimed_by_display_name: review.claimed? ? review.reviewer&.display_name : nil,
+      sibling_approved: sibling&.approved? || false,
+      requirements_check_reviewer_display_name: review.is_a?(DesignReview) ? ship.requirements_check_review&.reviewer&.display_name : nil
     }
   end
 
@@ -173,6 +176,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       user_id: project.user_id,
       user_display_name: project.user.display_name,
       user_avatar: project.user.avatar,
+      user_slack_id: project.user.slack_id, # Admin-only context; review pages are staff-only
       logged_hours: logged,
       approved_public_hours: public_hrs,
       approved_internal_hours: internal_hrs,
@@ -203,10 +207,12 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       rec_data = recording_annotations[rec_id] || {}
       duration = recording_duration(r)
       segments = rec_data["segments"] || []
+      # YouTube stretch_multiplier lets reviewers treat a YT video as a timelapse (e.g. ×60)
+      multiplier = r.recordable.is_a?(YouTubeVideo) ? (rec_data["stretch_multiplier"]&.to_f || 1.0) : 60.0
 
       removed_seconds = segments.sum do |seg|
         video_range = seg["end_seconds"].to_f - seg["start_seconds"].to_f
-        real_range = video_range * 60
+        real_range = video_range * multiplier
         case seg["type"]
         when "removed" then real_range
         when "deflated" then real_range * (seg["deflated_percent"].to_f / 100)
@@ -243,7 +249,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   def recording_duration(recording)
     case recording.recordable
     when LookoutTimelapse, LapseTimelapse then recording.recordable.duration.to_i
-    when YouTubeVideo then recording.recordable.duration_seconds.to_i
+    when YouTubeVideo then recording.recordable.duration_seconds.to_i * (recording.recordable.stretch_multiplier || 1)
     else 0
     end
   end
@@ -256,4 +262,20 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     return nil if base.zero? && dr_adj.zero? && br_adj.zero?
     (total / 3600.0).round(1)
   end
+
+  # Resolves a verified checkpoint message URL for the project owner.
+  # If a permalink is provided, it verifies it mentions the user. Otherwise,
+  # it searches the channel history automatically.
+  # Returns [url_or_nil, failure_reason_or_nil] where failure_reason is
+  # :not_found or :wrong_mention so callers can surface the right error.
+  def resolve_checkpoint_message(slack_id, provided_permalink)
+    if provided_permalink.present?
+      result = SlackCheckpointService.verify_permalink(provided_permalink, slack_id)
+      result == :ok ? [ provided_permalink, nil ] : [ nil, result ]
+    else
+      url = SlackCheckpointService.find_checkpoint_message(slack_id)
+      [ url, url ? nil : :not_found ]
+    end
+  end
+
 end

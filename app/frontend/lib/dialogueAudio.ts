@@ -44,28 +44,41 @@ const urlBuffers = new Map<string, AudioBuffer>()
 const activeSources = new Set<AudioBufferSourceNode>()
 let preloadPromise: Promise<void> | null = null
 
-function getContext(): AudioContext {
-  if (!audioContext) audioContext = new AudioContext()
-  return audioContext
+function getContext(): AudioContext | null {
+  try {
+    if (!audioContext) audioContext = new AudioContext()
+    return audioContext
+  } catch {
+    return null
+  }
 }
 
 async function decodeFile(ctx: AudioContext, name: string): Promise<void> {
-  const response = await fetch(`${AUDIO_BASE}/${name}.wav`)
-  const arrayBuffer = await response.arrayBuffer()
-  const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
-  buffers.set(name, audioBuffer)
+  try {
+    const response = await fetch(`${AUDIO_BASE}/${name}.wav`)
+    const arrayBuffer = await response.arrayBuffer()
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+    buffers.set(name, audioBuffer)
+  } catch {
+    // Audio not supported or fetch failed — silently skip
+  }
 }
 
 export function preload(): Promise<void> {
   if (preloadPromise) return preloadPromise
   const ctx = getContext()
+  if (!ctx) {
+    preloadPromise = Promise.resolve()
+    return preloadPromise
+  }
   preloadPromise = Promise.all(LETTER_FILES.map((name) => decodeFile(ctx, name))).then(() => {})
   return preloadPromise
 }
 
 function playBuffer(buffer: AudioBuffer, detuneCents: number, volume: number, onEnded?: () => void): void {
   const ctx = getContext()
-  if (ctx.state === 'suspended') ctx.resume()
+  if (!ctx) return
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
 
   const source = ctx.createBufferSource()
   const gainNode = ctx.createGain()
@@ -123,14 +136,19 @@ export async function playUrl(
   volume: number = URL_VOLUME,
 ): Promise<void> {
   const ctx = getContext()
-  if (ctx.state === 'suspended') ctx.resume()
+  if (!ctx) return
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
 
   let buffer = urlBuffers.get(url)
   if (!buffer) {
-    const res = await fetch(url)
-    const ab = await res.arrayBuffer()
-    buffer = await ctx.decodeAudioData(ab)
-    urlBuffers.set(url, buffer)
+    try {
+      const res = await fetch(url)
+      const ab = await res.arrayBuffer()
+      buffer = await ctx.decodeAudioData(ab)
+      urlBuffers.set(url, buffer)
+    } catch {
+      return
+    }
   }
 
   playBuffer(buffer, detuneCents, volume, onEnded)

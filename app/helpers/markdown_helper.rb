@@ -10,6 +10,7 @@ module MarkdownHelper
     cdn.hackclub.com
     github.com
     raw.githubusercontent.com
+    blueprint.hackclub.com
   ].freeze
 
   # Tags permitted in sanitized user-generated HTML
@@ -44,6 +45,10 @@ module MarkdownHelper
 
     def link(href, title, content)
       href = href.to_s
+      # Whitelist allowed protocols — anything else (javascript:, data:, vbscript:, etc.)
+      # renders as inert text so autolinked malicious URLs can't reach the DOM as <a>.
+      return ERB::Util.html_escape(content) unless safe_href?(href)
+
       attrs = []
       attrs << %(href="#{ERB::Util.html_escape(href)}")
       attrs << %(title="#{ERB::Util.html_escape(title)}") if title
@@ -54,6 +59,12 @@ module MarkdownHelper
       end
 
       "<a #{attrs.join(' ')}>#{content}</a>"
+    end
+
+    def safe_href?(href)
+      href.start_with?("#", "/", "./", "../") ||
+        href.match?(/\Ahttps?:\/\//i) ||
+        href.match?(/\Amailto:/i)
     end
 
     def guide_internal_link?(href)
@@ -142,9 +153,19 @@ module MarkdownHelper
     end
 
     doc.css("a[href]").each do |a|
+      href = a["href"].to_s
+
+      # Strip links whose protocol isn't on the whitelist (javascript:, data:, etc.).
+      # Replace the element with its inner text so the payload shows as plain characters.
+      unless href.start_with?("#", "/", "./", "../") ||
+             href.match?(/\Ahttps?:\/\//i) ||
+             href.match?(/\Amailto:/i)
+        a.replace(Nokogiri::XML::Text.new(a.inner_text, doc))
+        next
+      end
+
       a["rel"] = "nofollow noopener"
 
-      href = a["href"].to_s
       if external_link?(href)
         a["target"] = a["target"].presence || "_blank"
       end
@@ -260,10 +281,24 @@ module MarkdownHelper
     raw = File.read(path)
     cleaned = strip_front_matter_table(raw)
 
-    return render_markdown(cleaned, base_url: base_url) if Rails.env.development?
+    html = if Rails.env.development?
+      render_markdown(cleaned, base_url: base_url)
+    else
+      key = [ "guide_md_html", path.to_s, File.mtime(path).to_i, base_url ]
+      Rails.cache.fetch(key) { render_markdown(cleaned, base_url: base_url) }
+    end
 
-    key = [ "guide_md_html", path.to_s, File.mtime(path).to_i, base_url ]
-    Rails.cache.fetch(key) { render_markdown(cleaned, base_url: base_url) }
+    # Move src to data-src on <video> tags so the browser never fetches video
+    # files on parse — React portals them lazily once near the viewport instead.
+    # Add loading="lazy" to <img> tags so the browser defers off-screen image fetches.
+    html
+      .gsub(/<video([^>]*)\ssrc="([^"]*)"([^>]*)>/i) do
+        "<video#{Regexp.last_match(1)} data-src=\"#{Regexp.last_match(2)}\"#{Regexp.last_match(3)}>"
+      end
+      .gsub(/<img(?![^>]*loading=)/i) do |match|
+        match + ' loading="lazy"'
+      end
+      .html_safe
   end
 
   def docs_metadata(base:, url_prefix:, default_index_title: "")
@@ -316,6 +351,16 @@ module MarkdownHelper
   def docs_section_metadata
     base = Rails.root.join("docs")
     docs_metadata(base: base, url_prefix: "/docs", default_index_title: "Docs")
+  end
+
+  def docs_search_index
+    base = Rails.root.join("docs")
+    paths = Dir.glob(base.join("**/*.{md,mdx}").to_s)
+    return build_docs_search_index(paths) if Rails.env.development?
+
+    stats = paths.map { |p| [ p, File.mtime(p).to_i ] }.sort_by(&:first)
+    stats_digest = Digest::SHA256.hexdigest(stats.flatten.join("|"))
+    Rails.cache.fetch([ "docs_search_index", stats_digest ]) { build_docs_search_index(paths) }
   end
 
   def docs_menu_items
@@ -389,8 +434,37 @@ module MarkdownHelper
 
   private
 
-  def load_section_metadata(section_key)
-    path = Rails.root.join("docs", section_key, "metadata.yml")
+  def build_docs_search_index(paths)
+    base = Rails.root.join("docs")
+    paths.filter_map do |p|
+      meta = parse_guide_metadata(p)
+      next if meta[:unlisted]
+
+      rel = Pathname.new(p).relative_path_from(base).to_s
+      slug = rel.sub(/\.mdx?\z/, "")
+      slug = File.dirname(slug) if File.basename(slug) == "index"
+      slug = "" if slug == "."
+      path = slug.blank? ? "/docs" : "/docs/#{slug}"
+
+      raw = File.read(p)
+      body = strip_front_matter_table(raw)
+      # Strip markdown syntax to plain text for search
+      excerpt = body
+        .gsub(/^#+\s+/, "")         # headings
+        .gsub(/\[([^\]]+)\]\([^)]+\)/, '\1') # links
+        .gsub(/[*_`~]/, "")         # emphasis/code/strike
+        .gsub(/\s+/, " ")
+        .strip
+        .slice(0, 500)
+
+      title = meta[:title].presence || (slug.blank? ? "Docs" : slug.tr("-_/", " ").split.map(&:capitalize).join(" "))
+      { title: title, path: path, excerpt: excerpt }
+    rescue Errno::ENOENT
+      nil
+    end
+  end
+
+  def load_section_metadata(section_key)    path = Rails.root.join("docs", section_key, "metadata.yml")
     return { title: nil, priority: nil } unless File.exist?(path)
 
     data = YAML.safe_load(File.read(path)) || {}
@@ -400,6 +474,9 @@ module MarkdownHelper
   end
 
   def external_link?(href)
+    # Protocol-relative URLs (//host/path) resolve cross-origin in the browser; treat them as
+    # external so allowed_image_host? gates them and they don't slip past the host allowlist.
+    return true if href.start_with?("//")
     return false if href.start_with?("#", "/", "./", "../")
     return false unless href =~ /\Ahttps?:\/\//i
 

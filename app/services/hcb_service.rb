@@ -66,11 +66,29 @@ module HcbService
     response.body
   end
 
+  # Writes to HCB mutate real money state, so they are gated off by default in non-prod.
+  # Set HCB_ALLOW_WRITES=true (or 1/yes/t/y) to opt in for a given non-prod environment.
+  def writes_allowed?
+    Rails.env.production? || ActiveModel::Type::Boolean.new.cast(ENV["HCB_ALLOW_WRITES"])
+  end
+
+  # Returns `stub` and logs a warning if writes are disabled in the current env;
+  # returns nil (falsey) if writes are allowed, meaning callers should proceed.
+  def noop_write(op, stub)
+    return nil if writes_allowed?
+
+    Rails.logger.warn(
+      "[HcbService] NOOP (#{op}) in #{Rails.env} — set HCB_ALLOW_WRITES=true to enable real HCB writes"
+    )
+    stub
+  end
+
   # === Card Grant API Methods ===
 
   def list_card_grants
     authenticated_connection.get(
-      "/api/v4/organizations/#{ORGANIZATION_ID}/card_grants"
+      "/api/v4/organizations/#{ORGANIZATION_ID}/card_grants",
+      { expand: "balance_cents" }
     ).body
   end
 
@@ -82,6 +100,15 @@ module HcbService
   end
 
   def create_card_grant(params)
+    stub = noop_write(:create_card_grant, {
+      id: "stub_cg_#{SecureRandom.hex(6)}",
+      email: params[:email],
+      card_id: nil,
+      expires_on: params[:expiration_at],
+      status: "active"
+    })
+    return stub if stub
+
     authenticated_connection.post(
       "/api/v4/organizations/#{ORGANIZATION_ID}/card_grants"
     ) do |req|
@@ -91,12 +118,18 @@ module HcbService
   end
 
   def cancel_card_grant(card_grant_id)
+    stub = noop_write(:cancel_card_grant, { id: card_grant_id, status: "canceled" })
+    return stub if stub
+
     authenticated_connection.post(
       "/api/v4/card_grants/#{card_grant_id}/cancel"
     ).body
   end
 
   def topup_card_grant(card_grant_id, amount_cents:)
+    stub = noop_write(:topup_card_grant, { id: card_grant_id, amount_cents: amount_cents })
+    return stub if stub
+
     authenticated_connection.post(
       "/api/v4/card_grants/#{card_grant_id}/topup"
     ) do |req|
@@ -106,6 +139,9 @@ module HcbService
   end
 
   def withdraw_card_grant(card_grant_id, amount_cents:)
+    stub = noop_write(:withdraw_card_grant, { id: card_grant_id, amount_cents: amount_cents })
+    return stub if stub
+
     authenticated_connection.post(
       "/api/v4/card_grants/#{card_grant_id}/withdraw"
     ) do |req|
@@ -115,6 +151,9 @@ module HcbService
   end
 
   def activate_card_grant(card_grant_id)
+    stub = noop_write(:activate_card_grant, { id: card_grant_id, status: "active" })
+    return stub if stub
+
     authenticated_connection.post(
       "/api/v4/card_grants/#{card_grant_id}/activate"
     ).body

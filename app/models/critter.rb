@@ -41,6 +41,11 @@ class Critter < ApplicationRecord
   ALL_VARIANTS = (VARIANTS + SHINY_VARIANTS).freeze
   SHINY_CHANCE = 0.05
 
+  include Broadcastable
+
+  # Live-update the critter owner's path page (critter_variants array) on any change.
+  broadcasts_updates_to { "path_user_#{user_id}" }
+
   belongs_to :user
   belongs_to :journal_entry
 

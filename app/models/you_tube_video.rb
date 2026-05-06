@@ -15,6 +15,7 @@
 #  last_refreshed_at      :datetime
 #  live_broadcast_content :string
 #  published_at           :datetime
+#  stretch_multiplier     :integer          default(1), not null
 #  tags                   :text
 #  thumbnail_url          :string
 #  title                  :string
@@ -48,7 +49,7 @@ class YouTubeVideo < ApplicationRecord
 
   def refetch_data!
     attrs = YouTubeService.fetch_video_data(video_id)
-    raise ActiveRecord::RecordNotFound, "YouTube video #{video_id} not found" unless attrs
+    raise YouTubeService::Error, "YouTube video #{video_id} not found" unless attrs
 
     update!(attrs.except(:video_id).merge(last_refreshed_at: Time.current))
   end

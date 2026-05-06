@@ -13,6 +13,7 @@
 #  pending           :boolean          default(FALSE), not null
 #  reversed          :boolean          default(FALSE), not null
 #  transaction_date  :datetime         not null
+#  transaction_type  :string
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  hcb_grant_card_id :bigint           not null
@@ -23,6 +24,7 @@
 #  index_hcb_transactions_on_card_and_date      (hcb_grant_card_id,transaction_date)
 #  index_hcb_transactions_on_hcb_grant_card_id  (hcb_grant_card_id)
 #  index_hcb_transactions_on_hcb_id             (hcb_id) UNIQUE
+#  index_hcb_transactions_on_transaction_type   (transaction_type)
 #
 # Foreign Keys
 #
@@ -44,6 +46,9 @@ class HcbTransaction < ApplicationRecord
   scope :declined, -> { where(declined: true) }
   scope :reversed, -> { where(reversed: true) }
   scope :recent, -> { order(transaction_date: :desc) }
+  # Only real card spend. Excludes org↔card ledger movement (topups, withdrawals,
+  # initial grant issuance) which are internal bookkeeping, not user-visible activity.
+  scope :purchases, -> { where(transaction_type: "purchase") }
 
   def settled?
     !pending && !declined && !reversed

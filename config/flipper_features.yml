@@ -1,0 +1,5 @@
+shared:
+  shop: Koi shop where users can spend koi on items and experiences
+  collaborators: Allow users to add collaborators to their projects
+  grant_fulfillment: User-facing project-funding requests and the admin approval/HCB topup flow
+

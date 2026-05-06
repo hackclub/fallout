@@ -88,5 +88,7 @@ Rails.application.configure do
     Bullet.rails_logger = true
     # Enables X-bullet-console-text header on XHR responses for the frontend interceptor in inertia.ts
     Bullet.console = true
+    # ActiveStorage always loads blobs through attachments internally; Bullet can't track url_for access
+    Bullet.add_safelist type: :unused_eager_loading, class_name: "ActiveStorage::Attachment", association: :blob
   end
 end

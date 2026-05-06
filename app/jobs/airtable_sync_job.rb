@@ -1,7 +1,7 @@
 class AirtableSyncJob < ApplicationJob
   queue_as :background
 
-  CLASSES_TO_SYNC = %w[User Project ShopOrder].freeze
+  CLASSES_TO_SYNC = %w[User Project ShopOrder Ship TimeAuditReview RequirementsCheckReview DesignReview BuildReview].freeze
 
   def perform
     return unless ENV["AIRTABLE_API_KEY"].present?

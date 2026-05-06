@@ -7,3 +7,8 @@ declare module '@inertiajs/core' {
     errorValueType: string[]
   }
 }
+
+declare global {
+  // Injected by vite.config.ts via `define` — git SHA or null when unavailable
+  const __SENTRY_RELEASE__: string | null
+}

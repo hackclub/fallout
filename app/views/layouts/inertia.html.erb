@@ -3,6 +3,21 @@
   <head>
     <title><%= content_for(:title) || "Fallout" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <% if defined?(@unfurl_meta) && @unfurl_meta.present? %>
+      <meta property="og:type" content="website">
+      <meta property="og:title" content="<%= @unfurl_meta[:title] %>">
+      <meta property="og:description" content="<%= @unfurl_meta[:description] %>">
+      <meta property="og:url" content="<%= @unfurl_meta[:url] %>">
+      <% if @unfurl_meta[:image].present? %>
+        <meta property="og:image" content="<%= @unfurl_meta[:image] %>">
+      <% end %>
+      <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="<%= @unfurl_meta[:title] %>">
+      <meta name="twitter:description" content="<%= @unfurl_meta[:description] %>">
+      <% if @unfurl_meta[:image].present? %>
+        <meta name="twitter:image" content="<%= @unfurl_meta[:image] %>">
+      <% end %>
+    <% end %>
     <meta name="darkreader-lock">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -29,5 +44,11 @@
 
   <body>
     <%= yield %>
+    <% if current_user&.admin? || Rails.env.development? %>
+      <div id="db-query-badge" title="Click to expand">
+        <span class="short"><%= AdminPerfStats.compose %></span>
+        <span class="long"><%= AdminPerfStats.compose_long %></span>
+      </div>
+    <% end %>
   </body>
 </html>

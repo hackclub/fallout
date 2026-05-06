@@ -16,6 +16,7 @@ type CtxValue = {
   gap: number
   trackScroll: boolean
   alwaysShow: boolean
+  disabled: boolean
   snapWhenOffscreen: (() => { x: number; y: number }) | false
   onSnapClick?: () => void
 }
@@ -46,6 +47,7 @@ export function Tooltip({
   gap = DEFAULT_GAP,
   trackScroll = false,
   alwaysShow = false,
+  disabled = false,
   snapWhenOffscreen = false,
   onSnapClick,
 }: {
@@ -55,12 +57,13 @@ export function Tooltip({
   gap?: number
   trackScroll?: boolean
   alwaysShow?: boolean
+  disabled?: boolean
   snapWhenOffscreen?: (() => { x: number; y: number }) | false
   onSnapClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLElement>(null)
-  const effectiveOpen = alwaysShow || open
+  const effectiveOpen = !disabled && (alwaysShow || open)
   return (
     <Ctx.Provider
       value={{
@@ -72,6 +75,7 @@ export function Tooltip({
         gap,
         trackScroll,
         alwaysShow,
+        disabled,
         snapWhenOffscreen,
         onSnapClick,
       }}
@@ -82,16 +86,17 @@ export function Tooltip({
 }
 
 export function TooltipTrigger({ children, asChild }: { children: ReactNode; asChild?: boolean }) {
-  const { setOpen, triggerRef, alwaysShow } = useCtx()
+  const { setOpen, triggerRef, alwaysShow, disabled } = useCtx()
 
-  const handlers = alwaysShow
-    ? {}
-    : {
-        onMouseEnter: () => setOpen(true),
-        onMouseLeave: () => setOpen(false),
-        onFocus: () => setOpen(true),
-        onBlur: () => setOpen(false),
-      }
+  const handlers =
+    alwaysShow || disabled
+      ? {}
+      : {
+          onMouseEnter: () => setOpen(true),
+          onMouseLeave: () => setOpen(false),
+          onFocus: () => setOpen(true),
+          onBlur: () => setOpen(false),
+        }
 
   if (asChild && React.isValidElement(children)) {
     return React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {

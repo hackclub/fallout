@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { router } from '@inertiajs/react'
-import { Modal } from '@inertiaui/modal-react'
+import { Modal, useModal } from '@inertiaui/modal-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Frame from '@/components/shared/Frame'
@@ -13,8 +13,19 @@ type PageProps = {
 }
 
 function MailShow({ mail, is_modal }: PageProps) {
+  const modal = useModal()
+
   function handleDismiss() {
-    router.post(`/mails/${mail.id}/dismiss`, {}, { preserveScroll: true })
+    router.post(
+      `/mails/${mail.id}/dismiss`,
+      {},
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          if (is_modal) modal.close()
+        },
+      },
+    )
   }
 
   const content = (
@@ -26,7 +37,7 @@ function MailShow({ mail, is_modal }: PageProps) {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-4">
         {mail.content && (
-          <div className="prose prose-sm max-w-none text-dark-brown mb-6">
+          <div className="prose prose-sm max-w-none text-dark-brown mb-6 [&_img]:max-w-48 [&_hr]:border-light-brown [&_p]:my-1">
             <Markdown remarkPlugins={[remarkGfm]}>{mail.content}</Markdown>
           </div>
         )}
@@ -39,13 +50,19 @@ function MailShow({ mail, is_modal }: PageProps) {
             href={mail.action_url}
             className="py-1.5 px-4 border-2 font-bold uppercase bg-dark-brown text-light-brown border-dark-brown cursor-pointer hover:opacity-80"
           >
-            View
+            {mail.action_label ?? 'View'}
           </a>
         )}
-        {mail.dismissable && (
+        {mail.dismissable ? (
           <Button onClick={handleDismiss} className="bg-light-brown text-dark-brown">
             Dismiss
           </Button>
+        ) : (
+          is_modal && (
+            <Button onClick={() => modal.close()} className="bg-light-brown text-dark-brown">
+              Close
+            </Button>
+          )
         )}
       </div>
     </div>

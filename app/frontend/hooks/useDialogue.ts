@@ -31,7 +31,7 @@ export default function useDialogue(
   const [displayedText, setDisplayedText] = useState('')
   const [isComplete, setIsComplete] = useState(false)
   const indexRef = useRef(0)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
 

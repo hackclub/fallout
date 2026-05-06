@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import { Link, router, usePage } from '@inertiajs/react'
 import type { SharedProps } from '@/types'
@@ -9,21 +9,28 @@ import PathNode from '@/components/path/PathNode'
 import SignUpCta from '@/components/path/SignUpCta'
 import BgmPlayer from '@/components/path/BgmPlayer'
 import Header from '@/components/path/Header'
+import AnnouncementsBar from '@/components/announcements/AnnouncementsBar'
 import FlashMessages from '@/components/FlashMessages'
 import { notify } from '@/lib/notifications'
+import { useLiveReload } from '@/lib/useLiveReload'
 import { consumePathEntryTransition } from '@/lib/pathTransition'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
+import PathDialogOverlay from '@/components/path/PathDialogOverlay'
+import type { DialogScript } from '@/components/path/PathDialogOverlay'
 
 type PageProps = {
   user: {
+    id: number
     display_name: string
-    email: string
     koi: number
+    gold: number
     avatar: string
   }
   has_projects: boolean
   journal_entry_count: number
   critter_variants: (string | null)[]
+  pending_dialog: string | null
+  mail_intro_id: number | null
 }
 
 const PATH_ENTRY_HUD_DELAY_MS = 420
@@ -111,17 +118,100 @@ export default function PathIndex() {
     has_projects,
     journal_entry_count,
     critter_variants,
+    pending_dialog,
+    mail_intro_id,
     has_unread_mail,
     features,
     auth: { user: authUser },
     sign_in_path,
   } = usePage<PageProps & SharedProps>().props
+  // Refresh path progression props when journal entries, critters, projects, or collaborations
+  // change in another tab/client for this user. Path is a top-level page (no modal ancestor), so
+  // useLiveReload falls through to router.reload({ only }), which re-hydrates these props in place.
+  useLiveReload({
+    stream: `path_user_${user.id}`,
+    only: ['user', 'has_projects', 'journal_entry_count', 'critter_variants', 'pending_dialog'],
+  })
+
   const [notPressed] = useState<boolean>(true)
   const [loggedIn] = useState(false)
+  const [activeDialog, setActiveDialog] = useState<DialogScript | null>(null)
+  const isDialogOverlayOpen = activeDialog !== null
 
   const { visitModal, stack } = useModalStack()
 
   const modalOpen = stack.length > 0
+
+  const streakGoalScript = useCallback(
+    (): DialogScript => ({
+      mascotSrc: '/onboarding/chinese_heidi.webp',
+      speakerName: 'Soup',
+      onEnd: () => visitModal('/streak_goal'),
+      steps: [
+        { text: `Hang on, ${user.display_name}\nbefore you journal today...` },
+        {
+          text: 'What about committing to a weekly streak goal for some extra Koi?',
+          choices: [
+            { label: 'Sure!', onSelect: () => visitModal('/streak_goal') },
+            { label: 'Nah', goTo: 2 },
+          ],
+        },
+        { text: "That's OK! But keep in mind- doing a streak goal is risk free!" },
+        { text: "I'll show em to you just in case you're changing your mind.", last: true },
+      ],
+    }),
+    [visitModal, user],
+  )
+
+  const firstJournalScript = useCallback(
+    (): DialogScript => ({
+      mascotSrc: '/onboarding/chinese_heidi.webp',
+      speakerName: 'Soup',
+      steps: [
+        { text: "Congrats on your first journal entry!\nYou're off to a great start." },
+        {
+          text: "Want to set a weekly streak goal? It's a great way to earn extra Koi!",
+          choices: [{ label: "Let's go!", onSelect: () => visitModal('/streak_goal') }, { label: 'Maybe later' }],
+        },
+      ],
+    }),
+    [visitModal],
+  )
+
+  const keepJournalingScript = useCallback(
+    (): DialogScript => ({
+      mascotSrc: '/onboarding/chinese_heidi.webp',
+      speakerName: 'Soup',
+      steps: [
+        { text: "Congrats on completing your streak goal! You're showing momentum." },
+        {
+          text: 'Ready to keep going? Another streak goal means more Koi and more progress!',
+          choices: [{ label: "I'm on it!", onSelect: () => visitModal('/streak_goal') }, { label: 'Take a break' }],
+        },
+      ],
+    }),
+    [visitModal],
+  )
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault()
+        setActiveDialog(streakGoalScript())
+      }
+      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setActiveDialog(firstJournalScript())
+      }
+      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        setActiveDialog(keepJournalingScript())
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [streakGoalScript, firstJournalScript, keepJournalingScript])
 
   const [readDocsNudge, setReadDocsNudge] = useState(initialPathEntry.readDocsNudge)
   const [docsNudgeReady, setDocsNudgeReady] = useState(false)
@@ -163,9 +253,10 @@ export default function PathIndex() {
           journalEntryCount={journal_entry_count}
           critterVariant={i >= 1 ? (critter_variants[i - 1] ?? undefined) : undefined}
           readDocsNudge={readDocsNudge}
+          dialogOverlayOpen={isDialogOverlayOpen}
         />
       )),
-    [has_projects, journal_entry_count, critter_variants, pathIntro.active, readDocsNudge],
+    [has_projects, journal_entry_count, critter_variants, pathIntro.active, readDocsNudge, isDialogOverlayOpen],
   )
 
   useEffect(() => {
@@ -258,6 +349,48 @@ export default function PathIndex() {
     void visitModal(modalUrl)
   }, [introFinished, pendingModal, stack.length, visitModal])
 
+  const mailIntroTriggered = useRef(false)
+  useEffect(() => {
+    if (mailIntroTriggered.current) return
+    if (!introFinished || !mail_intro_id || pendingModal || stack.length > 0 || activeDialog) return
+
+    mailIntroTriggered.current = true
+    void visitModal(`/mails/${mail_intro_id}`)
+  }, [introFinished, mail_intro_id, pendingModal, stack.length, activeDialog, visitModal])
+
+  const campaignDialogTriggered = useRef(false)
+  useEffect(() => {
+    if (campaignDialogTriggered.current) return
+    if (!introFinished || !pending_dialog || pendingModal || stack.length > 0) return
+
+    const scriptMap: Record<string, () => DialogScript> = {
+      first_journal: firstJournalScript,
+      streak_goal_nudge: streakGoalScript,
+      streak_goal_completed: keepJournalingScript,
+    }
+
+    const scriptFn = scriptMap[pending_dialog]
+    if (!scriptFn) return
+
+    campaignDialogTriggered.current = true
+    setActiveDialog(scriptFn())
+
+    fetch(`/dialog_campaigns/${pending_dialog}/mark_seen`, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-Token': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '',
+      },
+    })
+  }, [
+    introFinished,
+    pending_dialog,
+    pendingModal,
+    stack.length,
+    streakGoalScript,
+    firstJournalScript,
+    keepJournalingScript,
+  ])
+
   function reloadPathProgress() {
     router.reload({ only: ['has_projects', 'journal_entry_count', 'critter_variants'] })
   }
@@ -278,10 +411,11 @@ export default function PathIndex() {
         initial={false}
         animate={{ opacity: pathIntro.hudVisible ? 1 : 0 }}
         transition={PATH_ENTRY_FADE_TRANSITION}
-        className="fixed z-20 top-2 left-2 right-2 xs:p-6 flex flex-col gap-2"
+        className="fixed z-20 top-2 left-2 right-2 xs:p-2 md:p-6 flex flex-col gap-2"
         style={{ pointerEvents: pathIntro.hudVisible ? 'auto' : 'none' }}
       >
-        <Header koiBalance={user.koi} avatar={user.avatar} displayName={user.display_name} />
+        <Header koiBalance={user.koi} goldBalance={user.gold} avatar={user.avatar} displayName={user.display_name} />
+        <AnnouncementsBar />
       </motion.div>
 
       <motion.div
@@ -290,9 +424,9 @@ export default function PathIndex() {
         transition={{ ...PATH_ENTRY_FADE_TRANSITION, delay: pathIntro.hudVisible ? 0.12 : 0 }}
         className="fixed h-full z-10 flex justify-end items-end p-8 w-full pointer-events-none"
       >
-        <div className="flex flex-col items-center justify-center sm:justify-end w-full sm:w-fit h-fit space-y-6 pointer-events-auto">
+        <div className="flex flex-col hidden sm:inline-flex items-end justify-end w-full sm:w-fit h-fit space-y-6 pointer-events-auto">
           {authUser?.is_trial && <SignUpCta signInPath={sign_in_path} />}
-          <div className="hidden xs:block">
+          <div className="">
             <BgmPlayer />
           </div>
         </div>
@@ -302,22 +436,22 @@ export default function PathIndex() {
         initial={false}
         animate={{ opacity: pathIntro.hudVisible ? 1 : 0 }}
         transition={{ ...PATH_ENTRY_FADE_TRANSITION, delay: pathIntro.hudVisible ? 0.2 : 0 }}
-        className="fixed z-10 flex flex-row xs:flex-col items-center xs:items-start space-y-4 bottom-2 left-2 xs:bottom-6 xs:left-6"
+        className="fixed z-10 grid grid-cols-4  place-items-center xs:flex xs:flex-col items-center xs:items-start short:space-y-0 space-y-4 bottom-2 left-2 xs:bottom-6 xs:left-6"
         style={{ pointerEvents: pathIntro.hudVisible ? 'auto' : 'none' }}
       >
-        <Tooltip alwaysShow={docsNudgeReady && !modalOpen}>
+        <Tooltip alwaysShow={docsNudgeReady && !modalOpen} disabled={isDialogOverlayOpen}>
           <TooltipTrigger>
             <Link href="/docs" onClick={() => setReadDocsNudge(false)}>
-              <img src="/icon/guide.webp" alt="Guide" className="cursor-pointer w-20 xs:w-25" />
+              <img src="/icon/guide.webp" alt="Guide" className="cursor-pointer short:w-20 w-25" />
             </Link>
           </TooltipTrigger>
           <TooltipContent>{readDocsNudge ? 'Read this!' : 'Docs & Resources'}</TooltipContent>
         </Tooltip>
-        <Tooltip>
+        <Tooltip disabled={isDialogOverlayOpen}>
           <TooltipTrigger>
             {has_projects ? (
               <ModalLink href="/projects" onProjectDeleted={reloadPathProgress} className="outline-0">
-                <img src="/icon/project.webp" alt="Projects" className="cursor-pointer w-25" />
+                <img src="/icon/project.webp" alt="Projects" className="cursor-pointer short:w-20 w-25" />
               </ModalLink>
             ) : (
               <button onClick={() => notify('alert', 'This is locked! Click on the star')}>
@@ -327,21 +461,25 @@ export default function PathIndex() {
           </TooltipTrigger>
           <TooltipContent>Projects</TooltipContent>
         </Tooltip>
-        <Tooltip>
+        <Tooltip disabled={isDialogOverlayOpen}>
           <TooltipTrigger>
-            {features.shop ? (
+            {features.shop && !authUser?.is_trial ? (
               <ModalLink href="/shop" className="outline-0">
-                <img src="/icon/shop.webp" alt="Shop" className="cursor-pointer w-20 xs:w-25" />
+                <img src="/icon/shop.webp" alt="Shop" className="cursor-pointer short:w-20 w-25" />
               </ModalLink>
+            ) : features.shop && authUser?.is_trial ? (
+              <button onClick={() => notify('alert', 'This is locked! Click on the star')}>
+                <img src="/icon/shop.webp" alt="Shop" className="cursor-pointer short:w-20 w-25" />
+              </button>
             ) : (
               <button onClick={() => notify('alert', "The shop isn't open yet. Check back later!")}>
-                <img src="/icon/shop.webp" alt="Shop" className="cursor-pointer w-20 xs:w-25" />
+                <img src="/icon/shop.webp" alt="Shop" className="cursor-pointer short:w-20 w-25" />
               </button>
             )}
           </TooltipTrigger>
           <TooltipContent>Shop</TooltipContent>
         </Tooltip>
-        <Tooltip>
+        <Tooltip disabled={isDialogOverlayOpen}>
           <TooltipTrigger>
             {!authUser?.is_trial ? (
               <Link href="/clearing" className="col-span-2 -mt-4">
@@ -370,6 +508,10 @@ export default function PathIndex() {
           targetNodeIndex: activePathNodeIndex,
         }}
       />
+
+      {activeDialog && (
+        <PathDialogOverlay isOpen={isDialogOverlayOpen} onClose={() => setActiveDialog(null)} script={activeDialog} />
+      )}
     </>
   )
 }

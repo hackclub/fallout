@@ -11,7 +11,11 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'ou
   cancelled: 'outline',
 }
 
-export function buildPendingColumns(basePath: string): ColumnDef<ReviewRow>[] {
+export function buildPendingColumns(
+  basePath: string,
+  siblingLabel?: string,
+  extraColumns: ColumnDef<ReviewRow>[] = [],
+): ColumnDef<ReviewRow>[] {
   return [
     {
       accessorKey: 'project_name',
@@ -26,6 +30,19 @@ export function buildPendingColumns(basePath: string): ColumnDef<ReviewRow>[] {
       accessorKey: 'user_display_name',
       header: 'Owner',
     },
+    {
+      accessorKey: 'sibling_approved',
+      header: '',
+      cell: ({ row }) => {
+        if (!row.original.sibling_approved || !siblingLabel) return null
+        return (
+          <Badge variant="default" className="text-xs whitespace-nowrap">
+            {siblingLabel}
+          </Badge>
+        )
+      },
+    },
+    ...extraColumns,
     {
       accessorKey: 'reviewer_display_name',
       header: 'Reviewer',
@@ -47,7 +64,11 @@ export function buildPendingColumns(basePath: string): ColumnDef<ReviewRow>[] {
   ]
 }
 
-export function buildAllColumns(isAdmin: boolean, basePath: string): ColumnDef<ReviewRow>[] {
+export function buildAllColumns(
+  isAdmin: boolean,
+  basePath: string,
+  extraColumns: ColumnDef<ReviewRow>[] = [],
+): ColumnDef<ReviewRow>[] {
   return [
     {
       accessorKey: 'id',
@@ -89,6 +110,7 @@ export function buildAllColumns(isAdmin: boolean, basePath: string): ColumnDef<R
         )
       },
     },
+    ...extraColumns,
     {
       accessorKey: 'reviewer_display_name',
       header: 'Reviewed By',

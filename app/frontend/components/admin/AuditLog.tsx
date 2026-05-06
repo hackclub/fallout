@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/admin/ui/skeleton'
 export interface AuditLogEntry {
   id: number
   event: string
+  item_label?: string
   whodunnit_name: string | null
   created_at: string
   changes: { field: string; before: string; after: string }[]
@@ -39,7 +40,7 @@ export default function AuditLog({ entries }: { entries: AuditLogEntry[] }) {
   return (
     <div>
       <h2 className="text-lg font-semibold tracking-tight mb-4">Audit Log</h2>
-      <Card className="py-0">
+      <Card className="py-0 max-h-140 overflow-y-auto">
         <div className="divide-y divide-border">
           {entries.map((entry) => (
             <div key={entry.id} className="px-4 py-3">
@@ -47,6 +48,7 @@ export default function AuditLog({ entries }: { entries: AuditLogEntry[] }) {
                 <Badge variant={eventVariants[entry.event] ?? 'outline'} className="text-[10px]">
                   {eventLabels[entry.event] ?? entry.event}
                 </Badge>
+                {entry.item_label && <span className="text-xs text-muted-foreground">{entry.item_label}</span>}
                 <span className="font-medium">{entry.whodunnit_name ?? 'System'}</span>
                 <span className="text-muted-foreground">{entry.created_at}</span>
               </div>

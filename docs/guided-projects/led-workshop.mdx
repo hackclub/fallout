@@ -1,0 +1,330 @@
+| title |  LED Workshop   |
+| description | Build and control your first LED circuit! |
+| --- | --- |
+
+# LED Workshop
+
+**Build and Control a Circuit**
+
+> **Note: This is NOT a project you can submit to Fallout! This is a workshop to learn the basics of electronics!**
+
+
+---
+
+## What You Will Build
+
+By the end of this tutorial, you will power a breadboard and turn on an LED!
+
+---
+
+A breadboard lets you build circuits **without soldering**.
+
+- Each **row** of holes is electrically connected **horizontally**
+- The long side rails are for **power (Voltage and GND; the PSU includes 3V3 and 5V)**
+- The center gap separates the left and right halves
+
+If two metal legs are in the same row, electricity can flow between them.
+
+![Breadboard Annotated](https://cdn.hackclub.com/019d1727-d909-7ddc-8dc8-01e7eed06d3f/image.png)
+
+---
+
+##  LED On/Off with Button
+
+> This project is built **in Tinkercad Circuits**, not on real hardware yet.
+>
+> Tinkercad simulates real electronic behavior, so the habits you build here will transfer directly to a physical breadboard later.
+
+---
+
+### What You Will Build
+
+By the end of this, you will have:
+
+- A button that turns an LED on only while it is pressed
+- An expanded version where one button controls multiple LEDs
+
+---
+
+### Getting Started in Tinkercad
+
+1. Go to **tinkercad.com** and sign in
+2. Click **Circuits** → **Create New Circuit**
+   1. **Here, do these three tutorials! They are very useful and informative**
+      ![Tinkercad tutorials](https://cdn.hackclub.com/019d1727-dbbb-71bd-b3de-2319ee183cd5/image.png)
+   2. After finishing these, take a screenshot of the end result for each tutorial! You'll need these later.
+   3. After that, also do these! Take a screenshot of the end result for each tutorial! You'll need these later.
+      ![More Tinkercad tutorials](https://cdn.hackclub.com/019d1727-ddfb-7c5a-9571-0c5134f4449f/image.png)
+3. Now, create a **brand new project!**
+4. From the components panel:
+   - Drag in a **Breadboard** — Both the Breadboard Small and Breadboard work!
+     ![Breadboard component](https://cdn.hackclub.com/019d1727-e045-76dc-a18c-8a6c50b83c34/image.png)
+   - Drag in a **Power Supply**
+     ![Power Supply component](https://cdn.hackclub.com/019d1727-e2a1-73bc-93a3-998226c4e601/image.png)
+   - Now connect red to red and black to black. The red wire carries voltage, and the black wire is ground.
+   - Change the color of each!
+   - At the end, it should look like this:
+     ![Wired breadboard](https://cdn.hackclub.com/019d1727-e4f0-7d0d-ac19-417ce88aa4b9/image.png)
+   - Drag in one **LED** and one **resistor**. Connect them as such, then wire them! Use different rows/columns than me, just to challenge yourself.
+     ![LED and resistor wired](https://cdn.hackclub.com/019d1727-e754-728d-95bb-c0bc81c5638c/image.png)
+
+You can zoom, pan, and rotate components freely. Take your time arranging things neatly; it helps you understand the connections better.
+
+**Here's what's happening here:**
+
+### 1. Power to the power rail
+
+You're taking the **positive output** of your power supply and connecting it to the **red power rail** on the breadboard. This rail becomes the source of **voltage** for the entire circuit.
+
+### 2. Ground to the ground rail
+
+You're connecting the **ground (GND)** of your power supply to the **blue/black rail** on the breadboard. This rail becomes the **return path** for the circuit.
+
+### 3. Resistor from power rail to LED
+
+You place a **resistor** between the power rail and the LED's positive leg. The resistor's job is to **limit current** so the LED doesn't burn out.
+
+### 4. LED gets voltage
+
+The LED's **anode (long leg)** connects to the resistor, which connects to the power rail. This means the LED receives **voltage**, the electrical "push" that makes current flow.
+
+### 5. LED ground
+
+The LED's **cathode (short leg)** goes to the **ground rail**, completing the circuit.
+
+---
+
+## Electricity Basics
+
+### What "ground" actually means here
+
+Ground is the **reference point** for the entire circuit. Think of it as the **zero level** that everything else is measured against.
+
+- Voltage is always measured **relative to ground**.
+- Current flows **from power → through components → back to ground**.
+- Without ground, the circuit has **no return path**, so nothing works.
+
+[Check this for more information!](https://www.build-electronic-circuits.com/what-is-ground/)
+
+Additionally, here's some ground!
+
+![Grass](https://cdn.hackclub.com/019d1727-e9bb-75dc-87a9-4cf6c6538862/image.png)
+
+### What voltage is, and why it matters
+
+Voltage is the **electrical pressure** that pushes electrons through the circuit.
+
+- Higher voltage = stronger push
+- Lower voltage = weaker push
+
+For an LED:
+
+- Too **low** voltage → LED won't turn on
+- Too **high** voltage → LED tries to pull too much current and burns out
+
+Voltage matters because every component is designed to operate within a certain range.
+
+[Check this for more information!](https://battlebornbatteries.com/what-are-volts/)
+
+![Low voltage](https://cdn.hackclub.com/019d1727-ec23-73ad-9ac5-0373f6347d5d/image.png)
+
+### What current is, and why it matters
+
+Current is the **amount of electrical flow** through the circuit.
+
+- Voltage is the push
+- Current is the flow caused by that push
+
+LEDs are **current-sensitive** devices. They don't care much about voltage; they care about **how much current flows through them**.
+
+### Why too much current is bad
+
+If you let too much current flow:
+
+- The LED overheats
+- The semiconductor junction gets damaged
+- It permanently burns out
+
+This is why you add a **resistor**; it limits current to a safe level.
+
+### However,
+
+**The *reason* too much current happens is because the *voltage* is too high.**
+
+Voltage is the **push**. If the push is too strong, the LED is *forced* to draw more current than it can survive.
+
+So the real chain is:
+
+**Too much voltage → too much current → LED damage**
+
+The resistor fixes this by dropping voltage and limiting current so the LED only gets what it can safely handle.
+
+A tiny straw (LED) can only handle a small flow. If you crank up the pressure (voltage), the straw bursts. But having a huge bucket of water (a power supply capable of lots of current) is harmless. The straw only takes what it can.
+
+![Electric shock](https://cdn.hackclub.com/019d1725-77f0-7227-9fba-a307b522ab4f/electrician-electric-shock.gif)
+
+---
+
+## How can I calculate the value I need on my resistor?
+
+Great question!
+
+You only need **three numbers**:
+
+1. **Supply voltage** (what your power source provides)
+2. **LED forward voltage** (how much voltage the LED "drops")
+3. **Desired LED current** (usually 10–20 mA for typical LEDs, I'll use 20mA!)
+
+![Resistor formula](https://cdn.hackclub.com/019d172b-7dbf-735d-8073-1cbba9bfae6c/image.png)
+![LED resistor calculator](https://cdn.hackclub.com/019d172b-804e-713d-a111-8e0e22c9f958/image.png)
+
+However, this is only the minimum needed! More can be added to be on the safe side, or have a dimmer LED:
+
+![Resistor values](https://cdn.hackclub.com/019d172b-82b1-7d4c-a6c1-83e74288ca5d/image.png)
+
+Here's a table of the values you may need:
+
+| LED Color | Typical Forward Voltage (V_LED) | Target Current |
+|-----------|----------------------------------|----------------|
+| Red       | 2.0 V                            | 20 mA          |
+| Yellow    | 2.1 V                            | 20 mA          |
+| Green     | 2.2 V                            | 20 mA          |
+| Blue      | 3.0 V                            | 20 mA          |
+| White     | 3.0 V                            | 20 mA          |
+
+For this example, I will be using a red LED. **For your schematic, use a different color!**
+
+```
+R = (V_supply − V_f) / I
+
+Plug in the values:
+
+R = (5V − 2.0V) / 20mA
+R = 3V / 0.02A
+R = 150Ω
+```
+
+So the **minimum resistor value** we want is **150Ω**.
+
+### How resistor values are chosen
+
+Real resistors only come in standard values. The way these values are chosen is really interesting! You should read about it [here](https://eepower.com/resistor-guide/resistor-standards-and-codes/resistor-values/).
+
+Your kit includes:
+
+**10Ω, 100Ω, 220Ω, 330Ω, 1KΩ, 2KΩ, 5KΩ, 10KΩ, 100KΩ, 1MΩ**
+
+We calculated **150Ω**, but the kit does **not** include 150Ω.
+
+So we choose the **next higher safe value**:
+
+- 100Ω → too low (too much current)
+- 220Ω → safe choice
+
+**Minimum (calculated): 150Ω**  
+**Value used from the kit: 220Ω**
+
+Click on the resistor and change the resistor value to the value you calculated. I used 220Ω, as shown here:
+
+![Resistor value setting](https://cdn.hackclub.com/019d172b-8501-7377-bf05-1fa462d5c6aa/image.png)
+
+Now click "start simulation," and watch it work!
+
+![Simulation running](https://cdn.hackclub.com/019d172b-8794-7b0b-863d-ecf07bfbce57/image.png)
+
+---
+
+## Part 1: Single LED Controlled by a Button
+
+### Goal
+
+- The LED is **off** when the button is not pressed
+- The LED turns **on** only while the button is pressed
+
+---
+
+### Helpful Notes Before Wiring
+
+- LED polarity matters: The anode connects toward the positive side; the cathode connects toward ground
+- The resistor protects the LED: It must be in series with the LED; it may be placed on either side
+- A complete circuit needs ground: Current must have a path back to the negative terminal! 
+
+With that in mind, just add the button!
+
+![Button added](https://cdn.hackclub.com/019d172b-8a2b-723f-90e5-581fd86a4d5c/image.png)
+
+> **Note: MAKE SURE THE LED IS ON THE OTHER SIDE!!! OR ELSE IT WILL JUST STAY CONNECTED TO THE VOLTAGE!!!**
+
+![Push button pinout](https://cdn.hackclub.com/019d172c-f758-73ba-b938-688cd157466c/push-button-pinout.gif)
+
+*Note: this diagram is flipped 90 degrees!*
+
+![Button circuit](https://cdn.hackclub.com/019d172d-c146-76e2-9d66-7e31f4251c04/image.png)
+
+Here, when the button is pressed, all four sides are connected!
+
+---
+
+### What's Happening in the Circuit
+
+- When the button is not pressed, the circuit is open and no current flows
+- When the button is pressed, the circuit closes and current flows through the resistor and LED
+- The LED lights because current is allowed to flow
+
+You are controlling current flow, not the LED directly.
+
+---
+
+### If the Circuit Does Not Behave as Expected
+
+Try checking:
+
+- Are the LED's two pins connected to different nodes?
+- Is the resistor in series with the LED?
+- Is the button actually between the power source and the LED?
+- Is ground connected?
+
+Use **Start Simulation** to observe changes as you adjust connections.
+
+Here's an assembly I created IRL with my kit!
+
+![Real breadboard assembly](https://cdn.hackclub.com/019d172e-5d47-701f-9471-5a9233d0a2b9/img_0464_360.gif)
+
+---
+
+## Part 3: Expanding to Multiple LEDs
+
+Now you will **build on the same circuit**.
+
+### New Goal
+
+- Pressing the button turns **multiple LEDs on**
+- Releasing the button turns **all of them off**
+
+---
+
+### Important Rule
+
+Each LED must have **its own resistor**.
+
+Even if Tinkercad allows one resistor to "work," using separate resistors is the correct and safe way to build the circuit. [Here's a detailed explanation](https://electronics.stackexchange.com/questions/22291/why-exactly-cant-a-single-resistor-be-used-for-many-parallel-leds)
+
+![Don't share resistors](https://cdn.hackclub.com/019d172e-e12a-7d91-a64d-02bafdc2f0a0/image.webp)
+
+> **Don't do this!** Sharing a single resistor across multiple LEDs causes uneven current distribution. LEDs have slightly different forward voltages, so one will hog more current than the others, burn brighter, and burn out faster. In the worst case, it can damage all the LEDs in the group.
+
+---
+
+### How to Expand the Circuit
+
+- Keep the button exactly as it is
+- From the button's output, create **multiple parallel paths**, each containing:
+  - One resistor
+  - One LED
+  - A return to ground
+
+All LEDs should turn on and off together.
+
+---
+
+These are the basics of a breadboard!

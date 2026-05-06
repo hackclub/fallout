@@ -2,20 +2,22 @@
 #
 # Table name: mail_messages
 #
-#  id          :bigint           not null, primary key
-#  action_url  :string
-#  content     :text
-#  dismissable :boolean          default(TRUE), not null
-#  expires_at  :datetime
-#  filters     :jsonb            not null
-#  pinned      :boolean          default(FALSE), not null
-#  source_type :string
-#  summary     :string           not null
-#  created_at  :datetime         not null
-#  updated_at  :datetime         not null
-#  author_id   :bigint
-#  source_id   :bigint
-#  user_id     :bigint
+#  id           :bigint           not null, primary key
+#  action_label :string
+#  action_url   :string
+#  auto_open    :boolean
+#  content      :text
+#  dismissable  :boolean          default(TRUE), not null
+#  expires_at   :datetime
+#  filters      :jsonb            not null
+#  pinned       :boolean          default(FALSE), not null
+#  source_type  :string
+#  summary      :string           not null
+#  created_at   :datetime         not null
+#  updated_at   :datetime         not null
+#  author_id    :bigint
+#  source_id    :bigint
+#  user_id      :bigint
 #
 # Indexes
 #
@@ -85,6 +87,9 @@ class MailMessage < ApplicationRecord
     # Activity filters — pre-evaluated in Ruby, safe boolean/string values only
     has_projects = user.projects.kept.exists?
     conditions << "(mail_messages.filters->>'has_projects' IS NULL OR #{has_projects})" # Safe: Ruby boolean literal, not user input
+
+    is_full_user = !user.trial? # Safe: Ruby boolean literal, not user input
+    conditions << "(mail_messages.filters->>'full_users_only' IS NULL OR #{is_full_user})"
 
     ship_statuses = user.ships.distinct.pluck(:status)
     if ship_statuses.any?

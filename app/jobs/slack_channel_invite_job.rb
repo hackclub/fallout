@@ -21,6 +21,11 @@ class SlackChannelInviteJob < ApplicationJob
     Rails.logger.tagged("SlackChannelInviteJob") do
       Rails.logger.warn({ event: "user_restricted", slack_id: slack_id, channel_id: channel_id }.to_json)
     end
+  rescue Slack::Web::Api::Errors::CantInvite
+    # User cannot be invited (already a member in a different form, account deactivated, etc.) — log and move on
+    Rails.logger.tagged("SlackChannelInviteJob") do
+      Rails.logger.warn({ event: "cant_invite", slack_id: slack_id, channel_id: channel_id }.to_json)
+    end
   rescue StandardError => e
     Rails.logger.tagged("SlackChannelInviteJob") do
       Rails.logger.error({ event: "invite_failed", slack_id: slack_id, channel_id: channel_id, error: e.message }.to_json)

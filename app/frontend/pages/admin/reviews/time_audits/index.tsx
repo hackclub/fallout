@@ -41,7 +41,7 @@ export default function TimeAuditsIndex({
             </Button>
           )}
         </div>
-        <DataTable columns={buildPendingColumns(BASE_PATH)} data={pending_reviews} noun="pending reviews" />
+        <DataTable columns={buildPendingColumns(BASE_PATH, 'Requirements Check done')} data={pending_reviews} noun="pending reviews" rowClassName={(row) => row.sibling_approved ? 'bg-yellow-50 dark:bg-yellow-950/20' : undefined} />
       </div>
 
       <div>

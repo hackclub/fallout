@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react'
 import { Deferred as InertiaDeferred, router } from '@inertiajs/react'
+import type { FormDataConvertible } from '@inertiajs/core'
 // @ts-expect-error useModal lacks type declarations in this beta package
 import { Deferred as ModalDeferred, Modal, useModal } from '@inertiaui/modal-react'
 import BookLayout from '@/components/shared/BookLayout'
 import Button from '@/components/shared/Button'
+import ImagePlaceholder from '@/components/shared/ImagePlaceholder'
 import Input from '@/components/shared/Input'
 import MarkdownEditor from '@/components/shared/MarkdownEditor'
 
@@ -95,6 +97,8 @@ function NewJournal({
   direct_upload_url,
   lookout_timelapses,
   timelapses,
+  streak_seconds_logged,
+  streak_threshold,
 }: {
   projects: Project[]
   selected_project_id: number | null
@@ -103,6 +107,8 @@ function NewJournal({
   direct_upload_url: string
   lookout_timelapses: LookoutRecording[] | null
   timelapses: Timelapse[] | null
+  streak_seconds_logged: number | null
+  streak_threshold: number | null
 }) {
   const initialProject = selected_project_id
     ? (projects.find((p) => p.id === selected_project_id) ?? null)
@@ -125,6 +131,7 @@ function NewJournal({
   const modalRef = useRef<{ close: () => void }>(null)
   const [selectedLookoutTokens, setSelectedLookoutTokens] = useState<Set<string>>(new Set())
   const [fullscreenEditor, setFullscreenEditor] = useState(false)
+  const [showStreakWarning, setShowStreakWarning] = useState(false)
 
   const draftKey = selectedProject ? `journal-draft-${selectedProject.id}` : null
   const [markdown, setMarkdown] = useState(() => {
@@ -177,6 +184,40 @@ function NewJournal({
   const recordingCount = selectedTimelapses.size + youtubeVideos.length + selectedLookoutTokens.size
   const hasRecording = recordingCount > 0
   const canSubmit = selectedProject && hasRecording && hasEnoughImages && hasEnoughChars
+
+  const streakWarningMessage = useMemo(() => {
+    if (streak_seconds_logged == null || streak_threshold == null) return null
+    if (youtubeVideos.some((v) => v.duration_seconds == null)) return null
+    const selectedLapseDuration = (timelapses ?? [])
+      .filter((t) => selectedTimelapses.has(t.id))
+      .reduce((sum, t) => sum + (t.duration || 0), 0)
+    const selectedYoutubeDuration = youtubeVideos.reduce((sum, v) => sum + (v.duration_seconds || 0), 0)
+    const selectedLookoutDuration = (lookout_timelapses ?? [])
+      .filter((r) => selectedLookoutTokens.has(r.token))
+      .reduce((sum, r) => sum + (r.duration || 0), 0)
+    const totalAfterSubmit =
+      streak_seconds_logged + selectedLapseDuration + selectedYoutubeDuration + selectedLookoutDuration
+    if (totalAfterSubmit >= streak_threshold - 480) return null
+    const remainingMinutes = Math.ceil((streak_threshold - totalAfterSubmit) / 60)
+    return `This journal alone won't count toward your daily streak! you need ${remainingMinutes} more minute${remainingMinutes !== 1 ? 's' : ''} of recordings today to reach 1 hour. You can journal more later today to reach 1 hour.`
+  }, [
+    streak_seconds_logged,
+    streak_threshold,
+    selectedTimelapses,
+    youtubeVideos,
+    selectedLookoutTokens,
+    timelapses,
+    lookout_timelapses,
+  ])
+
+  function handleLogJournal() {
+    if (!canSubmit) return
+    if (streakWarningMessage) {
+      setShowStreakWarning(true)
+      return
+    }
+    handleSubmit()
+  }
 
   function handleBack() {
     if (modal?.canGoBack) {
@@ -264,7 +305,7 @@ function NewJournal({
   function handleSubmit() {
     if (!canSubmit) return
     setSubmitting(true)
-    const data: Record<string, unknown> = {
+    const data: Record<string, FormDataConvertible> = {
       timelapse_ids: Array.from(selectedTimelapses),
       youtube_video_ids: youtubeVideos.map((v) => v.id),
       lookout_tokens: Array.from(selectedLookoutTokens),
@@ -420,7 +461,7 @@ function NewJournal({
             </button>
           )}
           <Button
-            onClick={handleSubmit}
+            onClick={handleLogJournal}
             disabled={submitting || !canSubmit}
             className="py-2 px-6 text-lg flex-1 xl:flex-none"
           >
@@ -537,10 +578,14 @@ function NewJournal({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
-                  <div
-                    className="aspect-video rounded overflow-hidden bg-light-brown bg-center bg-cover bg-no-repeat"
-                    style={{ backgroundImage: `url(${video.thumbnail_url})` }}
-                  />
+                  {video.thumbnail_url ? (
+                    <div
+                      className="aspect-video rounded overflow-hidden bg-light-brown bg-center bg-cover bg-no-repeat"
+                      style={{ backgroundImage: `url(${video.thumbnail_url})` }}
+                    />
+                  ) : (
+                    <ImagePlaceholder text="No thumbnail" className="aspect-video bg-light-brown rounded w-full" />
+                  )}
                   <div className="mt-1.5">
                     <p className="font-bold text-sm truncate text-white">{video.title}</p>
                     <div className="flex justify-between text-xs text-light-brown">
@@ -604,6 +649,34 @@ function NewJournal({
     </div>
   )
 
+  const streakWarningPopup = showStreakWarning && (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={() => setShowStreakWarning(false)}
+    >
+      <div
+        className="bg-light-brown border-2 border-dark-brown p-6 max-w-sm w-full flex flex-col items-center text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-dark-brown font-bold text-lg mb-2">Heads up!</p>
+        <p className="text-brown text-sm mb-6">{streakWarningMessage}</p>
+        <div className="flex gap-3">
+          <Button onClick={() => setShowStreakWarning(false)}>Go back</Button>
+          <Button
+            variant="link"
+            onClick={() => {
+              setShowStreakWarning(false)
+              handleSubmit()
+            }}
+            className="text-sm text-brown"
+          >
+            Log anyway
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+
   if (is_modal) {
     return (
       <Modal
@@ -617,6 +690,7 @@ function NewJournal({
           {content}
         </BookLayout>
         {fullscreenModal}
+        {streakWarningPopup}
       </Modal>
     )
   }
@@ -625,6 +699,7 @@ function NewJournal({
     <>
       <div className="h-screen">{content}</div>
       {fullscreenModal}
+      {streakWarningPopup}
     </>
   )
 }
@@ -716,10 +791,14 @@ function TimelapseBrowser({
                 </svg>
               </div>
             )}
-            <div
-              className="aspect-video rounded overflow-hidden bg-light-brown bg-center bg-contain bg-no-repeat"
-              style={{ backgroundImage: `url(${timelapse.thumbnailUrl})` }}
-            />
+            {timelapse.thumbnailUrl ? (
+              <div
+                className="aspect-video rounded overflow-hidden bg-light-brown bg-center bg-contain bg-no-repeat"
+                style={{ backgroundImage: `url(${timelapse.thumbnailUrl})` }}
+              />
+            ) : (
+              <ImagePlaceholder text="No thumbnail" className="aspect-video bg-light-brown rounded w-full" />
+            )}
             <div className="mt-1.5">
               <p className="font-bold text-sm truncate text-white">{timelapse.name}</p>
               <div className="flex justify-between text-xs text-light-brown">
@@ -780,10 +859,14 @@ function LookoutTimelapseBrowser({
                     </svg>
                   </div>
                 )}
-                <div
-                  className="aspect-video rounded overflow-hidden bg-light-brown bg-center bg-contain bg-no-repeat"
-                  style={recording.thumbnail_url ? { backgroundImage: `url(${recording.thumbnail_url})` } : undefined}
-                />
+                {recording.thumbnail_url ? (
+                  <div
+                    className="aspect-video rounded overflow-hidden bg-light-brown bg-center bg-contain bg-no-repeat"
+                    style={{ backgroundImage: `url(${recording.thumbnail_url})` }}
+                  />
+                ) : (
+                  <ImagePlaceholder text="No thumbnail" className="aspect-video bg-light-brown rounded w-full" />
+                )}
                 <div className="mt-1.5">
                   <p className="font-bold text-sm truncate text-white">{recording.name || 'Lookout Recording'}</p>
                   <div className="flex justify-between text-xs text-light-brown">

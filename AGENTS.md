@@ -10,7 +10,7 @@ Keep changes low impact, responses concise. No summaries, no testing. Reference 
 
 # Architecture Documentation
 
-Detailed architecture docs live in Claude Code's memory system. Before working on an unfamiliar area, check memory for relevant docs — they contain gotchas, patterns, and implementation details that prevent common mistakes. When you make changes that affect documented architecture (new controllers, models, policies, services, access control changes, new shared props, etc.), update the corresponding memory doc to keep it accurate.
+Detailed architecture docs live in [agents-docs/](agents-docs/INDEX.md). Before working on an unfamiliar area, scan the index and read the relevant doc — they contain gotchas, patterns, and implementation details that prevent common mistakes. The docs are point-in-time snapshots and may be out of date; treat them as a starting overview and verify against the current code before relying on specifics. When you make changes that affect documented architecture (new controllers, models, policies, services, access control changes, new shared props, etc.), update the corresponding doc in `agents-docs/` as part of the change.
 
 # Stack
 
@@ -18,7 +18,7 @@ Ruby 3.4.4, Rails 8.1.2, React 19, Tailwind 4.1.18 via inertia-rails. Only sugge
 
 In-house services: HCA is our unified authentication system. Hackatime is the time tracking system, where Lapse is the timelapse tool for Hackatime. HCB is our "bank" (real US dollars).
 
-Inertia bridges Rails and React. All attributes passed to the frontend — even unused ones — are visible in developer tools; for security & access reasons, be careful what you expose. Inertia docs: https://inertia-rails.dev/llms-full.txt
+Inertia bridges Rails and React and allows for SPA behavior with <Link> and Inertia Modals All attributes passed to the frontend — even unused ones — are visible in developer tools; for security & access reasons, be careful what you expose. Inertia docs: https://inertia-rails.dev/llms-full.txt
 
 # Security & Access Control
 
@@ -34,7 +34,7 @@ Two user types exist: **full users** (authenticated through HCA, cross-device ac
 
 ## Staff Roles & PII
 
-Staff users have one or more roles stored in a PostgreSQL array column: `time_auditor`, `requirements_checker`, `pass2_reviewer`, or `admin`. Each reviewer role grants access only to its specific review queue(s) — use `user.can_review?(queue)` to check. Admins have access to everything.
+Staff users have one or more roles stored in a PostgreSQL array column: `time_auditor`, `requirements_checker`, `pass2_reviewer`, `admin`, or `hcb`. Each reviewer role grants access only to its specific review queue(s) — use `user.can_review?(queue)` to check. Admins have access to everything except real money movement, which is reserved for the `hcb` role: only users with `user.hcb?` true can issue or top up HCB project funding card grants. Regular admins can read grant orders, edit `HcbGrantSetting`, adjust admin notes, and move orders to pending/on_hold/rejected — but cannot transition an order to `fulfilled` (which triggers an HCB topup) or mark a pending topup as completed during reconciliation.
 
 **PII (email, slack_id, etc.) must only be exposed to admins.** Non-admin reviewers see display names and avatars but never email addresses or other identifying information. When serializing user data for the admin frontend, always check `current_user.admin?` before including PII fields. The `/admin/users` pages are already admin-only via `require_admin!`.
 

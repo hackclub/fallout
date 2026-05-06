@@ -23,8 +23,17 @@
 #
 class Collaborator < ApplicationRecord
   include Discardable
+  include Broadcastable
 
   has_paper_trail
+
+  # Live-update the collaborator's path page when they're added to / removed from a path-relevant
+  # resource (journal entry counts towards stars, project flips has_projects). Returns nil for
+  # unrelated collaboratable types so Broadcastable skips the no-op broadcast.
+  PATH_RELEVANT_COLLABORATABLES = %w[JournalEntry Project].freeze
+  broadcasts_updates_to do
+    PATH_RELEVANT_COLLABORATABLES.include?(collaboratable_type) ? "path_user_#{user_id}" : nil
+  end
 
   belongs_to :user
   belongs_to :collaboratable, polymorphic: true

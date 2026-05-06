@@ -78,7 +78,8 @@ Rails.application.configure do
   # Enable DNS rebinding protection and other `Host` header attacks.
   config.hosts = [
     "fallout.hackclub.com",
-    "fow888800g0wgc4wkowwcks0.a.selfhosted.hackclub.com"
+    "fow888800g0wgc4wkowwcks0.a.selfhosted.hackclub.com",
+    "gvee5sookafykapvttvc30kv.b.selfhosted.hackclub.com"
   ]
 
   # Skip DNS rebinding protection for the default health check endpoint.

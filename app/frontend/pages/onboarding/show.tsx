@@ -194,7 +194,19 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
   return (
     <div className="w-screen h-screen overflow-y-hidden bg-light-blue flex flex-col items-center text-dark-brown p-3 text-center text-base lg:text-lg">
       {step.type !== 'dialogue' && (
-        <div className="w-full">
+        <div
+          className="w-full"
+          style={
+            isPathTransitioning
+              ? {
+                  opacity: 0,
+                  transform: 'translateY(28px)',
+                  filter: 'blur(4px)',
+                  transition: `opacity 480ms ${sceneTransitionEase}, transform 680ms ${sceneTransitionEase}, filter 480ms ${sceneTransitionEase}`,
+                }
+              : undefined
+          }
+        >
           <ProgressBar
             progress={progress}
             className="z-50 px-8 pt-6"
@@ -228,31 +240,37 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
         <img
           src="/clouds/4.webp"
           alt=""
-          className="absolute bottom-0 left-0 h-20 md:h-36"
+          className="absolute bottom-0 left-0 h-30 md:h-50"
           style={{ transform: 'translateX(-33.333%) translateY(0%) scale(1)' }}
         />
         <img
           src="/clouds/1.webp"
           alt=""
-          className="absolute bottom-0 left-40 h-20 md:h-32"
+          className="absolute bottom-0 left-40 h-30"
           style={{ transform: 'translateX(33.333%) translateY(0%) scale(1)' }}
         />
         <img
           src="/clouds/2.webp"
           alt=""
-          className="absolute bottom-0 right-0 h-20 md:h-28"
+          className="absolute bottom-0 right-0 h-30"
           style={{ transform: 'translateX(-83.333%) translateY(0%) scale(1)' }}
         />
         <img
           src="/clouds/3.webp"
           alt=""
-          className="absolute bottom-0 right-0 h-20 md:h-36"
+          className="absolute bottom-0 right-0 h-30 md:h-50 w-auto"
           style={{ transform: 'translateX(33.333%) translateY(0%) scale(1)' }}
         />
       </div>
 
       {/* Grass */}
-      <div className="absolute inset-0">
+      <div
+        className="absolute inset-0"
+        style={{
+          opacity: isPathTransitioning ? 0 : 1,
+          transition: `opacity ${finalPathTransitionDelayMs}ms ${sceneTransitionEase}`,
+        }}
+      >
         <img src="/grass/1.svg" className="absolute bottom-[32%] left-[3%] z-1 w-8" />
         <img src="/grass/2.svg" className="absolute bottom-[22%] left-[12%] z-1 w-10" />
         <img src="/grass/3.svg" className="absolute bottom-[10%] left-[8%] z-1 w-9" />
@@ -282,7 +300,19 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
         sceneTransitionEase={sceneTransitionEase}
       />
 
-      <div className="relative z-10 w-full flex-1 min-h-0 overflow-y-auto">
+      <div
+        className="relative z-10 w-full flex-1 min-h-0 overflow-y-auto"
+        style={
+          isPathTransitioning
+            ? {
+                opacity: 0,
+                transform: 'translateY(28px)',
+                filter: 'blur(4px)',
+                transition: `opacity 480ms ${sceneTransitionEase}, transform 680ms ${sceneTransitionEase}, filter 480ms ${sceneTransitionEase}`,
+              }
+            : undefined
+        }
+      >
         {step.type === 'dialogue' && (
           <DialogueStep step={step} onComplete={() => setCompletedPromptStepKey(step.key)} />
         )}

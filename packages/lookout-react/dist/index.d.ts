@@ -177,9 +177,7 @@ interface LookoutClient {
     stop(): Promise<StopResponse>;
     rename(name: string): Promise<RenameSessionResponse>;
     getStatus(): Promise<StatusResponse>;
-    getVideo(options?: {
-        format?: "mp4" | "webm";
-    }): Promise<VideoResponse>;
+    getVideo(): Promise<VideoResponse>;
 }
 interface CreateClientOptions {
     baseUrl: string;
@@ -277,8 +275,9 @@ interface GalleryProps {
     onArchive?: (token: string) => void;
     onRefresh?: () => void;
     onAdd?: () => void;
+    onSettings?: () => void;
 }
-declare function Gallery({ sessions, loading, error, onSessionClick, onArchive, onRefresh, onAdd, }: GalleryProps): react_jsx_runtime.JSX.Element;
+declare function Gallery({ sessions, loading, error, onSessionClick, onArchive, onRefresh, onAdd, onSettings, }: GalleryProps): react_jsx_runtime.JSX.Element;
 
 interface SessionCardProps {
     session: SessionSummary;
@@ -433,11 +432,15 @@ type Route = {
 } | {
     page: "add";
 } | {
+    page: "settings";
+} | {
     page: "record";
     token: string;
 } | {
     page: "session";
     token: string;
+} | {
+    page: "tray";
 };
 declare function useHashRouter(): {
     route: Route;

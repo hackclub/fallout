@@ -3,6 +3,12 @@ require "json"
 
 module HcaService
   class Error < StandardError; end
+  # Raised when HCA rejects a stored access token (401/403) — the token is no longer valid,
+  # so callers must clear it rather than retry. Distinct from transient network errors.
+  class InvalidToken < Error; end
+
+  TRANSIENT_NETWORK_ERRORS = [ Faraday::ConnectionFailed, Faraday::TimeoutError ].freeze
+  INVALID_TOKEN_STATUSES = [ 401, 403 ].freeze
 
   module_function
 
@@ -58,8 +64,8 @@ module HcaService
     end
 
     JSON.parse(response.body)
-  rescue StandardError => e
-    ErrorReporter.capture_exception(e, contexts: { hca: { action: "token_exchange" } })
+  rescue *TRANSIENT_NETWORK_ERRORS => e
+    ErrorReporter.capture_exception(e, level: :warning, contexts: { hca: { action: "token_exchange" } })
     nil
   end
 
@@ -71,6 +77,12 @@ module HcaService
       req.headers["Accept"] = "application/json"
     end
 
+    # Persistent auth failure — HCA rejected the token. Raise a distinct error so callers
+    # (e.g. HcaIdentityRefreshJob) can clear the user's stored token instead of retrying.
+    if INVALID_TOKEN_STATUSES.include?(response.status)
+      raise InvalidToken, "HCA rejected access token (status #{response.status})"
+    end
+
     unless response.success?
       ErrorReporter.capture_message("HCA /me fetch failed", level: :warning, contexts: {
         hca: { status: response.status }
@@ -79,7 +91,7 @@ module HcaService
     end
 
     JSON.parse(response.body)
-  rescue StandardError => e
+  rescue *TRANSIENT_NETWORK_ERRORS => e
     ErrorReporter.capture_exception(e, level: :warning, contexts: { hca: { action: "me" } })
     nil
   end

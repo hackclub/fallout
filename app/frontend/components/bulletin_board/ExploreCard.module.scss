@@ -1,0 +1,334 @@
+$sm: 640px;
+$md: 768px;
+$lg: 1024px;
+
+$card-bg: var(--color-beige);
+$card-divider: var(--color-brown);
+
+$ink-primary: var(--color-dark-brown);
+$ink-secondary: var(--color-dark-brown);
+$ink-muted: var(--color-brown);
+
+$avatar-bg: var(--color-dark-brown);
+$avatar-text: var(--color-light-brown);
+
+$tag-bg: var(--color-dark-brown);
+$tag-border: var(--color-dark-brown);
+$tag-text: var(--color-light-brown);
+
+$readmore-rest: var(--color-brown);
+$readmore-hover: var(--color-dark-brown);
+$readmore-underline: var(--color-coral);
+
+$placeholder-gradient: linear-gradient(
+  160deg,
+  color-mix(in oklab, var(--color-brown) 28%, var(--color-light-brown)) 0%,
+  color-mix(in oklab, var(--color-brown) 60%, var(--color-light-brown)) 100%
+);
+
+$shadow-rest:
+  0 1px 3px rgba(58, 36, 25, 0.12),
+  0 6px 18px rgba(58, 36, 25, 0.16);
+
+$shadow-hover:
+  0 3px 6px rgba(58, 36, 25, 0.18),
+  0 16px 36px rgba(58, 36, 25, 0.26);
+
+.cardWrap {
+  width: 100%;
+  margin-bottom: 1.25rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+  background-color: $card-bg;
+  box-shadow: $shadow-rest;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  color: $ink-primary;
+  transition: box-shadow 220ms ease-out;
+
+  &:hover {
+    box-shadow: $shadow-hover;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-dark-brown);
+    outline-offset: 3px;
+  }
+}
+
+.media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: $placeholder-gradient;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.mediaImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.youtubePreview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.playIcon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3.25rem;
+  height: 3.25rem;
+  color: white;
+  pointer-events: none;
+}
+
+.mediaPlaceholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: $placeholder-gradient;
+  color: $ink-secondary;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1rem 1.125rem 1.125rem;
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: $avatar-bg;
+  color: $avatar-text;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+.username {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $ink-primary;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date {
+  font-size: 0.75rem;
+  color: $ink-muted;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+  color: $ink-primary;
+  margin: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.content {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: $ink-primary;
+  margin: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.latestJournal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem;
+  border: 1px solid $card-divider;
+  border-radius: 0.5rem;
+  background-color: var(--color-light-brown);
+}
+
+.latestJournalMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: $ink-secondary;
+}
+
+.latestJournalLabel {
+  text-transform: uppercase;
+}
+
+.latestJournalAge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: $ink-muted;
+  text-transform: none;
+}
+
+.latestJournalWhen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.latestJournalSeparator {
+  color: $ink-muted;
+}
+
+.description {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: $ink-secondary;
+  margin: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  list-style: none;
+  padding: 0;
+  margin: 0.125rem 0 0;
+}
+
+.tag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid $tag-border;
+  border-radius: 9999px;
+  background-color: $tag-bg;
+  color: $tag-text;
+  letter-spacing: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid $card-divider;
+}
+
+.entryCount {
+  min-width: 0;
+  color: $ink-muted;
+  font-size: 0.75rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relativeAge {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  color: $ink-muted;
+  font-size: 0.75rem;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.readMore {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: $readmore-rest;
+  position: relative;
+  transition: color 160ms ease-out;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 100%;
+    bottom: -2px;
+    height: 1.5px;
+    background-color: $readmore-underline;
+    transition: right 200ms ease-out;
+  }
+}
+
+.card:hover .readMore {
+  color: $readmore-hover;
+}
+
+.card:hover .readMore::after {
+  right: 0;
+}
+
+.highlight {
+  background-color: var(--color-yellow);
+  color: var(--color-dark-brown);
+  border-radius: 2px;
+  padding: 0 1px;
+}

@@ -11,6 +11,10 @@ class HcbGrantCardSyncJob < ApplicationJob
     return if connection.token_expired?
 
     sync_grant_cards
+    # After every card's amount_cents has been refreshed from HCB, scan for
+    # ledger/reality divergence so admins see current-state warnings without
+    # having to trigger a topup to discover issues.
+    ProjectGrantWarning.scan_all!
   rescue HcbService::Error => e
     ErrorReporter.capture_exception(e, contexts: { hcb: { event: "grant_card_sync_failure" } })
   rescue Faraday::Error => e
@@ -101,6 +105,7 @@ class HcbGrantCardSyncJob < ApplicationJob
       pending: txn_data[:pending] || false,
       declined: txn_data[:declined] || false,
       reversed: txn_data[:reversed] || false,
+      transaction_type: infer_transaction_type(txn_data),
       last_synced_at: Time.current
     )
     if txn.changed?
@@ -118,5 +123,16 @@ class HcbGrantCardSyncJob < ApplicationJob
     return unless merchant
 
     merchant[:smart_name].presence || merchant[:name]
+  end
+
+  # HCB returns two structurally distinct payloads on the same transactions
+  # endpoint: card charges carry a `card_charge` key (real spend at a merchant);
+  # org↔card money movement carries a `transfer` key (topups, withdrawals,
+  # initial grant, refunds). Everything else is "other" — fallback so we don't
+  # leave a nil type.
+  def infer_transaction_type(txn_data)
+    return "purchase" if txn_data[:card_charge].present?
+    return "transfer" if txn_data[:transfer].present?
+    "other"
   end
 end

@@ -18,6 +18,7 @@ interface DataTableProps<TData, TValue> {
   pagy?: PagyProps
   noun?: string
   pageParam?: string
+  rowClassName?: (row: TData) => string | undefined
 }
 
 function goToPage(pageNum: number, param = 'page') {
@@ -46,7 +47,7 @@ function PagyInfo({ pagy, noun = 'results' }: { pagy: PagyProps; noun?: string }
   )
 }
 
-export function DataTable<TData, TValue>({ columns, data, pagy, noun, pageParam }: DataTableProps<TData, TValue>) {
+export function DataTable<TData, TValue>({ columns, data, pagy, noun, pageParam, rowClassName }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
 
   const table = useReactTable({
@@ -76,7 +77,7 @@ export function DataTable<TData, TValue>({ columns, data, pagy, noun, pageParam 
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className={rowClassName?.(row.original)}>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                   ))}

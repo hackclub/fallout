@@ -19,10 +19,14 @@ import {
   Users,
   SlidersHorizontal,
   BriefcaseBusiness,
+  Activity,
   Flag,
   Store,
   ShoppingCart,
   Fish,
+  Soup,
+  ReceiptText,
+  Megaphone,
 } from 'lucide-react'
 
 interface AdminStats {
@@ -38,10 +42,12 @@ interface AdminStats {
 
 interface AdminPermissions {
   is_admin: boolean
+  is_hcb: boolean
   can_review_time_audits: boolean
   can_review_requirements_checks: boolean
   can_review_design_reviews: boolean
   can_review_build_reviews: boolean
+  performance_enabled: boolean
 }
 
 type PermissionKey = keyof AdminPermissions
@@ -112,6 +118,7 @@ function buildNavSections(): { items: NavItem[] }[] {
     },
     {
       items: [
+        { label: 'Bulletin Events', href: '/admin/bulletin_events', icon: Megaphone, statKey: null },
         { label: 'Shop Items', href: '/admin/shop_items', icon: Store, statKey: null, requirePermission: 'is_admin' },
         {
           label: 'Shop Orders',
@@ -127,6 +134,25 @@ function buildNavSections(): { items: NavItem[] }[] {
           statKey: null,
           requirePermission: 'is_admin',
         },
+        {
+          label: 'Soup Campaigns',
+          href: '/admin/soup_campaigns',
+          icon: Soup,
+          statKey: null,
+          requirePermission: 'is_admin',
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          label: 'Project Grants',
+          href: '/admin/project_grants/orders',
+          icon: ReceiptText,
+          statKey: null,
+          requirePermission: 'is_admin',
+        },
+        // Grant Settings lives as a Settings button on the Project Grants page itself.
       ],
     },
     {
@@ -146,6 +172,14 @@ function buildNavSections(): { items: NavItem[] }[] {
           external: true,
           statKey: null,
           requirePermission: 'is_admin',
+        },
+        {
+          label: 'Performance',
+          href: '/admin/performance',
+          icon: Activity,
+          external: true,
+          statKey: null,
+          requirePermission: 'performance_enabled',
         },
       ],
     },
@@ -191,17 +225,22 @@ export default function AdminSidebar() {
   >().props
   const perms: AdminPermissions = admin_permissions ?? {
     is_admin: auth.user?.is_admin ?? false,
+    is_hcb: false,
     can_review_time_audits: false,
     can_review_requirements_checks: false,
     can_review_design_reviews: false,
     can_review_build_reviews: false,
+    performance_enabled: false,
   }
   const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
   const [collapsed, setCollapsed] = useState(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
     try {
-      return localStorage.getItem('admin-sidebar-collapsed') === '1'
+      const stored = localStorage.getItem('admin-sidebar-collapsed')
+      if (stored !== null) return stored !== '0'
+      return isMobile
     } catch {
-      return false
+      return isMobile
     }
   })
   function toggleCollapsed() {
@@ -215,66 +254,93 @@ export default function AdminSidebar() {
   }
   const [dark, toggleDark] = useAdminDark()
 
-  const textClass = `transition-opacity duration-200 ${collapsed ? 'opacity-0' : 'opacity-100'}`
   const iconBtn =
     'p-1 rounded hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-accent-foreground transition-colors cursor-pointer shrink-0'
 
   return (
-    <aside
-      className={`shrink-0 overflow-hidden border-r border-border bg-sidebar text-sidebar-foreground flex flex-col transition-[width] duration-200 ease-in-out sticky top-0 h-screen ${collapsed ? 'w-12' : 'w-56'}`}
-    >
-      {/* Header sits outside the fixed-width wrapper so the collapse button
-          tracks the aside's actual width and stays visible when collapsed. */}
-      <div className="flex items-center px-2.5 py-3 border-b border-sidebar-border">
-        <Link
-          href="/admin"
-          className={`text-sm font-semibold tracking-tight whitespace-nowrap flex-1 min-w-0 truncate ${textClass}`}
+    <>
+      {/* Backdrop — only when expanded */}
+      <div
+        className={`fixed inset-0 z-40 bg-[#000000]/20 transition-opacity duration-200 ${!collapsed ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={toggleCollapsed}
+      />
+
+      {collapsed && (
+        <button
+          onClick={toggleCollapsed}
+          className="fixed top-3 left-3 z-30 sm:hidden p-1 rounded hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-accent-foreground transition-colors cursor-pointer"
+          title="Expand sidebar"
         >
-          Fallout Admin
-        </Link>
-        <button onClick={toggleCollapsed} className={iconBtn} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-          {collapsed ? <ChevronDoubleRightIcon className="size-4" /> : <ChevronDoubleLeftIcon className="size-4" />}
+          <ChevronDoubleRightIcon className="size-4" />
         </button>
-      </div>
+      )}
 
-      <nav className="flex-1 overflow-hidden py-2 px-1.5">
-        {buildNavSections().map((section, i) => {
-          const visibleItems = section.items.filter((item) => !item.requirePermission || perms[item.requirePermission])
-          if (visibleItems.length === 0) return null
-          return (
-            <div key={i}>
-              {i > 0 && <div className="my-2 mx-2 border-t border-sidebar-border" />}
-              <div className="space-y-0.5">
-                {visibleItems.map((item) => renderNavItem(item, pathname, collapsed, admin_stats))}
-              </div>
-            </div>
-          )
-        })}
-      </nav>
-
-      <div className="border-t border-sidebar-border overflow-hidden px-1.5 py-2">
-        <div className="flex items-center gap-2 px-1 whitespace-nowrap">
-          {auth.user && (
-            <>
-              <img src={auth.user.avatar} alt={auth.user.display_name} className="size-6 rounded-full shrink-0" />
-              <span className={`text-xs text-muted-foreground truncate flex-1 ${textClass}`}>
-                {auth.user.display_name}
-              </span>
-            </>
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 overflow-hidden border-r border-border bg-sidebar text-sidebar-foreground flex flex-col transition-transform sm:transition-[width] duration-200 ease-in-out ${collapsed ? '-translate-x-full sm:translate-x-0 w-56 sm:w-12' : 'translate-x-0 w-56'}`}
+      >
+        <div className="flex items-center px-2.5 py-3 border-b border-sidebar-border">
+          {!collapsed && (
+            <Link
+              href="/admin"
+              className="text-sm font-semibold tracking-tight whitespace-nowrap flex-1 min-w-0 truncate"
+            >
+              Fallout Admin
+            </Link>
           )}
-          {!auth.user && <div className="flex-1" />}
-          <Link href="/path" title="Leave Admin" className={iconBtn}>
-            <ArrowLeftStartOnRectangleIcon className="size-4" />
-          </Link>
           <button
-            onClick={toggleDark}
+            onClick={toggleCollapsed}
             className={iconBtn}
-            title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {dark ? <SunIcon className="size-4" /> : <MoonIcon className="size-4" />}
+            {collapsed ? <ChevronDoubleRightIcon className="size-4" /> : <ChevronDoubleLeftIcon className="size-4" />}
           </button>
         </div>
-      </div>
-    </aside>
+
+        <nav className="flex-1 overflow-y-auto py-2 px-1.5">
+          {buildNavSections().map((section, i) => {
+            const visibleItems = section.items.filter(
+              (item) => !item.requirePermission || perms[item.requirePermission],
+            )
+            if (visibleItems.length === 0) return null
+            return (
+              <div key={i}>
+                {i > 0 && <div className="my-2 mx-2 border-t border-sidebar-border" />}
+                <div className="space-y-0.5">
+                  {visibleItems.map((item) => renderNavItem(item, pathname, collapsed, admin_stats))}
+                </div>
+              </div>
+            )
+          })}
+        </nav>
+
+        <div className="border-t border-sidebar-border overflow-hidden px-1.5 py-2">
+          <div className="flex items-center gap-2 px-1 whitespace-nowrap">
+            {auth.user && (
+              <>
+                <img src={auth.user.avatar} alt={auth.user.display_name} className="size-6 rounded-full shrink-0" />
+                {!collapsed && (
+                  <span className="text-xs text-muted-foreground truncate flex-1">{auth.user.display_name}</span>
+                )}
+              </>
+            )}
+            {!auth.user && <div className="flex-1" />}
+            {!collapsed && (
+              <>
+                <Link href="/path" title="Leave Admin" className={iconBtn}>
+                  <ArrowLeftStartOnRectangleIcon className="size-4" />
+                </Link>
+                <button
+                  onClick={toggleDark}
+                  className={iconBtn}
+                  title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {dark ? <SunIcon className="size-4" /> : <MoonIcon className="size-4" />}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </aside>
+    </>
   )
 }

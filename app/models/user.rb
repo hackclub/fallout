@@ -2,26 +2,36 @@
 #
 # Table name: users
 #
-#  id                     :bigint           not null, primary key
-#  avatar                 :string           not null
-#  device_token           :text
-#  discarded_at           :datetime
-#  display_name           :string           not null
-#  email                  :string           not null
-#  hca_token              :text
-#  is_adult               :boolean          default(FALSE), not null
-#  is_banned              :boolean          default(FALSE), not null
-#  lapse_token            :text
-#  onboarded              :boolean          default(FALSE), not null
-#  pending_lookout_tokens :string           default([]), not null, is an Array
-#  roles                  :string           default([]), not null, is an Array
-#  timezone               :string           not null
-#  type                   :string
-#  verification_status    :string
-#  created_at             :datetime         not null
-#  updated_at             :datetime         not null
-#  hca_id                 :string
-#  slack_id               :string
+#  id                          :bigint           not null, primary key
+#  avatar                      :string           not null
+#  ban_reason                  :text
+#  ban_type                    :string
+#  bio                         :text
+#  device_token                :text
+#  discarded_at                :datetime
+#  display_name                :string           not null
+#  email                       :string           not null
+#  gold_balance                :integer          default(0), not null
+#  has_hca_address             :boolean          default(FALSE), not null
+#  hca_token                   :text
+#  is_adult                    :boolean          default(FALSE), not null
+#  is_banned                   :boolean          default(FALSE), not null
+#  lapse_token                 :text
+#  onboarded                   :boolean          default(FALSE), not null
+#  pending_lookout_tokens      :string           default([]), not null, is an Array
+#  pronouns                    :string
+#  roles                       :string           default([]), not null, is an Array
+#  slack_token                 :text
+#  streak_freezes              :integer          default(1), not null
+#  streak_in_app_notifications :boolean          default(TRUE), not null
+#  streak_slack_notifications  :boolean          default(TRUE), not null
+#  timezone                    :string           not null
+#  type                        :string
+#  verification_status         :string
+#  created_at                  :datetime         not null
+#  updated_at                  :datetime         not null
+#  hca_id                      :string
+#  slack_id                    :string
 #
 # Indexes
 #
@@ -56,9 +66,10 @@ class User < ApplicationRecord
     { conditions: sql }
   end
 
+  has_one_attached :custom_avatar
+
   has_many :ahoy_visits, class_name: "Ahoy::Visit", dependent: :nullify
   has_many :ahoy_events, class_name: "Ahoy::Event", dependent: :nullify
-  has_one :latest_locatable_visit, -> { where.not(country: [ nil, "" ]).order(started_at: :desc) }, class_name: "Ahoy::Visit"
   has_many :projects, dependent: :destroy
   has_many :ships, through: :projects
   has_many :reviewed_ships, class_name: "Ship", foreign_key: :reviewer_id, dependent: :nullify, inverse_of: :reviewer
@@ -72,33 +83,55 @@ class User < ApplicationRecord
   has_many :critters, dependent: :destroy
   has_many :koi_transactions, dependent: :destroy
   has_many :acting_koi_transactions, class_name: "KoiTransaction", foreign_key: :actor_id, dependent: :nullify, inverse_of: :actor
+  has_many :gold_transactions, dependent: :destroy
+  has_many :acting_gold_transactions, class_name: "GoldTransaction", foreign_key: :actor_id, dependent: :nullify, inverse_of: :actor
   has_many :shop_orders, dependent: :destroy
+  has_many :streak_days, dependent: :destroy
+  has_many :streak_events, dependent: :destroy
+  has_many :streak_goals, dependent: :destroy
+  has_one :streak_goal, -> { kept }, dependent: :destroy, class_name: "StreakGoal"
   has_many :collaborations, -> { kept }, class_name: "Collaborator", dependent: :destroy
   has_many :collaborated_projects, through: :collaborations, source: :collaboratable, source_type: "Project"
   has_many :received_collaboration_invites, -> { kept }, class_name: "CollaborationInvite", foreign_key: :invitee_id, dependent: :destroy, inverse_of: :invitee
   has_many :sent_collaboration_invites, -> { kept }, class_name: "CollaborationInvite", foreign_key: :inviter_id, dependent: :destroy, inverse_of: :inviter
   has_many :sent_pending_collaboration_invites, -> { kept }, class_name: "PendingCollaborationInvite", foreign_key: :inviter_id, dependent: :destroy, inverse_of: :inviter
+  has_many :dialog_campaigns, dependent: :destroy
   has_many :hcb_grant_cards, dependent: :destroy
   has_one :active_hcb_grant_card, -> { where(status: "active") }, class_name: "HcbGrantCard"
+  has_many :project_grant_orders, dependent: :restrict_with_error
+  has_many :project_funding_topups, dependent: :restrict_with_error
   has_many :reviewer_notes
   has_many :project_flags
 
   encrypts :hca_token
   encrypts :lapse_token
+  encrypts :slack_token
   encrypts :device_token, deterministic: true # Deterministic so find_by lookups work
 
   scope :verified, -> { where(type: nil) } # STI: verified users have type=nil; TrialUser subclass has type='TrialUser'
 
   validates :avatar, :display_name, :email, :timezone, presence: true
+  validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
+  validates :bio, length: { maximum: 100 }, allow_nil: true
   validates :slack_id, presence: true, unless: :trial?
   validates :hca_id, presence: true, unless: :trial?
-  VALID_ROLES = %w[user admin time_auditor requirements_checker pass2_reviewer].freeze
+  VALID_ROLES = %w[user admin time_auditor requirements_checker pass2_reviewer hcb].freeze
   REVIEWER_ROLES = %w[time_auditor requirements_checker pass2_reviewer].freeze
+  # Roles assignable through the admin UI. `user` is structural (managed elsewhere).
+  # `hcb` gates real money movement and is deliberately console-only to prevent an
+  # admin UI compromise from leading directly to HCB writes.
+  ADMIN_ASSIGNABLE_ROLES = (VALID_ROLES - %w[user hcb]).freeze
   SLACK_WELCOME_CHANNELS = %w[C037157AL30 C0ACG0XQWGN C0ACJ290090].freeze
+
+  # Ban types in priority order (highest first). Higher-priority bans take precedence.
+  BAN_PRIORITY = %w[fallout hcb hardware age hackatime].freeze
+  # Ban types set/managed manually by humans — UserBanCheckJob will not override these
+  MANUAL_BAN_TYPES = %w[fallout hcb hardware age].freeze
 
   validates :roles, presence: true, unless: :trial?
   validate :roles_must_be_valid, unless: :trial?
   validates :is_banned, inclusion: { in: [ true, false ] }
+  validates :ban_type, inclusion: { in: BAN_PRIORITY }, allow_nil: true
 
   def has_role?(role)
     roles.include?(role.to_s)
@@ -140,6 +173,13 @@ class User < ApplicationRecord
     has_role?(:pass2_reviewer)
   end
 
+  # The "hcb" role gates real money movement on HCB (issuing project funding grants
+  # and topping them up). Admins without this role can still review/edit grant orders
+  # and adjust HCB grant settings, but cannot push the button that moves money.
+  def hcb?
+    has_role?(:hcb)
+  end
+
   # True if user can review in a specific queue
   def can_review?(queue)
     return true if admin?
@@ -160,6 +200,76 @@ class User < ApplicationRecord
   end
 
   def verified?
+    true
+  end
+
+  def ysws_verified?
+    verification_status == "verified"
+  end
+
+  def fully_identity_gated?
+    ysws_verified? && has_hca_address?
+  end
+
+  def identity_gate_state
+    return :verified_with_address if fully_identity_gated?
+    return :verified_no_address   if ysws_verified?
+    return :pending               if verification_status == "pending"
+
+    :unverified
+  end
+
+  # Sync cached identity fields from an HCA identity hash we already have. Avoids re-hitting
+  # HCA in batch contexts (airtable sync, admin views). Returns true if anything changed.
+  # Promotes any held ships when the user flips to fully_identity_gated?.
+  def apply_identity_cache!(identity)
+    return false if identity.blank?
+
+    new_status = identity["verification_status"].to_s
+    new_has_addr = identity["addresses"].is_a?(Array) && identity["addresses"].any?
+    new_first = identity["first_name"].presence
+    new_last = identity["last_name"].presence
+    primary_country = identity["addresses"].is_a?(Array) ? identity["addresses"].find { |a| a["primary"] }&.dig("country") : nil
+    new_country = User.normalize_country_code(primary_country)
+
+    unchanged = new_status == verification_status.to_s &&
+                new_has_addr == has_hca_address? &&
+                new_first == first_name &&
+                new_last == last_name &&
+                new_country == country
+    return false if unchanged
+
+    was_gated = fully_identity_gated?
+    update!(
+      verification_status: new_status,
+      has_hca_address: new_has_addr,
+      first_name: new_first,
+      last_name: new_last,
+      country: new_country
+    )
+    Ship.promote_awaiting_identity_for(self) if !was_gated && fully_identity_gated?
+    true
+  end
+
+  # Fetch fresh identity from HCA and sync cached fields. Used by the periodic refresh job.
+  # Raises HcaService::InvalidToken if HCA rejects our stored token (401/403); the caller
+  # is expected to handle that by clearing the user's HCA session via #clear_hca_session!.
+  def refresh_identity_cache!
+    return false if hca_token.blank?
+
+    identity = HcaService.identity(hca_token)
+    apply_identity_cache!(identity)
+  end
+
+  # Idempotent: drops the stored HCA token and resets cached identity fields so the user is
+  # treated as unverified on the next request. Invoked when HCA has told us the token is no
+  # longer valid — stops us from hammering HCA with a known-dead token. Intentionally does
+  # NOT demote any ships that were already promoted out of :awaiting_identity; that promotion
+  # is one-way by design and the next successful refresh will restore verified state.
+  def clear_hca_session!
+    return false if hca_token.blank? && verification_status.blank? && !has_hca_address?
+
+    update!(hca_token: nil, verification_status: nil, has_hca_address: false)
     true
   end
 
@@ -199,6 +309,7 @@ class User < ApplicationRecord
       end
 
       user.update(hca_token: access_token, email: email)
+      user.apply_identity_cache!(identity)
       user.refresh_profile_from_slack
       return user
     end
@@ -215,7 +326,6 @@ class User < ApplicationRecord
     avatar = identity["profile_picture"].presence || "/static-assets/pfp_fallback.webp"
     timezone = "UTC"
     slack_id = identity["slack_id"] || ""
-    verification_status = identity["verification_status"] || ""
     is_adult = determine_is_adult(identity)
 
     if email.blank? || !(email =~ URI::MailTo::EMAIL_REGEXP)
@@ -223,6 +333,13 @@ class User < ApplicationRecord
         user_creation: { email: email, hca_id: identity["id"] }
       })
       raise StandardError, "HCA user has an invalid email: #{email.inspect}"
+    end
+
+    if slack_id.blank?
+      ErrorReporter.capture_message("HCA identity missing linked Slack account", level: :warning, contexts: {
+        user_creation: { hca_id: identity["id"] }
+      })
+      raise StandardError, "HCA identity is missing a linked Slack account"
     end
 
     Rails.logger.tagged("UserCreation") do
@@ -235,19 +352,20 @@ class User < ApplicationRecord
       }.to_json)
     end
 
-    User.create!(
+    user = User.create!(
       email: email,
       display_name: display_name,
       avatar: avatar,
       timezone: timezone,
       slack_id: slack_id,
-      verification_status: verification_status,
       hca_token: access_token,
       hca_id: identity["id"],
       is_adult: is_adult,
       is_banned: false,
       roles: [ "user" ]
     )
+    user.apply_identity_cache!(identity)
+    user
   end
 
   def refresh_profile_from_slack
@@ -267,7 +385,6 @@ class User < ApplicationRecord
       profile.image_32.presence ||
       profile.image_24.presence ||
       profile.image_original
-    new_timezone = user_info.user.tz
 
     updates = {}
     updates[:display_name] = new_display_name if new_display_name.present? && display_name != new_display_name
@@ -276,7 +393,6 @@ class User < ApplicationRecord
     elsif avatar.blank?
       updates[:avatar] = "/static-assets/pfp_fallback.webp"
     end
-    updates[:timezone] = new_timezone if new_timezone.present? && timezone != new_timezone
 
     return if updates.empty?
 
@@ -313,15 +429,23 @@ class User < ApplicationRecord
     entry_scope = { project_id: projects.kept.select(:id), discarded_at: nil }
 
     LapseTimelapse.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration).to_i +
-      YouTubeVideo.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration_seconds).to_i +
-      LookoutTimelapse.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration).to_i
+      YouTubeVideo.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(Arel.sql("duration_seconds * stretch_multiplier")).to_i +
+      LookoutTimelapse.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration).to_i +
+      projects.kept.sum(:manual_seconds).to_i
   end
 
   def koi
     return 0 if trial? # Trial users cannot earn or spend koi
 
     koi_transactions.sum(:amount) -
-      shop_orders.where.not(state: :rejected).sum("frozen_price * quantity")
+      shop_orders.joins(:shop_item).where(shop_items: { currency: "koi" }).where.not(state: :rejected).sum("frozen_price * quantity") -
+      project_grant_orders.kept.where.not(state: :rejected).sum(:frozen_koi_amount)
+  end
+
+  def gold
+    return 0 if trial? # Trial users cannot earn or spend gold
+
+    gold_balance
   end
 
   def self.normalize_country_code(country)
@@ -339,14 +463,21 @@ class User < ApplicationRecord
     "M1Rx186e"
   end
 
-  def self.airtable_sync_scope(query)
-    query.includes(:latest_locatable_visit)
-  end
-
   def self.airtable_sync_preload(records)
     user_ids = records.map(&:id)
+    # DISTINCT ON returns one row per user_id (the latest locatable visit), backed by
+    # the partial index index_ahoy_visits_on_user_locatable. Replaces a scoped has_one
+    # eager-load that pulled every visit for every user and sorted in Ruby.
+    latest_visit_country = Ahoy::Visit
+      .where(user_id: user_ids)
+      .where.not(country: [ nil, "" ])
+      .select("DISTINCT ON (user_id) user_id, country")
+      .order(:user_id, started_at: :desc)
+      .each_with_object({}) { |v, h| h[v.user_id] = v.country }
+
     {
-      first_project_created_at: Project.kept.where(user_id: user_ids).group(:user_id).minimum(:created_at)
+      first_project_created_at: Project.kept.where(user_id: user_ids).group(:user_id).minimum(:created_at),
+      latest_visit_country: latest_visit_country
     }
   end
 
@@ -355,12 +486,10 @@ class User < ApplicationRecord
       "ID" => :id,
       "Email" => :email,
       "Display Name" => :display_name,
-      "First Name" => ->(u) { u.hca_identity&.dig("first_name") },
-      "Last Name" => ->(u) { u.hca_identity&.dig("last_name") },
-      "Country" => ->(u) {
-        raw = u.hca_identity&.dig("addresses")&.find { |a| a["primary"] }&.dig("country") ||
-              u.latest_locatable_visit&.country
-        User.normalize_country_code(raw)
+      "First Name" => :first_name,
+      "Last Name" => :last_name,
+      "Country" => ->(u, pre) {
+        u.country.presence || User.normalize_country_code(pre[:latest_visit_country][u.id])
       },
       "First Project Created At" => ->(u, pre) { pre[:first_project_created_at][u.id]&.iso8601 },
       "Created At" => ->(u) { u.created_at&.iso8601 },
@@ -397,6 +526,40 @@ class User < ApplicationRecord
     return nil if hca_token.blank?
 
     @hca_identity ||= HcaService.me(hca_token)&.dig("identity")
+  rescue HcaService::InvalidToken
+    # Persistent auth failure during a web request — degrade to nil so callers like the shop
+    # address picker keep working. HcaIdentityRefreshJob handles clearing stored state.
+    nil
+  end
+
+  def preferred_reminder_hour
+    tz = ActiveSupport::TimeZone[timezone] || ActiveSupport::TimeZone["UTC"]
+    quoted_tz = self.class.connection.quote(tz.tzinfo.identifier)
+
+    # Single query: earliest journal entry per day → extract hour, all in user's local timezone
+    hours = journal_entries.kept
+      .select(Arel.sql("EXTRACT(HOUR FROM MIN(created_at AT TIME ZONE 'UTC' AT TIME ZONE #{quoted_tz}))::int AS hour"))
+      .group(Arel.sql("(created_at AT TIME ZONE 'UTC' AT TIME ZONE #{quoted_tz})::date"))
+      .map(&:hour)
+
+    return 18 if hours.empty?
+
+    hours.sort!
+    median_hour = hours[hours.size / 2]
+
+    entry_ids = journal_entries.kept.select(:id)
+    total_seconds = LapseTimelapse.joins(:recording).where(recordings: { journal_entry_id: entry_ids }).sum(:duration).to_i +
+                    YouTubeVideo.joins(:recording).where(recordings: { journal_entry_id: entry_ids }).sum(Arel.sql("duration_seconds * stretch_multiplier")).to_i +
+                    LookoutTimelapse.joins(:recording).where(recordings: { journal_entry_id: entry_ids }).sum(:duration).to_i
+    avg_duration_hours = (total_seconds.to_f / hours.size / 3600).ceil
+
+    (median_hour - avg_duration_hours).clamp(6, 22)
+  end
+
+  def normalized_slack_id
+    return slack_id unless Rails.env.development?
+
+    slack_id.delete_suffix("_DEV")
   end
 
   private
@@ -409,7 +572,8 @@ class User < ApplicationRecord
 
     LapseService.find_timelapses_by_user(lapse_user["id"]) || []
   rescue StandardError => e
-    ErrorReporter.capture_exception(e, contexts: { lapse: { user_id: id, action: "program_key_fallback" } })
+    # Transient upstream Lapse failure — warning, return empty list so journal flow continues
+    ErrorReporter.capture_exception(e, level: :warning, contexts: { lapse: { user_id: id, action: "program_key_fallback" } })
     []
   end
 
@@ -457,11 +621,5 @@ class User < ApplicationRecord
       ErrorReporter.capture_exception(e, level: :warning, contexts: { slack: { slack_id: slack_id } })
       nil
     end
-  end
-
-  def normalized_slack_id
-    return slack_id unless Rails.env.development?
-
-    slack_id.delete_suffix("_DEV")
   end
 end

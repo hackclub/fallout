@@ -35,6 +35,8 @@ registry:
 env:
   secret:
     - RAILS_MASTER_KEY
+    - SLACK_CLIENT_ID
+    - SLACK_CLIENT_SECRET
   clear:
     # Set number of processes dedicated to Solid Queue (default: 1)
     # JOB_CONCURRENCY: 3

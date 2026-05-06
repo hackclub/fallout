@@ -4,25 +4,28 @@
 #
 # Table name: hcb_grant_cards
 #
-#  id             :bigint           not null, primary key
-#  amount_cents   :integer          not null
-#  balance_cents  :integer
-#  canceled_at    :datetime
-#  category_lock  :string           default([]), not null, is an Array
-#  email          :string
-#  expires_on     :date
-#  keyword_lock   :string
-#  last4          :string
-#  last_synced_at :datetime
-#  merchant_lock  :string           default([]), not null, is an Array
-#  one_time_use   :boolean          default(FALSE), not null
-#  purpose        :string
-#  status         :string           default("active"), not null
-#  created_at     :datetime         not null
-#  updated_at     :datetime         not null
-#  card_id        :string
-#  hcb_id         :string
-#  user_id        :bigint           not null
+#  id                         :bigint           not null, primary key
+#  amount_cents               :integer          not null
+#  balance_cents              :integer
+#  canceled_at                :datetime
+#  category_lock              :string           default([]), not null, is an Array
+#  email                      :string
+#  expires_on                 :date
+#  instructions               :text
+#  invite_message             :text
+#  keyword_lock               :string
+#  last4                      :string
+#  last_synced_at             :datetime
+#  merchant_lock              :string           default([]), not null, is an Array
+#  one_time_use               :boolean          default(FALSE), not null
+#  pre_authorization_required :boolean          default(FALSE), not null
+#  purpose                    :string
+#  status                     :string           default("active"), not null
+#  created_at                 :datetime         not null
+#  updated_at                 :datetime         not null
+#  card_id                    :string
+#  hcb_id                     :string
+#  user_id                    :bigint           not null
 #
 # Indexes
 #
@@ -42,6 +45,7 @@ class HcbGrantCard < ApplicationRecord
 
   belongs_to :user
   has_many :hcb_transactions, dependent: :delete_all # delete_all bypasses HcbTransaction's before_destroy guard
+  has_many :project_funding_topups, dependent: :restrict_with_error
 
   validates :hcb_id, uniqueness: true, allow_nil: true
   validates :status, presence: true, inclusion: { in: STATUSES }
@@ -81,11 +85,14 @@ class HcbGrantCard < ApplicationRecord
       email: user.email,
       purpose: purpose,
       one_time_use: one_time_use,
+      pre_authorization_required: pre_authorization_required,
       merchant_lock: merchant_lock,
       category_lock: category_lock,
       keyword_lock: keyword_lock
     }
     params[:expiration_at] = expires_on.to_s if expires_on.present?
+    params[:instructions] = instructions if instructions.present?
+    params[:invite_message] = invite_message if invite_message.present?
 
     data = HcbService.create_card_grant(params)
 

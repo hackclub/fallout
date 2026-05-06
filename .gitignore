@@ -55,9 +55,13 @@ node_modules
 *.csv
 
 .playwright-mcp/
+.claude/
 docs/plans
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
 .idea/
 *.iml
+
+# Meilisearch local data
+/data.ms/

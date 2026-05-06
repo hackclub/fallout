@@ -6,7 +6,7 @@
 #  address      :text
 #  admin_note   :text
 #  frozen_price :integer          not null
-#  phone        :string
+#  phone        :text
 #  quantity     :integer          default(1), not null
 #  state        :string           default("pending"), not null
 #  created_at   :datetime         not null
@@ -26,6 +26,10 @@
 #  fk_rails_...  (user_id => users.id)
 #
 class ShopOrder < ApplicationRecord
+  # Shipping PII of minors — encrypted at rest. Never queried, so non-deterministic.
+  encrypts :phone
+  encrypts :address
+
   belongs_to :user
   belongs_to :shop_item
 
@@ -33,10 +37,14 @@ class ShopOrder < ApplicationRecord
 
   before_validation :freeze_price, on: :create
 
+  after_create :deduct_gold_balance, if: :gold_order?
+  after_update :sync_gold_balance, if: -> { gold_order? && saved_change_to_state? }
+
   validates :frozen_price, presence: true, numericality: { greater_than: 0 }
   validates :quantity, presence: true, numericality: { greater_than: 0, only_integer: true }
-  validates :address, presence: true
-  validates :phone, presence: true, format: { with: /\A[\d\+\(\)\-\s\.]{7,20}\z/, message: "must be a valid phone number" }
+  validates :address, presence: true, if: -> { shop_item&.requires_shipping? }
+  validates :phone, presence: true, if: -> { shop_item&.requires_shipping? }
+  validate :phone_digit_count
   validate :user_can_afford, on: :create
 
   def self.airtable_sync_base_id
@@ -63,16 +71,44 @@ class ShopOrder < ApplicationRecord
 
   private
 
+  def gold_order?
+    shop_item.currency == "gold"
+  end
+
+  def deduct_gold_balance
+    User.update_counters(user_id, gold_balance: -(frozen_price * quantity))
+  end
+
+  def sync_gold_balance
+    cost = frozen_price * quantity
+    if rejected?
+      User.update_counters(user_id, gold_balance: cost)         # refund when rejected
+    elsif state_before_last_save == "rejected"
+      User.update_counters(user_id, gold_balance: -cost)        # re-deduct if un-rejected
+    end
+  end
+
   def freeze_price
     self.frozen_price ||= shop_item&.price
   end
 
+  def phone_digit_count
+    return unless phone && shop_item&.requires_shipping?
+    errors.add(:phone, "must be a valid phone number") unless phone.gsub(/\D/, "").length.between?(7, 15)
+  end
+
   def user_can_afford
-    return unless user && frozen_price && quantity
+    return unless user && shop_item && frozen_price && quantity
     return if user.trial? # trial users are blocked at policy level
 
-    if user.koi < frozen_price * quantity
-      errors.add(:base, "You don't have enough koi for this purchase")
+    total_cost = frozen_price * quantity
+    case shop_item.currency
+    when "gold"
+      errors.add(:base, "You don't have enough gold for this purchase") if user.gold < total_cost
+    when "hours"
+      errors.add(:base, "This item cannot be purchased directly")
+    else
+      errors.add(:base, "You don't have enough koi for this purchase") if user.koi < total_cost
     end
   end
 end

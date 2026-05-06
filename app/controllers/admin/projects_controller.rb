@@ -1,4 +1,6 @@
 class Admin::ProjectsController < Admin::ApplicationController
+  before_action :require_admin!, except: :show # Mutations require full admin; show is staff-accessible
+
   def index
     base_scope = policy_scope(Project).includes(:user)
     base_scope = base_scope.kept unless params[:include_deleted] == "1"
@@ -51,6 +53,14 @@ class Admin::ProjectsController < Admin::ApplicationController
     render inertia: props
   end
 
+  def update_manual_seconds
+    @project = Project.find(params[:id])
+    authorize @project, :update_manual_seconds?
+    hours = params[:manual_hours].to_f
+    @project.update!(manual_seconds: (hours * 3600).round)
+    redirect_back fallback_location: admin_project_path(@project)
+  end
+
   private
 
   def serialize_project_row(project)
@@ -88,6 +98,7 @@ class Admin::ProjectsController < Admin::ApplicationController
       user_avatar: project.user.avatar,
       journal_entries_count: entry_count,
       hours_tracked: (project.time_logged / 3600.0).round(1),
+      manual_hours: (project.manual_seconds / 3600.0).round(2),
       last_entry_at: last_entry&.strftime("%b %d, %Y"),
       created_at: project.created_at.strftime("%b %d, %Y"),
       collaborators: project.collaborator_users.map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
@@ -147,13 +158,19 @@ class Admin::ProjectsController < Admin::ApplicationController
 
   def recording_duration(recording)
     rec = recording.recordable
-    rec.respond_to?(:duration_seconds) ? rec.duration_seconds.to_i : rec.duration.to_i
+    if rec.is_a?(YouTubeVideo)
+      rec.duration_seconds.to_i * (rec.stretch_multiplier || 1)
+    else
+      rec.respond_to?(:duration_seconds) ? rec.duration_seconds.to_i : rec.duration.to_i
+    end
   end
 
-  def compute_removed_seconds(segments)
+  def compute_removed_seconds(segments, recording: nil, rec_data: {})
+    # YouTube stretch_multiplier lets reviewers treat a YT video as a timelapse (e.g. ×60)
+    multiplier = recording&.recordable.is_a?(YouTubeVideo) ? (rec_data["stretch_multiplier"]&.to_f || 1.0) : 60.0
     segments.sum do |seg|
       video_range = seg["end_seconds"].to_f - seg["start_seconds"].to_f
-      real_range = video_range * 60
+      real_range = video_range * multiplier
       case seg["type"]
       when "removed" then real_range
       when "deflated" then real_range * (seg["deflated_percent"].to_f / 100)
@@ -166,7 +183,7 @@ class Admin::ProjectsController < Admin::ApplicationController
     duration = recording_duration(recording)
     rec_data = rec_annotations[recording.id.to_s] || {}
     segments = rec_data["segments"] || []
-    removed = segments.any? ? compute_removed_seconds(segments) : 0
+    removed = segments.any? ? compute_removed_seconds(segments, recording: recording, rec_data: rec_data) : 0
     {
       id: recording.id,
       type: recording.recordable_type,

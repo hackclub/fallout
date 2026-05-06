@@ -16,6 +16,7 @@ class CollaborationInvitePolicy < ApplicationPolicy
 
   def revoke?
     return false unless collaborators_enabled? && user.present? && record.pending?
-    admin? || record.inviter_id == user.id
+
+    record.inviter_id == user.id # User-facing invite revocation stays with the inviter; admins use admin workflows.
   end
 end

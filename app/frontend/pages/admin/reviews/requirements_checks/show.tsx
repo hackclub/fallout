@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback, memo } from 'react'
+import { useState, useMemo, useCallback, useEffect, memo } from 'react'
 import type { ReactNode } from 'react'
-import { Link, router } from '@inertiajs/react'
+import { Link, router, usePage } from '@inertiajs/react'
 import { useReviewHeartbeat } from '@/hooks/useReviewHeartbeat'
 import ReviewLayout from '@/layouts/ReviewLayout'
 import HoursDisplay from '@/components/admin/HoursDisplay'
@@ -8,6 +8,7 @@ import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { Separator } from '@/components/admin/ui/separator'
 import { Textarea } from '@/components/admin/ui/textarea'
+import { Input } from '@/components/admin/ui/input'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -33,9 +34,11 @@ import {
   GlobeIcon,
   ChevronDownIcon,
   RefreshCwIcon,
+  ArrowUpRightIcon,
 } from 'lucide-react'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import RepoTree from '@/components/admin/RepoTree'
+import { notify } from '@/lib/notifications'
 import type {
   RequirementsCheckReviewDetail,
   RequirementsCheckJournalEntry,
@@ -131,7 +134,7 @@ const JournalEntriesList = memo(function JournalEntriesList({
           </div>
 
           {entry.recordings.length > 0 && (
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
               {entry.recordings.map((rec) => (
                 <div key={rec.id} className="text-xs rounded border border-border p-2 space-y-1">
                   <div className="flex items-center gap-1.5">
@@ -170,7 +173,7 @@ const JournalEntriesList = memo(function JournalEntriesList({
             dangerouslySetInnerHTML={{ __html: entry.content_html }}
           />
           {entry.images.length > 0 && (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {entry.images.map((img, j) => (
                 <a key={j} href={img} target="_blank" rel="noopener noreferrer">
                   <img src={img} alt="" className="rounded border border-border object-cover w-full max-h-24" />
@@ -363,7 +366,7 @@ function TopBar({
   const [flagReason, setFlagReason] = useState('')
 
   return (
-    <div className="z-50 bg-muted/40 border-b border-border px-4 py-2 flex items-center gap-3 shrink-0">
+    <div className="z-50 bg-muted/40 border-b border-border px-4 py-2 flex flex-wrap items-center gap-2 shrink-0">
       <Button variant="outline" size="sm" asChild>
         <Link href="/admin/reviews/requirements_checks">End Session</Link>
       </Button>
@@ -371,7 +374,7 @@ function TopBar({
         Skip
       </Button>
 
-      <Separator orientation="vertical" className="h-6" />
+      <Separator orientation="vertical" className="h-6 hidden sm:block" />
 
       <a
         href={`/admin/projects/${project.id}`}
@@ -381,9 +384,9 @@ function TopBar({
       >
         {project.name}
       </a>
-      <span className="text-sm text-muted-foreground">by {project.user_display_name}</span>
+      <span className="text-sm text-muted-foreground hidden sm:inline">by {project.user_display_name}</span>
 
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center flex-wrap gap-2 ml-auto">
         <Button variant="outline" size="sm" asChild>
           <a href={`/admin/users/${project.user_id}`} target="_blank" rel="noopener noreferrer">
             <UserIcon data-icon="inline-start" />
@@ -464,6 +467,7 @@ interface PageProps {
   sibling_statuses: SiblingStatuses
   repo_tree?: RepoTreeData | null
   refresh_tree_path: string
+  gerber_zip_files_path: string
   reviewer_notes?: ReviewerNote[]
   reviewer_notes_path: string
   project_flagged: boolean
@@ -482,6 +486,7 @@ export default function RequirementsChecksShow({
   sibling_statuses,
   repo_tree,
   refresh_tree_path,
+  gerber_zip_files_path,
   reviewer_notes,
   reviewer_notes_path,
   project_flagged,
@@ -492,13 +497,43 @@ export default function RequirementsChecksShow({
   const isTerminal = review.status !== 'pending'
   useReviewHeartbeat(heartbeat_path)
 
+  const { errors } = usePage<{ errors?: Record<string, string[]> }>().props
+
   const [feedback, setFeedback] = useState(review.feedback || '')
   const [internalReason, setInternalReason] = useState(review.internal_reason || '')
   const [submitting, setSubmitting] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const [flagging, setFlagging] = useState(false)
   const [isFlagged, setIsFlagged] = useState(project_flagged)
+  const [reviewOpen, setReviewOpen] = useState(false)
   const [refreshingTree, setRefreshingTree] = useState(false)
+  const [notes, setNotes] = useState<ReviewerNote[]>(reviewer_notes ?? [])
+  const [checkpointLinkInput, setCheckpointLinkInput] = useState('')
+  const [pendingStatus, setPendingStatus] = useState<'approved' | 'returned' | null>(null)
+
+  useEffect(() => {
+    if (reviewer_notes) setNotes(reviewer_notes)
+  }, [reviewer_notes])
+
+  useEffect(() => {
+    if (isTerminal) return
+    try {
+      const saved = localStorage.getItem(`rc-draft:${review.id}`)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (!review.feedback && parsed.feedback) setFeedback(parsed.feedback)
+        if (!review.internal_reason && parsed.internalReason) setInternalReason(parsed.internalReason)
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleModalClose = useCallback(() => {
+    try {
+      localStorage.setItem(`rc-draft:${review.id}`, JSON.stringify({ feedback, internalReason }))
+    } catch {}
+    setReviewOpen(false)
+  }, [feedback, internalReason, review.id])
 
   const handleRefreshTree = useCallback(async () => {
     setRefreshingTree(true)
@@ -567,8 +602,12 @@ export default function RequirementsChecksShow({
   )
 
   const handleSubmit = useCallback(
-    (status: 'approved' | 'returned') => {
+    (status: 'approved' | 'returned', checkpointMessageUrl?: string) => {
       setSubmitting(true)
+      setPendingStatus(status)
+      try {
+        localStorage.removeItem(`rc-draft:${review.id}`)
+      } catch {}
       const url = skip
         ? `/admin/reviews/requirements_checks/${review.id}?skip=${skip}`
         : `/admin/reviews/requirements_checks/${review.id}`
@@ -580,241 +619,390 @@ export default function RequirementsChecksShow({
             status,
             feedback: feedback.trim() || null,
             internal_reason: internalReason.trim() || null,
+            ...(checkpointMessageUrl ? { checkpoint_message_url: checkpointMessageUrl } : {}),
           } as any,
         },
-        { onFinish: () => setSubmitting(false) },
+        {
+          onSuccess: () => {
+            setFeedback('')
+            setInternalReason('')
+            setPendingStatus(null)
+          },
+          onError: (errs) => {
+            // The checkpoint_message_url error is handled by the AlertDialog below — don't double-notify.
+            const entries = Object.entries(errs as Record<string, string | string[]>).filter(
+              ([k]) => k !== 'checkpoint_message_url',
+            )
+            if (entries.length === 0) return
+            const message = entries
+              .map(([field, val]) => {
+                const msg = Array.isArray(val) ? val.join(', ') : val
+                const label = field.replace(/_/g, ' ')
+                return `${label}: ${msg}`
+              })
+              .join('; ')
+            notify('alert', `Could not submit review — ${message}`)
+          },
+          onFinish: () => setSubmitting(false),
+        },
       )
     },
     [review.id, feedback, internalReason, skip],
   )
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden border-t-3 border-emerald-500">
-      <TopBar
-        project={project}
-        notesCount={reviewer_notes?.length ?? 0}
-        projectFlagged={isFlagged}
-        flagging={flagging}
-        onSkip={handleSkip}
-        onToggleNotes={() => setNotesOpen((v) => !v)}
-        onFlag={handleFlag}
-      />
-
-      {notesOpen && reviewer_notes && (
-        <ProjectNotesWindow
-          notes={reviewer_notes}
-          notesPath={reviewer_notes_path}
-          shipId={review.ship_id}
-          reviewStage="requirements_check"
-          onClose={() => setNotesOpen(false)}
+    <>
+      <div className="h-screen flex flex-col overflow-hidden border-t-3 border-emerald-500">
+        <TopBar
+          project={project}
+          notesCount={notes.length}
+          projectFlagged={isFlagged}
+          flagging={flagging}
+          onSkip={handleSkip}
+          onToggleNotes={() => setNotesOpen((v) => !v)}
+          onFlag={handleFlag}
         />
-      )}
 
-      <div className="flex-1 min-h-0 flex">
-        {/* Left: project info + preflight + journal */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Project overview */}
-          <div className="rounded-md border border-border overflow-hidden">
-            <div className="p-3 space-y-1">
-              <h1 className="text-base font-semibold leading-snug">
-                <a
-                  href={`/admin/projects/${project.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:underline"
+        {notesOpen && reviewer_notes && (
+          <ProjectNotesWindow
+            notes={notes}
+            setNotes={setNotes}
+            notesPath={reviewer_notes_path}
+            shipId={review.ship_id}
+            reviewStage="requirements_check"
+            onClose={() => setNotesOpen(false)}
+          />
+        )}
+
+        <div className="flex-1 min-h-0 sm:flex">
+          <div className="overflow-y-auto p-4 pb-24 sm:pb-4 space-y-4 sm:flex-1">
+            {/* Project overview */}
+            <div className="rounded-md border border-border overflow-hidden">
+              <div className="p-3 space-y-1">
+                <h1 className="text-base font-semibold leading-snug">
+                  <a
+                    href={`/admin/projects/${project.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline"
+                  >
+                    {project.name}
+                  </a>
+                </h1>
+                {project.description && (
+                  <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
+                )}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                  <img src={project.user_avatar} alt="" className="size-4 rounded-full" />
+                  <span className="text-foreground">{project.user_display_name}</span>
+                  <span>|</span>
+                  <span>{project.created_at}</span>
+                  {project.tags.length > 0 && (
+                    <>
+                      <span>|</span>
+                      <span className="text-foreground">{project.tags.join(', ')}</span>
+                    </>
+                  )}
+                  <span>|</span>
+                  <WaitingLabel waitingSince={project.waiting_since} firstSubmittedAt={project.first_submitted_at} />
+                </div>
+              </div>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
+                <div className="px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-0.5">Type</p>
+                  <p className="text-sm font-medium capitalize">{project.ship_type}</p>
+                </div>
+                <div className="px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-0.5">Hours Approved</p>
+                  <p className="text-sm">
+                    <HoursDisplay
+                      publicHours={project.approved_public_hours}
+                      internalHours={project.approved_internal_hours}
+                    />
+                  </p>
+                </div>
+                <div className="px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-0.5">Entries</p>
+                  <p className="text-sm font-mono">{project.entry_count}</p>
+                </div>
+              </div>
+
+              {/* Links row */}
+              {(isSafeUrl(project.frozen_repo_link) || isSafeUrl(project.frozen_demo_link)) && (
+                <div
+                  className={`grid divide-x divide-border border-t border-border ${
+                    isSafeUrl(project.frozen_repo_link) && isSafeUrl(project.frozen_demo_link)
+                      ? 'grid-cols-2'
+                      : 'grid-cols-1'
+                  }`}
                 >
-                  {project.name}
-                </a>
-              </h1>
-              {project.description && (
-                <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
+                  {isSafeUrl(project.frozen_repo_link) && (
+                    <div className="px-3 py-2">
+                      <p className="text-xs text-muted-foreground mb-0.5">Repository</p>
+                      <a
+                        href={project.frozen_repo_link!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
+                      >
+                        {project.frozen_repo_link}
+                      </a>
+                    </div>
+                  )}
+                  {isSafeUrl(project.frozen_demo_link) && (
+                    <div className="px-3 py-2">
+                      <p className="text-xs text-muted-foreground mb-0.5">Demo</p>
+                      <a
+                        href={project.frozen_demo_link!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
+                      >
+                        {project.frozen_demo_link}
+                      </a>
+                    </div>
+                  )}
+                </div>
               )}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                <img src={project.user_avatar} alt="" className="size-4 rounded-full" />
-                <span className="text-foreground">{project.user_display_name}</span>
-                <span>|</span>
-                <span>{project.created_at}</span>
-                {project.tags.length > 0 && (
-                  <>
-                    <span>|</span>
-                    <span className="text-foreground">{project.tags.join(', ')}</span>
-                  </>
-                )}
-                <span>|</span>
-                <WaitingLabel waitingSince={project.waiting_since} firstSubmittedAt={project.first_submitted_at} />
+
+              {/* Sibling review statuses */}
+              <div className="px-3 py-2 border-t border-border flex items-center gap-3 text-xs flex-wrap">
+                <span className="text-muted-foreground">Reviews:</span>
+                <SiblingBadge label="Time Audit" status={sibling_statuses.time_audit} />
+                <SiblingBadge label="Requirements" status={sibling_statuses.requirements_check} />
+                <SiblingBadge label="Design" status={sibling_statuses.design_review} />
+                <SiblingBadge label="Build" status={sibling_statuses.build_review} />
               </div>
+
+              {/* Terminal: review result inline — mobile only, desktop shows in right panel */}
+              {isTerminal && (
+                <div className="sm:hidden px-3 py-2 border-t border-border space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">
+                      Review Complete
+                    </span>
+                    <Badge
+                      className={
+                        review.status === 'approved'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                          : review.status === 'returned'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                            : review.status === 'rejected'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
+                              : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                      }
+                    >
+                      {review.status}
+                    </Badge>
+                    {review.reviewer_display_name && (
+                      <span className="text-xs text-muted-foreground">by {review.reviewer_display_name}</span>
+                    )}
+                  </div>
+                  {review.internal_reason && (
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                      <span className="font-medium">Internal:</span> {review.internal_reason}
+                    </p>
+                  )}
+                  {review.feedback && (
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                      <span className="font-medium">Feedback:</span> {review.feedback}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Stats row */}
-            <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
-              <div className="px-3 py-2">
-                <p className="text-xs text-muted-foreground mb-0.5">Type</p>
-                <p className="text-sm font-medium capitalize">{project.ship_type}</p>
-              </div>
-              <div className="px-3 py-2">
-                <p className="text-xs text-muted-foreground mb-0.5">Hours Approved</p>
-                <p className="text-sm">
-                  <HoursDisplay
-                    publicHours={project.approved_public_hours}
-                    internalHours={project.approved_internal_hours}
-                  />
-                </p>
-              </div>
-              <div className="px-3 py-2">
-                <p className="text-xs text-muted-foreground mb-0.5">Entries</p>
-                <p className="text-sm font-mono">{project.entry_count}</p>
-              </div>
-            </div>
+            {/* Preflight checks */}
+            {preflight.length > 0 && <PreflightResults checks={preflight} />}
 
-            {/* Links row */}
-            {(isSafeUrl(project.frozen_repo_link) || isSafeUrl(project.frozen_demo_link)) && (
-              <div
-                className={`grid divide-x divide-border border-t border-border ${
-                  isSafeUrl(project.frozen_repo_link) && isSafeUrl(project.frozen_demo_link)
-                    ? 'grid-cols-2'
-                    : 'grid-cols-1'
-                }`}
+            {/* Repo tree — GitHub projects only */}
+            {repo_tree && repo_tree.entries?.length > 0 && project.repo_link && (
+              <CollapsibleCard
+                title="Repository"
+                storageKey="rc-repo"
+                summary={
+                  repo_tree.entries.filter((e) => e.type === 'tree').length +
+                  ' dirs | ' +
+                  repo_tree.entries.filter((e) => e.type === 'blob').length +
+                  ' files'
+                }
+                trailing={
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`https://hurt-xi.vercel.app/?repo=${encodeURIComponent(project.repo_link)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
+                    >
+                      Open in HURT
+                      <ArrowUpRightIcon className="size-3" />
+                    </a>
+                    {handleRefreshTree && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRefreshTree()
+                        }}
+                        disabled={refreshingTree}
+                        title="Refresh tree"
+                        className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCwIcon className={`size-3.5 ${refreshingTree ? 'animate-spin' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                }
               >
-                {isSafeUrl(project.frozen_repo_link) && (
-                  <div className="px-3 py-2">
-                    <p className="text-xs text-muted-foreground mb-0.5">Repository</p>
-                    <a
-                      href={project.frozen_repo_link!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
-                    >
-                      {project.frozen_repo_link}
-                    </a>
-                  </div>
-                )}
-                {isSafeUrl(project.frozen_demo_link) && (
-                  <div className="px-3 py-2">
-                    <p className="text-xs text-muted-foreground mb-0.5">Demo</p>
-                    <a
-                      href={project.frozen_demo_link!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
-                    >
-                      {project.frozen_demo_link}
-                    </a>
-                  </div>
-                )}
-              </div>
+                <RepoTree
+                  data={repo_tree}
+                  repoLink={project.repo_link}
+                  bare
+                  gerberZipFilesPath={gerber_zip_files_path}
+                />
+              </CollapsibleCard>
             )}
 
-            {/* Sibling review statuses */}
-            <div className="px-3 py-2 border-t border-border flex items-center gap-3 text-xs">
-              <span className="text-muted-foreground">Reviews:</span>
-              <SiblingBadge label="Time Audit" status={sibling_statuses.time_audit} />
-              <SiblingBadge label="Requirements" status={sibling_statuses.requirements_check} />
-              <SiblingBadge label="Design" status={sibling_statuses.design_review} />
-              <SiblingBadge label="Build" status={sibling_statuses.build_review} />
-            </div>
+            {/* Journal — all entries shown inline */}
+            {allEntries.length > 0 && (
+              <CollapsibleCard
+                title="Journal"
+                storageKey="rc-journal"
+                summary={
+                  <>
+                    Count: {allEntries.length}
+                    {' | '}Total: {(allEntries.reduce((s, e) => s + e.total_duration, 0) / 3600).toFixed(1)}h{' | '}Avg:{' '}
+                    {(allEntries.reduce((s, e) => s + e.total_duration, 0) / allEntries.length / 3600).toFixed(2)}h
+                    {' | '}
+                    Range: {(Math.min(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h –{' '}
+                    {(Math.max(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h
+                  </>
+                }
+                defaultOpen
+              >
+                <JournalEntriesList entries={allEntries} />
+              </CollapsibleCard>
+            )}
           </div>
 
-          {/* Preflight checks */}
-          {preflight.length > 0 && <PreflightResults checks={preflight} />}
-
-          {/* Repo tree — GitHub projects only */}
-          {repo_tree && repo_tree.entries?.length > 0 && project.repo_link && (
-            <CollapsibleCard
-              title="Repository"
-              storageKey="rc-repo"
-              summary={
-                repo_tree.entries.filter((e) => e.type === 'tree').length +
-                ' dirs | ' +
-                repo_tree.entries.filter((e) => e.type === 'blob').length +
-                ' files'
-              }
-              trailing={
-                handleRefreshTree && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRefreshTree()
-                    }}
-                    disabled={refreshingTree}
-                    title="Refresh tree"
-                    className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+          {/* Desktop: divider + right panel */}
+          <div className="hidden sm:block w-px shrink-0 bg-border" />
+          <div className="hidden sm:flex sm:flex-col w-80 shrink-0 overflow-y-auto p-4 space-y-4">
+            {isTerminal ? (
+              <>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Review Complete</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={
+                        review.status === 'approved'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                          : review.status === 'returned'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                            : review.status === 'rejected'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
+                              : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                      }
+                    >
+                      {review.status}
+                    </Badge>
+                    {review.reviewer_display_name && (
+                      <p className="text-xs text-muted-foreground">by {review.reviewer_display_name}</p>
+                    )}
+                  </div>
+                  {review.internal_reason && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Internal Reason</label>
+                      <p className="text-sm whitespace-pre-wrap">{review.internal_reason}</p>
+                    </div>
+                  )}
+                  {review.feedback && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Feedback</label>
+                      <p className="text-sm whitespace-pre-wrap">{review.feedback}</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Submit Review</h3>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">
+                    Internal Reason <span className="opacity-60">(not shown to user)</span>
+                  </label>
+                  <Textarea
+                    value={internalReason}
+                    onChange={(e) => setInternalReason(e.target.value)}
+                    placeholder="Justify your decision..."
+                    className="h-20 text-sm resize-y"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">
+                    Feedback <span className="opacity-60">(shown to user)</span>
+                  </label>
+                  <Textarea
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                    placeholder="Feedback for the project author..."
+                    className="h-20 text-sm resize-y"
+                  />
+                </div>
+                <div className="space-y-2 pt-2">
+                  <Button
+                    className="w-full"
+                    variant="default"
+                    disabled={submitting}
+                    onClick={() => handleSubmit('approved')}
                   >
-                    <RefreshCwIcon className={`size-3.5 ${refreshingTree ? 'animate-spin' : ''}`} />
-                  </button>
-                )
-              }
-            >
-              <RepoTree data={repo_tree} repoLink={project.repo_link} bare />
-            </CollapsibleCard>
-          )}
-
-          {/* Journal — all entries shown inline */}
-          {allEntries.length > 0 && (
-            <CollapsibleCard
-              title="Journal"
-              storageKey="rc-journal"
-              summary={
-                <>
-                  Count: {allEntries.length}
-                  {' | '}Total: {(allEntries.reduce((s, e) => s + e.total_duration, 0) / 3600).toFixed(1)}h{' | '}Avg:{' '}
-                  {(allEntries.reduce((s, e) => s + e.total_duration, 0) / allEntries.length / 3600).toFixed(2)}h{' | '}
-                  Range: {(Math.min(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h –{' '}
-                  {(Math.max(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h
-                </>
-              }
-              defaultOpen
-            >
-              <JournalEntriesList entries={allEntries} />
-            </CollapsibleCard>
-          )}
+                    {submitting ? (
+                      <LoaderIcon className="size-4 animate-spin mr-1" />
+                    ) : (
+                      <CheckIcon data-icon="inline-start" />
+                    )}
+                    Approve
+                  </Button>
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    disabled={submitting || !feedback.trim()}
+                    onClick={() => handleSubmit('returned')}
+                    title={!feedback.trim() ? 'Feedback is required when returning' : undefined}
+                  >
+                    Return (Needs Changes)
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Divider */}
-        <div className="w-px shrink-0 bg-border" />
+        {/* Mobile: floating submit button */}
+        {!isTerminal && (
+          <button
+            className="fixed bottom-6 right-6 z-40 sm:hidden bg-primary text-primary-foreground rounded-full px-4 py-2.5 shadow-lg text-sm font-medium hover:opacity-90 transition-opacity"
+            onClick={() => setReviewOpen(true)}
+          >
+            Review
+          </button>
+        )}
 
-        {/* Right: review form / read-only summary */}
-        <div className="w-80 shrink-0 overflow-y-auto p-4 space-y-4">
-          {isTerminal ? (
-            <>
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Review Complete</h3>
-                <Badge
-                  className={
-                    review.status === 'approved'
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                      : review.status === 'returned'
-                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
-                        : review.status === 'rejected'
-                          ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
-                          : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                  }
-                >
-                  {review.status}
-                </Badge>
-                {review.reviewer_display_name && (
-                  <p className="text-xs text-muted-foreground">by {review.reviewer_display_name}</p>
-                )}
-              </div>
-              {review.internal_reason && (
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Internal Reason</label>
-                  <p className="text-sm whitespace-pre-wrap">{review.internal_reason}</p>
-                </div>
-              )}
-              {review.feedback && (
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Feedback</label>
-                  <p className="text-sm whitespace-pre-wrap">{review.feedback}</p>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
+        {/* Mobile: review modal */}
+        {reviewOpen && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center sm:hidden">
+            <div className="absolute inset-0 bg-[#000000]/20" onClick={handleModalClose} />
+            <div
+              className="relative z-10 w-full bg-background border border-border rounded-t-xl shadow-xl p-4 space-y-4 max-h-[85vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Submit Review</h3>
 
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">
-                  Internal Reason <span className="text-muted-foreground/60">(not shown to user)</span>
+                  Internal Reason <span className="opacity-60">(not shown to user)</span>
                 </label>
                 <Textarea
                   value={internalReason}
@@ -826,7 +1014,7 @@ export default function RequirementsChecksShow({
 
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">
-                  Feedback <span className="text-muted-foreground/60">(shown to user)</span>
+                  Feedback <span className="opacity-60">(shown to user)</span>
                 </label>
                 <Textarea
                   value={feedback}
@@ -861,11 +1049,48 @@ export default function RequirementsChecksShow({
                   Return (Needs Changes)
                 </Button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* Checkpoint message dialog — shown when backend finds no #fallout-checkpoint message */}
+      <AlertDialog open={!!errors?.checkpoint_message_url && !!pendingStatus}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Checkpoint message required</AlertDialogTitle>
+            <AlertDialogDescription>
+              {errors?.checkpoint_message_url?.[0] ?? 'No checkpoint message found.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={checkpointLinkInput}
+            onChange={(e) => setCheckpointLinkInput(e.target.value)}
+            placeholder="https://hackclub.enterprise.slack.com/archives/..."
+            className="mt-2"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setPendingStatus(null)
+                setCheckpointLinkInput('')
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!checkpointLinkInput.trim()}
+              onClick={() => {
+                if (pendingStatus) handleSubmit(pendingStatus, checkpointLinkInput.trim())
+                setCheckpointLinkInput('')
+              }}
+            >
+              Submit with link
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 

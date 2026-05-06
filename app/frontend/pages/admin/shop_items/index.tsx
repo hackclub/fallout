@@ -15,7 +15,9 @@ type ShopItem = {
   image_url: string
   status: 'available' | 'unavailable'
   featured: boolean
-  ticket: boolean
+  currency: 'koi' | 'gold' | 'hours'
+  grants_streak_freeze: boolean
+  requires_shipping: boolean
 }
 
 type RowState = Omit<ShopItem, 'id'>
@@ -27,7 +29,9 @@ const BLANK_ROW: RowState = {
   image_url: '',
   status: 'available',
   featured: false,
-  ticket: false,
+  currency: 'koi',
+  grants_streak_freeze: false,
+  requires_shipping: true,
 }
 
 function itemToRow(item: ShopItem): RowState {
@@ -38,7 +42,9 @@ function itemToRow(item: ShopItem): RowState {
     image_url: item.image_url,
     status: item.status,
     featured: item.featured,
-    ticket: item.ticket,
+    currency: item.currency,
+    grants_streak_freeze: item.grants_streak_freeze,
+    requires_shipping: item.requires_shipping,
   }
 }
 
@@ -69,7 +75,9 @@ function EditableRow({
   saving: boolean
   error?: string
 }) {
-  const [usdInput, setUsdInput] = useState(() => (row.ticket ? '' : String(+(row.price / KOI_PER_USD).toFixed(2))))
+  const [usdInput, setUsdInput] = useState(() =>
+    row.currency === 'koi' || row.currency === 'gold' ? String(+(row.price / KOI_PER_USD).toFixed(2)) : '',
+  )
   const skipSyncRef = useRef(false)
 
   useEffect(() => {
@@ -77,8 +85,8 @@ function EditableRow({
       skipSyncRef.current = false
       return
     }
-    setUsdInput(row.ticket ? '' : String(+(row.price / KOI_PER_USD).toFixed(2)))
-  }, [row.price, row.ticket])
+    setUsdInput(row.currency === 'koi' || row.currency === 'gold' ? String(+(row.price / KOI_PER_USD).toFixed(2)) : '')
+  }, [row.price, row.currency])
 
   const handleUsdChange = useCallback(
     (val: string) => {
@@ -95,7 +103,7 @@ function EditableRow({
   return (
     <TableRow className="align-top">
       <TableCell>
-        <select value={row.status} onChange={(e) => onChange('status', e.target.value)} className={inputClass}>
+        <select value={row.status} onChange={(e) => onChange('status', e.target.value)} className={`${inputClass} whitespace-nowrap`}>
           <option value="available">Available</option>
           <option value="unavailable">Unavailable</option>
         </select>
@@ -111,10 +119,25 @@ function EditableRow({
       <TableCell className="text-center">
         <input
           type="checkbox"
-          checked={!!row.ticket}
-          onChange={(e) => onChange('ticket', e.target.checked)}
+          checked={!!row.grants_streak_freeze}
+          onChange={(e) => onChange('grants_streak_freeze', e.target.checked)}
           className="w-4 h-4 cursor-pointer"
         />
+      </TableCell>
+      <TableCell className="text-center">
+        <input
+          type="checkbox"
+          checked={!!row.requires_shipping}
+          onChange={(e) => onChange('requires_shipping', e.target.checked)}
+          className="w-4 h-4 cursor-pointer"
+        />
+      </TableCell>
+      <TableCell>
+        <select value={row.currency} onChange={(e) => onChange('currency', e.target.value)} className={inputClass}>
+          <option value="koi">Koi</option>
+          <option value="gold">Gold</option>
+          <option value="hours">Hours</option>
+        </select>
       </TableCell>
       <TableCell>
         <input
@@ -134,11 +157,13 @@ function EditableRow({
             onChange={(e) => onChange('price', e.target.value)}
             className={inputClass}
           />
-          <span className="text-xs text-muted-foreground shrink-0">{row.ticket ? 'h' : 'koi'}</span>
+          <span className="text-xs text-muted-foreground shrink-0">
+            {row.currency === 'hours' ? 'h' : row.currency}
+          </span>
         </div>
       </TableCell>
       <TableCell>
-        {!row.ticket && (
+        {(row.currency === 'koi' || row.currency === 'gold') && (
           <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground shrink-0">$</span>
             <input
@@ -193,12 +218,10 @@ function EditableRow({
 
 export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopItem[] }) {
   const { errors } = usePage<SharedProps>().props
-  const shopItemsRef = useRef(shop_items)
   const [rows, setRows] = useState<Record<number, RowState>>(
     Object.fromEntries(shop_items.map((item) => [item.id, itemToRow(item)])),
   )
   useEffect(() => {
-    shopItemsRef.current = shop_items
     setRows((prev) => {
       const next = { ...prev }
       shop_items.forEach((item) => {
@@ -226,12 +249,6 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
       { shop_item: row },
       {
         preserveScroll: true,
-        preserveState: true,
-        onSuccess: () => {
-          setSaving((prev) => ({ ...prev, [item.id]: false }))
-          const fresh = shopItemsRef.current.find((i) => i.id === item.id)
-          if (fresh) setRows((prev) => ({ ...prev, [fresh.id]: itemToRow(fresh) }))
-        },
         onError: () => {
           setSaving((prev) => ({ ...prev, [item.id]: false }))
           setRowErrors((prev) => ({ ...prev, [item.id]: 'Failed to save' }))
@@ -302,10 +319,12 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
             <TableRow>
               <TableHead className="whitespace-nowrap">Status</TableHead>
               <TableHead className="whitespace-nowrap">Featured</TableHead>
-              <TableHead className="whitespace-nowrap">Ticket</TableHead>
+              <TableHead className="whitespace-normal">Streak Freeze</TableHead>
+              <TableHead className="whitespace-normal">Needs Shipping</TableHead>
+              <TableHead className="whitespace-nowrap">Currency</TableHead>
               <TableHead className="min-w-36">Name</TableHead>
-              <TableHead className="min-w-16">Price</TableHead>
-              <TableHead className="min-w-16">USD</TableHead>
+              <TableHead className="min-w-24">Price</TableHead>
+              <TableHead className="min-w-24">USD</TableHead>
               <TableHead className="min-w-52">Description</TableHead>
               <TableHead className="min-w-48">Image URL</TableHead>
               <TableHead></TableHead>
@@ -341,7 +360,7 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
             )}
             {shop_items.length === 0 && !newRow && (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                   No shop items yet.
                 </TableCell>
               </TableRow>

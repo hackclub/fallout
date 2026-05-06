@@ -9,7 +9,7 @@ class JournalEntriesController < ApplicationController
       collaborated_project_ids = Collaborator.kept.where(user: current_user, collaboratable_type: "Project").select(:collaboratable_id)
       projects = projects.or(Project.kept.where(id: collaborated_project_ids))
     end
-    projects = projects.includes(:collaborator_users, :user)
+    projects = projects.includes(:collaborator_users, :user) if collaborators_enabled?
 
     if params[:project_id]
       @project = projects.find(params[:project_id])
@@ -20,12 +20,16 @@ class JournalEntriesController < ApplicationController
 
     lapse_connected = current_user.lapse_token.present? || ENV["LAPSE_PROGRAM_KEY"].present?
 
+    streak_data = streak_data_for_warning(current_user)
+
     render inertia: "journal_entries/new", props: {
       projects: projects.map { |p| serialize_project_for_journal(p) },
       selected_project_id: @project&.id,
       lapse_connected: lapse_connected,
       is_modal: request.headers["X-InertiaUI-Modal"].present?,
       direct_upload_url: rails_direct_uploads_url,
+      streak_seconds_logged: streak_data[:seconds_logged],
+      streak_threshold: streak_data[:threshold],
       lookout_timelapses: InertiaRails.defer {
         tokens = current_user.pending_lookout_tokens
         if tokens.any?
@@ -68,56 +72,130 @@ class JournalEntriesController < ApplicationController
     lookout_tokens = Array(params[:lookout_tokens]).map(&:to_s).uniq
     collaborator_ids = Array(params[:collaborator_ids]).map(&:to_i).uniq
 
-    ActiveRecord::Base.transaction do
-      @journal_entry.save!
+    begin
+      ActiveRecord::Base.transaction do
+        @journal_entry.save!
 
-      Array(params[:images]).each { |signed_id| @journal_entry.images.attach(signed_id) }
+        journal_image_signed_ids.each { |signed_id| @journal_entry.images.attach(signed_id) }
 
-      timelapse_ids.each do |tid|
-        timelapse = current_user.lapse_timelapses.create!(lapse_timelapse_id: tid)
-        timelapse.refetch_data! # Fetches from Lapse API to verify and populate cached fields
-        @journal_entry.recordings.create!(recordable: timelapse, user: current_user)
-      end
+        timelapse_ids.each do |tid|
+          timelapse = current_user.lapse_timelapses.find_or_create_by!(lapse_timelapse_id: tid)
+          timelapse.refetch_data! # Fetches from Lapse API to verify and populate cached fields
+          @journal_entry.recordings.create!(recordable: timelapse, user: current_user)
+        end
 
-      youtube_video_ids.each do |vid|
-        video = YouTubeVideo.find(vid)
-        @journal_entry.recordings.create!(recordable: video, user: current_user)
-      end
+        youtube_video_ids.each do |vid|
+          video = YouTubeVideo.find(vid)
+          # Refuse to attach a video already claimed by another user via a Recording.
+          # The unique constraint on (recordable_type, recordable_id) would reject the
+          # insert anyway, but we fail explicitly so attackers can't probe ID space.
+          if (existing = Recording.find_by(recordable: video)) && existing.user_id != current_user.id
+            raise ActiveRecord::RecordNotFound, "YouTube video not available"
+          end
+          @journal_entry.recordings.create!(recordable: video, user: current_user)
+        end
 
-      lookout_tokens.each do |token|
-        raise ActiveRecord::RecordNotFound, "Token not in pending list" unless current_user.pending_lookout_tokens.include?(token)
+        lookout_tokens.each do |token|
+          raise ActiveRecord::RecordNotFound, "Token not in pending list" unless current_user.pending_lookout_tokens.include?(token)
 
-        lookout = current_user.lookout_timelapses.create!(session_token: token)
-        lookout.refetch_data!
-        @journal_entry.recordings.create!(recordable: lookout, user: current_user)
+          lookout = current_user.lookout_timelapses.find_or_create_by!(session_token: token)
+          lookout.refetch_data!
+          @journal_entry.recordings.create!(recordable: lookout, user: current_user)
 
-        current_user.update!(pending_lookout_tokens: current_user.pending_lookout_tokens - [ token ])
-      end
+          current_user.update!(pending_lookout_tokens: current_user.pending_lookout_tokens - [ token ])
+        end
 
-      # Add journal entry collaborators — only project participants (owner + collaborators) minus the creator
-      if collaborators_enabled?
-        collaborator_ids.each do |uid|
-          collab_user = User.verified.kept.find_by(id: uid)
-          next unless collab_user && collab_user.id != current_user.id
-          next unless @project.owner_or_collaborator?(collab_user)
-          @journal_entry.collaborators.create!(user: collab_user)
+        # Add journal entry collaborators — only project participants (owner + collaborators) minus the creator
+        if collaborators_enabled?
+          collaborator_ids.each do |uid|
+            collab_user = User.verified.kept.find_by(id: uid)
+            next unless collab_user && collab_user.id != current_user.id
+            next unless @project.owner_or_collaborator?(collab_user)
+            @journal_entry.collaborators.create!(user: collab_user)
+          end
         end
       end
+    rescue ActiveRecord::RecordInvalid => e
+      return render_journal_entry_error(friendly_journal_entry_error(e.record))
     end
 
     critter = maybe_award_critter(@journal_entry, current_user)
     award_critters_to_collaborators(@journal_entry)
+    StreakService.record_activity(current_user)
+
+    # Invalidate the streak-warning cache for today (see streak_data_for_warning) so the next /journal_entries/new
+    # reflects the just-added recordings rather than a stale 30s-cached value.
+    today = Time.current.in_time_zone(current_user.timezone).to_date
+    Rails.cache.delete("streak_seconds:#{current_user.id}:#{today}")
+
+    if current_user.journal_entries.kept.count == 1
+      current_user.dialog_campaigns.find_or_create_by!(key: "first_journal") { |c| c.seen_at = nil }
+    end
 
     if critter
       redirect_to critter_path(critter)
     else
-      # Redirect to path when created from the journal modal so it closes and the path updates
       destination = params[:return_to] == "path" ? path_path : project_path(@project)
       redirect_to destination, notice: "Journal created."
     end
   end
 
+  def destroy
+    @journal_entry = JournalEntry.kept.find(params[:id])
+    authorize @journal_entry
+
+    source_project = @journal_entry.project
+    unless @journal_entry.discard
+      return render_journal_entry_error("Could not delete this journal entry. Please try again.")
+    end
+
+    if modal_json_request?
+      head :no_content
+    else
+      redirect_to project_path(source_project), notice: "Journal entry deleted."
+    end
+  end
+
+  def switch_project
+    @journal_entry = JournalEntry.kept.includes(:project).find(params[:id])
+    authorize @journal_entry, :switch_project?
+
+    new_project = Project.kept.find(params[:project_id])
+    authorize JournalEntry.new(user: current_user, project: new_project), :create? # Re-check project access for the destination project
+
+    source_project = @journal_entry.project
+    if source_project.ships.approved.exists? || new_project.ships.approved.exists?
+      return render_switch_project_error("Cannot move a journal entry from or to an approved project.")
+    end
+
+    if @journal_entry.update(project: new_project)
+      if modal_json_request?
+        head :no_content
+      else
+        redirect_to project_path(source_project), notice: "Journal moved."
+      end
+    else
+      render_switch_project_error(@journal_entry.errors.full_messages.to_sentence)
+    end
+  end
+
   private
+
+  def journal_image_signed_ids
+    submitted = Array(params[:images]).map(&:to_s)
+    (submitted + markdown_image_signed_ids(params[:content].to_s)).filter_map(&:presence).uniq
+  end
+
+  def markdown_image_signed_ids(content)
+    prefix = Regexp.escape(Rails.application.config.active_storage.routes_prefix)
+    content.scan(%r{#{prefix}/blobs/(?:redirect/|proxy/)?([^)\s"'<>/]+)}).flatten.filter_map do |signed_id|
+      signed_id = Rack::Utils.unescape_path(signed_id)
+      blob = ActiveStorage::Blob.find_signed(signed_id)
+      blob&.image? ? signed_id : nil
+    rescue ActiveSupport::MessageVerifier::InvalidSignature, ArgumentError
+      nil
+    end
+  end
 
   def maybe_award_critter(journal_entry, user)
     return nil unless user.can_earn_critter?
@@ -146,5 +224,57 @@ class JournalEntriesController < ApplicationController
     end
 
     { id: project.id, name: project.name, potential_collaborators: potential }
+  end
+
+  def streak_data_for_warning(user)
+    if user.trial?
+      { seconds_logged: nil, threshold: nil }
+    else
+      today = Time.current.in_time_zone(user.timezone).to_date
+      streak_day = StreakDay.find_by(user: user, date: today)
+      if streak_day&.status_active?
+        { seconds_logged: nil, threshold: nil } # Already hit the threshold — no warning needed
+      else
+        # Short-cache the 3-SUM aggregation — drives a UI warning, so a few seconds of staleness is fine.
+        # Explicitly invalidated by JournalEntriesController#create after recordings are attached;
+        # the 30s TTL is a safety net for any path that adds recordings without going through #create.
+        seconds_logged = Rails.cache.fetch("streak_seconds:#{user.id}:#{today}", expires_in: 30.seconds) do
+          StreakService.daily_seconds_logged(user, today)
+        end
+        { seconds_logged: seconds_logged, threshold: StreakService::STREAK_THRESHOLD_SECONDS }
+      end
+    end
+  end
+
+  def render_switch_project_error(message)
+    if modal_json_request? || request.headers["X-Inertia"].present?
+      render json: { errors: { base: [ message ] } }, status: :unprocessable_entity
+    else
+      redirect_back fallback_location: projects_path, inertia: { errors: { base: [ message ] } }
+    end
+  end
+
+  def render_journal_entry_error(message)
+    fallback = @project ? new_project_journal_entry_path(@project) : new_journal_entry_path
+    if modal_json_request? || request.headers["X-Inertia"].present?
+      render json: { errors: { base: [ message ] } }, status: :unprocessable_entity
+    else
+      redirect_back fallback_location: fallback, inertia: { errors: { base: [ message ] } }
+    end
+  end
+
+  # Translate recording/timelapse uniqueness failures into a generic user-facing
+  # message without leaking which account already claimed the underlying asset.
+  def friendly_journal_entry_error(record)
+    case record
+    when Recording, LapseTimelapse, YouTubeVideo, LookoutTimelapse
+      "One of the selected recordings is already attached to another journal entry."
+    else
+      record.errors.full_messages.to_sentence.presence || "Unable to save journal entry."
+    end
+  end
+
+  def modal_json_request?
+    request.format.json? || request.headers["X-InertiaUI-Modal"].present?
   end
 end

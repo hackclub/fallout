@@ -22,24 +22,39 @@ class ProjectPolicy < ApplicationPolicy
   end
 
   def update?
-    return false if record.discarded? && !admin?
-    admin? || owner?
+    return false if record.discarded?
+
+    owner? # User-facing project edits are owner-only; admins use /admin or Airtable.
+  end
+
+  def update_manual_seconds?
+    admin? # Admin-only: manual time overrides for legacy projects
   end
 
   def destroy?
     return false if record.discarded?
-    admin? || owner?
+
+    owner? # User-facing project deletes are owner-only; admins use /admin or Airtable.
+  end
+
+  def export_journal?
+    return false if record.discarded?
+
+    admin? || owner? # Journal export contains full project history/media links; restrict to owner/admin only.
   end
 
   def ship?
     return false if record.discarded?
-    return false if record.ships.pending.exists? # Block while a submission is already pending review
+    return false if record.ships.where(status: %i[pending awaiting_identity]).exists? # Block while a submission is queued or held for identity verification
+    return false unless user.present?
+
     !user.trial? && owner? # Only verified project owners can submit for review
   end
 
   def manage_collaborators?
     return false unless user.present? && !user.trial? && collaborators_enabled?
-    admin? || owner? # Only verified project owners can send/revoke invites (flag-gated)
+
+    owner? # Only verified project owners manage collaborators from the user-facing project page.
   end
 
   class Scope < ApplicationPolicy::Scope
