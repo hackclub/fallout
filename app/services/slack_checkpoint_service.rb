@@ -35,21 +35,7 @@ class SlackCheckpointService
     )
     permalink_response.permalink
   rescue Slack::Web::Api::Errors::SlackError, Faraday::Error => e
-    Rails.logger.warn(
-      "SlackCheckpointService.post_review_thread failed: #{e.class}: #{e.message} " \
-      "(channel=#{CHANNEL_ID}, thread_ts=#{message_ts}, ship_id=#{ship.id}, review_type=#{review_type})"
-    )
-    ErrorReporter.capture_exception(
-      e,
-      contexts: {
-        slack_checkpoint_thread: {
-          channel: CHANNEL_ID,
-          thread_ts: message_ts,
-          ship_id: ship.id,
-          review_type: review_type
-        }
-      }
-    )
+    Rails.logger.warn("SlackCheckpointService.find_checkpoint_message failed: #{e.class}: #{e.message}")
     nil
   end
 
@@ -99,30 +85,14 @@ class SlackCheckpointService
 
     tasks = build_plan_tasks(ship, review_type)
 
-    card_actions = build_card_actions(project_url, repo_url)
-
-    icon_url = resize_avatar_url(project.user.avatar, base_url: base_url)
-
-    card_block = {
-      type: "card",
-      icon: {
-        type: "image",
-        image_url: icon_url || project.user.avatar,
-        alt_text: project.user.display_name
-      },
-      title: { type: "mrkdwn", text: project.name, verbatim: false },
-      subtitle: { type: "mrkdwn", text: project.user.display_name, verbatim: false },
-      body: { type: "mrkdwn", text: project.description.to_s.truncate(280), verbatim: false },
-      actions: card_actions
-    }
-
-    if cover_image_url.present?
-      card_block[:hero_image] = {
-        type: "image",
-        image_url: cover_image_url,
-        alt_text: "#{project.name} cover image"
-      }
-    end
+    icon_url = SlackAvatarService.card_icon_url(avatar_url: project.user.avatar, base_url: base_url)
+    card_block = SlackProjectCardService.build_card_block(
+      project: project,
+      project_url: project_url,
+      repo_url: repo_url,
+      cover_image_url: cover_image_url,
+      icon_url: icon_url
+    )
 
     plan_status = tasks.any? { |t| t[:status] == "error" } ? "error" : "complete"
 
@@ -249,54 +219,4 @@ class SlackCheckpointService
     task
   end
   private_class_method :build_task
-
-  def self.build_card_actions(project_url, repo_url)
-    actions = [ {
-      type: "button",
-      text: { type: "plain_text", text: "View Project", emoji: false },
-      action_id: "view_project",
-      url: project_url
-    } ]
-
-    if repo_url.present?
-      actions << {
-        type: "button",
-        text: { type: "plain_text", text: "GitHub", emoji: false },
-        action_id: "view_repo",
-        url: repo_url
-      }
-    end
-
-    actions
-  end
-  private_class_method :build_card_actions
-
-  def self.resize_avatar_url(avatar_url, base_url:)
-    return nil if avatar_url.blank?
-
-    require "open-uri"
-
-    source = Tempfile.new([ "review_avatar_source", ".img" ])
-    source.binmode
-    URI.open(avatar_url, read_timeout: 10) { |io| source.write(io.read) } # rubocop:disable Security/Open
-    source.flush
-
-    output = Tempfile.new([ "review_avatar", ".jpg" ])
-    Vips::Image.thumbnail(source.path, 30, height: 30, crop: :centre).jpegsave(output.path, Q: 85)
-
-    blob = ActiveStorage::Blob.create_and_upload!(
-      io: File.open(output.path),
-      filename: "review_avatar_#{SecureRandom.hex(6)}.jpg",
-      content_type: "image/jpeg"
-    )
-
-    Rails.application.routes.url_helpers.rails_blob_url(blob, host: base_url)
-  rescue StandardError => e
-    Rails.logger.warn("SlackCheckpointService.resize_avatar_url failed: #{e.class}: #{e.message}")
-    nil
-  ensure
-    source&.close!
-    output&.close!
-  end
-  private_class_method :resize_avatar_url
 end

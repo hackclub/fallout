@@ -79,6 +79,16 @@ User messaging and channel management via bot token.
 - **Used by**: `AuthController#create` (post-HCA verification welcome), `User#refresh_profile_from_slack`
 - **Env**: `SLACK_BOT_TOKEN`
 
+#### Native link unfurls
+
+- **Endpoint:** `POST /slack/events` (`Slack::EventsController#create`)
+- **Auth:** request signature verification using `SLACK_SIGNING_SECRET` (`X-Slack-Signature`, `X-Slack-Request-Timestamp`)
+- **Events:** handles `url_verification` + `event_callback` `link_shared`
+- **Supported URLs:**
+  - `https://fallout.hackclub.com/projects/:id`
+  - `https://fallout.hackclub.com/bulletin_board?project=:id`
+- **Response:** calls `chat.unfurl` with the same native `card` block structure used in review thread messages (title/subtitle/body/actions/hero image/icon)
+
 ### MailDeliveryService — `app/services/mail_delivery_service.rb`
 
 Creates in-app MailMessage notifications. Not an external integration — purely internal, but lives in `services/` because it's a stateless service object.

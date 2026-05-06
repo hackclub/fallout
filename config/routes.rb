@@ -357,6 +357,7 @@ Rails.application.routes.draw do
 
   get "auth/slack/start" => "slack_auth#start", as: :slack_start
   get "auth/slack/callback" => "slack_auth#callback", as: :slack_callback
+  post "slack/events" => "slack/events#create", as: :slack_events
 
   get "auth/hcb/start" => "hcb_auth#start", as: :hcb_start
   get "auth/hcb/callback" => "hcb_auth#callback", as: :hcb_callback
@@ -384,6 +385,9 @@ Rails.application.routes.draw do
 
   # Campaign-based dialog system — marks a one-time dialog as seen via plain fetch (not Inertia)
   post "dialog_campaigns/:key/mark_seen", to: "dialog_campaigns#mark_seen", as: :mark_seen_dialog_campaign
+
+  # Summit RSVP — saved from the 60-hours soup dialog
+  patch "profile/summit_rsvp", to: "profiles#summit_rsvp", as: :summit_rsvp
 
   resources :critters, only: [ :show, :update ], path: "spin" # Gacha spin reveal page
   get "clearing" => "clearing#index", as: :clearing
