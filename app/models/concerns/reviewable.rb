@@ -102,10 +102,13 @@ module Reviewable
       {
         "Review ID" => ->(r) { "#{r.class.review_id_prefix}#{r.id}" },
         "Review Type" => ->(r) { r.class.name },
-        "Ship ID" => :ship_id,
-        "Project ID" => ->(r, pre) { pre[:ships][r.ship_id]&.first },
-        "User ID" => ->(r, pre) { pre[:ships][r.ship_id]&.last },
-        "Reviewer ID" => :reviewer_id,
+        # Linked-record fields. Airtable typecast (enabled in upload_or_create!) matches
+        # the array of primary-field values against the linked table's primary field, so
+        # each value is sent as [id.to_s] rather than a bare integer.
+        "Ship ID" => ->(r) { r.ship_id ? [ r.ship_id.to_s ] : nil },
+        "Project ID" => ->(r, pre) { (pid = pre[:ships][r.ship_id]&.first) ? [ pid.to_s ] : nil },
+        "User ID" => ->(r, pre) { (uid = pre[:ships][r.ship_id]&.last) ? [ uid.to_s ] : nil },
+        "Reviewer ID" => ->(r) { r.reviewer_id ? [ r.reviewer_id.to_s ] : nil },
         "Status" => ->(r) { r.status },
         "Feedback" => :feedback,
         "Created At" => ->(r) { r.created_at&.iso8601 },

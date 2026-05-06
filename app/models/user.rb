@@ -496,6 +496,7 @@ class User < ApplicationRecord
       },
       "First Project Created At" => ->(u, pre) { pre[:first_project_created_at][u.id]&.iso8601 },
       "Created At" => ->(u) { u.created_at&.iso8601 },
+      "Deleted At" => ->(u) { u.discarded_at&.iso8601 },
       "Email Verified" => ->(u) { !u.trial? }
     }
   end

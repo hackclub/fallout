@@ -140,6 +140,7 @@ class Project < ApplicationRecord
       "Description" => :description,
       "Repo Link" => :repo_link,
       "Created At" => ->(p) { p.created_at&.iso8601 },
+      "Deleted At" => ->(p) { p.discarded_at&.iso8601 },
       "Author" => ->(p) { p.user&.id },
       "Hours Logged" => ->(p, pre) { (pre[:hours_logged][p.id] || 0).round(2) }
     }
