@@ -3,7 +3,7 @@
 # Returns the permalink of the matching message, or nil if none is found.
 class SlackCheckpointService
   CHANNEL_ID = "C0ATLF0ALBW"
-  MAX_TASK_TEXT_CHARS = 1200
+  MIN_TASK_TEXT_CHARS = 160
 
   REVIEW_LABELS = {
     "time_audit"          => "Time Audit",
@@ -97,23 +97,34 @@ class SlackCheckpointService
 
     plan_status = tasks.any? { |t| t[:status] == "error" } ? "error" : "complete"
 
-    blocks = [
-      {
-        type: "plan",
-        plan_id: "plan_#{ship.id}_#{review_type}",
-        title: review_label,
-        status: plan_status,
-        tasks: tasks
-      },
-      card_block
-    ]
+    limit = nil
 
-    client.chat_postMessage(
-      channel: CHANNEL_ID,
-      thread_ts: message_ts,
-      text: "#{project.name} — #{review_label} review submitted",
-      blocks: blocks.to_json
-    )
+    loop do
+      blocks = [
+        {
+          type: "plan",
+          plan_id: "plan_#{ship.id}_#{review_type}",
+          title: review_label,
+          status: plan_status,
+          tasks: truncate_tasks_for_slack(tasks, limit)
+        },
+        card_block
+      ]
+
+      return client.chat_postMessage(
+        channel: CHANNEL_ID,
+        thread_ts: message_ts,
+        text: "#{project.name} — #{review_label} review submitted",
+        blocks: blocks.to_json
+      )
+    rescue Slack::Web::Api::Errors::InvalidBlocks
+      next_limit = next_task_truncate_limit(limit)
+      break if next_limit.nil?
+
+      limit = next_limit
+    end
+
+    nil
   rescue Slack::Web::Api::Errors::SlackError, Faraday::Error
     nil
   end
@@ -183,7 +194,6 @@ class SlackCheckpointService
     end
 
     detail = review.feedback.to_s.presence || review.status.to_s.capitalize
-    detail = truncate_for_slack(detail)
     build_task(
       task_id: "#{key}_#{review.id}",
       title: label_override || REVIEW_LABELS[key],
@@ -213,7 +223,7 @@ class SlackCheckpointService
         type: "rich_text",
         elements: [ {
           type: "rich_text_section",
-          elements: [ { type: "text", text: truncate_for_slack(prior_output) } ]
+          elements: [ { type: "text", text: prior_output } ]
         } ]
       }
     end
@@ -222,8 +232,32 @@ class SlackCheckpointService
   end
   private_class_method :build_task
 
-  def self.truncate_for_slack(text)
-    text.to_s.truncate(MAX_TASK_TEXT_CHARS, omission: "...")
+  def self.truncate_tasks_for_slack(tasks, limit)
+    return tasks if limit.nil?
+
+    tasks.map do |task|
+      shrunk = task.deep_dup
+
+      detail_text = shrunk.dig(:details, :elements, 0, :elements, 0, :text)
+      if detail_text
+        shrunk[:details][:elements][0][:elements][0][:text] = detail_text.to_s.truncate(limit, omission: "...")
+      end
+
+      output_text = shrunk.dig(:output, :elements, 0, :elements, 0, :text)
+      if output_text
+        shrunk[:output][:elements][0][:elements][0][:text] = output_text.to_s.truncate(limit, omission: "...")
+      end
+
+      shrunk
+    end
   end
-  private_class_method :truncate_for_slack
+  private_class_method :truncate_tasks_for_slack
+
+  def self.next_task_truncate_limit(current_limit)
+    return 1200 if current_limit.nil?
+
+    next_limit = (current_limit * 0.75).floor
+    next_limit >= MIN_TASK_TEXT_CHARS ? next_limit : nil
+  end
+  private_class_method :next_task_truncate_limit
 end

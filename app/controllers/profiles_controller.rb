@@ -55,6 +55,15 @@ class ProfilesController < ApplicationController
     render json: { avatar_url: current_user.avatar }
   end
 
+  def summit_rsvp
+    skip_authorization
+    rsvp = params[:rsvp].presence
+    return head :bad_request unless %w[yup maybe maybe_not].include?(rsvp)
+
+    current_user.update!(summit_rsvp: rsvp)
+    head :no_content
+  end
+
   def set_slack_photo
     skip_authorization
     return head :bad_request if params[:image_data].blank?

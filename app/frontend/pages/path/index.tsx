@@ -193,6 +193,42 @@ export default function PathIndex() {
     [visitModal],
   )
 
+  const saveSummitRsvp = useCallback((rsvp: string) => {
+    fetch('/profile/summit_rsvp', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '',
+      },
+      body: JSON.stringify({ rsvp }),
+    })
+  }, [])
+
+  const sixtyHoursScript = useCallback(
+    (): DialogScript => ({
+      mascotSrc: '/onboarding/chinese_heidi.webp',
+      speakerName: 'Soup',
+      steps: [
+        { text: `${user.display_name}!!! AUIHSDIUASUDH.\nYOU FINALLY HIT 60 HOURS` },
+        { text: 'after all those hours designing the cad and journaling your stuff YOU DID IT' },
+        {
+          text: "oh... and as promised, i'll invite you to my base in Shenzhen!!",
+          //last: true,
+        },
+        { text: 'after you ship... and our reviewers review your hours CHECK YOUR EMAIL!!' },
+        {
+          text: 'are you planning to join us in Shenzhen? (you can always change this later!)',
+          choices: [
+            { label: 'yup!', onSelect: () => saveSummitRsvp('yup') },
+            { label: 'maybe', onSelect: () => saveSummitRsvp('maybe') },
+            { label: 'maybe not', onSelect: () => saveSummitRsvp('maybe_not') },
+          ],
+        },
+      ],
+    }),
+    [user, saveSummitRsvp],
+  )
+
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -208,10 +244,14 @@ export default function PathIndex() {
         e.preventDefault()
         setActiveDialog(keepJournalingScript())
       }
+      if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'o') {
+        e.preventDefault()
+        setActiveDialog(sixtyHoursScript())
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [streakGoalScript, firstJournalScript, keepJournalingScript])
+  }, [streakGoalScript, firstJournalScript, keepJournalingScript, sixtyHoursScript])
 
   const [readDocsNudge, setReadDocsNudge] = useState(initialPathEntry.readDocsNudge)
   const [docsNudgeReady, setDocsNudgeReady] = useState(false)
@@ -367,6 +407,7 @@ export default function PathIndex() {
       first_journal: firstJournalScript,
       streak_goal_nudge: streakGoalScript,
       streak_goal_completed: keepJournalingScript,
+      sixty_hours: sixtyHoursScript,
     }
 
     const scriptFn = scriptMap[pending_dialog]
@@ -389,6 +430,7 @@ export default function PathIndex() {
     streakGoalScript,
     firstJournalScript,
     keepJournalingScript,
+    sixtyHoursScript,
   ])
 
   function reloadPathProgress() {

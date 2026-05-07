@@ -50,7 +50,13 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
   def update
     authorize @review
 
-    if @review.update(stamp_annotation_reviewer(review_params))
+    params_for_update = stamp_annotation_reviewer(review_params)
+    if link_only_feedback?(params_for_update[:feedback] || params_for_update["feedback"])
+      return redirect_back fallback_location: admin_reviews_time_audit_path(@review),
+                           inertia: { errors: { feedback: [ "Feedback cannot be only a link. Please explain your time audit decision." ] } }
+    end
+
+    if @review.update(params_for_update)
       respond_to do |format|
         format.json { render json: { ok: true } }
         format.html do
@@ -111,6 +117,14 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
     end
 
     permitted_params
+  end
+
+  def link_only_feedback?(feedback)
+    text = feedback.to_s.strip
+    return false if text.blank?
+
+    tokens = text.split(/\s+/)
+    tokens.all? { |token| token.match?(%r{\Ahttps?://\S+\z}) }
   end
 
   def serialize_review_detail(review)

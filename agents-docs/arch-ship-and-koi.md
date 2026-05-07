@@ -133,6 +133,8 @@ Created by `Ship#ensure_phase_two_review!` only after `phase_one_complete?` (bot
 
 Both have identical schema: `feedback`, `internal_reason`, `hours_adjustment` (private add-on to public TA hours), `koi_adjustment` (intended koi reward), `annotations` jsonb. Both gated to `pass2_reviewer` only.
 
+Time Audit now rejects link-only feedback in the admin controller (`Admin::Reviews::TimeAuditsController#update`). If `feedback` consists only of one or more `http(s)` URLs, the update is rejected with an inline validation error requiring written explanation.
+
 `Ship#phase_one_complete?` does:
 ```ruby
 TimeAuditReview.where(ship_id: id, status: :approved).exists? &&

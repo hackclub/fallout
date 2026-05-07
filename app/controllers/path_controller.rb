@@ -69,6 +69,17 @@ class PathController < ApplicationController
   def pending_dialog_key(journal_entries)
     return nil if current_user.trial?
 
+    unseen_sixty = current_user.dialog_campaigns.unseen.find_by(key: "sixty_hours")
+    return "sixty_hours" if unseen_sixty
+
+    if current_user.total_time_logged_seconds >= 60 * 3600
+      campaign = current_user.dialog_campaigns.find_or_initialize_by(key: "sixty_hours")
+      if campaign.new_record?
+        campaign.save!
+        return "sixty_hours"
+      end
+    end
+
     unseen_completed = current_user.dialog_campaigns.unseen.find_by(key: "streak_goal_completed")
     return "streak_goal_completed" if unseen_completed
 
