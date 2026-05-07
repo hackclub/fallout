@@ -111,17 +111,19 @@ class SlackCheckpointService
         card_block
       ]
 
-      return client.chat_postMessage(
-        channel: CHANNEL_ID,
-        thread_ts: message_ts,
-        text: "#{project.name} — #{review_label} review submitted",
-        blocks: blocks.to_json
-      )
-    rescue Slack::Web::Api::Errors::InvalidBlocks
-      next_limit = next_task_truncate_limit(limit)
-      break if next_limit.nil?
+      begin
+        return client.chat_postMessage(
+          channel: CHANNEL_ID,
+          thread_ts: message_ts,
+          text: "#{project.name} — #{review_label} review submitted",
+          blocks: blocks.to_json
+        )
+      rescue Slack::Web::Api::Errors::InvalidBlocks
+        next_limit = next_task_truncate_limit(limit)
+        break if next_limit.nil?
 
-      limit = next_limit
+        limit = next_limit
+      end
     end
 
     nil
