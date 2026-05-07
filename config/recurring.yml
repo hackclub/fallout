@@ -73,3 +73,7 @@ production:
     class: YouTubeVideoBackfillJob
     queue: background
     schedule: every day at 11pm
+
+  hours_stats_refresh:
+    command: 'Rails.cache.delete("admin/hours_stats/logged"); Rails.cache.delete("admin/hours_stats/build_approved")'
+    schedule: every day at 5am

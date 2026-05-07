@@ -27,6 +27,7 @@ import {
   Soup,
   ReceiptText,
   Megaphone,
+  BarChart2,
 } from 'lucide-react'
 
 interface AdminStats {
@@ -107,6 +108,13 @@ function buildNavSections(): { items: NavItem[] }[] {
           statKey: 'projects_count',
         },
         { label: 'Users', href: '/admin/users', icon: Users, statKey: 'users_count' },
+        {
+          label: 'Hours Stats',
+          href: '/admin/hours_stats',
+          icon: BarChart2,
+          statKey: null,
+          requirePermission: 'is_admin',
+        },
         {
           label: 'Flagged',
           href: '/admin/project_flags',
