@@ -110,7 +110,7 @@ unspent      = ledger_net − spent_cents
 ```
 If `unspent > 0`, book one `out` ProjectFundingTopup with:
 - `direction: "out"`, `status: "completed"`, `completed_at: Time.current`
-- `counts_toward_funding: true` (this **does** reduce future settle math — it's the actual reversal, not an out-of-band note)
+- `counts_toward_funding: true` — **load-bearing**: returned balance must count toward future funding, so a subsequent order replenishes what came back. Example: user requests $30, spends $20, $10 returned on cancel; next request for $5 sends $15 (= $5 new + $10 replenishment). Flipping this to false would under-fund users by the returned amount on every closure.
 - `note: "Auto-booked: card closed, refund to org status=#{status} (ledger_net=Xc, spent=Yc)"`
 
 ### Idempotency: double-checked locking
@@ -121,6 +121,13 @@ If `unspent > 0`, book one `out` ProjectFundingTopup with:
 
 ### Pending-charge edge case
 The math counts pending purchases as "spent" (so an in-flight charge at closure isn't counted as still-on-card). If the pending later **declines**, the booked `out` is too small (under-booked refund). The cheap pre-check prevents auto-correction. This is surfaced via `scan_ledger_divergence!` if HCB updates the card's amount accordingly. Eventual consistency, admin-reconciled.
+
+### HCB pending semantics: card charges vs transfers
+HCB returns two structurally distinct payloads on the transactions endpoint, and they treat `pending` differently:
+- **`card_charge`** (purchases) — pending means the merchant has captured an authorization but the bank hasn't fully posted. May still resolve to declined/reversed. We count pending as spent for spending totals and closure-refund math, but acknowledge it can flip.
+- **`transfer`** (org↔card movement: topups, withdrawals, initial grant) — pending means the money has **already moved**, awaiting HCB staff confirmation. Treat the same as settled when reasoning about money flow. Fallout's local ledger is the source of truth for transfers anyway, so this distinction mostly matters when reading the HCB UI / API directly.
+
+Both row types live in `HcbTransaction` keyed off `transaction_type` (`purchase | transfer | other`). The `purchases` scope filters to `card_charge` only.
 
 ---
 

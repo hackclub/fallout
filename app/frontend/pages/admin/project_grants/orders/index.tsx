@@ -305,9 +305,9 @@ export default function AdminProjectGrantsOrdersIndex({
           </div>
           <div
             className="text-[11px] text-muted-foreground mt-1"
-            title="Settled card charges only — excludes pending, declined, reversed, and org↔card transfers"
+            title="Pending + settled card charges — excludes declined, reversed, and org↔card transfers. Pending is counted because the merchant has already captured the authorization."
           >
-            settled purchases on HCB
+            card purchases on HCB
           </div>
         </div>
       </div>

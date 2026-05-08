@@ -71,18 +71,20 @@ class Admin::ProjectGrants::OrdersController < Admin::ApplicationController
     # spent amount, while `amount_cents` stays at the historical grant total —
     # comparing the two would always show a phantom drift on closed cards.
     active_card_ids = HcbGrantCard.where(status: "active").pluck(:id)
-    # Spending = settled purchases only (excludes pending/declined/reversed) so the
-    # dollar figure reflects money that actually moved. HCB stores card-charge
-    # debits as negative amount_cents — flip to positive for display.
-    settled_purchases = HcbTransaction.purchases.settled
+    # Spending = pending + settled purchases (excludes declined and reversed). On HCB,
+    # a pending card charge is an authorization the merchant has captured but the bank
+    # hasn't fully posted yet — money has effectively moved, so we count it. Same
+    # rule used by HcbGrantCardSyncJob#book_closure_refund! when computing `spent`.
+    # HCB stores card-charge debits as negative amount_cents — flip to positive.
+    spending_purchases = HcbTransaction.purchases.where(declined: false, reversed: false)
     stats = {
       issued_actual_cents: HcbGrantCard.where(id: active_card_ids).sum(:amount_cents),
       issued_expected_cents: ProjectFundingTopup.kept.where(status: "completed", hcb_grant_card_id: active_card_ids).sum(
         Arel.sql("CASE direction WHEN 'out' THEN -amount_cents ELSE amount_cents END")
       ),
       active_cards: active_card_ids.size,
-      spending_cents: -settled_purchases.sum(:amount_cents),
-      spending_count: settled_purchases.count
+      spending_cents: -spending_purchases.sum(:amount_cents),
+      spending_count: spending_purchases.count
     }
 
     render inertia: "admin/project_grants/orders/index", props: {

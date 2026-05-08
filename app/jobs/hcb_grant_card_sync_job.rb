@@ -123,6 +123,11 @@ class HcbGrantCardSyncJob < ApplicationJob
         direction: "out",
         status: "completed",
         completed_at: Time.current,
+        # MUST be true: returned balance counts toward the user's funding so a
+        # future order replenishes what came back. Example: user requests $30,
+        # spends $20, $10 returned on cancel; next request for $5 should send
+        # $15 (= $5 new + $10 replenishment). Flipping this to false would
+        # under-fund users by the returned amount on every closure.
         counts_toward_funding: true,
         note: "#{CLOSURE_REFUND_NOTE_PREFIX} status=#{card.status} (ledger_net=#{ledger_net}c, spent=#{spent_cents}c)"
       )
