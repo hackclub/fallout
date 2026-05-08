@@ -11,6 +11,7 @@ import { ArrowLeftIcon, TrashIcon } from '@heroicons/react/20/solid'
 import ProgressBar from '@/components/shared/ProgressBar'
 
 type Tab = 'body' | 'bg' | 'eyes' | 'hats' | 'mouth' | 'tie' | 'ears' | 'cheeks'
+type ProfileTab = 'profile' | 'integrations'
 
 type PageProps = {
   display_name: string
@@ -31,6 +32,8 @@ type PageProps = {
   cheek_images: string[]
   direct_upload_url: string
   has_slack_token: boolean
+  has_lapse_token: boolean
+  hcb_email: string | null
   is_modal: boolean
 }
 
@@ -77,6 +80,8 @@ function ProfileShow({
   cheek_images,
   direct_upload_url,
   has_slack_token,
+  has_lapse_token,
+  hcb_email: initial_hcb_email,
   is_modal,
 }: PageProps) {
   const shared = usePage<SharedProps>().props
@@ -116,6 +121,8 @@ function ProfileShow({
   const [settingSlack, setSettingSlack] = useState(false)
   const [randomizing, setRandomizing] = useState(false)
   const [showCustomizer, setShowCustomizer] = useState(false)
+  const [profileTab, setProfileTab] = useState<ProfileTab>('profile')
+  const [hcbEmail, setHcbEmail] = useState(initial_hcb_email ?? '')
   const [hasVisitedPfpEditor, setHasVisitedPfpEditor] = useState(() => {
     try {
       return !!localStorage.getItem('pfp-editor-visited')
@@ -383,7 +390,7 @@ function ProfileShow({
     setRandomizing(false)
   }
 
-  function handleSaveProfile(data: { bio?: string; pronouns?: string | null }) {
+  function handleSaveProfile(data: { bio?: string; pronouns?: string | null; hcb_email?: string }) {
     if (is_modal) {
       Axios.patch('/profile', data, { headers: modalHeaders() }).catch(() => notify('alert', 'Failed to save.'))
     } else {
@@ -391,25 +398,49 @@ function ProfileShow({
     }
   }
 
+  const navButtons = (
+    <>
+      <button
+        type="button"
+        onClick={() => setProfileTab('profile')}
+        className={`text-center rounded-lg px-3 py-0.5 w-full text-base hover:scale-94 transition-all cursor-pointer block ${profileTab === 'profile' ? 'bg-dark-brown text-light-brown' : 'text-dark-brown'}`}
+      >
+        Profile
+      </button>
+      <button
+        type="button"
+        onClick={() => setProfileTab('integrations')}
+        className={`text-center rounded-lg px-3 py-0.5 w-full text-base hover:scale-94 transition-all cursor-pointer block ${profileTab === 'integrations' ? 'bg-dark-brown text-light-brown' : 'text-dark-brown'}`}
+      >
+        Integrations
+      </button>
+      {shared.auth.user?.is_staff && (
+        <a
+          href="/admin"
+          className="bg-dark-brown text-center rounded-lg px-2 py-0.5 text-light-brown w-full text-base hover:scale-94 transition-all cursor-pointer block"
+        >
+          Admin
+        </a>
+      )}
+      <button
+        type="button"
+        onClick={signOut}
+        className="text-center rounded-lg px-3 py-0.5 text-dark-brown w-full text-base hover:scale-94 transition-all cursor-pointer block"
+      >
+        Log out
+      </button>
+    </>
+  )
+
+  const sideNav = (
+    <div className="flex flex-row flex-wrap whitespace-nowrap pb-4 sm:flex-col gap-2 sm:absolute top-4 md:top-6 left-4 md:left-6 ">
+      {navButtons}
+    </div>
+  )
+
   const profileView = (
     <div className="flex flex-col items-center justify-center h-full p-4 md:p-6 relative">
-      <div className="flex flex-row whitespace-nowrap pb-4 sm:flex-col gap-2 sm:absolute top-4 md:top-6 left-4 md:left-6 ">
-        {shared.auth.user?.is_staff && (
-          <a
-            href="/admin"
-            className="bg-dark-brown text-center rounded-lg px-2 py-0.5 text-light-brown w-full text-base hover:scale-94 transition-all cursor-pointer block"
-          >
-            Admin
-          </a>
-        )}
-        <button
-          type="button"
-          onClick={signOut}
-          className="text-center rounded-lg px-3 py-0.5 text-dark-brown w-full text-base hover:scale-94 transition-all cursor-pointer block"
-        >
-          Log out
-        </button>
-      </div>
+      {sideNav}
       <button
         type="button"
         onClick={() => {
@@ -690,9 +721,57 @@ function ProfileShow({
     </div>
   )
 
+  const integrationsView = (
+    <div className="flex flex-col sm:flex-row h-full p-4 md:p-6 gap-4 md:gap-6">
+      <div className="flex flex-row flex-wrap whitespace-nowrap sm:flex-col gap-2 sm:w-32 shrink-0">
+        {navButtons}
+      </div>
+      <div className="flex flex-col gap-5 max-w-md w-full">
+        <h1 className="font-bold text-2xl text-dark-brown">Integrations</h1>
+
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold text-dark-brown">Lapse</div>
+              <div className="text-brown text-xs">
+                {has_lapse_token ? 'Connected to Lapse.' : `Connected via ${initial_email}.`}
+              </div>
+            </div>
+            <a
+              href="/auth/lapse/start"
+              className="bg-dark-brown text-light-brown text-sm rounded-md px-3 py-1 hover:scale-94 transition-all cursor-pointer"
+            >
+              Reconnect
+            </a>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="hcb-email" className="font-semibold text-dark-brown">
+            HCB email
+          </label>
+          <div className="text-brown text-xs">
+            Used to send HCB grant card invites. Leave blank to use your main email.
+          </div>
+          <input
+            id="hcb-email"
+            type="email"
+            value={hcbEmail}
+            onChange={(e) => setHcbEmail(e.target.value)}
+            onBlur={() => handleSaveProfile({ hcb_email: hcbEmail })}
+            placeholder={initial_email}
+            className="mt-1 w-full text-brown text-sm bg-white border border-dark-brown rounded-md px-2 py-1 outline-none placeholder:text-brown/40"
+          />
+        </div>
+      </div>
+    </div>
+  )
+
+  const mainView = profileTab === 'integrations' ? integrationsView : profileView
+
   const content = (
     <div className="w-full md:w-[600px] max-h-[85vh] md:h-[520px] overflow-y-auto md:overflow-visible flex flex-col">
-      {showCustomizer ? customizerView : profileView}
+      {showCustomizer ? customizerView : mainView}
     </div>
   )
 

@@ -16,6 +16,7 @@
 #  gold_balance                :integer          default(0), not null
 #  has_hca_address             :boolean          default(FALSE), not null
 #  hca_token                   :text
+#  hcb_email                   :string
 #  is_adult                    :boolean          default(FALSE), not null
 #  is_banned                   :boolean          default(FALSE), not null
 #  lapse_token                 :text
@@ -28,7 +29,6 @@
 #  streak_freezes              :integer          default(1), not null
 #  streak_in_app_notifications :boolean          default(TRUE), not null
 #  streak_slack_notifications  :boolean          default(TRUE), not null
-#  summit_rsvp                 :string
 #  timezone                    :string           not null
 #  type                        :string
 #  verification_status         :string
@@ -116,6 +116,7 @@ class User < ApplicationRecord
 
   validates :avatar, :display_name, :email, :timezone, presence: true
   validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
+  validates :hcb_email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
   validates :bio, length: { maximum: 100 }, allow_nil: true
   validates :slack_id, presence: true, unless: :trial?
   validates :hca_id, presence: true, unless: :trial?
@@ -565,6 +566,10 @@ class User < ApplicationRecord
     return slack_id unless Rails.env.development?
 
     slack_id.delete_suffix("_DEV")
+  end
+
+  def hcb_email_for_grants
+    hcb_email.presence || email
   end
 
   private

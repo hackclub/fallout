@@ -24,6 +24,8 @@ class ProfilesController < ApplicationController
       email: current_user.email,
       pronouns: current_user.pronouns,
       has_slack_token: current_user.slack_token.present?,
+      has_lapse_token: current_user.lapse_token.present?,
+      hcb_email: current_user.hcb_email,
       is_modal: request.headers["X-InertiaUI-Modal"].present?
     }
   end
@@ -37,6 +39,7 @@ class ProfilesController < ApplicationController
     profile_attrs = {}
     profile_attrs[:bio] = params[:bio] if params.key?(:bio)
     profile_attrs[:pronouns] = params[:pronouns].presence if params.key?(:pronouns)
+    profile_attrs[:hcb_email] = params[:hcb_email].presence if params.key?(:hcb_email)
 
     if profile_attrs.any? && !current_user.update(profile_attrs)
       return render json: { errors: current_user.errors.full_messages }, status: :unprocessable_entity

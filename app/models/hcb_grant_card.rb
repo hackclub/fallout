@@ -82,7 +82,7 @@ class HcbGrantCard < ApplicationRecord
 
     params = {
       amount_cents: amount_cents,
-      email: user.email,
+      email: user.hcb_email_for_grants,
       purpose: purpose,
       one_time_use: one_time_use,
       pre_authorization_required: pre_authorization_required,

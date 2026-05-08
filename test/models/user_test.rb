@@ -16,6 +16,7 @@
 #  gold_balance                :integer          default(0), not null
 #  has_hca_address             :boolean          default(FALSE), not null
 #  hca_token                   :text
+#  hcb_email                   :string
 #  is_adult                    :boolean          default(FALSE), not null
 #  is_banned                   :boolean          default(FALSE), not null
 #  lapse_token                 :text
@@ -28,7 +29,6 @@
 #  streak_freezes              :integer          default(1), not null
 #  streak_in_app_notifications :boolean          default(TRUE), not null
 #  streak_slack_notifications  :boolean          default(TRUE), not null
-#  summit_rsvp                 :string
 #  timezone                    :string           not null
 #  type                        :string
 #  verification_status         :string
