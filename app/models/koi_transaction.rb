@@ -43,8 +43,8 @@ class KoiTransaction < ApplicationRecord
   private
 
   # Enforces the structural contract `reason == "ship_review" iff ship_id present`.
-  # Belt-and-suspenders alongside the partial unique index in
-  # 20260427132327_add_ship_to_koi_transactions; the index guarantees uniqueness
+  # Belt-and-suspenders alongside the partial unique index on (ship_id, user_id)
+  # WHERE reason = 'ship_review'; the index guarantees one award per member per ship
   # but this validation guards against malformed inserts (wrong reason, stray ship_id).
   def ship_id_consistency
     if reason == "ship_review" && ship_id.blank?

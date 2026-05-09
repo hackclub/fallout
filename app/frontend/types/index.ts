@@ -253,6 +253,7 @@ export interface AdminProjectRow {
   is_unlisted: boolean
   is_discarded: boolean
   created_at: string
+  collaborators: { id: number; display_name: string; avatar: string | null }[]
 }
 
 export interface AdminProjectDetail {

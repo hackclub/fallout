@@ -480,14 +480,16 @@ class Ship < ApplicationRecord
     Rails.logger.error("Ship##{id} status notification failed: #{e.message}")
   end
 
-  # Awards koi when a ship reaches :approved. Delegates to ShipKoiAwarder which holds the
-  # formula and is the single source of truth (also called from rake koi:reconcile_ship_reviews
-  # for backfill / safety-net). Idempotency is enforced at the DB level by a partial unique
-  # index on koi_transactions(ship_id) WHERE reason = 'ship_review'. Failures are logged but
-  # do NOT roll back the approval — operators reconcile via the rake task.
+  # Awards koi when a ship reaches :approved. ShipKoiAwarder splits the amount evenly
+  # among all non-trial kept project members (also called from rake koi:reconcile_ship_reviews
+  # for backfill / safety-net). Idempotency is enforced per member by a partial unique
+  # index on koi_transactions(ship_id, user_id). Failures are logged but do NOT roll back
+  # the approval — operators reconcile via the rake task.
   def award_ship_review_koi!
-    result = ShipKoiAwarder.call(self)
-    Rails.logger.info("Ship##{id} koi award: #{result.status} (amount=#{result.amount})")
+    ship = Ship.includes(project: { user: {}, collaborators: :user }).find(id) # preload to avoid N+1
+    ShipKoiAwarder.call(ship).each do |result|
+      Rails.logger.info("Ship##{id} koi award: #{result.status} (amount=#{result.amount})")
+    end
   rescue => e
     Rails.logger.error("Ship##{id} koi award failed: #{e.message}")
     ErrorReporter.capture_exception(e, contexts: { ship_review_koi: { ship_id: id } })

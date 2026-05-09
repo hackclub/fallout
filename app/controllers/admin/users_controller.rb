@@ -23,7 +23,8 @@ class Admin::UsersController < Admin::ApplicationController
   def show
     @user = User.find(params[:id])
     authorize @user
-    @projects_count = @user.projects.kept.count
+    collab_sub = @user.collaborations.where(collaboratable_type: "Project").select(:collaboratable_id)
+    @projects_count = Project.kept.where(user_id: @user.id).or(Project.kept.where(id: collab_sub)).count
 
     props = {
       user: serialize_user_detail(@user),
@@ -53,7 +54,8 @@ class Admin::UsersController < Admin::ApplicationController
         }
       },
       project_data: InertiaRails.defer {
-        base_scope = @user.projects
+        collab_project_ids = @user.collaborations.where(collaboratable_type: "Project").pluck(:collaboratable_id)
+        base_scope = Project.where(user_id: @user.id).or(Project.where(id: collab_project_ids))
         base_scope = base_scope.kept unless params[:include_deleted] == "1"
         base_scope = base_scope.where(is_unlisted: false) if params[:hide_unlisted] == "1"
         base_scope = base_scope.where("EXISTS (SELECT 1 FROM journal_entries WHERE journal_entries.project_id = projects.id AND journal_entries.discarded_at IS NULL)") if params[:with_journals] == "1"
@@ -64,6 +66,12 @@ class Admin::UsersController < Admin::ApplicationController
         @entry_counts = JournalEntry.where(project_id: project_ids, discarded_at: nil).group(:project_id).count
         @last_entries = JournalEntry.where(project_id: project_ids, discarded_at: nil).group(:project_id).maximum(:created_at)
         @hours_tracked = Project.batch_time_logged(project_ids)
+        @collaborators_by_project = Collaborator.kept
+          .where(collaboratable_type: "Project", collaboratable_id: project_ids)
+          .includes(:user)
+          .group_by(&:collaboratable_id)
+        non_owned_owner_ids = projects.filter_map { |p| p.user_id if p.user_id != @user.id }
+        @project_owners = User.where(id: non_owned_owner_ids).index_by(&:id)
 
         {
           projects: projects.map { |p| serialize_project_row(p) },
@@ -275,6 +283,14 @@ class Admin::UsersController < Admin::ApplicationController
   end
 
   def serialize_project_row(project)
+    collabs = @collaborators_by_project[project.id] || []
+    owner = @project_owners[project.user_id]
+    other_members = []
+    other_members << { id: owner.id, display_name: owner.display_name, avatar: owner.avatar } if owner
+    other_members += collabs
+      .reject { |c| c.user_id == @user.id }
+      .map { |c| { id: c.user_id, display_name: c.user.display_name, avatar: c.user.avatar } }
+
     {
       id: project.id,
       name: project.name,
@@ -286,7 +302,8 @@ class Admin::UsersController < Admin::ApplicationController
       last_entry_at: @last_entries[project.id]&.strftime("%b %d, %Y"),
       is_unlisted: project.is_unlisted,
       is_discarded: project.discarded?,
-      created_at: project.created_at.strftime("%b %d, %Y")
+      created_at: project.created_at.strftime("%b %d, %Y"),
+      collaborators: other_members
     }
   end
 end

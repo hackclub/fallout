@@ -431,12 +431,14 @@ class User < ApplicationRecord
   end
 
   def total_time_logged_seconds
-    entry_scope = { project_id: projects.kept.select(:id), discarded_at: nil }
+    owned_ids = projects.kept.pluck(:id)
+    collab_ids = collaborated_projects.kept.pluck(:id)
+    all_ids = (owned_ids + collab_ids).uniq
+    return 0 if all_ids.empty?
 
-    LapseTimelapse.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration).to_i +
-      YouTubeVideo.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(Arel.sql("duration_seconds * stretch_multiplier")).to_i +
-      LookoutTimelapse.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration).to_i +
-      projects.kept.sum(:manual_seconds).to_i
+    seconds_by_project = Project.batch_time_logged(all_ids)
+    member_counts = Project.batch_member_counts(all_ids)
+    all_ids.sum { |pid| m = member_counts[pid].to_i; m > 0 ? seconds_by_project[pid].to_i / m : 0 }
   end
 
   def koi

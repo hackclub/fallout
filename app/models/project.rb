@@ -165,6 +165,17 @@ class Project < ApplicationRecord
     lapse + youtube + lookout + manual_seconds.to_i
   end
 
+  def self.batch_member_counts(project_ids)
+    return {} if project_ids.empty?
+    kept_owner_ids = joins("INNER JOIN users ON users.id = projects.user_id AND users.discarded_at IS NULL AND users.type IS NULL")
+      .where(id: project_ids).pluck(:id).to_set
+    collab_counts = Collaborator.kept
+      .joins("INNER JOIN users ON users.id = collaborators.user_id AND users.discarded_at IS NULL AND users.type IS NULL")
+      .where(collaboratable_type: "Project", collaboratable_id: project_ids)
+      .group(:collaboratable_id).count
+    project_ids.to_h { |pid| [ pid, (kept_owner_ids.include?(pid) ? 1 : 0) + (collab_counts[pid] || 0) ] }
+  end
+
   # Batch version: returns { project_id => seconds } for a set of project IDs in a single query
   def self.batch_time_logged(project_ids)
     return {} if project_ids.empty?

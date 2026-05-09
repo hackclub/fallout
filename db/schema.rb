@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_08_202950) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_08_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -329,7 +329,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_202950) do
     t.bigint "ship_id"
     t.bigint "user_id", null: false
     t.index ["actor_id"], name: "index_koi_transactions_on_actor_id"
-    t.index ["ship_id"], name: "index_koi_transactions_on_ship_review_uniqueness", unique: true, where: "(((reason)::text = 'ship_review'::text) AND (ship_id IS NOT NULL))"
+    t.index ["ship_id", "user_id"], name: "index_koi_transactions_on_ship_review_uniqueness", unique: true, where: "(((reason)::text = 'ship_review'::text) AND (ship_id IS NOT NULL))"
     t.index ["user_id", "created_at"], name: "index_koi_transactions_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_koi_transactions_on_user_id"
   end
@@ -883,7 +883,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_202950) do
     t.boolean "has_hca_address", default: false, null: false
     t.string "hca_id"
     t.text "hca_token"
-    t.string "hcb_email"
     t.boolean "is_adult", default: false, null: false
     t.boolean "is_banned", default: false, null: false
     t.text "lapse_token"
@@ -897,6 +896,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_202950) do
     t.integer "streak_freezes", default: 1, null: false
     t.boolean "streak_in_app_notifications", default: true, null: false
     t.boolean "streak_slack_notifications", default: true, null: false
+    t.string "summit_rsvp"
     t.string "timezone", null: false
     t.string "type"
     t.datetime "updated_at", null: false
@@ -958,7 +958,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_202950) do
   add_foreign_key "critters", "users"
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
-  add_foreign_key "dialog_campaigns", "users"
+  add_foreign_key "dialog_campaigns", "users", name: "dialog_campaigns_user_id_fkey"
   add_foreign_key "gold_transactions", "users"
   add_foreign_key "gold_transactions", "users", column: "actor_id"
   add_foreign_key "hcb_connections", "users", column: "connected_by_id"
