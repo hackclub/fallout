@@ -19,12 +19,14 @@
 #                                                    PATCH  /admin/reviews/requirements_checks/:id(.:format)                                              admin/reviews/requirements_checks#update
 #                                                    PUT    /admin/reviews/requirements_checks/:id(.:format)                                              admin/reviews/requirements_checks#update
 #              heartbeat_admin_reviews_design_review POST   /admin/reviews/design_reviews/:id/heartbeat(.:format)                                         admin/reviews/design_reviews#heartbeat
+#              swap_type_admin_reviews_design_review POST   /admin/reviews/design_reviews/:id/swap_type(.:format)                                         admin/reviews/design_reviews#swap_type
 #                  next_admin_reviews_design_reviews GET    /admin/reviews/design_reviews/next(.:format)                                                  admin/reviews/design_reviews#next
 #                       admin_reviews_design_reviews GET    /admin/reviews/design_reviews(.:format)                                                       admin/reviews/design_reviews#index
 #                        admin_reviews_design_review GET    /admin/reviews/design_reviews/:id(.:format)                                                   admin/reviews/design_reviews#show
 #                                                    PATCH  /admin/reviews/design_reviews/:id(.:format)                                                   admin/reviews/design_reviews#update
 #                                                    PUT    /admin/reviews/design_reviews/:id(.:format)                                                   admin/reviews/design_reviews#update
 #               heartbeat_admin_reviews_build_review POST   /admin/reviews/build_reviews/:id/heartbeat(.:format)                                          admin/reviews/build_reviews#heartbeat
+#               swap_type_admin_reviews_build_review POST   /admin/reviews/build_reviews/:id/swap_type(.:format)                                          admin/reviews/build_reviews#swap_type
 #                   next_admin_reviews_build_reviews GET    /admin/reviews/build_reviews/next(.:format)                                                   admin/reviews/build_reviews#next
 #                        admin_reviews_build_reviews GET    /admin/reviews/build_reviews(.:format)                                                        admin/reviews/build_reviews#index
 #                         admin_reviews_build_review GET    /admin/reviews/build_reviews/:id(.:format)                                                    admin/reviews/build_reviews#show
@@ -62,6 +64,8 @@
 #                              update_ban_admin_user PATCH  /admin/users/:id/update_ban(.:format)                                                         admin/users#update_ban
 #                              admin_activity_checks POST   /admin/activity_checks(.:format)                                                              admin/activity_checks#create
 #                           new_admin_activity_check GET    /admin/activity_checks/new(.:format)                                                          admin/activity_checks#new
+#                          refresh_admin_hours_stats POST   /admin/hours_stats/refresh(.:format)                                                          admin/hours_stats#refresh
+#                                  admin_hours_stats GET    /admin/hours_stats(.:format)                                                                  admin/hours_stats#index
 #                                   admin_shop_items GET    /admin/shop_items(.:format)                                                                   admin/shop_items#index
 #                                                    POST   /admin/shop_items(.:format)                                                                   admin/shop_items#create
 #                                    admin_shop_item PATCH  /admin/shop_items/:id(.:format)                                                               admin/shop_items#update
