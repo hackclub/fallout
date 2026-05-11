@@ -6,7 +6,7 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
     pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).order(created_at: :asc).load
     @pagy, @all_reviews = pagy(base.order(created_at: :desc))
     flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
-    Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship).uniq) # avoid N+1 in serialize_review_row
+    Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
 
     render inertia: {
       pending_reviews: pending_reviews.map { |r| serialize_review_row(r) },

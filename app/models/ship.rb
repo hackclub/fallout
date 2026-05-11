@@ -224,17 +224,23 @@ class Ship < ApplicationRecord
   def self.preload_cycle_started_at(ships)
     return if ships.blank?
 
-    project_ids = ships.map(&:project_id).uniq
+    # Callers often pass ships from multiple queries (pending + all_reviews) which yields
+    # DIFFERENT Ship instances with the same id. Group by id and propagate the cached value
+    # to every instance, otherwise the second result set falls back to the per-ship N+1.
+    instances_by_id = ships.group_by(&:id)
+    representatives = instances_by_id.values.map(&:first)
+
+    project_ids = representatives.map(&:project_id).uniq
     project_versions = Ship.where(project_id: project_ids).group(:project_id).maximum(:updated_at)
 
-    cache_keys = ships.to_h { |s| [ s, cycle_started_at_cache_key(s, project_versions[s.project_id]) ] }
+    cache_keys = representatives.to_h { |s| [ s.id, cycle_started_at_cache_key(s, project_versions[s.project_id]) ] }
     hits = Rails.cache.read_multi(*cache_keys.values)
 
     uncached = []
-    ships.each do |ship|
-      cached = hits[cache_keys[ship]]
+    representatives.each do |ship|
+      cached = hits[cache_keys[ship.id]]
       if cached
-        ship.cycle_started_at_cached = cached
+        propagate_cycle_started_at(instances_by_id[ship.id], cached)
       else
         uncached << ship
       end
@@ -250,9 +256,13 @@ class Ship < ApplicationRecord
       cutoff = prev_approved&.created_at || Time.at(0)
       cycle_first = siblings.find { |s| s.created_at > cutoff && s.created_at <= ship.created_at }
       value = cycle_first&.created_at || ship.created_at
-      ship.cycle_started_at_cached = value
-      Rails.cache.write(cache_keys[ship], value, expires_in: CYCLE_STARTED_AT_CACHE_TTL)
+      propagate_cycle_started_at(instances_by_id[ship.id], value)
+      Rails.cache.write(cache_keys[ship.id], value, expires_in: CYCLE_STARTED_AT_CACHE_TTL)
     end
+  end
+
+  def self.propagate_cycle_started_at(instances, value)
+    instances.each { |s| s.cycle_started_at_cached = value }
   end
 
   def self.cycle_started_at_cache_key(ship, project_version)
