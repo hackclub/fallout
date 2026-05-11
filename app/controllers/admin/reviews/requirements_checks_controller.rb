@@ -15,7 +15,8 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
       pending_reviews: pending_reviews.map { |r| serialize_review_row(r) },
       all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids) },
       pagy: pagy_props(@pagy),
-      start_reviewing_path: next_admin_reviews_requirements_checks_path
+      start_reviewing_path: next_admin_reviews_requirements_checks_path,
+      **review_stats_props(RequirementsCheckReview)
     }
   end
 

@@ -1,4 +1,8 @@
 class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
+  # DR-only action — base controller's :set_review can't list this because the
+  # other queues don't define swap_type, and Rails 8.1 raises on missing callback actions.
+  before_action :set_review, only: %i[ swap_type ]
+
   def index
     base = policy_scope(DesignReview)
       .includes(ship: [ :project, :time_audit_review, project: :user, requirements_check_review: :reviewer ], reviewer: [])
@@ -12,7 +16,8 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
       pending_reviews: pending_reviews.map { |r| serialize_review_row(r) },
       all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids) },
       pagy: pagy_props(@pagy),
-      start_reviewing_path: next_admin_reviews_design_reviews_path
+      start_reviewing_path: next_admin_reviews_design_reviews_path,
+      **review_stats_props(DesignReview)
     }
   end
 
