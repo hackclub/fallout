@@ -1,8 +1,4 @@
 class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
-  # DR-only action — base controller's :set_review can't list this because the
-  # other queues don't define swap_type, and Rails 8.1 raises on missing callback actions.
-  before_action :set_review, only: %i[ swap_type ]
-
   def index
     base = policy_scope(DesignReview)
       .includes(ship: [ :project, :time_audit_review, project: :user, requirements_check_review: :reviewer ], reviewer: [])
@@ -56,6 +52,12 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
   end
 
   def swap_type
+    # Inline find — declaring `before_action :set_review, only: %i[swap_type]` in this
+    # subclass would dedup against the parent's set_review (Rails set_callback removes
+    # prior entries with the same symbol filter), nuking the base's `only:` and breaking
+    # show/update/heartbeat. Match the pattern used by RequirementsChecksController's
+    # custom actions instead.
+    @review = DesignReview.find(params[:id])
     authorize @review, :swap_type?
     new_review = @review.ship.swap_phase_two_type!
     redirect_to admin_reviews_build_review_path(new_review), notice: "Moved to Build Review."
