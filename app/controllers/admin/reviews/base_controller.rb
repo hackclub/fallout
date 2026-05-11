@@ -362,8 +362,9 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   def stat_turnaround(model, completion_col, current_window, prior_window)
     current = turnaround_for_window(model, completion_col, current_window)
     prior = turnaround_for_window(model, completion_col, prior_window)
-    delta = (current[:ship_days] && prior[:ship_days]) ? (current[:ship_days] - prior[:ship_days]).round(1) : nil
-    current.merge(delta: delta)
+    ship_delta = (current[:ship_days] && prior[:ship_days]) ? (current[:ship_days] - prior[:ship_days]).round(1) : nil
+    cycle_delta = (current[:cycle_days] && prior[:cycle_days]) ? (current[:cycle_days] - prior[:cycle_days]).round(1) : nil
+    current.merge(ship_delta: ship_delta, cycle_delta: cycle_delta)
   end
 
   # Returns { ship_days:, cycle_days:, count: }. Pluck (completion_at, ship_id)
@@ -406,12 +407,17 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     current.merge(delta: delta)
   end
 
+  # Use explicit COUNT FILTER instead of group(:status).count — the latter's hash
+  # keys vary by Rails version (integer raw vs enum string), which caused approved
+  # counts to silently resolve to nil and report 0%.
   def approval_ratio_for_window(model, completion_col, window)
-    counts = model.where(completion_col => window)
-      .where(status: [ model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected] ])
-      .group(:status).count
-    approved = counts[model.statuses[:approved]].to_i
-    total = counts.values.sum
+    decided = [ model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected] ]
+    row = model.where(completion_col => window).where(status: decided).pick(
+      Arel.sql("COUNT(*)"),
+      Arel.sql("COUNT(*) FILTER (WHERE status = #{model.statuses[:approved]})")
+    )
+    total = row&.first.to_i
+    approved = row&.last.to_i
     return { percent: nil, count: 0 } if total.zero?
     { percent: ((approved.to_f / total) * 100).round(1), count: total }
   end

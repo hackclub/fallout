@@ -5,7 +5,13 @@ export type ReviewStatKey = 'hours_pending' | 'turnaround' | 'approval_ratio' | 
 
 export type ReviewStats = {
   hours_pending?: { value: number }
-  turnaround?: { ship_days: number | null; cycle_days: number | null; count: number; delta: number | null }
+  turnaround?: {
+    ship_days: number | null
+    cycle_days: number | null
+    count: number
+    ship_delta: number | null
+    cycle_delta: number | null
+  }
   approval_ratio?: { percent: number | null; count: number; delta: number | null }
   reship_ratio?: { percent: number | null; count: number; delta: number | null }
 }
@@ -13,7 +19,7 @@ export type ReviewStats = {
 // delta === null: prior window had no data — render nothing (no signal to compare).
 // delta === 0: stats unchanged — render a neutral dash so the reader sees we did
 // look and it just hasn't moved (distinct from "no comparison available").
-function DeltaChevron({ delta, better, unit }: { delta: number | null; better: 'down' | 'up'; unit: 'd' | 'pp' }) {
+function DeltaChevron({ delta, better, unit }: { delta: number | null; better: 'down' | 'up'; unit: 'd' | '%' }) {
   if (delta == null) return null
   if (delta === 0) {
     return (
@@ -78,6 +84,11 @@ function renderCard(key: ReviewStatKey, stats?: ReviewStats) {
                 </TooltipTrigger>
                 <TooltipContent>This ship</TooltipContent>
               </Tooltip>
+              {t && (
+                <span className="ml-1 align-middle">
+                  <DeltaChevron delta={t.ship_delta} better="down" unit="d" />
+                </span>
+              )}
               <span className="text-muted-foreground"> / </span>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -86,13 +97,13 @@ function renderCard(key: ReviewStatKey, stats?: ReviewStats) {
                 <TooltipContent>This cycle</TooltipContent>
               </Tooltip>
               {t && (
-                <span className="text-muted-foreground text-sm font-normal ml-2">
-                  ({t.count} ship{t.count === 1 ? '' : 's'})
+                <span className="ml-1 align-middle">
+                  <DeltaChevron delta={t.cycle_delta} better="down" unit="d" />
                 </span>
               )}
               {t && (
-                <span className="ml-2 align-middle">
-                  <DeltaChevron delta={t.delta} better="down" unit="d" />
+                <span className="text-muted-foreground text-sm font-normal ml-2">
+                  ({t.count} ship{t.count === 1 ? '' : 's'})
                 </span>
               )}
             </span>
@@ -112,7 +123,7 @@ function renderCard(key: ReviewStatKey, stats?: ReviewStats) {
           )}
           {a && (
             <span className="ml-2 align-middle">
-              <DeltaChevron delta={a.delta} better="up" unit="pp" />
+              <DeltaChevron delta={a.delta} better="up" unit="%" />
             </span>
           )}
         </StatCard>
@@ -134,7 +145,7 @@ function renderCard(key: ReviewStatKey, stats?: ReviewStats) {
           )}
           {r && (
             <span className="ml-2 align-middle">
-              <DeltaChevron delta={r.delta} better="down" unit="pp" />
+              <DeltaChevron delta={r.delta} better="down" unit="%" />
             </span>
           )}
         </StatCard>
