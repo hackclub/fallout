@@ -38,6 +38,7 @@ class ProjectPolicy < ApplicationPolicy
 
   def destroy?
     return false if record.discarded?
+    return false if record.ships.exists? # Once submitted (any status — pending, awaiting_identity, approved, returned, rejected), the project is locked from deletion for audit integrity.
 
     owner? # User-facing project deletes are owner-only; admins use /admin or Airtable.
   end
