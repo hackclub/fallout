@@ -42,7 +42,13 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   end
 
   def set_review
-    @review = review_model.find(params[:id])
+    # Eager-load the ship/project/user/collaborators graph used by serialize_project_context
+    # so the show render doesn't fan out to per-row queries. Heartbeat fires every ~30s
+    # while a reviewer holds a claim and only touches the review itself, so skip the
+    # extra joins on that path.
+    scope = review_model
+    scope = scope.includes(ship: { project: [ :user, { collaborators: :user } ] }) unless action_name == "heartbeat"
+    @review = scope.find(params[:id])
   end
 
   # -- Claim lifecycle --
@@ -326,7 +332,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   def compute_review_stats(model, include:)
     cache_stamp = model.maximum(:updated_at)&.to_i || 0
     Rails.cache.fetch(
-      "admin/reviews/stats/#{model.name}/v1/#{include.join(',')}/#{cache_stamp}",
+      "admin/reviews/stats/#{model.name}/v2/#{include.join(',')}/#{cache_stamp}",
       expires_in: STATS_CACHE_TTL
     ) do
       build_review_stats(model, include)
@@ -407,18 +413,17 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     current.merge(delta: delta)
   end
 
-  # Use explicit COUNT FILTER instead of group(:status).count — the latter's hash
-  # keys vary by Rails version (integer raw vs enum string), which caused approved
-  # counts to silently resolve to nil and report 0%.
+  # Two simple counts instead of group(:status).count — the latter's hash keys
+  # vary by Rails version (integer raw vs enum string), which silently resolved
+  # `approved` to 0 and reported 0%. Two indexed COUNT queries are cheap and
+  # leave no room for enum-key ambiguity.
   def approval_ratio_for_window(model, completion_col, window)
-    decided = [ model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected] ]
-    row = model.where(completion_col => window).where(status: decided).pick(
-      Arel.sql("COUNT(*)"),
-      Arel.sql("COUNT(*) FILTER (WHERE status = #{model.statuses[:approved]})")
-    )
-    total = row&.first.to_i
-    approved = row&.last.to_i
+    scope = model.where(completion_col => window).where(status: [
+      model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected]
+    ])
+    total = scope.count
     return { percent: nil, count: 0 } if total.zero?
+    approved = scope.where(status: model.statuses[:approved]).count
     { percent: ((approved.to_f / total) * 100).round(1), count: total }
   end
 
@@ -433,29 +438,26 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   # Approved siblings are excluded — a follow-on after a clean approval is a new
   # cycle, not a "redo" of a failed attempt.
   #
-  # Single round-trip: COUNT(*) FILTER (...) computes total and reships together.
-  # The EXISTS subquery hits ships.project_id (indexed) and is fast per row.
+  # Two simple counts (total + reships-with-EXISTS) rather than one COUNT FILTER —
+  # keeps the AR-pluck path straightforward and avoids the same Arel.sql-aggregate
+  # pitfall that silently zeroed the approval ratio.
   def reship_ratio_for_window(model, completion_col, window)
     decided = [ model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected] ]
-    row = model.joins(:ship)
+    scope = model.joins(:ship)
       .where(model.table_name => { completion_col => window })
       .where(status: decided)
-      .pick(
-        Arel.sql("COUNT(*)"),
-        Arel.sql(<<~SQL.squish)
-          COUNT(*) FILTER (
-            WHERE EXISTS (
-              SELECT 1 FROM ships s2
-              WHERE s2.project_id = ships.project_id
-                AND s2.created_at < ships.created_at
-                AND s2.status IN (#{Ship.statuses[:returned]}, #{Ship.statuses[:rejected]})
-            )
-          )
-        SQL
-      )
-    total = row&.first.to_i
-    reships = row&.last.to_i
+
+    total = scope.count
     return { percent: nil, count: 0 } if total.zero?
+
+    reships = scope.where(<<~SQL.squish).count
+      EXISTS (
+        SELECT 1 FROM ships s2
+        WHERE s2.project_id = ships.project_id
+          AND s2.created_at < ships.created_at
+          AND s2.status IN (#{Ship.statuses[:returned]}, #{Ship.statuses[:rejected]})
+      )
+    SQL
 
     { percent: ((reships.to_f / total) * 100).round(1), count: total }
   end

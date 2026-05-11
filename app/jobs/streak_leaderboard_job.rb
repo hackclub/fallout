@@ -3,14 +3,28 @@ class StreakLeaderboardJob < ApplicationJob
   queue_as :background
 
   def perform
-    top = User.verified.kept
-               .joins(:streak_days)
-               .distinct
-               .select("users.*")
-               .map { |u| [ u, StreakDay.current_streak(u), current_streak_frozen_count(u) ] }
-               .select { |_, streak, _| streak > 0 }
-               .sort_by { |_, streak, frozen| [ -streak, frozen ] }
-               .first(15)
+    user_ids = User.verified.kept.joins(:streak_days).distinct.pluck(:id)
+    return if user_ids.empty?
+
+    users_by_id = User.where(id: user_ids).index_by(&:id)
+
+    # One query for every streak-counting day across all candidate users, instead
+    # of two per-user round trips (StreakDay.current_streak + frozen_count) — for
+    # ~hundreds of users this collapses N×2 queries down to 1.
+    days_by_user = StreakDay
+      .where(user_id: user_ids, status: [ :active, :frozen ])
+      .order(date: :desc)
+      .pluck(:user_id, :date, :status)
+      .group_by(&:first)
+
+    top = users_by_id.map do |uid, user|
+      day_pairs = (days_by_user[uid] || []).map { |_, date, status| [ date, status ] }
+      streak, frozen = compute_streak_and_frozen(user, day_pairs)
+      [ user, streak, frozen ]
+    end
+    top = top.select { |_, streak, _| streak > 0 }
+             .sort_by { |_, streak, frozen| [ -streak, frozen ] }
+             .first(15)
 
     return if top.empty?
 
@@ -31,32 +45,36 @@ class StreakLeaderboardJob < ApplicationJob
 
   private
 
-  def current_streak_frozen_count(user)
+  # Returns [streak_length, frozen_count_within_streak] from a date-desc list of
+  # [date, status] pairs (only active/frozen statuses included). Mirrors the
+  # logic in StreakDay.current_streak and the prior current_streak_frozen_count,
+  # but operates on preloaded data so it doesn't re-query per user.
+  def compute_streak_and_frozen(user, day_pairs)
+    return [ 0, 0 ] if day_pairs.empty?
+
     today = Time.current.in_time_zone(user.timezone).to_date
     yesterday = today - 1.day
+    pairs = day_pairs.select { |date, _| date <= today }
+    return [ 0, 0 ] if pairs.empty?
 
-    days = StreakDay.where(user: user).streak_counting.where("date <= ?", today).reverse_chronological.pluck(:date, :status)
-    return 0 if days.empty?
-
-    most_recent_date = days.first.first
-    start_from = if most_recent_date == today
+    most_recent_date = pairs.first.first
+    expected = if most_recent_date == today
       today
     elsif most_recent_date == yesterday
       yesterday
     else
-      return 0
+      return [ 0, 0 ]
     end
 
-    frozen_count = 0
-    expected = start_from
-
-    days.each do |date, status|
+    streak = 0
+    frozen = 0
+    pairs.each do |date, status|
       break unless date == expected
-
-      frozen_count += 1 if status == "frozen"
+      streak += 1
+      frozen += 1 if status == "frozen"
       expected -= 1.day
     end
 
-    frozen_count
+    [ streak, frozen ]
   end
 end
