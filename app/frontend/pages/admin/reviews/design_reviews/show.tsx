@@ -959,8 +959,8 @@ export default function DesignReviewsShow({
                           <AlertDialogTitle>Move to Build Review?</AlertDialogTitle>
                           <AlertDialogDescription>
                             This ship will be moved into the Build Review queue. Queued-at timestamp and current
-                            in-progress fields (feedback, internal reason, hours/koi adjustments) are preserved. This
-                            replaces the Design Review record.
+                            in-progress fields (feedback, internal reason, hours/currency adjustments) are preserved.
+                            This replaces the Design Review record.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

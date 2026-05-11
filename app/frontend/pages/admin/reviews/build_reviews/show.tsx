@@ -448,6 +448,7 @@ interface PageProps {
   reviewer_notes?: ReviewerNote[]
   reviewer_notes_path: string
   project_flagged: boolean
+  pending_conversion_koi: number
   can: { update: boolean; swap_type: boolean }
   skip: string | null
   heartbeat_path: string
@@ -466,6 +467,7 @@ export default function BuildReviewsShow({
   reviewer_notes,
   reviewer_notes_path,
   project_flagged,
+  pending_conversion_koi,
   can,
   skip,
   heartbeat_path,
@@ -480,7 +482,7 @@ export default function BuildReviewsShow({
   const [hoursAdjInput, setHoursAdjInput] = useState(
     review.hours_adjustment != null ? String(review.hours_adjustment / 3600) : '',
   )
-  const [koiAdjInput, setKoiAdjInput] = useState(review.koi_adjustment != null ? String(review.koi_adjustment) : '')
+  const [goldAdjInput, setGoldAdjInput] = useState(review.gold_adjustment != null ? String(review.gold_adjustment) : '')
   const [submitting, setSubmitting] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const [flagging, setFlagging] = useState(false)
@@ -494,9 +496,9 @@ export default function BuildReviewsShow({
   const userFacingHours = project.approved_public_hours ?? project.logged_hours
   const hoursAdj = hoursAdjInput !== '' ? parseFloat(hoursAdjInput) || 0 : 0
   const internalHours = userFacingHours + hoursAdj
-  const baseKoi = Math.floor(7 * userFacingHours) // Koi based on user-facing hours (TA-approved)
-  const koiAdj = koiAdjInput !== '' ? parseInt(koiAdjInput, 10) || 0 : 0
-  const finalKoi = baseKoi + koiAdj
+  const baseGold = Math.floor(7 * userFacingHours) // Gold based on user-facing hours (TA-approved)
+  const goldAdj = goldAdjInput !== '' ? parseInt(goldAdjInput, 10) || 0 : 0
+  const finalGold = baseGold + goldAdj
 
   const preflight = useMemo(() => {
     const results = review.preflight_results || []
@@ -557,7 +559,7 @@ export default function BuildReviewsShow({
         ? `/admin/reviews/build_reviews/${review.id}?skip=${skip}`
         : `/admin/reviews/build_reviews/${review.id}`
       const hoursAdjSeconds = hoursAdjInput !== '' ? Math.round((parseFloat(hoursAdjInput) || 0) * 3600) : null
-      const koiAdjValue = koiAdjInput !== '' ? parseInt(koiAdjInput, 10) || 0 : null
+      const goldAdjValue = goldAdjInput !== '' ? parseInt(goldAdjInput, 10) || 0 : null
       router.patch(
         url,
         {
@@ -567,7 +569,7 @@ export default function BuildReviewsShow({
             feedback: feedback.trim() || null,
             internal_reason: internalReason.trim() || null,
             hours_adjustment: hoursAdjSeconds,
-            koi_adjustment: koiAdjValue,
+            gold_adjustment: goldAdjValue,
           } as any,
         },
         {
@@ -594,7 +596,7 @@ export default function BuildReviewsShow({
         },
       )
     },
-    [review.id, feedback, internalReason, hoursAdjInput, koiAdjInput, skip],
+    [review.id, feedback, internalReason, hoursAdjInput, goldAdjInput, skip],
   )
 
   return (
@@ -802,7 +804,7 @@ export default function BuildReviewsShow({
                   <p className="text-sm whitespace-pre-wrap">{review.feedback}</p>
                 </div>
               )}
-              {(review.hours_adjustment != null || review.koi_adjustment != null) && (
+              {(review.hours_adjustment != null || review.gold_adjustment != null) && (
                 <div className="space-y-1.5 pt-1">
                   {review.hours_adjustment != null && (
                     <div className="flex items-center gap-2 text-xs">
@@ -813,12 +815,12 @@ export default function BuildReviewsShow({
                       </span>
                     </div>
                   )}
-                  {review.koi_adjustment != null && (
+                  {review.gold_adjustment != null && (
                     <div className="flex items-center gap-2 text-xs">
-                      <span className="text-muted-foreground">Koi adj:</span>
+                      <span className="text-muted-foreground">Gold adj:</span>
                       <span className="font-mono">
-                        {review.koi_adjustment >= 0 ? '+' : ''}
-                        {review.koi_adjustment}
+                        {review.gold_adjustment >= 0 ? '+' : ''}
+                        {review.gold_adjustment}
                       </span>
                     </div>
                   )}
@@ -884,30 +886,39 @@ export default function BuildReviewsShow({
 
                 <div className="space-y-1.5">
                   <label className="text-xs text-muted-foreground">
-                    Modify Koi <span className="text-muted-foreground/60">(shown to user)</span>
+                    Modify Gold <span className="text-muted-foreground/60">(shown to user)</span>
                   </label>
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-muted-foreground font-mono whitespace-nowrap">
-                      {baseKoi}
+                      {baseGold}
                       <span className="text-[10px] ml-0.5 opacity-60">{userFacingHours}h×7</span>
                     </span>
                     <span className="text-muted-foreground">→</span>
                     <Input
                       type="number"
                       step="1"
-                      value={koiAdjInput}
-                      onChange={(e) => setKoiAdjInput(e.target.value)}
+                      value={goldAdjInput}
+                      onChange={(e) => setGoldAdjInput(e.target.value)}
                       placeholder="0"
                       className="h-8 text-sm font-mono w-20 text-center"
                     />
                     <span className="text-muted-foreground">→</span>
                     <span
-                      className={`font-mono whitespace-nowrap ${koiAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
+                      className={`font-mono whitespace-nowrap ${goldAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
                     >
-                      {finalKoi}
+                      {finalGold}
                     </span>
                   </div>
                 </div>
+
+                {pending_conversion_koi > 0 && (
+                  <div className="rounded-md border border-border bg-muted/40 px-2.5 py-2 text-xs space-y-0.5">
+                    <p className="text-muted-foreground">Approval will convert koi to gold</p>
+                    <p className="font-mono text-foreground">
+                      {pending_conversion_koi} koi → {pending_conversion_koi} gold
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 pt-2">
@@ -948,7 +959,7 @@ export default function BuildReviewsShow({
                         <AlertDialogTitle>Move to Design Review?</AlertDialogTitle>
                         <AlertDialogDescription>
                           This ship will be moved into the Design Review queue. Queued-at timestamp and current
-                          in-progress fields (feedback, internal reason, hours/koi adjustments) are preserved. This
+                          in-progress fields (feedback, internal reason, hours/currency adjustments) are preserved. This
                           replaces the Build Review record.
                         </AlertDialogDescription>
                       </AlertDialogHeader>

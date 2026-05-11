@@ -146,6 +146,20 @@ class Project < ApplicationRecord
     }
   end
 
+  # True once any build-type ship on this project has been approved. Flipping this on
+  # is the trigger for BuiltIrlConversionService (koi → gold sweep). Computed on the fly
+  # rather than cached so it stays in sync with the canonical ship state.
+  def built_irl?
+    ships.approved.where(ship_type: :build).exists?
+  end
+
+  # Lifetime koi awarded to this project across all approved DR cycles, including
+  # DR koi_adjustment (which is baked into ship_review amounts). Used as the cap for
+  # how much koi can convert to gold when this project becomes built_irl.
+  def lifetime_ship_review_koi
+    KoiTransaction.where(reason: "ship_review", ship_id: ships.select(:id)).sum(:amount)
+  end
+
   def time_logged
     lapse = LapseTimelapse
       .joins(recording: :journal_entry)

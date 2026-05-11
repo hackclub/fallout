@@ -1,7 +1,8 @@
-# Issues one ship_review koi transaction per non-trial kept project member when a ship
-# reaches :approved. Koi is split evenly; the owner absorbs any integer remainder.
+# Issues one ship_review koi transaction per non-trial kept project member when a
+# DESIGN ship reaches :approved. Koi is split evenly; the owner absorbs any integer
+# remainder. Build ships award gold via ShipGoldAwarder instead (DR → koi, BR → gold).
 #
-# Single source of truth for the awarding formula. Called from Ship#award_ship_review_koi!
+# Single source of truth for the koi formula. Called from Ship#award_ship_review_currency!
 # (after_update_commit) and from `rake koi:reconcile_ship_reviews` (operator-triggered
 # backfill / safety-net). Idempotent per member — the partial unique index on
 # koi_transactions(ship_id, user_id) WHERE reason = 'ship_review' is the guarantee.
@@ -12,13 +13,15 @@
 #   :skipped_zero_amount      — hours+adjustments sum to 0; nothing to record
 #   :skipped_trial_user       — all eligible members are trial users
 #   :skipped_not_approved     — ship status is not :approved
+#   :skipped_wrong_ship_type  — ship is not a design ship (koi is DR-only)
 class ShipKoiAwarder
   Result = Data.define(:status, :transaction, :amount)
 
   RATE_KOI_PER_HOUR = 7
 
   def self.call(ship)
-    return [ Result.new(status: :skipped_not_approved, transaction: nil, amount: 0) ] unless ship.approved?
+    return [ Result.new(status: :skipped_not_approved,    transaction: nil, amount: 0) ] unless ship.approved?
+    return [ Result.new(status: :skipped_wrong_ship_type, transaction: nil, amount: 0) ] unless ship.ship_type_design?
 
     members = eligible_members(ship)
     return [ Result.new(status: :skipped_trial_user, transaction: nil, amount: 0) ] if members.empty?
@@ -58,7 +61,7 @@ class ShipKoiAwarder
   def self.compute_amount(ship)
     seconds = ship.approved_public_seconds.to_i # Public/user-facing hours only — internal hours_adjustment is excluded by design
     hours_koi = Rational(seconds * RATE_KOI_PER_HOUR, 3600).round
-    adjustment = ship.design_review&.koi_adjustment.to_i + ship.build_review&.koi_adjustment.to_i
+    adjustment = ship.design_review&.koi_adjustment.to_i # DR-only; BR adjusts gold via ShipGoldAwarder
     hours_koi + adjustment
   end
 

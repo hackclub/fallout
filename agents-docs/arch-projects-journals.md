@@ -103,10 +103,10 @@ Rails 8 `delegated_type :recordable` pattern. The Recording is a **claim** — i
 
 ## Ships — `app/models/ship.rb`
 
-Formal project submissions, reviewed through a multi-stage pipeline. **See [arch-ship-and-koi.md](arch-ship-and-koi.md) for the full deep-dive** (preflight, identity gating, TA/RC/DR/BR pipeline, claim/heartbeat, re-ship behavior, koi ledger, edge cases). Quick reference:
+Formal project submissions, reviewed through a multi-stage pipeline. **See [arch-ship-and-koi.md](arch-ship-and-koi.md) for the full deep-dive** (preflight, identity gating, TA/RC/DR/BR pipeline, claim/heartbeat, re-ship behavior, koi/gold ledger + built-irl conversion, edge cases). Quick reference:
 
 - **Status lifecycle**: `pending` | `approved` | `returned` | `rejected` | `awaiting_identity` (held until `User#fully_identity_gated?`).
-- **Ship type** enum (default `design`): `design` → DesignReview Phase 2; `build` → BuildReview Phase 2.
+- **Ship type** enum (default `design`): `design` → DesignReview Phase 2, awards **koi**; `build` → BuildReview Phase 2, awards **gold** AND triggers built-irl koi → gold sweep on first approval per project.
 - **Frozen fields** at submit time: `frozen_demo_link`, `frozen_repo_link`, `frozen_screenshot`, `frozen_hca_data` (encrypted JSON), `preflight_results`.
 - **Submission**: 4-step UI (`pages/projects/ships/preflight.tsx`) → `Projects::ShipsController#create`. `ShipCheckService` runs ~16 user-visible + 3 internal preflight checks via `ShipPreflightJob`.
 - **Lifecycle callbacks** (Ship): `after_create :claim_journal_entries!` (assign new entries), `after_create :create_initial_reviews!` (TA + RC), `after_update_commit :create_initial_reviews!` on `awaiting_identity → pending` promotion, `after_update_commit :notify_status_change`.

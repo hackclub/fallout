@@ -21,6 +21,7 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
     ship = @review.ship
     project = ship.project
     time_audit = ship.time_audit_review
+    project_owner = project.user
 
     new_entries = ship.new_journal_entries
       .includes(:user, images_attachments: :blob, recordings: :recordable)
@@ -29,6 +30,17 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
     previous_entries = ship.previous_journal_entries
       .includes(:user, images_attachments: :blob, recordings: :recordable)
       .order(created_at: :asc)
+
+    # Conversion preview — show "Approval will convert N koi → N gold" only when this
+    # BR is the project's first approved build (i.e., would actually trigger conversion).
+    # We preview the project owner's conversion since they're the primary recipient;
+    # collaborators get their own conversion at the same trigger but aren't surfaced here.
+    pending_conversion_koi =
+      if @review.pending? && !project.built_irl?
+        BuiltIrlConversionService.compute_amount(ship, project_owner)
+      else
+        0
+      end
 
     render inertia: {
       review: serialize_review_detail(@review),
@@ -40,6 +52,7 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
       reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
       reviewer_notes_path: admin_project_reviewer_notes_path(project),
       project_flagged: project.flagged?,
+      pending_conversion_koi: pending_conversion_koi,
       can: { update: policy(@review).update?, swap_type: policy(@review).swap_type? },
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_build_review_path(@review),
@@ -79,7 +92,7 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
   end
 
   def review_params
-    params.expect(build_review: [ :status, :feedback, :internal_reason, :hours_adjustment, :koi_adjustment ])
+    params.expect(build_review: [ :status, :feedback, :internal_reason, :hours_adjustment, :gold_adjustment ])
   end
 
   def serialize_review_detail(review)
@@ -91,7 +104,7 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
       feedback: review.feedback,
       internal_reason: review.internal_reason,
       hours_adjustment: review.hours_adjustment,
-      koi_adjustment: review.koi_adjustment,
+      gold_adjustment: review.gold_adjustment,
       reviewer_display_name: review.reviewer&.display_name,
       project_name: ship.project.name,
       user_display_name: ship.project.user.display_name,

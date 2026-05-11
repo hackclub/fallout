@@ -615,7 +615,7 @@ export interface BuildReviewDetail {
   feedback: string | null
   internal_reason: string | null
   hours_adjustment: number | null
-  koi_adjustment: number | null
+  gold_adjustment: number | null
   annotations: Record<string, unknown> | null
   reviewer_display_name: string | null
   project_name: string

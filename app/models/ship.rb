@@ -70,7 +70,7 @@ class Ship < ApplicationRecord
   after_create :create_initial_reviews!, if: :pending?
   after_update_commit :create_initial_reviews!, if: :became_pending_from_awaiting?
   after_update_commit :notify_status_change, if: :saved_change_to_status?
-  after_update_commit :award_ship_review_koi!, if: :saved_change_to_status?
+  after_update_commit :award_ship_review_currency!, if: :saved_change_to_status?
   after_update_commit :enqueue_unified_airtable_upload, if: :saved_change_to_status?
 
   # YSWS Unified Submissions table — receives a one-shot snapshot when a ship
@@ -123,7 +123,7 @@ class Ship < ApplicationRecord
       time_audit: TimeAuditReview.where(ship_id: ship_ids).select(:id, :ship_id, :status).index_by(&:ship_id),
       requirements_check: RequirementsCheckReview.where(ship_id: ship_ids).select(:id, :ship_id, :status).index_by(&:ship_id),
       design: DesignReview.where(ship_id: ship_ids).select(:id, :ship_id, :status, :hours_adjustment, :koi_adjustment).index_by(&:ship_id),
-      build: BuildReview.where(ship_id: ship_ids).select(:id, :ship_id, :status, :hours_adjustment, :koi_adjustment).index_by(&:ship_id)
+      build: BuildReview.where(ship_id: ship_ids).select(:id, :ship_id, :status, :hours_adjustment, :gold_adjustment).index_by(&:ship_id)
     }
 
     { project_user: project_user, logged_seconds: logged_seconds, koi: koi_by_ship, reviews: reviews }
@@ -247,9 +247,11 @@ class Ship < ApplicationRecord
   end
 
   # Admin-only swap between DesignReview and BuildReview for a pending ship. Carries
-  # in-progress reviewer work (feedback/internal_reason/hours_adjustment/koi_adjustment/
-  # annotations) onto the new review and preserves the original review's created_at so
-  # the queue wait time / position is unchanged. Returns the new review.
+  # in-progress reviewer work (feedback/internal_reason/hours_adjustment/currency
+  # adjustment/annotations) onto the new review and preserves the original review's
+  # created_at so the queue wait time / position is unchanged. DR's koi_adjustment
+  # and BR's gold_adjustment are the same semantic knob (signed integer credit/debit
+  # on hours-derived currency) — they carry across the swap. Returns the new review.
   def swap_phase_two_type!
     raise ActiveRecord::RecordInvalid.new(self), "ship is not pending" unless pending?
 
@@ -258,17 +260,19 @@ class Ship < ApplicationRecord
       raise ActiveRecord::RecordInvalid.new(self), "no phase two review to swap" if current.nil?
       raise ActiveRecord::RecordInvalid.new(self), "phase two review is not pending" unless current.pending?
 
+      currency_adj = current.is_a?(DesignReview) ? current.koi_adjustment : current.gold_adjustment
+
+      new_type = ship_type_design? ? :build : :design
+      new_class = new_type == :design ? DesignReview : BuildReview
+
       carry = {
         feedback: current.feedback,
         internal_reason: current.internal_reason,
         hours_adjustment: current.hours_adjustment,
-        koi_adjustment: current.koi_adjustment,
         annotations: current.annotations,
         created_at: current.created_at
       }
-
-      new_type = ship_type_design? ? :build : :design
-      new_class = new_type == :design ? DesignReview : BuildReview
+      carry[new_class == DesignReview ? :koi_adjustment : :gold_adjustment] = currency_adj
 
       current.destroy!
       update!(ship_type: new_type)
@@ -514,19 +518,29 @@ class Ship < ApplicationRecord
     Rails.logger.error("Ship##{id} status notification failed: #{e.message}")
   end
 
-  # Awards koi when a ship reaches :approved. ShipKoiAwarder splits the amount evenly
-  # among all non-trial kept project members (also called from rake koi:reconcile_ship_reviews
-  # for backfill / safety-net). Idempotency is enforced per member by a partial unique
-  # index on koi_transactions(ship_id, user_id). Failures are logged but do NOT roll back
-  # the approval — operators reconcile via the rake task.
-  def award_ship_review_koi!
+  # Awards the appropriate currency when a ship reaches :approved — koi for design
+  # ships, gold for build ships. Build ships ALSO trigger BuiltIrlConversionService on
+  # the first approval per project to sweep accumulated project-koi into gold.
+  # Idempotency is enforced per member by partial unique indexes; failures are logged
+  # but do NOT roll back the approval — operators reconcile via the rake task.
+  def award_ship_review_currency!
     ship = Ship.includes(project: { user: {}, collaborators: :user }).find(id) # preload to avoid N+1
-    ShipKoiAwarder.call(ship).each do |result|
-      Rails.logger.info("Ship##{id} koi award: #{result.status} (amount=#{result.amount})")
+
+    if ship_type_design?
+      ShipKoiAwarder.call(ship).each do |result|
+        Rails.logger.info("Ship##{id} koi award: #{result.status} (amount=#{result.amount})")
+      end
+    elsif ship_type_build?
+      ShipGoldAwarder.call(ship).each do |result|
+        Rails.logger.info("Ship##{id} gold award: #{result.status} (amount=#{result.amount})")
+      end
+      BuiltIrlConversionService.call(ship).each do |result|
+        Rails.logger.info("Ship##{id} built_irl conversion: #{result.status} user=#{result.user_id} amount=#{result.amount}")
+      end
     end
   rescue => e
-    Rails.logger.error("Ship##{id} koi award failed: #{e.message}")
-    ErrorReporter.capture_exception(e, contexts: { ship_review_koi: { ship_id: id } })
+    Rails.logger.error("Ship##{id} currency award failed: #{e.message}")
+    ErrorReporter.capture_exception(e, contexts: { ship_review_currency: { ship_id: id } })
   end
 
   def enqueue_unified_airtable_upload
