@@ -15,7 +15,7 @@ Sentry.init do |config|
   config.traces_sample_rate = Rails.env.production? ? 0.2 : 1.0
   config.profiles_sample_rate = Rails.env.production? ? 0.2 : 1.0 # CPU profiles via stackprof
 
-  # Mirror every Sentry-bound error into Rails.logger so it also reaches the log stream (e.g. Uptrace).
+  # Mirror every Sentry-bound error into Rails.logger so it also reaches whatever the log broadcast feeds (stdout, Better Stack, etc.). rescue ensures a logger crash never blocks the Sentry send.
   config.before_send = lambda do |event, hint|
     exception = hint && hint[:exception]
     summary = if exception
