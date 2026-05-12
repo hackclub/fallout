@@ -19,6 +19,10 @@ class BuildReviewPolicy < ApplicationPolicy
     admin? || active_claimer?
   end
 
+  def swap_type?
+    admin? && record.pending? && record.ship.pending? # Admins only; only swap while still pending
+  end
+
   private
 
   def active_claimer?

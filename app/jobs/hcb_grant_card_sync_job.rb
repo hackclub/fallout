@@ -40,7 +40,6 @@ class HcbGrantCardSyncJob < ApplicationJob
 
   def sync_single_grant(card, data)
     attrs = {
-      amount_cents: data[:amount_cents],
       balance_cents: data[:balance_cents],
       purpose: data[:purpose],
       email: data[:email],
@@ -53,6 +52,12 @@ class HcbGrantCardSyncJob < ApplicationJob
       last_synced_at: Time.current
     }
 
+    # Preserve the historical grant total locally if HCB ever returns 0/nil
+    # (e.g. on a closed card) — `amount_cents` validates `> 0` so accepting 0
+    # would fail the save and silently abort the rest of this method, including
+    # the cancel-refund booking below. `balance_cents` already tracks runtime state.
+    attrs[:amount_cents] = data[:amount_cents] if data[:amount_cents].is_a?(Integer) && data[:amount_cents].positive?
+
     # Don't let sync revert a local cancel — write scope is needed to cancel on HCB
     attrs[:status] = data[:status] unless card.canceled? && data[:status] != "canceled"
 
@@ -64,13 +69,82 @@ class HcbGrantCardSyncJob < ApplicationJob
       card.update_column(:last_synced_at, Time.current)
     end
 
-    sync_transactions(card)
+    fully_synced = sync_transactions(card)
+
+    # When HCB closes a card (cancel or expiry), the unspent balance is returned
+    # to the org and the closure is irreversible. Without booking an `out` topup
+    # the Fallout ledger keeps showing the original transferred amount and
+    # `delta_cents` over-counts the user's funding on any future settle.
+    # Evaluated every sync (not just on the closing edge) so a crashed-mid-way
+    # prior attempt is retried on the next pass; idempotency is enforced inside
+    # book_closure_refund! by a double-checked guard. Gated on a successful
+    # txn-sync pass so a partial purchase history doesn't over-book the refund.
+    book_closure_refund!(card) if fully_synced && (card.canceled? || card.expired?)
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
     ErrorReporter.capture_exception(e, contexts: {
       hcb: { event: "grant_card_sync_record_invalid", hcb_id: card.hcb_id }
     })
   end
 
+  CLOSURE_REFUND_NOTE_PREFIX = "Auto-booked: card closed, refund to org"
+
+  # Books a single ledger-only `out` topup for the unspent balance returned to
+  # the org when a card is closed (canceled or expired). Safe to call every sync
+  # — guarded by an existence check both outside and inside the advisory lock so
+  # a concurrent caller can't slip a duplicate row through between the check
+  # and the insert.
+  def book_closure_refund!(card)
+    user = card.user
+    return unless user
+    return if closure_refund_already_booked?(card) # cheap pre-check: avoid taking the lock when there's nothing to do
+
+    ActiveRecord::Base.transaction do
+      lock_key = "pft:#{user.id}" # same key the settle service uses, so we serialize against an in-flight topup for this user
+      ActiveRecord::Base.connection.execute(
+        "SELECT pg_advisory_xact_lock(hashtext(#{ActiveRecord::Base.connection.quote(lock_key)}))"
+      )
+      next if closure_refund_already_booked?(card) # re-check inside the lock — a concurrent worker may have just booked it
+
+      ledger_net = card.project_funding_topups.kept.where(status: "completed").sum(
+        Arel.sql("CASE direction WHEN 'out' THEN -amount_cents ELSE amount_cents END")
+      )
+      # HCB stores card-charge debits as negative amount_cents — flip to a
+      # positive "spent" figure. Excludes declined/reversed; includes pending
+      # so an in-flight charge at closure isn't counted as still-on-card.
+      spent_cents = -card.hcb_transactions.purchases.where(declined: false, reversed: false).sum(:amount_cents)
+      unspent_cents = ledger_net - spent_cents
+
+      next unless unspent_cents.positive? # nothing to refund (fully spent, or admin already booked an offsetting out)
+
+      ProjectFundingTopup.create!(
+        user: user,
+        hcb_grant_card: card,
+        amount_cents: unspent_cents,
+        direction: "out",
+        status: "completed",
+        completed_at: Time.current,
+        # MUST be true: returned balance counts toward the user's funding so a
+        # future order replenishes what came back. Example: user requests $30,
+        # spends $20, $10 returned on cancel; next request for $5 should send
+        # $15 (= $5 new + $10 replenishment). Flipping this to false would
+        # under-fund users by the returned amount on every closure.
+        counts_toward_funding: true,
+        note: "#{CLOSURE_REFUND_NOTE_PREFIX} status=#{card.status} (ledger_net=#{ledger_net}c, spent=#{spent_cents}c)"
+      )
+    end
+  end
+
+  def closure_refund_already_booked?(card)
+    card.project_funding_topups.kept
+        .where(direction: "out", status: "completed")
+        .where("note LIKE ?", "#{CLOSURE_REFUND_NOTE_PREFIX}%")
+        .exists?
+  end
+
+  # Returns true iff the full transaction history paginated cleanly to the end.
+  # The cancel-refund booking depends on a complete `card.hcb_transactions`
+  # view — a partial history would undercount `spent` and over-book the refund,
+  # and the cheap pre-check would prevent self-correction on later passes.
   def sync_transactions(card)
     after_cursor = nil
 
@@ -88,10 +162,12 @@ class HcbGrantCardSyncJob < ApplicationJob
       after_cursor = remote_txns.last&.dig(:id)
       break unless after_cursor
     end
+    true
   rescue Faraday::Error => e
     ErrorReporter.capture_exception(e, contexts: {
       hcb: { event: "transaction_sync_failure", card_hcb_id: card.hcb_id }
     })
+    false
   end
 
   def sync_single_transaction(card, txn_data)

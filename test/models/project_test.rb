@@ -18,12 +18,11 @@
 #
 # Indexes
 #
-#  index_projects_on_description_trgm  (description) USING gin
-#  index_projects_on_discarded_at      (discarded_at)
-#  index_projects_on_is_unlisted       (is_unlisted)
-#  index_projects_on_name_trgm         (name) USING gin
-#  index_projects_on_tags              (tags) USING gin
-#  index_projects_on_user_id           (user_id)
+#  index_projects_on_discarded_at  (discarded_at)
+#  index_projects_on_is_unlisted   (is_unlisted)
+#  index_projects_on_name_trgm     (name) USING gin
+#  index_projects_on_tags          (tags) USING gin
+#  index_projects_on_user_id       (user_id)
 #
 # Foreign Keys
 #

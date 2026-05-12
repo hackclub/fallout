@@ -407,19 +407,17 @@ function StreakGoalShow({ goal, current_streak, streak_freezes, targets, last_go
 
   if (is_modal) {
     return (
-      <>
-        <Modal panelClasses="" paddingClasses="max-w-md mx-auto" closeButton={false} onClose={() => setClosing(true)}>
-          <Frame showBorderOnMobile>{content}</Frame>
-        </Modal>
-        {createPortal(mascot, document.body)}
-      </>
+      <Modal panelClasses="" paddingClasses="max-w-md mx-auto" closeButton={false} onClose={() => setClosing(true)}>
+        <Frame showBorderOnMobile>{content}</Frame>
+        {mascot}
+      </Modal>
     )
   }
 
   return (
     <>
-      {content}
       {mascot}
+      {content}
     </>
   )
 }

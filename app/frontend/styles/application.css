@@ -182,6 +182,11 @@
 .im-modal-positioner {
   @apply h-full!;
 }
+.im-dialog,
+.im-modal-container,
+.im-slideover-container {
+  z-index: 10000 !important;
+}
 .im-modal-wrapper {
   @apply h-full! min-w-full! p-8;
 }

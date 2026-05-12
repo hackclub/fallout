@@ -59,6 +59,10 @@ class ProjectGrantWarning < ApplicationRecord
     pending_topup_stuck
     dangling_card
     ratchet_capped
+    donation_no_active_card
+    donation_refunded_after_match
+    donation_amount_mismatch
+    donation_donor_mismatch
   ].freeze
 
   # Description shown to admin in the UI. Keep these accurate as the detection logic
@@ -108,6 +112,41 @@ class ProjectGrantWarning < ApplicationRecord
       example: "Admin manually added $50 on HCB without recording in Fallout. Next topup " \
                "attempt tried to add another $10 but got capped to $0. Fix: record the " \
                "$50 as an `in` adjustment to align the ledger."
+    },
+    "donation_no_active_card" => {
+      title: "Donation top-up arrived but user has no active card",
+      detail: "A user-funded donation matched a HcbDonationRequest but at match time the " \
+              "user had no active issued HCB grant card (canceled/expired between submit " \
+              "and deposit). Money landed in the org and can't be auto-moved to a card.",
+      example: "User donated $20 expecting it on their grant card; admin canceled the card " \
+               "shortly after. Fix: issue a new card and manually book an `in` adjustment, " \
+               "or refund the donation on HCB."
+    },
+    "donation_refunded_after_match" => {
+      title: "Donation was refunded after we booked the top-up",
+      detail: "HCB flipped the donation's refunded flag after we already added the funds " \
+              "to the user's card. We never auto-claw-back from a card (it may already be " \
+              "spent). Admin decides whether to book a corrective `out` adjustment.",
+      example: "User donated $30, card was topped up; HCB reversed the Stripe charge a day " \
+               "later. Fix: if the card hasn't been spent, withdraw $30 on HCB and book an " \
+               "`out` adjustment; otherwise absorb."
+    },
+    "donation_amount_mismatch" => {
+      title: "Donation amount differs from the intent",
+      detail: "The HCB donation's amount_cents doesn't match what the user originally " \
+              "entered in /top_ups/new. We trust HCB's actual amount and book that — this " \
+              "warning is informational so admin can see the discrepancy.",
+      example: "User submitted intent for $50; on HCB's donation page they overrode the " \
+               "amount to $40. We book $40 (the real money) and surface the diff here."
+    },
+    "donation_donor_mismatch" => {
+      title: "Donation donor email doesn't match the user",
+      detail: "A donation's message included a valid token but the donor.email on HCB " \
+              "didn't match the user who created the request. Refused to book — likely a " \
+              "token leak or someone using another user's intent to credit a different card.",
+      example: "User A creates intent (token ABCD). User B donates with the same message " \
+               "string but signs in as themselves on HCB. We refuse to credit either card; " \
+               "admin reviews."
     }
   }.freeze
 
@@ -163,7 +202,12 @@ class ProjectGrantWarning < ApplicationRecord
                                                .group(:hcb_grant_card_id)
                                                .sum(Arel.sql("CASE direction WHEN 'out' THEN -amount_cents ELSE amount_cents END"))
 
-    HcbGrantCard.issued.includes(:user).find_each do |card|
+    # Skip closed cards (canceled/expired): once HCB returns the unspent balance
+    # to the org, `card.amount_cents` (the historical grant total) no longer
+    # represents reality — and HcbGrantCardSyncJob#book_closure_refund! has
+    # already booked an `out` row that intentionally drives ledger_net below
+    # amount_cents. Comparing the two would warn forever for every closed card.
+    HcbGrantCard.issued.where(status: "active").includes(:user).find_each do |card|
       ledger_net = ledger_net_by_card_id[card.id] || 0
       next if card.amount_cents == ledger_net
 

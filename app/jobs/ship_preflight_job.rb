@@ -26,17 +26,26 @@ class ShipPreflightJob < ApplicationJob
     user_results = results.select(&:user?)
     status = user_results.none?(&:blocking?) ? :passed : :failed
 
+    final_results = results.map(&:as_json)
+
     # Persist final results to DB — source of truth after cache expires
     preflight_run.update!(
       status: status,
-      checks: results.map(&:as_json),
-      all_results: results.map(&:as_json)
+      checks: final_results,
+      all_results: final_results
     )
+
+    # Backfill any ship that was submitted before slow internal checks (e.g. code_plagiarism)
+    # finished — its preflight_results snapshot still has those entries as "running" and the
+    # admin UI filters non-terminal statuses out. Submission is intentionally not blocked on
+    # internal checks, so we update the ship after-the-fact instead. update_columns skips
+    # callbacks/paper_trail since this is a passive backfill, not a user-initiated change.
+    preflight_run.ship&.update_columns(preflight_results: final_results, updated_at: Time.current)
 
     # Update cache so active pollers see the final state
     Rails.cache.write(cache_key, {
       status: status.to_s,
-      checks: results.map(&:as_json)
+      checks: final_results
     }, expires_in: 5.minutes)
   end
 end

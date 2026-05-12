@@ -22,9 +22,11 @@ class ProjectsController < ApplicationController
     scope = scope.includes(kept_journal_entries: { images_attachments: :blob })
     scope = scope.search(params[:query]) if params[:query].present?
     @pagy, @projects = pagy(scope.order(created_at: :desc))
+    project_ids = @projects.map(&:id)
     @recordings_counts = Recording.joins(:journal_entry)
-      .where(journal_entries: { project_id: @projects.map(&:id), discarded_at: nil })
+      .where(journal_entries: { project_id: project_ids, discarded_at: nil })
       .group("journal_entries.project_id").count
+    @time_logged_by_project = Project.batch_time_logged(project_ids)
 
     render inertia: {
       projects: @projects.map { |p| serialize_project_card(p) },
@@ -77,6 +79,7 @@ class ProjectsController < ApplicationController
         update: project_policy.update?,
         destroy: project_policy.destroy?,
         export_journal: project_policy.export_journal?,
+        share: project_policy.share?, # Gates the "Copy share link" overflow menu item — true only for listed, non-discarded projects
         ship: project_policy.ship?,
         manage_collaborators: collab_enabled && project_policy.manage_collaborators?,
         create_journal_entry: JournalEntryPolicy.new(current_user, @project.journal_entries.build(user: current_user)).create?,
@@ -223,7 +226,7 @@ class ProjectsController < ApplicationController
       tags: project.tags,
       cover_image_url: cover_entry&.images&.first&.then { |img| url_for(img) },
       journal_entries_count: kept_entries.size,
-      time_logged: project.time_logged,
+      time_logged: @time_logged_by_project[project.id] || 0,
       recordings_count: @recordings_counts[project.id] || 0,
       is_collaborator: project.user_id != current_user.id # True when viewing a project you collaborate on (not own)
     }

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_12_155903) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -50,7 +50,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.bigint "user_id"
     t.bigint "visit_id"
     t.index ["name", "time"], name: "index_ahoy_events_on_name_and_time"
-    t.index ["properties"], name: "index_ahoy_events_on_properties", opclass: :jsonb_path_ops, using: :gin
     t.index ["user_id"], name: "index_ahoy_events_on_user_id"
     t.index ["visit_id"], name: "index_ahoy_events_on_visit_id"
   end
@@ -102,9 +101,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.datetime "claim_expires_at"
     t.datetime "created_at", null: false
     t.text "feedback"
+    t.integer "gold_adjustment"
     t.integer "hours_adjustment"
     t.text "internal_reason"
-    t.integer "koi_adjustment"
     t.integer "lock_version", default: 0, null: false
     t.bigint "reviewer_id"
     t.bigint "ship_id", null: false
@@ -155,23 +154,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.index ["discarded_at"], name: "index_collaborators_on_discarded_at"
     t.index ["user_id", "collaboratable_type", "collaboratable_id"], name: "index_collaborators_uniqueness", unique: true
     t.index ["user_id"], name: "index_collaborators_on_user_id"
-  end
-
-  create_table "collapse_timelapses", force: :cascade do |t|
-    t.string "collapse_session_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "last_refreshed_at"
-    t.string "name"
-    t.integer "screenshot_count"
-    t.text "session_token", null: false
-    t.string "status"
-    t.string "thumbnail_url"
-    t.integer "tracked_seconds"
-    t.datetime "updated_at", null: false
-    t.bigint "user_id", null: false
-    t.string "video_url"
-    t.index ["collapse_session_id"], name: "index_collapse_timelapses_on_collapse_session_id", unique: true
-    t.index ["user_id"], name: "index_collapse_timelapses_on_user_id"
   end
 
   create_table "critters", force: :cascade do |t|
@@ -238,9 +220,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.datetime "created_at", null: false
     t.text "description", null: false
     t.string "reason", null: false
+    t.bigint "ship_id"
+    t.uuid "transfer_id"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["actor_id"], name: "index_gold_transactions_on_actor_id"
+    t.index ["ship_id", "user_id"], name: "index_gold_transactions_on_built_irl_conversion_uniqueness", unique: true, where: "(((reason)::text = 'built_irl_conversion'::text) AND (ship_id IS NOT NULL))"
+    t.index ["ship_id", "user_id"], name: "index_gold_transactions_on_ship_review_uniqueness", unique: true, where: "(((reason)::text = 'ship_review'::text) AND (ship_id IS NOT NULL))"
+    t.index ["ship_id"], name: "index_gold_transactions_on_ship_id"
+    t.index ["transfer_id"], name: "index_gold_transactions_on_transfer_id", where: "(transfer_id IS NOT NULL)"
     t.index ["user_id", "created_at"], name: "index_gold_transactions_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_gold_transactions_on_user_id"
   end
@@ -254,6 +242,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.datetime "token_expires_at"
     t.datetime "updated_at", null: false
     t.index ["connected_by_id"], name: "index_hcb_connections_on_connected_by_id"
+  end
+
+  create_table "hcb_donation_requests", force: :cascade do |t|
+    t.integer "amount_cents", null: false
+    t.datetime "created_at", null: false
+    t.datetime "discarded_at"
+    t.datetime "donated_at"
+    t.string "hcb_donation_id"
+    t.datetime "last_seen_at"
+    t.datetime "matched_at"
+    t.bigint "project_funding_topup_id"
+    t.datetime "refunded_at"
+    t.string "token", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["discarded_at"], name: "index_hcb_donation_requests_on_discarded_at"
+    t.index ["hcb_donation_id"], name: "index_hcb_donation_requests_on_hcb_donation_id", unique: true, where: "(hcb_donation_id IS NOT NULL)"
+    t.index ["matched_at"], name: "index_hcb_donation_requests_on_matched_at"
+    t.index ["project_funding_topup_id"], name: "index_hcb_donation_requests_on_project_funding_topup_id"
+    t.index ["token"], name: "index_hcb_donation_requests_on_token", unique: true
+    t.index ["user_id"], name: "index_hcb_donation_requests_on_user_id"
+    t.check_constraint "amount_cents > 0", name: "hcb_donation_requests_amount_cents_positive"
   end
 
   create_table "hcb_grant_cards", force: :cascade do |t|
@@ -330,7 +340,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.bigint "ship_id"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
-    t.index ["content"], name: "index_journal_entries_on_content_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["discarded_at"], name: "index_journal_entries_on_discarded_at"
     t.index ["project_id"], name: "index_journal_entries_on_project_id"
     t.index ["ship_id"], name: "index_journal_entries_on_ship_id"
@@ -344,9 +353,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.text "description", null: false
     t.string "reason", null: false
     t.bigint "ship_id"
+    t.uuid "transfer_id"
     t.bigint "user_id", null: false
     t.index ["actor_id"], name: "index_koi_transactions_on_actor_id"
-    t.index ["ship_id"], name: "index_koi_transactions_on_ship_review_uniqueness", unique: true, where: "(((reason)::text = 'ship_review'::text) AND (ship_id IS NOT NULL))"
+    t.index ["ship_id", "user_id"], name: "index_koi_transactions_on_built_irl_conversion_uniqueness", unique: true, where: "(((reason)::text = 'built_irl_conversion'::text) AND (ship_id IS NOT NULL))"
+    t.index ["ship_id", "user_id"], name: "index_koi_transactions_on_ship_review_uniqueness", unique: true, where: "(((reason)::text = 'ship_review'::text) AND (ship_id IS NOT NULL))"
+    t.index ["transfer_id"], name: "index_koi_transactions_on_transfer_id", where: "(transfer_id IS NOT NULL)"
     t.index ["user_id", "created_at"], name: "index_koi_transactions_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_koi_transactions_on_user_id"
   end
@@ -558,7 +570,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.string "tags", default: [], null: false, array: true
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
-    t.index ["description"], name: "index_projects_on_description_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["discarded_at"], name: "index_projects_on_discarded_at"
     t.index ["is_unlisted"], name: "index_projects_on_is_unlisted"
     t.index ["name"], name: "index_projects_on_name_trgm", opclass: :gin_trgm_ops, using: :gin
@@ -900,6 +911,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.boolean "has_hca_address", default: false, null: false
     t.string "hca_id"
     t.text "hca_token"
+    t.string "hcb_email"
     t.boolean "is_adult", default: false, null: false
     t.boolean "is_banned", default: false, null: false
     t.text "lapse_token"
@@ -913,7 +925,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
     t.integer "streak_freezes", default: 1, null: false
     t.boolean "streak_in_app_notifications", default: true, null: false
     t.boolean "streak_slack_notifications", default: true, null: false
-    t.string "summit_rsvp"
     t.string "timezone", null: false
     t.string "type"
     t.datetime "updated_at", null: false
@@ -971,15 +982,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_123547) do
   add_foreign_key "collaboration_invites", "users", column: "invitee_id"
   add_foreign_key "collaboration_invites", "users", column: "inviter_id"
   add_foreign_key "collaborators", "users"
-  add_foreign_key "collapse_timelapses", "users"
   add_foreign_key "critters", "journal_entries"
   add_foreign_key "critters", "users"
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
-  add_foreign_key "dialog_campaigns", "users", name: "dialog_campaigns_user_id_fkey"
+  add_foreign_key "dialog_campaigns", "users"
+  add_foreign_key "gold_transactions", "ships"
   add_foreign_key "gold_transactions", "users"
   add_foreign_key "gold_transactions", "users", column: "actor_id"
   add_foreign_key "hcb_connections", "users", column: "connected_by_id"
+  add_foreign_key "hcb_donation_requests", "project_funding_topups"
+  add_foreign_key "hcb_donation_requests", "users"
   add_foreign_key "hcb_grant_cards", "users"
   add_foreign_key "hcb_transactions", "hcb_grant_cards"
   add_foreign_key "journal_entries", "projects"

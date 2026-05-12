@@ -13,7 +13,6 @@
 #
 # Indexes
 #
-#  index_journal_entries_on_content_trgm  (content) USING gin
 #  index_journal_entries_on_discarded_at  (discarded_at)
 #  index_journal_entries_on_project_id    (project_id)
 #  index_journal_entries_on_ship_id       (ship_id)

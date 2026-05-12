@@ -127,7 +127,13 @@ export default function AdminProjectGrantsOrdersIndex({
   warning_kind_descriptions: Record<string, WarningKindDescription>
   last_scan_at: string | null
   hcb_auth_status: 'connected' | 'expired' | 'disconnected' | 'not_configured'
-  stats: { issued_actual_cents: number; issued_expected_cents: number; active_cards: number; transactions: number }
+  stats: {
+    issued_actual_cents: number
+    issued_expected_cents: number
+    active_cards: number
+    spending_cents: number
+    spending_count: number
+  }
   rates: Rates
   hours_configured: boolean
   is_hcb: boolean
@@ -264,7 +270,8 @@ export default function AdminProjectGrantsOrdersIndex({
                         <span className="cursor-default">{formatDollars(actual)}</span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        Actual — HCB's authoritative amount_cents across all grant cards (reality){gapNote}
+                        Actual — HCB's authoritative amount_cents across active grant cards (reality). Closed cards
+                        excluded — their books are settled by the auto-booked closure refund.{gapNote}
                       </TooltipContent>
                     </Tooltip>
                     <span className="text-muted-foreground"> / </span>
@@ -273,7 +280,7 @@ export default function AdminProjectGrantsOrdersIndex({
                         <span className="cursor-default text-muted-foreground">{formatDollars(expected)}</span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        Expected — Fallout's ledger net (in minus out across all completed topups)
+                        Expected — Fallout's ledger net (in minus out) across active cards
                       </TooltipContent>
                     </Tooltip>
                   </span>
@@ -291,13 +298,16 @@ export default function AdminProjectGrantsOrdersIndex({
           <div className="text-[11px] text-muted-foreground mt-1">HcbGrantCard where status=active</div>
         </div>
         <div className="rounded-md border border-border p-3">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide">Total transactions</div>
-          <div className="text-2xl font-semibold font-mono mt-1">{stats.transactions}</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wide">Spending</div>
+          <div className="text-2xl font-semibold font-mono mt-1">
+            {formatDollars(stats.spending_cents)}{' '}
+            <span className="text-muted-foreground">({stats.spending_count})</span>
+          </div>
           <div
             className="text-[11px] text-muted-foreground mt-1"
-            title="Only card charges — excludes topups, withdrawals, and initial grant transfers"
+            title="Pending + settled card charges — excludes declined, reversed, and org↔card transfers. Pending is counted because the merchant has already captured the authorization."
           >
-            real card purchases from HCB
+            card purchases on HCB
           </div>
         </div>
       </div>

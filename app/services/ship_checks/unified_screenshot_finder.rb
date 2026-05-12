@@ -17,12 +17,14 @@ module ShipChecks
   #       screenshot.
   module UnifiedScreenshotFinder
     def self.find_url(project)
-      ctx = SharedContext.new(project)
+      Rails.cache.fetch([ "unified_screenshot_finder", project.id, project.updated_at.to_i ], expires_in: 6.hours) do
+        ctx = SharedContext.new(project)
 
-      find_zine_by_filename_in_tree(ctx) ||
-        find_zine_in_tree_via_llm(ctx) ||
-        find_zine_in_readme_via_llm(ctx) ||
-        find_representative_in_readme_via_llm(ctx)
+        find_zine_by_filename_in_tree(ctx) ||
+          find_zine_in_tree_via_llm(ctx) ||
+          find_zine_in_readme_via_llm(ctx) ||
+          find_representative_in_readme_via_llm(ctx)
+      end
     rescue StandardError => e
       Rails.logger.error("UnifiedScreenshotFinder failed for project ##{project.id}: #{e.class}: #{e.message}")
       nil

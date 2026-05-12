@@ -261,7 +261,7 @@ export default function AdminProjectsShow({
             </Link>
             {project.collaborators.length > 0 && (
               <>
-                <span>in collaboration with</span>
+                <span>&</span>
                 {project.collaborators.map((collab, i) => (
                   <span key={collab.id} className="inline-flex items-center gap-1">
                     {i > 0 && (

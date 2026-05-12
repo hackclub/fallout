@@ -1,7 +1,7 @@
 module Reviewable
   extend ActiveSupport::Concern
 
-  CLAIM_DURATION = 5.minutes
+  CLAIM_DURATION = 10.minutes
   REVIEW_MODELS = %w[TimeAuditReview RequirementsCheckReview DesignReview BuildReview].freeze
 
   included do

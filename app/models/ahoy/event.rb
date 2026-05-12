@@ -12,7 +12,6 @@
 # Indexes
 #
 #  index_ahoy_events_on_name_and_time  (name,time)
-#  index_ahoy_events_on_properties     (properties) USING gin
 #  index_ahoy_events_on_user_id        (user_id)
 #  index_ahoy_events_on_visit_id       (visit_id)
 #

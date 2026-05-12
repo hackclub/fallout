@@ -18,7 +18,8 @@ This index points to the per-subsystem docs. Start with [Project Architecture](p
 
 ## Deep-Dives
 
-- [Ship Pipeline & Koi Economy](arch-ship-and-koi.md) — Preflight, identity gate, multi-stage review (TA/RC/DR/BR), claim/heartbeat, re-ship, koi/gold ledger, edge cases
+- [Ship Pipeline & Koi/Gold Economy](arch-ship-and-koi.md) — Preflight, identity gate, multi-stage review (TA/RC/DR/BR), claim/heartbeat, re-ship, DR=koi / BR=gold awarding, built-irl conversion sweep, edge cases
+- [Project Grants & HCB Ledger](arch-hcb-ledger.md) — Two-table ledger (orders + topups), settle service, card lifecycle, closure refund auto-booking, divergence detection, admin UI scoping
 - [HCB API v4 docs](hcb-api-docs.md) — OAuth flow, token lifecycle, scopes, card grants, transactions, organizations
 - [Lookout API docs](lookout-api-docs.md) — Full endpoint reference for Lookout (video recording service)
 - [Inertia Modal fork](inertia-modal-fork.md) — Custom duration prop, in-modal navigation, modified files

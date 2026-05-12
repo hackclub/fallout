@@ -90,11 +90,17 @@ class BulletinBoardController < ApplicationController
     projects = Project.public_for_explore
     journals = JournalEntry.public_for_explore
 
+    # Fire all four counts/maxes in parallel — wall-time ≈ 1 round-trip instead of 4.
+    projects_count = projects.async_count
+    journals_count = journals.async_count
+    last_project = projects.async_maximum(:created_at)
+    last_journal = journals.async_maximum("journal_entries.created_at")
+
     {
-      projects_count: projects.count,
-      journals_count: journals.count,
-      last_project_created_at: projects.maximum(:created_at)&.iso8601,
-      last_journal_created_at: journals.maximum("journal_entries.created_at")&.iso8601
+      projects_count: projects_count.value,
+      journals_count: journals_count.value,
+      last_project_created_at: last_project.value&.iso8601,
+      last_journal_created_at: last_journal.value&.iso8601
     }
   end
 
@@ -327,7 +333,11 @@ class BulletinBoardController < ApplicationController
     project_ids = projects.map(&:id)
     @explore_journal_counts = JournalEntry.kept.where(project_id: project_ids).group(:project_id).count
     @explore_latest_entries = latest_entries_for_projects(project_ids)
-    @explore_cover_entries = cover_entries_for_projects(project_ids)
+
+    # Skip the separate cover-entry scan for projects whose latest entry already has an image —
+    # which is the common case. Only fetch covers for projects that still need one.
+    needs_cover_ids = project_ids - @explore_latest_entries.filter_map { |pid, e| pid if e.images.attached? }
+    @explore_cover_entries = cover_entries_for_projects(needs_cover_ids)
   end
 
   def latest_entries_for_projects(project_ids)
@@ -343,6 +353,7 @@ class BulletinBoardController < ApplicationController
       .index_by(&:project_id)
   end
 
+  # Only called for projects whose latest_entry has no attached image — see preload_project_explore_context.
   def cover_entries_for_projects(project_ids)
     return {} if project_ids.empty?
 

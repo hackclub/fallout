@@ -552,7 +552,11 @@ function HcbGrantCardsSection({ cards }: { cards: AdminHcbGrantCard[] }) {
                     {(() => {
                       const actual = c.amount_cents
                       const expected = c.transferred_in_cents
-                      const match = actual === expected
+                      // Closed cards (canceled/expired) intentionally show actual != expected:
+                      // amount_cents is the historical grant total, while ledger_net was driven
+                      // to the spent amount by the auto-booked closure refund. Don't flag as drift.
+                      const isActive = c.status === 'active'
+                      const match = !isActive || actual === expected
                       const gapNote = match
                         ? ''
                         : ` — ${formatDollars(Math.abs(actual - expected))} ${actual > expected ? 'extra on HCB' : 'missing from HCB'}`
@@ -564,7 +568,9 @@ function HcbGrantCardsSection({ cards }: { cards: AdminHcbGrantCard[] }) {
                                 <span className="cursor-default">{formatDollars(actual)}</span>
                               </TooltipTrigger>
                               <TooltipContent>
-                                Actual — HCB's amount_cents on this card (reality){gapNote}
+                                {isActive
+                                  ? `Actual — HCB's amount_cents on this card (reality)${gapNote}`
+                                  : "Historical grant total (HCB's amount_cents). Card is closed; current balance is in the next column."}
                               </TooltipContent>
                             </Tooltip>
                             <span className="text-muted-foreground"> / </span>
@@ -573,7 +579,9 @@ function HcbGrantCardsSection({ cards }: { cards: AdminHcbGrantCard[] }) {
                                 <span className="cursor-default text-muted-foreground">{formatDollars(expected)}</span>
                               </TooltipTrigger>
                               <TooltipContent>
-                                Expected — Fallout's ledger net (in minus out) for this card
+                                {isActive
+                                  ? "Expected — Fallout's ledger net (in minus out) for this card"
+                                  : 'Ledger net for this card (in minus out, including the closure refund)'}
                               </TooltipContent>
                             </Tooltip>
                           </span>

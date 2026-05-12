@@ -3,6 +3,18 @@ class PathController < ApplicationController
   skip_after_action :verify_authorized, only: %i[index] # No authorizable resource
   skip_after_action :verify_policy_scoped, only: %i[index] # No scoped collection
 
+  # Scoped to path-only so other pages don't pay these queries on every load.
+  inertia_share has_unread_mail: -> { # Drives the envelope badge on the path page
+    next false unless current_user && !current_user.trial?
+    MailMessage.visible_to(current_user)
+              .where.not(id: current_user.mail_interactions.read.select(:mail_message_id))
+              .exists?
+  }
+  inertia_share current_streak: -> { # Read-only — reconciliation happens in StreakReconciliationJob and StreakService.record_activity
+    next 0 unless current_user && !current_user.trial?
+    StreakDay.current_streak(current_user)
+  }
+
   def index
     mail_intro_id = deliver_mail_intro || deliver_auto_open_mail
 
@@ -66,35 +78,38 @@ class PathController < ApplicationController
     mail.id
   end
 
+  DIALOG_LOOKUP_KEYS = %w[sixty_hours streak_goal_completed first_journal streak_goal_nudge].freeze
+
   def pending_dialog_key(journal_entries)
     return nil if current_user.trial?
 
-    unseen_sixty = current_user.dialog_campaigns.unseen.find_by(key: "sixty_hours")
-    return "sixty_hours" if unseen_sixty
+    # Batch-fetch all dialog campaigns we might check, instead of running a separate
+    # find_by per key (was 4 sequential queries on every /path load).
+    campaigns_by_key = current_user.dialog_campaigns.where(key: DIALOG_LOOKUP_KEYS).index_by(&:key)
 
-    if current_user.total_time_logged_seconds >= 60 * 3600
-      campaign = current_user.dialog_campaigns.find_or_initialize_by(key: "sixty_hours")
-      if campaign.new_record?
-        campaign.save!
-        return "sixty_hours"
-      end
+    sixty = campaigns_by_key["sixty_hours"]
+    return "sixty_hours" if sixty && !sixty.seen?
+
+    if sixty.nil? && current_user.total_time_logged_seconds >= 60 * 3600
+      current_user.dialog_campaigns.create!(key: "sixty_hours")
+      return "sixty_hours"
     end
 
-    unseen_completed = current_user.dialog_campaigns.unseen.find_by(key: "streak_goal_completed")
-    return "streak_goal_completed" if unseen_completed
+    completed = campaigns_by_key["streak_goal_completed"]
+    return "streak_goal_completed" if completed && !completed.seen?
 
-    unseen_first = current_user.dialog_campaigns.unseen.find_by(key: "first_journal")
-    return "first_journal" if unseen_first
+    first = campaigns_by_key["first_journal"]
+    return "first_journal" if first && !first.seen?
 
     if journal_entries.size >= 1 && current_user.streak_goal.nil?
-      campaign = current_user.dialog_campaigns.find_or_initialize_by(key: "streak_goal_nudge")
-      if campaign.new_record?
-        campaign.save!
+      nudge = campaigns_by_key["streak_goal_nudge"]
+      if nudge.nil?
+        current_user.dialog_campaigns.create!(key: "streak_goal_nudge")
         return "streak_goal_nudge"
-      elsif campaign.seen? && campaign.seen_at < NUDGE_INTERVAL_DAYS.days.ago
-        campaign.update!(seen_at: nil) # Reset so it triggers again
+      elsif nudge.seen? && nudge.seen_at < NUDGE_INTERVAL_DAYS.days.ago
+        nudge.update!(seen_at: nil) # Reset so it triggers again
         return "streak_goal_nudge"
-      elsif !campaign.seen?
+      elsif !nudge.seen?
         return "streak_goal_nudge"
       end
     end

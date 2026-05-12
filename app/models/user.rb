@@ -16,6 +16,7 @@
 #  gold_balance                :integer          default(0), not null
 #  has_hca_address             :boolean          default(FALSE), not null
 #  hca_token                   :text
+#  hcb_email                   :string
 #  is_adult                    :boolean          default(FALSE), not null
 #  is_banned                   :boolean          default(FALSE), not null
 #  lapse_token                 :text
@@ -28,7 +29,6 @@
 #  streak_freezes              :integer          default(1), not null
 #  streak_in_app_notifications :boolean          default(TRUE), not null
 #  streak_slack_notifications  :boolean          default(TRUE), not null
-#  summit_rsvp                 :string
 #  timezone                    :string           not null
 #  type                        :string
 #  verification_status         :string
@@ -60,12 +60,16 @@ class User < ApplicationRecord
   scoped_search on: :created_at, aliases: [ :joined ]
   scoped_search on: :roles, aliases: [ :role ], ext_method: :search_roles, only_explicit: true, operators: [ :eq, :ne ]
 
+  # Reachable from /admin/users and /admin/projects search via scoped_search. The value is
+  # spliced into the WHERE clause by scoped_search, so it must be safe SQL — validate against
+  # the role allowlist and parameter-bind, never string-interpolate (CVE-pattern: SQLi).
   def self.search_roles(_key, operator, value)
-    sanitized = ActiveRecord::Base.sanitize_sql_like(value)
+    return { conditions: "1=0" } unless VALID_ROLES.include?(value)
+
     sql = if operator == "="
-      "roles @> ARRAY['#{sanitized}']::varchar[]"
+      ActiveRecord::Base.sanitize_sql_array([ "roles @> ARRAY[?]::varchar[]", value ])
     else
-      "NOT (roles @> ARRAY['#{sanitized}']::varchar[])"
+      ActiveRecord::Base.sanitize_sql_array([ "NOT (roles @> ARRAY[?]::varchar[])", value ])
     end
     { conditions: sql }
   end
@@ -116,6 +120,7 @@ class User < ApplicationRecord
 
   validates :avatar, :display_name, :email, :timezone, presence: true
   validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
+  validates :hcb_email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
   validates :bio, length: { maximum: 100 }, allow_nil: true
   validates :slack_id, presence: true, unless: :trial?
   validates :hca_id, presence: true, unless: :trial?
@@ -430,20 +435,43 @@ class User < ApplicationRecord
   end
 
   def total_time_logged_seconds
-    entry_scope = { project_id: projects.kept.select(:id), discarded_at: nil }
+    owned_ids = projects.kept.pluck(:id)
+    collab_ids = collaborated_projects.kept.pluck(:id)
+    all_ids = (owned_ids + collab_ids).uniq
+    return 0 if all_ids.empty?
 
-    LapseTimelapse.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration).to_i +
-      YouTubeVideo.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(Arel.sql("duration_seconds * stretch_multiplier")).to_i +
-      LookoutTimelapse.joins(recording: :journal_entry).where(journal_entries: entry_scope).sum(:duration).to_i +
-      projects.kept.sum(:manual_seconds).to_i
+    seconds_by_project = Project.batch_time_logged(all_ids)
+    member_counts = Project.batch_member_counts(all_ids)
+    all_ids.sum { |pid| m = member_counts[pid].to_i; m > 0 ? seconds_by_project[pid].to_i / m : 0 }
+  end
+
+  def approved_time_logged_seconds
+    owned_ids = projects.kept.pluck(:id)
+    collab_ids = collaborated_projects.kept.pluck(:id)
+    all_ids = (owned_ids + collab_ids).uniq
+    return 0 if all_ids.empty?
+
+    seconds_by_project = Ship.approved
+      .joins(:project)
+      .where(projects: { id: all_ids, discarded_at: nil })
+      .group("projects.id")
+      .sum(:approved_public_seconds)
+    member_counts = Project.batch_member_counts(all_ids)
+    all_ids.sum { |pid| m = member_counts[pid].to_i; m > 0 ? seconds_by_project[pid].to_i / m : 0 }
   end
 
   def koi
     return 0 if trial? # Trial users cannot earn or spend koi
 
-    koi_transactions.sum(:amount) -
-      shop_orders.joins(:shop_item).where(shop_items: { currency: "koi" }).where.not(state: :rejected).sum("frozen_price * quantity") -
-      project_grant_orders.kept.where.not(state: :rejected).sum(:frozen_koi_amount)
+    # Fire the three ledger sums in parallel — wall-time ≈ 1 round-trip instead of 3.
+    earned = koi_transactions.async_sum(:amount)
+    spent_shop = shop_orders.joins(:shop_item)
+                            .where(shop_items: { currency: "koi" })
+                            .where.not(state: :rejected)
+                            .async_sum("frozen_price * quantity")
+    spent_grants = project_grant_orders.kept.where.not(state: :rejected).async_sum(:frozen_koi_amount)
+
+    earned.value - spent_shop.value - spent_grants.value
   end
 
   def gold
@@ -567,6 +595,10 @@ class User < ApplicationRecord
     return slack_id unless Rails.env.development?
 
     slack_id.delete_suffix("_DEV")
+  end
+
+  def hcb_email_for_grants
+    hcb_email.presence || email
   end
 
   private

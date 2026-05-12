@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Badge } from '@/components/admin/ui/badge'
+import { WaitingLabel } from '@/components/admin/WaitingLabel'
 import type { ReviewRow } from '@/types'
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -58,8 +59,15 @@ export function buildPendingColumns(
       },
     },
     {
-      accessorKey: 'created_at',
-      header: 'Waiting Since',
+      accessorKey: 'waiting_since',
+      header: 'Waiting',
+      cell: ({ row }) => (
+        <WaitingLabel
+          waitingSince={row.original.waiting_since}
+          cycleStartedAt={row.original.cycle_started_at}
+          prefix={false}
+        />
+      ),
     },
   ]
 }

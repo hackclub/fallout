@@ -10,7 +10,7 @@ import type { SharedProps } from '@/types'
 
 type Order = {
   id: number
-  user: { id: number; display_name: string; email: string; avatar: string }
+  user: { id: number; display_name: string; email: string; hcb_email: string; avatar: string }
   frozen_koi_amount: number
   frozen_usd_cents: number
   state: 'pending' | 'fulfilled' | 'rejected' | 'on_hold'
@@ -211,6 +211,12 @@ export default function AdminProjectGrantsOrdersShow({
                 {order.user.display_name}
               </Link>{' '}
               · {order.user.email}
+            </div>
+            <div>
+              <span className="text-muted-foreground">HCB email:</span>{' '}
+              <span className={order.user.hcb_email === order.user.email ? 'text-muted-foreground' : ''}>
+                {order.user.hcb_email}
+              </span>
             </div>
             <div>
               <span className="text-muted-foreground">Koi paid:</span>{' '}

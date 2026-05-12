@@ -14,6 +14,11 @@ class ProjectPolicy < ApplicationPolicy
     staff? || !record.is_unlisted || owner? || (collaborators_enabled? && record.collaborator?(user)) # Collaborators can see unlisted projects they're on (flag-gated)
   end
 
+  def share?
+    return false if record.discarded?
+    !record.is_unlisted # Only listed projects expose a copyable public URL — unlisted ones are intentionally private.
+  end
+
   def create?
     return false unless user.present?
     return !user.projects.kept.exists? if user.trial?
@@ -33,6 +38,7 @@ class ProjectPolicy < ApplicationPolicy
 
   def destroy?
     return false if record.discarded?
+    return false if record.ships.exists? # Once submitted (any status — pending, awaiting_identity, approved, returned, rejected), the project is locked from deletion for audit integrity.
 
     owner? # User-facing project deletes are owner-only; admins use /admin or Airtable.
   end

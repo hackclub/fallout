@@ -18,12 +18,11 @@
 #
 # Indexes
 #
-#  index_projects_on_description_trgm  (description) USING gin
-#  index_projects_on_discarded_at      (discarded_at)
-#  index_projects_on_is_unlisted       (is_unlisted)
-#  index_projects_on_name_trgm         (name) USING gin
-#  index_projects_on_tags              (tags) USING gin
-#  index_projects_on_user_id           (user_id)
+#  index_projects_on_discarded_at  (discarded_at)
+#  index_projects_on_is_unlisted   (is_unlisted)
+#  index_projects_on_name_trgm     (name) USING gin
+#  index_projects_on_tags          (tags) USING gin
+#  index_projects_on_user_id       (user_id)
 #
 # Foreign Keys
 #
@@ -146,6 +145,20 @@ class Project < ApplicationRecord
     }
   end
 
+  # True once any build-type ship on this project has been approved. Flipping this on
+  # is the trigger for BuiltIrlConversionService (koi → gold sweep). Computed on the fly
+  # rather than cached so it stays in sync with the canonical ship state.
+  def built_irl?
+    ships.approved.where(ship_type: :build).exists?
+  end
+
+  # Lifetime koi awarded to this project across all approved DR cycles, including
+  # DR koi_adjustment (which is baked into ship_review amounts). Used as the cap for
+  # how much koi can convert to gold when this project becomes built_irl.
+  def lifetime_ship_review_koi
+    KoiTransaction.where(reason: "ship_review", ship_id: ships.select(:id)).sum(:amount)
+  end
+
   def time_logged
     lapse = LapseTimelapse
       .joins(recording: :journal_entry)
@@ -163,6 +176,17 @@ class Project < ApplicationRecord
       .sum(:duration).to_i
 
     lapse + youtube + lookout + manual_seconds.to_i
+  end
+
+  def self.batch_member_counts(project_ids)
+    return {} if project_ids.empty?
+    kept_owner_ids = joins("INNER JOIN users ON users.id = projects.user_id AND users.discarded_at IS NULL AND users.type IS NULL")
+      .where(id: project_ids).pluck(:id).to_set
+    collab_counts = Collaborator.kept
+      .joins("INNER JOIN users ON users.id = collaborators.user_id AND users.discarded_at IS NULL AND users.type IS NULL")
+      .where(collaboratable_type: "Project", collaboratable_id: project_ids)
+      .group(:collaboratable_id).count
+    project_ids.to_h { |pid| [ pid, (kept_owner_ids.include?(pid) ? 1 : 0) + (collab_counts[pid] || 0) ] }
   end
 
   # Batch version: returns { project_id => seconds } for a set of project IDs in a single query

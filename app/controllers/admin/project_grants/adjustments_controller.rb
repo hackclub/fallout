@@ -41,12 +41,17 @@ class Admin::ProjectGrants::AdjustmentsController < Admin::ApplicationController
     # view on admin/users/show: actual is what HCB actually holds (reality), expected
     # is what Fallout's ledger says should be there. The adjustment being previewed
     # shifts expected (since it writes a ledger row) and leaves actual unchanged.
+    # Both scoped to active cards: closed-card historicals are non-comparable
+    # to ledger_net once book_closure_refund! has run.
+    active_card_ids = user.hcb_grant_cards.where(status: "active").pluck(:id)
     render json: {
       found: true,
       user: { id: user.id, display_name: user.display_name, email: user.email },
       has_card: user.hcb_grant_cards.exists?,
-      actual_cents: user.hcb_grant_cards.sum(:amount_cents),
-      expected_cents: ProjectFundingTopupService.transferred_usd_cents(user)
+      actual_cents: HcbGrantCard.where(id: active_card_ids).sum(:amount_cents),
+      expected_cents: ProjectFundingTopup.kept.where(status: "completed", hcb_grant_card_id: active_card_ids).sum(
+        Arel.sql("CASE direction WHEN 'out' THEN -amount_cents ELSE amount_cents END")
+      )
     }
   end
 

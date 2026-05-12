@@ -70,7 +70,7 @@ class Ship < ApplicationRecord
   after_create :create_initial_reviews!, if: :pending?
   after_update_commit :create_initial_reviews!, if: :became_pending_from_awaiting?
   after_update_commit :notify_status_change, if: :saved_change_to_status?
-  after_update_commit :award_ship_review_koi!, if: :saved_change_to_status?
+  after_update_commit :award_ship_review_currency!, if: :saved_change_to_status?
   after_update_commit :enqueue_unified_airtable_upload, if: :saved_change_to_status?
 
   # YSWS Unified Submissions table — receives a one-shot snapshot when a ship
@@ -123,7 +123,7 @@ class Ship < ApplicationRecord
       time_audit: TimeAuditReview.where(ship_id: ship_ids).select(:id, :ship_id, :status).index_by(&:ship_id),
       requirements_check: RequirementsCheckReview.where(ship_id: ship_ids).select(:id, :ship_id, :status).index_by(&:ship_id),
       design: DesignReview.where(ship_id: ship_ids).select(:id, :ship_id, :status, :hours_adjustment, :koi_adjustment).index_by(&:ship_id),
-      build: BuildReview.where(ship_id: ship_ids).select(:id, :ship_id, :status, :hours_adjustment, :koi_adjustment).index_by(&:ship_id)
+      build: BuildReview.where(ship_id: ship_ids).select(:id, :ship_id, :status, :hours_adjustment, :gold_adjustment).index_by(&:ship_id)
     }
 
     { project_user: project_user, logged_seconds: logged_seconds, koi: koi_by_ship, reviews: reviews }
@@ -203,6 +203,72 @@ class Ship < ApplicationRecord
     project.ships.approved.where("created_at < ?", created_at).order(created_at: :desc).first
   end
 
+  # Populated by Ship.preload_cycle_started_at to bypass the per-ship query pair in cycle_started_at
+  attr_writer :cycle_started_at_cached
+
+  # First ship-submission timestamp in the current cycle (the cycle this ship belongs to).
+  # Used by reviewer "Waiting Xd (Yd)" labels — Y is total cycle wait, distinct from per-ship wait.
+  def cycle_started_at
+    return @cycle_started_at_cached if defined?(@cycle_started_at_cached)
+    cutoff = previous_approved_ship&.created_at || Time.at(0)
+    project.ships.where("created_at > ? AND created_at <= ?", cutoff, created_at)
+           .order(:created_at).pick(:created_at) || created_at
+  end
+
+  # Batch-compute cycle_started_at for a set of ships, with Rails.cache keyed on a per-project
+  # version stamp (max updated_at across the project's ships) so the cache invalidates whenever
+  # any sibling ship changes (new submission, status transition). 6h TTL is a safety net since
+  # the UI only displays days-of-waiting granularity.
+  CYCLE_STARTED_AT_CACHE_TTL = 6.hours
+
+  def self.preload_cycle_started_at(ships)
+    return if ships.blank?
+
+    # Callers often pass ships from multiple queries (pending + all_reviews) which yields
+    # DIFFERENT Ship instances with the same id. Group by id and propagate the cached value
+    # to every instance, otherwise the second result set falls back to the per-ship N+1.
+    instances_by_id = ships.group_by(&:id)
+    representatives = instances_by_id.values.map(&:first)
+
+    project_ids = representatives.map(&:project_id).uniq
+    project_versions = Ship.where(project_id: project_ids).group(:project_id).maximum(:updated_at)
+
+    cache_keys = representatives.to_h { |s| [ s.id, cycle_started_at_cache_key(s, project_versions[s.project_id]) ] }
+    hits = Rails.cache.read_multi(*cache_keys.values)
+
+    uncached = []
+    representatives.each do |ship|
+      cached = hits[cache_keys[ship.id]]
+      if cached
+        propagate_cycle_started_at(instances_by_id[ship.id], cached)
+      else
+        uncached << ship
+      end
+    end
+    return if uncached.empty?
+
+    sibling_project_ids = uncached.map(&:project_id).uniq
+    by_project = Ship.where(project_id: sibling_project_ids).order(:created_at).group_by(&:project_id)
+
+    uncached.each do |ship|
+      siblings = by_project[ship.project_id] || []
+      prev_approved = siblings.reverse.find { |s| s.approved? && s.created_at < ship.created_at }
+      cutoff = prev_approved&.created_at || Time.at(0)
+      cycle_first = siblings.find { |s| s.created_at > cutoff && s.created_at <= ship.created_at }
+      value = cycle_first&.created_at || ship.created_at
+      propagate_cycle_started_at(instances_by_id[ship.id], value)
+      Rails.cache.write(cache_keys[ship.id], value, expires_in: CYCLE_STARTED_AT_CACHE_TTL)
+    end
+  end
+
+  def self.propagate_cycle_started_at(instances, value)
+    instances.each { |s| s.cycle_started_at_cached = value }
+  end
+
+  def self.cycle_started_at_cache_key(ship, project_version)
+    "ships/cycle_started_at/#{ship.id}/v#{project_version&.to_i || 0}"
+  end
+
   def new_journal_entries
     cutoff = previous_approved_ship&.created_at || Time.at(0)
     project.journal_entries.kept.where("journal_entries.created_at > ?", cutoff)
@@ -236,6 +302,44 @@ class Ship < ApplicationRecord
 
     review_class = ship_type_design? ? DesignReview : BuildReview
     review_class.find_or_create_by!(ship: self)
+  end
+
+  # Admin-only swap between DesignReview and BuildReview for a pending ship. Carries
+  # in-progress reviewer work (feedback/internal_reason/hours_adjustment/currency
+  # adjustment/annotations) onto the new review and preserves the original review's
+  # created_at so the queue wait time / position is unchanged. DR's koi_adjustment
+  # and BR's gold_adjustment are the same semantic knob (signed integer credit/debit
+  # on hours-derived currency) — they carry across the swap. Returns the new review.
+  def swap_phase_two_type!
+    raise ActiveRecord::RecordInvalid.new(self), "ship is not pending" unless pending?
+
+    with_lock do
+      current = phase_two_review
+      raise ActiveRecord::RecordInvalid.new(self), "no phase two review to swap" if current.nil?
+      raise ActiveRecord::RecordInvalid.new(self), "phase two review is not pending" unless current.pending?
+
+      currency_adj = current.is_a?(DesignReview) ? current.koi_adjustment : current.gold_adjustment
+
+      new_type = ship_type_design? ? :build : :design
+      new_class = new_type == :design ? DesignReview : BuildReview
+
+      carry = {
+        feedback: current.feedback,
+        internal_reason: current.internal_reason,
+        hours_adjustment: current.hours_adjustment,
+        annotations: current.annotations,
+        created_at: current.created_at
+      }
+      carry[new_class == DesignReview ? :koi_adjustment : :gold_adjustment] = currency_adj
+
+      current.destroy!
+      update!(ship_type: new_type)
+
+      new_review = new_class.new(ship: self, **carry)
+      new_review.skip_ship_recompute = true # No-op: status stays pending → pending, avoid redundant recompute
+      new_review.save!
+      new_review
+    end
   end
 
   def recompute_status!
@@ -416,11 +520,14 @@ class Ship < ApplicationRecord
     new_recordings = current_ids - reviewed_ids
 
     if new_recordings.empty? && prev_ta.approved?
-      # All current recordings already reviewed — auto-approve with recomputed time
+      # All current recordings already reviewed — auto-approve with recomputed time.
+      # Carry the prior TA's reviewer so downstream attribution (e.g. unified Airtable
+      # justification's TIME_AUDITOR) credits the human who actually did the work.
       ta.update!(
         status: :approved,
         annotations: carried,
-        approved_public_seconds: compute_approved_public_seconds(carried)
+        approved_public_seconds: compute_approved_public_seconds(carried),
+        reviewer_id: prev_ta.reviewer_id
       )
     elsif carried["recordings"].any?
       # New recordings need review; carry forward existing annotations so reviewer only sees the delta
@@ -469,17 +576,29 @@ class Ship < ApplicationRecord
     Rails.logger.error("Ship##{id} status notification failed: #{e.message}")
   end
 
-  # Awards koi when a ship reaches :approved. Delegates to ShipKoiAwarder which holds the
-  # formula and is the single source of truth (also called from rake koi:reconcile_ship_reviews
-  # for backfill / safety-net). Idempotency is enforced at the DB level by a partial unique
-  # index on koi_transactions(ship_id) WHERE reason = 'ship_review'. Failures are logged but
-  # do NOT roll back the approval — operators reconcile via the rake task.
-  def award_ship_review_koi!
-    result = ShipKoiAwarder.call(self)
-    Rails.logger.info("Ship##{id} koi award: #{result.status} (amount=#{result.amount})")
+  # Awards the appropriate currency when a ship reaches :approved — koi for design
+  # ships, gold for build ships. Build ships ALSO trigger BuiltIrlConversionService on
+  # the first approval per project to sweep accumulated project-koi into gold.
+  # Idempotency is enforced per member by partial unique indexes; failures are logged
+  # but do NOT roll back the approval — operators reconcile via the rake task.
+  def award_ship_review_currency!
+    ship = Ship.includes(project: { user: {}, collaborators: :user }).find(id) # preload to avoid N+1
+
+    if ship_type_design?
+      ShipKoiAwarder.call(ship).each do |result|
+        Rails.logger.info("Ship##{id} koi award: #{result.status} (amount=#{result.amount})")
+      end
+    elsif ship_type_build?
+      ShipGoldAwarder.call(ship).each do |result|
+        Rails.logger.info("Ship##{id} gold award: #{result.status} (amount=#{result.amount})")
+      end
+      BuiltIrlConversionService.call(ship).each do |result|
+        Rails.logger.info("Ship##{id} built_irl conversion: #{result.status} user=#{result.user_id} amount=#{result.amount}")
+      end
+    end
   rescue => e
-    Rails.logger.error("Ship##{id} koi award failed: #{e.message}")
-    ErrorReporter.capture_exception(e, contexts: { ship_review_koi: { ship_id: id } })
+    Rails.logger.error("Ship##{id} currency award failed: #{e.message}")
+    ErrorReporter.capture_exception(e, contexts: { ship_review_currency: { ship_id: id } })
   end
 
   def enqueue_unified_airtable_upload

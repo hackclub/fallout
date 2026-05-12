@@ -260,7 +260,7 @@ List transactions with filtering and pagination.
 
 Pagination: `limit` (default 25), `after` (cursor)
 
-**Returns:** `{ transactions: [...], total_count: N, has_more: bool }`
+**Returns:** `{ data: [...], total_count: N, has_more: bool }`
 
 ### `GET /api/v4/transactions/:id`
 Get a single transaction.

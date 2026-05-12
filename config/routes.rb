@@ -12,19 +12,20 @@
 #                                                    PUT    /admin/reviews/time_audits/:id(.:format)                                                      admin/reviews/time_audits#update
 #         heartbeat_admin_reviews_requirements_check POST   /admin/reviews/requirements_checks/:id/heartbeat(.:format)                                    admin/reviews/requirements_checks#heartbeat
 #      refresh_tree_admin_reviews_requirements_check POST   /admin/reviews/requirements_checks/:id/refresh_tree(.:format)                                 admin/reviews/requirements_checks#refresh_tree
-#  gerber_zip_files_admin_reviews_requirements_check GET    /admin/reviews/requirements_checks/:id/gerber_zip_files(.:format)                             admin/reviews/requirements_checks#gerber_zip_files
 #             next_admin_reviews_requirements_checks GET    /admin/reviews/requirements_checks/next(.:format)                                             admin/reviews/requirements_checks#next
 #                  admin_reviews_requirements_checks GET    /admin/reviews/requirements_checks(.:format)                                                  admin/reviews/requirements_checks#index
 #                   admin_reviews_requirements_check GET    /admin/reviews/requirements_checks/:id(.:format)                                              admin/reviews/requirements_checks#show
 #                                                    PATCH  /admin/reviews/requirements_checks/:id(.:format)                                              admin/reviews/requirements_checks#update
 #                                                    PUT    /admin/reviews/requirements_checks/:id(.:format)                                              admin/reviews/requirements_checks#update
 #              heartbeat_admin_reviews_design_review POST   /admin/reviews/design_reviews/:id/heartbeat(.:format)                                         admin/reviews/design_reviews#heartbeat
+#              swap_type_admin_reviews_design_review POST   /admin/reviews/design_reviews/:id/swap_type(.:format)                                         admin/reviews/design_reviews#swap_type
 #                  next_admin_reviews_design_reviews GET    /admin/reviews/design_reviews/next(.:format)                                                  admin/reviews/design_reviews#next
 #                       admin_reviews_design_reviews GET    /admin/reviews/design_reviews(.:format)                                                       admin/reviews/design_reviews#index
 #                        admin_reviews_design_review GET    /admin/reviews/design_reviews/:id(.:format)                                                   admin/reviews/design_reviews#show
 #                                                    PATCH  /admin/reviews/design_reviews/:id(.:format)                                                   admin/reviews/design_reviews#update
 #                                                    PUT    /admin/reviews/design_reviews/:id(.:format)                                                   admin/reviews/design_reviews#update
 #               heartbeat_admin_reviews_build_review POST   /admin/reviews/build_reviews/:id/heartbeat(.:format)                                          admin/reviews/build_reviews#heartbeat
+#               swap_type_admin_reviews_build_review POST   /admin/reviews/build_reviews/:id/swap_type(.:format)                                          admin/reviews/build_reviews#swap_type
 #                   next_admin_reviews_build_reviews GET    /admin/reviews/build_reviews/next(.:format)                                                   admin/reviews/build_reviews#next
 #                        admin_reviews_build_reviews GET    /admin/reviews/build_reviews(.:format)                                                        admin/reviews/build_reviews#index
 #                         admin_reviews_build_review GET    /admin/reviews/build_reviews/:id(.:format)                                                    admin/reviews/build_reviews#show
@@ -62,6 +63,8 @@
 #                              update_ban_admin_user PATCH  /admin/users/:id/update_ban(.:format)                                                         admin/users#update_ban
 #                              admin_activity_checks POST   /admin/activity_checks(.:format)                                                              admin/activity_checks#create
 #                           new_admin_activity_check GET    /admin/activity_checks/new(.:format)                                                          admin/activity_checks#new
+#                          refresh_admin_hours_stats POST   /admin/hours_stats/refresh(.:format)                                                          admin/hours_stats#refresh
+#                                  admin_hours_stats GET    /admin/hours_stats(.:format)                                                                  admin/hours_stats#index
 #                                   admin_shop_items GET    /admin/shop_items(.:format)                                                                   admin/shop_items#index
 #                                                    POST   /admin/shop_items(.:format)                                                                   admin/shop_items#create
 #                                    admin_shop_item PATCH  /admin/shop_items/:id(.:format)                                                               admin/shop_items#update
@@ -285,16 +288,21 @@ Rails.application.routes.draw do
           member do
             post :heartbeat
             post :refresh_tree
-            get :gerber_zip_files
           end
           collection { get :next }
         end
         resources :design_reviews, only: [ :index, :show, :update ] do
-          member { post :heartbeat }
+          member do
+            post :heartbeat
+            post :swap_type
+          end
           collection { get :next }
         end
         resources :build_reviews, only: [ :index, :show, :update ] do
-          member { post :heartbeat }
+          member do
+            post :heartbeat
+            post :swap_type
+          end
           collection { get :next }
         end
       end
@@ -487,6 +495,10 @@ Rails.application.routes.draw do
 
   # User-facing project funding requests. Admin approval lives under /admin/project_grants/orders.
   resources :project_grants, only: [ :index, :new, :create ]
+
+  # User-funded top-ups via HCB donations. Money lands on the user's active card
+  # without consuming koi-funded entitlement (counts_toward_funding: false).
+  resources :top_ups, only: [ :index, :new, :create ]
 
   # Adblocker-safe tracking redirects — sets utm_source on Ahoy visit without query params
   %w[infill rmrrf infill-2026 rmrrf-2026].each do |slug|

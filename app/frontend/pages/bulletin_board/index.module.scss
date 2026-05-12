@@ -56,7 +56,10 @@ $beige: var(--color-light-brown);
 }
 
 .inner {
+  width: 100%;
   max-width: 72rem;
+  margin-left: auto;
+  margin-right: auto;
 
   padding: 3rem 1.5rem 4rem;
 
@@ -378,7 +381,7 @@ $beige: var(--color-light-brown);
 }
 
 .exploreSection {
-  gap: 0.875rem;
+  gap: clamp(1.5rem, 2.5vw, 2.25rem);
   scroll-margin-top: 1rem;
 }
 
@@ -443,7 +446,7 @@ $beige: var(--color-light-brown);
 .exploreControls {
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
+  gap: 1.25rem;
   scroll-margin-top: 1rem;
 }
 
@@ -526,7 +529,7 @@ $beige: var(--color-light-brown);
 }
 
 .exploreScroll {
-  padding: 0 1rem 1rem;
+  padding: 0.5rem 1rem 1rem;
 }
 
 .exploreViewport {
@@ -641,7 +644,7 @@ $beige: var(--color-light-brown);
   display: flex;
   align-items: stretch;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 1rem;
   flex-wrap: wrap;
 
   @media (min-width: $sm) {

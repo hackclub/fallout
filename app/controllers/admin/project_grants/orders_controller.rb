@@ -66,13 +66,25 @@ class Admin::ProjectGrants::OrdersController < Admin::ApplicationController
     # A drift means either external HCB activity (actual > expected) or a missing sync
     # on our side (expected > actual). Same framing is used per-card on
     # admin/users/show.
+    # Both sides scoped to active cards only: closed cards (canceled/expired)
+    # have an auto-booked `out` row that intentionally drives ledger_net to the
+    # spent amount, while `amount_cents` stays at the historical grant total —
+    # comparing the two would always show a phantom drift on closed cards.
+    active_card_ids = HcbGrantCard.where(status: "active").pluck(:id)
+    # Spending = pending + settled purchases (excludes declined and reversed). On HCB,
+    # a pending card charge is an authorization the merchant has captured but the bank
+    # hasn't fully posted yet — money has effectively moved, so we count it. Same
+    # rule used by HcbGrantCardSyncJob#book_closure_refund! when computing `spent`.
+    # HCB stores card-charge debits as negative amount_cents — flip to positive.
+    spending_purchases = HcbTransaction.purchases.where(declined: false, reversed: false)
     stats = {
-      issued_actual_cents: HcbGrantCard.sum(:amount_cents),
-      issued_expected_cents: ProjectFundingTopup.kept.where(status: "completed").sum(
+      issued_actual_cents: HcbGrantCard.where(id: active_card_ids).sum(:amount_cents),
+      issued_expected_cents: ProjectFundingTopup.kept.where(status: "completed", hcb_grant_card_id: active_card_ids).sum(
         Arel.sql("CASE direction WHEN 'out' THEN -amount_cents ELSE amount_cents END")
       ),
-      active_cards: HcbGrantCard.where(status: "active").count,
-      transactions: HcbTransaction.purchases.count
+      active_cards: active_card_ids.size,
+      spending_cents: -spending_purchases.sum(:amount_cents),
+      spending_count: spending_purchases.count
     }
 
     render inertia: "admin/project_grants/orders/index", props: {
@@ -297,7 +309,7 @@ class Admin::ProjectGrants::OrdersController < Admin::ApplicationController
 
     {
       id: order.id,
-      user: { id: user.id, display_name: user.display_name, email: user.email, avatar: user.avatar },
+      user: { id: user.id, display_name: user.display_name, email: user.email, hcb_email: user.hcb_email_for_grants, avatar: user.avatar },
       frozen_koi_amount: order.frozen_koi_amount,
       frozen_usd_cents: order.frozen_usd_cents,
       state: order.state,

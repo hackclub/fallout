@@ -40,7 +40,7 @@ class DesignReview < ApplicationRecord
     {
       "Internal Reason" => :internal_reason,
       "Hours Adjustment" => :hours_adjustment,
-      "Koi Adjustment" => :koi_adjustment
+      "Currency Adjustment" => :koi_adjustment
     }
   end
 end

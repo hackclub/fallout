@@ -173,6 +173,34 @@ function ReviewTopBar({
           (#{project.id})
         </a>
         <span className="text-sm text-muted-foreground">
+          by{' '}
+          <a
+            href={`/admin/users/${project.user_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline text-foreground"
+          >
+            {project.user_display_name}
+          </a>
+          {project.collaborators.length > 0 && (
+            <>
+              {project.collaborators.map((c, i) => (
+                <span key={c.id}>
+                  {i === 0 ? ' with ' : ', '}
+                  <a
+                    href={`/admin/users/${c.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline text-foreground"
+                  >
+                    {c.display_name}
+                  </a>
+                </span>
+              ))}
+            </>
+          )}
+        </span>
+        <span className="text-sm text-muted-foreground">
           {totalEntries} {totalEntries === 1 ? 'entry' : 'entries'} to review ({formatDuration(approvedSeconds)} /{' '}
           {formatDuration(totalDuration)})
         </span>

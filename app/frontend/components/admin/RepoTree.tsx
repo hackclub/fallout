@@ -50,13 +50,11 @@ function buildTree(entries: RepoTreeEntry[]): TreeNode[] {
 function TreeFolder({
   node,
   depth,
-  selectedPath,
-  getGithubUrl,
+  fileUrl,
 }: {
   node: TreeNode
   depth: number
-  selectedPath?: string | null
-  getGithubUrl: (path: string) => string
+  fileUrl: (path: string) => string
 }) {
   const [open, setOpen] = useState(depth === 0)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -115,20 +113,9 @@ function TreeFolder({
           {open &&
             node.children.map((child) =>
               child.type === 'tree' ? (
-                <TreeFolder
-                  key={child.path}
-                  node={child}
-                  depth={depth + 1}
-                  getGithubUrl={getGithubUrl}
-                  selectedPath={selectedPath}
-                />
+                <TreeFolder key={child.path} node={child} depth={depth + 1} fileUrl={fileUrl} />
               ) : (
-                <FileEntry
-                  key={child.path}
-                  node={child}
-                  depth={depth + 1}
-                  githubUrl={getGithubUrl(child.path)}
-                />
+                <FileEntry key={child.path} node={child} depth={depth + 1} fileUrl={fileUrl} />
               ),
             )}
         </div>
@@ -154,18 +141,18 @@ function TreeFolder({
 function FileEntry({
   node,
   depth,
-  githubUrl,
+  fileUrl,
 }: {
   node: TreeNode
   depth: number
-  githubUrl: string
+  fileUrl: (path: string) => string
 }) {
   return (
     <a
-      href={githubUrl}
+      href={fileUrl(node.path)}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-1 py-0.5 rounded transition-colors w-full text-left hover:bg-muted/50 text-foreground"
+      className="flex items-center gap-1 py-0.5 rounded transition-colors w-full text-left cursor-pointer hover:bg-muted/50 text-foreground"
       style={{ paddingLeft: `${depth * 16 + 4 + 12}px` }}
     >
       <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -212,40 +199,24 @@ export default function RepoTree({
   const nwo = githubBase.match(/github\.com\/([^/]+\/[^/]+)/)?.[1] ?? 'Repository'
   const updatedStr = formatRepoDate(data.pushed_at)
   const createdStr = formatRepoDate(data.created_at)
-  const treeScrollRef = useRef<HTMLDivElement>(null)
 
-  const getGithubUrl = (path: string) => `${githubBase}/blob/${branch}/${path}`
+  const fileUrl = (path: string) => `${githubBase}/blob/${branch}/${path.split('/').map(encodeURIComponent).join('/')}`
 
-  const splitContent = (
-    <div className="flex h-[500px] overflow-hidden">
-      <div
-        ref={treeScrollRef}
-        className="overflow-y-auto w-full"
-      >
-        <div className="p-2 text-xs">
-          {tree.map((node) =>
-            node.type === 'tree' ? (
-              <TreeFolder
-                key={node.path}
-                node={node}
-                depth={0}
-                getGithubUrl={getGithubUrl}
-              />
-            ) : (
-              <FileEntry
-                key={node.path}
-                node={node}
-                depth={0}
-                githubUrl={getGithubUrl(node.path)}
-              />
-            ),
-          )}
-        </div>
+  const treeContent = (
+    <div className="h-125 overflow-y-auto">
+      <div className="p-2 text-xs">
+        {tree.map((node) =>
+          node.type === 'tree' ? (
+            <TreeFolder key={node.path} node={node} depth={0} fileUrl={fileUrl} />
+          ) : (
+            <FileEntry key={node.path} node={node} depth={0} fileUrl={fileUrl} />
+          ),
+        )}
       </div>
     </div>
   )
 
-  if (bare) return splitContent
+  if (bare) return treeContent
 
   return (
     <div className="rounded-md border border-border overflow-hidden">
@@ -280,7 +251,7 @@ export default function RepoTree({
           </button>
         )}
       </div>
-      <div className="border-t border-border">{splitContent}</div>
+      <div className="border-t border-border">{treeContent}</div>
     </div>
   )
 }

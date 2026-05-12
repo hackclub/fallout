@@ -27,7 +27,7 @@ class JournalEntryPolicy < ApplicationPolicy
 
   def destroy?
     return false unless owner?
-    return false if record.project&.ships&.approved&.exists? # Preserve submission history on approved projects
+    return false if record.ship_id.present? # Entry is locked once included in a submission (any ship status — pending, awaiting_identity, approved, returned, rejected) to preserve submission history.
 
     record.project&.user_id == user.id || (collaborators_enabled? && record.project&.owner_or_collaborator?(user)) # Collaborator delete access is flag-gated
   end

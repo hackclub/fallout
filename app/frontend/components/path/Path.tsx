@@ -268,7 +268,7 @@ function Path({ nodes, introTransition }: PathProps) {
         y: billboards[i].y + BILLBOARD_SPACING * 0.7,
         leftPct: n % 2 === 0 ? -35 : 75,
       })
-      i -= n === 0 ? 12 : 14
+      i -= n === 0 ? 5 : 7
     }
     return result
   }, [billboards])
@@ -415,29 +415,21 @@ function Path({ nodes, introTransition }: PathProps) {
       node.style.visibility = 'visible'
       node.style.pointerEvents = visible ? 'auto' : 'none'
 
-      const transformControls = animate(
-        node,
-        {
-          y: visible ? 0 : BOARD_POP_HIDDEN_Y,
-          scale: visible ? BOARD_POP_VISIBLE_SCALE : BOARD_POP_HIDDEN_SCALE,
-        },
-        visible
-          ? { type: 'spring', stiffness: 360, damping: 22, mass: 0.62 }
-          : { type: 'spring', stiffness: 760, damping: 42, mass: 0.38 },
-      )
-      const opacityControls = animate(
-        node,
-        { opacity: visible ? 1 : 0 },
-        {
-          duration: visible ? BOARD_POP_OPACITY_IN_DURATION : BOARD_POP_OPACITY_OUT_DURATION,
-          ease: 'easeOut',
-        },
-      )
-      const nextAnimations = [transformControls, opacityControls]
+      const nextAnimations = visible
+        ? [
+            animate(
+              node,
+              { y: 0, scale: BOARD_POP_VISIBLE_SCALE },
+              { type: 'spring', stiffness: 360, damping: 22, mass: 0.62 },
+            ),
+            animate(node, { opacity: 1 }, { duration: BOARD_POP_OPACITY_IN_DURATION, ease: 'easeOut' }),
+          ]
+        : [animate(node, { opacity: 0 }, { duration: BOARD_POP_OPACITY_OUT_DURATION, ease: 'easeOut' })]
 
       animations[layer] = nextAnimations
       void Promise.all(nextAnimations).then(() => {
         if (!visible && boardPopVisibleRefs.current[bi] === visible) {
+          node.style.transform = `translateY(${BOARD_POP_HIDDEN_Y}px) scale(${BOARD_POP_HIDDEN_SCALE})`
           node.style.visibility = 'hidden'
         }
 
@@ -519,6 +511,23 @@ function Path({ nodes, introTransition }: PathProps) {
       prevHigh = highIdx
 
       {
+        let mainBoardIdx = -1
+        let minRawY = Infinity
+        boards.forEach((board, bi) => {
+          const rawY = board.y + scrollOffset
+          const effectiveY = Math.max(0, rawY)
+          const boardScreenY = screenYAt(effectiveY, planetRadius, H)
+          if (
+            rawY > 0 &&
+            effectiveY < inflectionGroundY &&
+            boardScreenY >= inflectionScreenY + BOARD_POP_HILL_CLEARANCE &&
+            rawY < minRawY
+          ) {
+            minRawY = rawY
+            mainBoardIdx = bi
+          }
+        })
+
         boards.forEach((board, bi) => {
           const rawY = board.y + scrollOffset
           const effectiveY = Math.max(0, rawY)
@@ -526,13 +535,7 @@ function Path({ nodes, introTransition }: PathProps) {
           const pastInflection = effectiveY >= inflectionGroundY
           const bottom = `${rawY}px`
           const transform = `translateZ(${-curveZ}px) rotateX(-${GROUND_ANGLE}deg)`
-          const nextRawY = bi + 1 < boards.length ? boards[bi + 1].y + scrollOffset : -Infinity
-          const boardScreenY = screenYAt(effectiveY, planetRadius, H)
-          const visible =
-            rawY > 0 &&
-            boardScreenY >= inflectionScreenY + BOARD_POP_HILL_CLEARANCE &&
-            !(nextRawY > 0 && nextRawY < inflectionGroundY)
-          setBoardPopVisible(bi, visible)
+          setBoardPopVisible(bi, bi === mainBoardIdx)
 
           const back = backBoardRefs.current[bi]
           if (back) {
@@ -614,13 +617,19 @@ function Path({ nodes, introTransition }: PathProps) {
     }
   }, [introActive])
 
-  // Position scroll at the very end of the path before first paint
+  // Position scroll before first paint — intro animates from maxScroll; no-intro jumps to target directly
   useLayoutEffect(() => {
-    if (initialScrollDoneRef.current || !introActive) return
+    if (initialScrollDoneRef.current) return
     initialScrollDoneRef.current = true
-    scrollRef.current = maxScroll
-    window.scrollTo({ top: maxScroll, behavior: 'auto' })
-  }, [introActive, maxScroll])
+    if (introActive) {
+      scrollRef.current = maxScroll
+      window.scrollTo({ top: maxScroll, behavior: 'auto' })
+    } else {
+      const target = scrollTopForNode(introTargetNodeIndex)
+      scrollRef.current = target
+      window.scrollTo({ top: target, behavior: 'auto' })
+    }
+  }, [introActive, maxScroll, introTargetNodeIndex, scrollTopForNode])
 
   useEffect(() => {
     if (!introActive || !introNodesVisible || !ready || introScrollStartedRef.current) {

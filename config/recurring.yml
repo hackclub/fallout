@@ -39,6 +39,11 @@ production:
     queue: background
     schedule: every 15 minutes
 
+  hcb_donation_sync:
+    class: HcbDonationSyncJob
+    queue: background
+    schedule: every 5 minutes
+
   streak_reconciliation:
     class: StreakReconciliationJob
     queue: background

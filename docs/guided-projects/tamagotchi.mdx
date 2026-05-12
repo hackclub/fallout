@@ -19,6 +19,7 @@
 - [Installing KiCad](#installing-kicad)
 
 ### 1. Schematic Design
+
 - [Creating the Schematic](#creating-the-schematic)
   - [Importing the MCU](#importing-the-mcu)
   - [Adding the OLED Display](#adding-the-oled-display)
@@ -28,6 +29,7 @@
   - [Assigning Footprints](#assigning-footprints)
 
 ### 2. PCB Design
+
 - [Creating the PCB](#creating-the-pcb)
   - [Defining the Board Outline](#defining-the-board-outline)
   - [Component Placement](#component-placement)
@@ -39,15 +41,18 @@
   - [Common DRC Errors](#common-drc-errors)
 
 ### 7. Files & Version Control
+
 - [Add Your Files to Your GitHub Repo](#add-your-files-to-your-github-repo)
 - [Upload Your Files to GitHub](#upload-your-files-to-github)
   - [Edit Your README](#edit-your-readme)
 
 ### 8. Fabrication
+
 - [Getting a JLCPCB Price](#getting-a-jlcpcb-price)
   - [Settings](#settings)
 
 ### 9. Enclosure Design
+
 - [Designing the Case](#designing-the-case)
 
 ---
@@ -83,20 +88,20 @@ What is an MCU?
 
 Useful schematic editor keybinds
 
-> | Key | Action |
-> |-----|--------|
-> | **A** | Add a symbol (component) |
-> | **W** | Draw a wire |
-> | **P** | Add a power symbol (VCC, GND, 3V3, etc.) |
-> | **L** | Add a net label |
-> | **M** | Move a component |
-> | **R** | Rotate a component |
-> | **G** | Grab/drag a component (keeps wires attached) |
-> | **E** | Edit component properties |
-> | **C** | Copy a component |
-> | **Delete** | Delete selected item |
-> | **Ctrl+Z** | Undo |
-> | **Ctrl+S** | Save |
+> | Key        | Action                                       |
+> | ---------- | -------------------------------------------- |
+> | **A**      | Add a symbol (component)                     |
+> | **W**      | Draw a wire                                  |
+> | **P**      | Add a power symbol (VCC, GND, 3V3, etc.)     |
+> | **L**      | Add a net label                              |
+> | **M**      | Move a component                             |
+> | **R**      | Rotate a component                           |
+> | **G**      | Grab/drag a component (keeps wires attached) |
+> | **E**      | Edit component properties                    |
+> | **C**      | Copy a component                             |
+> | **Delete** | Delete selected item                         |
+> | **Ctrl+Z** | Undo                                         |
+> | **Ctrl+S** | Save                                         |
 
 ### Importing the MCU
 
@@ -110,11 +115,11 @@ I then clicked **A** (Add Symbol), searched for the part, and imported it. I end
 
 ![Xiao](https://cdn.hackclub.com/019d985d-8af2-746a-901e-c897ece4b3fa/image.png)
 
-Most symbols won't label every pin with its function (SDA, SCL, MOSI, etc.) They'll just show pin numbers. When that happens, google the MCU name + "pinout" to find the official diagram and cross-reference which pin number maps to which function :D 
+Most symbols won't label every pin with its function (SDA, SCL, MOSI, etc.) They'll just show pin numbers. When that happens, google the MCU name + "pinout" to find the official diagram and cross-reference which pin number maps to which function :D
 
 **Now, for this tutorial, I will create the base Tamagotchi. Spice your own Tamagotchi up more than this one! Add some flavor!**
 
-I then connect GND to GND, 5V to +5V, 3V3 to  and BAT to + as shown below:
+I then connect GND to GND, 5V to +5V, 3V3 to and BAT to + as shown below:
 
 ![Power connections](https://files.catbox.moe/kgmyi6.png)
 
@@ -228,12 +233,13 @@ You should see something like this:
 
 To synchronize changes between your schematic and PCB layout in KiCad:
 
-- Press **F8**, *or*
+- Press **F8**, _or_
 - Click the **Update PCB from Schematic** button
 
 You can do this anytime you want to refresh the PCB with the latest schematic updates.
 
 What are those two circles?
+
 > Those are M3 mounting holes! Click A to add them!
 
 ### Defining the Board Outline
@@ -298,10 +304,10 @@ KiCad uses a **cleaner 2-pin representation**:
 
 When imported, EasyEDA's pins 1 and 2 map to opposite footprint pads, but on a tactile switch they're on the **same physical side** (internally shorted). This means pads that should be electrically separated end up sharing a net, and the button does nothing because one side is permanently shorted to itself.
 
-| EasyEDA pins | Physical side | KiCad net |
-|:---:|:---:|:---:|
-| 1, 2 | Side A (shorted) | Net 1 |
-| 3, 4 | Side B (shorted) | Net 2 |
+| EasyEDA pins |  Physical side   | KiCad net |
+| :----------: | :--------------: | :-------: |
+|     1, 2     | Side A (shorted) |   Net 1   |
+|     3, 4     | Side B (shorted) |   Net 2   |
 
 The switch connects **Side A to Side B** when pressed. The footprint must reflect this.
 
@@ -376,12 +382,12 @@ A PCB is made up of multiple layers. Our boards are "two-layer," meaning that th
 
 What are the PCB layers?
 
-> | Layer | Description |
-> |-------|-------------|
-> | **Top & bottom silkscreen** | The white ink layer where you can add art |
-> | **Top & bottom copper** | The layers where you make your copper wires |
-> | **Substrate** | The actual plastic (usually green) which makes up your board |
-> | **Via** | The tunnels which connect the top and bottom copper layers |
+> | Layer                       | Description                                                  |
+> | --------------------------- | ------------------------------------------------------------ |
+> | **Top & bottom silkscreen** | The white ink layer where you can add art                    |
+> | **Top & bottom copper**     | The layers where you make your copper wires                  |
+> | **Substrate**               | The actual plastic (usually green) which makes up your board |
+> | **Via**                     | The tunnels which connect the top and bottom copper layers   |
 >
 > ![PCB layers](https://cdn.hackclub.com/019c545f-32f8-71b8-9b46-079aee118944/c2ec73f247fdb1f466903fc86d345fe0f4b47b6f_image.webp)
 
@@ -432,7 +438,7 @@ To add art, select the **Top Silkscreen Layer** or **Bottom Silkscreen Layer** i
 
 ![KiCad image converter](https://kicad-info.s3.dualstack.us-west-2.amazonaws.com/original/3X/a/3/a3b5fba9b9455697b0d861d48a028c571ec44403.png)
 
-Your board is now beautiful! 
+Your board is now beautiful!
 
 ---
 
@@ -520,7 +526,7 @@ Finally, edit your README to include the submission requirements:
 
 **A BOM (Bill of Materials) in table format at the end of the README, with links.**
 
-> **NOTE:** ALL projects you make for Blueprint must have a project photo in your README.
+> **NOTE:** ALL projects you make for Fallout must have a project photo in your README.
 
 ---
 
@@ -536,11 +542,11 @@ You should keep the default settings for everything. The only thing you should/c
 
 ![PCB color](https://cdn.hackclub.com/019d69c3-8a8d-72bd-b620-ac8daa1d780e/image.png)
 
-For high-spec options, also keep the default. **Do not** click PCB assembly! 
+For high-spec options, also keep the default. **Do not** click PCB assembly!
 
 ![High-spec options](https://cdn.hackclub.com/019c5535-28a4-787e-8bf4-ba4fcbce1653/053061912ca84c66c46323ccef5b12cb71c7d721_image.webp)
 
-Once you have successfully *not* changed any of the settings (except the board color), on the right, change the shipping method to **Global Standard Direct** (or **Air Registered Mail** if it is cheaper).
+Once you have successfully _not_ changed any of the settings (except the board color), on the right, change the shipping method to **Global Standard Direct** (or **Air Registered Mail** if it is cheaper).
 
 ---
 
@@ -592,7 +598,7 @@ Finally, I used the section view tool to confirm that there is no overlapping:
 
 ![](https://cdn.hackclub.com/019c5c89-1791-78d6-9b35-902744dcb72a/image.png)
 
-Now, my design is finished! I uploaded all necessary files to my GitHub repo. 
+Now, my design is finished! I uploaded all necessary files to my GitHub repo.
 
 **Note: Design is an iterative process. I spent about 20+ hours manually adjusting everything to look as pretty as possible! But don't worry, #fallout is here to guide you! This is a normal process and you are not alone.**
 

@@ -163,6 +163,16 @@ redirect_to_onboarding!         → Force onboarding completion
 - Internal IDs that could enable enumeration
 - Any data the user shouldn't see
 
+## 6.5. PII Classification
+
+AGENTS.md groups PII broadly and reserves it for admins. In practice the sensitivity tiers are:
+
+- **Admin-only PII**: `email`, `hcb_email`, `pronouns`, `bio`, `first_name`/`last_name`, `country`, `is_adult`, HCA identity payload, `device_token`. Gate on `current_user.admin?` before serializing.
+- **Not sensitive in this codebase**: `slack_id`. Every platform user is also a member of the Hack Club Slack workspace, so Slack IDs are effectively community-public. Safe to expose to staff/reviewers and to other authenticated users where useful (e.g. review pages, admin user lists). Still don't expose to fully unauthenticated routes or across trial-user boundaries without a reason.
+- **Server-only, never client**: `hca_token`, `lapse_token`, `slack_token`, `device_token` (encrypted at rest; never in Inertia props).
+
+The AGENTS.md line "PII (email, slack_id, etc.) must only be exposed to admins" is over-broad — `slack_id` is the explicit exception. When reviewing code or writing serializers, treat the list above as authoritative.
+
 ## 7. User Types (STI)
 
 | | Full User (`User`) | Trial User (`TrialUser`) |

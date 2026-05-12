@@ -1,4 +1,5 @@
 import { usePage, router } from '@inertiajs/react'
+import { ModalLink } from '@inertiaui/modal-react'
 import { useState, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { SharedProps } from '@/types'
@@ -479,7 +480,7 @@ export default function LandingIndex() {
             </div>
             <a
               href={shared.sign_in_path}
-              className="group justify-self-end w-fit h-fit shrink-0 border-2 border-dark-brown bg-brown text-light-brown active:bg-dark-brown active:text-light-brown font-bold whitespace-nowrap text-sm sm:text-xl md:text-2xl px-3 py-2 rounded-sm transition-all"
+              className="group w-fit h-fit justify-self-end shrink-0 border-2 border-dark-brown bg-brown text-light-brown active:bg-dark-brown active:text-light-brown font-bold whitespace-nowrap text-sm sm:text-xl md:text-2xl px-3 py-2 rounded-sm transition-all"
             >
               <span className="relative overflow-hidden block leading-none">
                 <span className="block transition-transform duration-300 group-hover:translate-y-full">LOG IN</span>
@@ -505,35 +506,65 @@ export default function LandingIndex() {
               Build hardware projects for free, visit Shenzhen, China!
             </h1>
             <p className="text-base md:text-2xl tracking-[5%] text-center ">Solo or in teams, for teens 13-18.</p>
-            <Frame showBorderOnMobile className="w-full max-w-[calc(100%-1rem)] sm:max-w-160 ml-1">
-              <form
-                className="w-full h-full flex px-2 sm:px-4 py-1 text-xl items-center justify-between gap-2"
-                onSubmit={handleSubmit}
-              >
-                <input
-                  className="flex-1 min-w-0 py-2 md:py-3 text-lg sm:text-xl md:text-3xl placeholder-brown outline-none bg-transparent text-brown"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@shenzhen.com"
-                  required
-                />
-                <button
-                  className="group cursor-pointer disabled:opacity-50 w-fit h-fit shrink-0 border-2 border-dark-brown bg-brown text-light-brown active:bg-dark-brown active:text-light-brown font-bold whitespace-nowrap text-sm sm:text-xl md:text-2xl px-3 py-2 rounded-sm transition-all"
-                  aria-label="Submit"
-                  disabled={submitting}
+            <div className="relative w-full max-w-[calc(100%-1rem)] sm:max-w-160 ml-1 mb-8">
+              <Frame showBorderOnMobile className="w-full">
+                <form
+                  className="w-full h-full flex px-2 sm:px-4 py-1 text-xl items-center justify-between gap-2"
+                  onSubmit={handleSubmit}
                 >
-                  <span className="relative overflow-hidden block leading-none">
-                    <span className="block transition-transform duration-300 group-hover:translate-y-full">
-                      {submitting ? '...' : 'START NOW'}
+                  <input
+                    className="flex-1 min-w-0 py-2 md:py-3 text-lg sm:text-xl md:text-3xl placeholder-brown outline-none bg-transparent text-brown"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@shenzhen.com"
+                    required
+                  />
+                  <button
+                    className="group cursor-pointer disabled:opacity-50 w-fit h-fit shrink-0 border-2 border-dark-brown bg-brown text-light-brown active:bg-dark-brown active:text-light-brown font-bold whitespace-nowrap text-sm sm:text-xl md:text-2xl px-3 py-2 rounded-sm transition-all"
+                    aria-label="Submit"
+                    disabled={submitting}
+                  >
+                    <span className="relative overflow-hidden block leading-none">
+                      <span className="block transition-transform duration-300 group-hover:translate-y-full">
+                        {submitting ? '...' : 'START NOW'}
+                      </span>
+                      <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">
+                        {submitting ? '...' : 'START NOW'}
+                      </span>
                     </span>
-                    <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">
-                      {submitting ? '...' : 'START NOW'}
-                    </span>
-                  </span>
-                </button>
-              </form>
-            </Frame>
+                  </button>
+                </form>
+              </Frame>
+            </div>
+            <ModalLink
+              href="/bulletin_board"
+              panelClasses="bulletin-board-modal-panel min-h-screen max-md:w-full max-md:max-w-none"
+              paddingClasses="p-0 md:max-w-6xl md:mx-auto"
+              closeButton={false}
+              maxWidth="7xl"
+              className="group flex items-center gap-3 mt-2 mb-4 px-3 py-2 rounded-sm"
+            >
+              <span className="text-sm sm:text-base font-medium text-light-brown text-shadow-sm whitespace-nowrap">
+                See what teens are building
+              </span>
+              <ul className="flex items-center">
+                {PROJECTS.slice(0, 4).map((project, i) => (
+                  <li
+                    key={i}
+                    className="w-12 h-12 sm:w-14 sm:h-14 first:ml-0 -ml-3 border-2 border-dark-brown bg-light-brown rounded-xs bg-center bg-cover transition-transform duration-300 group-hover:rotate-0 group-hover:translate-x-0"
+                    style={{
+                      backgroundImage: `url(${project.image})`,
+                      transform: `rotate(${(i - 1.5) * 4}deg)`,
+                      zIndex: 4 - i,
+                    }}
+                  />
+                ))}
+              </ul>
+              <span className="text-sm sm:text-base font-bold text-light-brown text-shadow-sm whitespace-nowrap transition-transform duration-300 group-hover:translate-x-1">
+                Explore →
+              </span>
+            </ModalLink>
             <FlashMessages />
           </div>
           <div
@@ -684,26 +715,51 @@ export default function LandingIndex() {
               </section>
             </div>
           </div>
-          <section ref={carouselSectionRef} className="w-full h-120 lg:pt-30 py-20 overflow-hidden">
-            <ul
-              ref={carouselTrackRef}
-              className="w-max h-full flex gap-4 text-base leading-tight will-change-transform"
+          <div className="w-full lg:pt-30 pt-20 pb-20 flex flex-col items-center">
+            <div className="px-6 lg:px-30 text-center">
+              <h2 className="text-3xl md:text-5xl font-semibold font-outfit text-dark-brown">
+                See what teens are building
+              </h2>
+              <p className="text-base md:text-lg text-brown mt-2">Past projects from previous Hack Club events</p>
+            </div>
+            <section ref={carouselSectionRef} className="w-full h-120 mt-8 overflow-hidden">
+              <ul
+                ref={carouselTrackRef}
+                className="w-max h-full flex gap-4 text-base leading-tight will-change-transform"
+              >
+                {[...PROJECTS, ...PROJECTS].map((project, i) => (
+                  <li
+                    key={i}
+                    className="border-2 border-dark-brown h-full aspect-3/4 bg-light-brown rounded-xs text-dark-brown font-bold p-2 flex flex-col transition-transform duration-300 hover:scale-110 hover:-rotate-3 hover:z-10"
+                  >
+                    <div
+                      className="w-full h-[70%] bg-beige rounded-xs bg-center bg-cover opacity-90 border-beige border-6"
+                      style={{ backgroundImage: `url(${project.image})` }}
+                    />
+                    <p className="py-2">{project.description}</p>
+                    <p className="mt-auto text-center text-xs font-light">{project.credit}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <ModalLink
+              href="/bulletin_board"
+              panelClasses="bulletin-board-modal-panel min-h-screen max-md:w-full max-md:max-w-none"
+              paddingClasses="p-0 md:max-w-6xl md:mx-auto"
+              closeButton={false}
+              maxWidth="7xl"
+              className="group mt-8 w-fit h-fit border-2 border-dark-brown bg-brown text-light-brown active:bg-dark-brown active:text-light-brown font-bold whitespace-nowrap text-base md:text-xl px-6 py-3 rounded-sm transition-all"
             >
-              {[...PROJECTS, ...PROJECTS].map((project, i) => (
-                <li
-                  key={i}
-                  className="border-2 border-dark-brown h-full aspect-3/4 bg-light-brown rounded-xs text-dark-brown font-bold p-2 flex flex-col transition-transform duration-300 hover:scale-110 hover:-rotate-3 hover:z-10"
-                >
-                  <div
-                    className="w-full h-[70%] bg-beige rounded-xs bg-center bg-cover opacity-90 border-beige border-6"
-                    style={{ backgroundImage: `url(${project.image})` }}
-                  />
-                  <p className="py-2">{project.description}</p>
-                  <p className="mt-auto text-center text-xs font-light">{project.credit}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
+              <span className="relative overflow-hidden block leading-none">
+                <span className="block transition-transform duration-300 group-hover:translate-y-full">
+                  Explore all projects
+                </span>
+                <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">
+                  Explore all projects
+                </span>
+              </span>
+            </ModalLink>
+          </div>
           <section className="px-6 lg:px-30 xl:px-50 flex flex-col md:flex-row justify-center items-center w-full">
             <h2 className="text-8xl lg:text-9xl lg:text-[10rem] font-semibold font-outfit">60H</h2>
             <HalftoneBg
@@ -1175,14 +1231,14 @@ export default function LandingIndex() {
       </div>
       <div
         ref={customCursorRef}
-        className="fixed top-0 left-0 z-[9999] pointer-events-none select-none"
+        className="fixed top-0 left-0 z-[10001] pointer-events-none select-none"
         style={{ opacity: 0 }}
       >
         <img src="/cursors/arrowhead.svg" width="36" height="36" />
       </div>
       <div
         ref={pointerCursorRef}
-        className="fixed top-0 left-0 z-[9999] pointer-events-none select-none"
+        className="fixed top-0 left-0 z-[10001] pointer-events-none select-none"
         style={{ opacity: 0 }}
       >
         <img src="/cursors/pointer.svg" width="36" height="36" />

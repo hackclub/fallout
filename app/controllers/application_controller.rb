@@ -51,19 +51,13 @@ class ApplicationController < ActionController::Base
     {
       collaborators: Flipper.enabled?(:collaborators, current_user),
       shop: Flipper.enabled?(:shop, current_user),
-      grant_fulfillment: Flipper.enabled?(:grant_fulfillment, current_user)
+      grant_fulfillment: Flipper.enabled?(:grant_fulfillment, current_user),
+      hcb_top_ups: Flipper.enabled?(:hcb_top_ups, current_user)
     }
   }
-  inertia_share has_unread_mail: -> { # Drives the envelope badge on the path page
-    next false unless current_user && !current_user.trial?
-    MailMessage.visible_to(current_user)
-              .where.not(id: current_user.mail_interactions.read.select(:mail_message_id))
-              .exists?
-  }
-  inertia_share current_streak: -> { # Read-only — reconciliation happens in StreakReconciliationJob and StreakService.record_activity
-    next 0 unless current_user && !current_user.trial?
-    StreakDay.current_streak(current_user)
-  }
+  # has_unread_mail and current_streak are scoped to PathController only (see PathController)
+  # since they're only consumed by the path page's header. Skipping them on every other
+  # authenticated request saves 2 queries per page.
   inertia_share streak_freezes: -> {
     next 0 unless current_user && !current_user.trial?
     current_user.streak_freezes

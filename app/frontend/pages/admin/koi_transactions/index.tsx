@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link } from '@inertiajs/react'
+import { Link, router } from '@inertiajs/react'
 import type { ColumnDef } from '@tanstack/react-table'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
@@ -28,7 +28,7 @@ const columns: ColumnDef<Transaction>[] = [
     header: 'Amount',
     cell: ({ row }) => (
       <span className={`font-medium ${row.original.amount > 0 ? 'text-green-700' : 'text-red-700'}`}>
-        {row.original.amount > 0 ? `+${row.original.amount}` : row.original.amount} koi
+        {row.original.amount > 0 ? `+${row.original.amount}` : row.original.amount}
       </span>
     ),
   },
@@ -46,30 +46,48 @@ export default function AdminKoiTransactionsIndex({
   transactions,
   user_id_filter,
   pagy,
+  currency,
 }: {
   transactions: Transaction[]
   user_id_filter: string
   pagy: PagyProps
+  currency: 'koi' | 'gold'
 }) {
+  function switchCurrency(c: 'koi' | 'gold') {
+    const params: Record<string, string> = { currency: c }
+    if (user_id_filter) params.user_id = user_id_filter
+    router.get('/admin/koi_transactions', params)
+  }
+
+  const newPath = `/admin/koi_transactions/new?currency=${currency}${user_id_filter ? `&user_id=${user_id_filter}` : ''}`
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Koi Transactions</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
           {user_id_filter && (
             <Badge variant="secondary" className="text-sm">
               User #{user_id_filter}
             </Badge>
           )}
+          <div className="flex rounded-md border border-input overflow-hidden">
+            <button
+              onClick={() => switchCurrency('koi')}
+              className={`px-3 py-1 text-sm ${currency === 'koi' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}
+            >
+              Koi
+            </button>
+            <button
+              onClick={() => switchCurrency('gold')}
+              className={`px-3 py-1 text-sm ${currency === 'gold' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}
+            >
+              Gold
+            </button>
+          </div>
         </div>
         <Button asChild variant="outline">
-          <Link
-            href={
-              user_id_filter ? `/admin/koi_transactions/new?user_id=${user_id_filter}` : '/admin/koi_transactions/new'
-            }
-          >
-            + Adjust Koi
-          </Link>
+          <Link href={newPath}>+ Adjust {currency === 'koi' ? 'Koi' : 'Gold'}</Link>
         </Button>
       </div>
 

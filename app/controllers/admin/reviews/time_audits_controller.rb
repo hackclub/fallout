@@ -6,12 +6,14 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
     pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).order(created_at: :asc).load
     @pagy, @all_reviews = pagy(base.order(created_at: :desc))
     flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
+    Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
 
     render inertia: {
       pending_reviews: pending_reviews.map { |r| serialize_review_row(r) },
       all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids) },
       pagy: pagy_props(@pagy),
-      start_reviewing_path: next_admin_reviews_time_audits_path
+      start_reviewing_path: next_admin_reviews_time_audits_path,
+      **review_stats_props(TimeAuditReview)
     }
   end
 
@@ -56,6 +58,7 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
                            inertia: { errors: { feedback: [ "Feedback cannot be only a link. Please explain your time audit decision." ] } }
     end
 
+    stamp_reviewer_for_terminal!(params.dig(:time_audit_review, :status))
     if @review.update(params_for_update)
       respond_to do |format|
         format.json { render json: { ok: true } }
@@ -158,7 +161,8 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
       demo_link: project.demo_link,
       user_id: project.user_id,
       user_display_name: project.user.display_name,
-      user_avatar: project.user.avatar
+      user_avatar: project.user.avatar,
+      collaborators: project.collaborator_users.map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
     }
   end
 

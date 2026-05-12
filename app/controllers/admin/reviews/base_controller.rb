@@ -48,16 +48,17 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   # -- Claim lifecycle --
 
   def release_all_review_claims
-    had_claim = any_active_claim?
-    Reviewable::REVIEW_MODELS.each { |name| name.constantize.release_all_claims!(current_user) }
-    flash.now[:notice] = "Review session ended." if had_claim
+    # update_all returns the affected row count; summing across models tells us whether
+    # the user had any active claim without an extra round of SELECTs.
+    released = Reviewable::REVIEW_MODELS.sum { |name| name.constantize.release_all_claims!(current_user) }
+    flash.now[:notice] = "Review session ended." if released.positive?
   end
 
   def claim_review!
-    had_claim = any_active_claim?
-
-    # Release any existing claim by this user (one claim at a time across all types)
-    Reviewable::REVIEW_MODELS.each { |name| name.constantize.release_all_claims!(current_user) }
+    # Release any existing claim by this user (one claim at a time across all types).
+    # Use the update_all row count as the "had_claim" signal — skips a separate active-claim probe.
+    released = Reviewable::REVIEW_MODELS.sum { |name| name.constantize.release_all_claims!(current_user) }
+    had_claim = released.positive?
 
     claimed = review_model.atomic_claim!(@review.id, current_user)
 
@@ -82,10 +83,6 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
 
   # -- Helpers --
 
-  def any_active_claim?
-    Reviewable::REVIEW_MODELS.any? { |name| name.constantize.active_claim_for(current_user).present? }
-  end
-
   def parse_skip_ids
     (params[:skip] || "").split(",").filter_map { |id| id.to_i if id.present? }
   end
@@ -100,6 +97,17 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     clear_flag_if_admin_override!
     skip_ids = parse_skip_ids << @review.id
     redirect_to review_next_path(skip: skip_ids.join(",")), notice: notice
+  end
+
+  # Stamp the submitter as reviewer when finalizing a review. The claim system
+  # normally sets reviewer_id, but ExpireStaleReviewClaimsJob can clear it
+  # between page load and submit, and the policy permits admins to update
+  # without an active claim. Without this, terminal reviews can land with
+  # reviewer_id=NULL, losing attribution. Only fills when blank so we preserve
+  # the original claimer when one exists.
+  def stamp_reviewer_for_terminal!(submitted_status)
+    return unless %w[approved returned rejected].include?(submitted_status.to_s)
+    @review.reviewer_id ||= current_user.id
   end
 
   # Admin submitting a decision on a flagged review clears the flag (admin override)
@@ -152,6 +160,8 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       project_flagged: flagged_project_ids.include?(ship.project_id),
       reviewer_display_name: review.reviewer&.display_name,
       created_at: review.created_at.strftime("%b %d, %Y"),
+      waiting_since: ship.created_at.iso8601,
+      cycle_started_at: ship.cycle_started_at.iso8601,
       is_claimed: review.claimed?,
       claimed_by_display_name: review.claimed? ? review.reviewer&.display_name : nil,
       sibling_approved: sibling&.approved? || false,
@@ -161,10 +171,14 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
 
   def serialize_project_context(project, ship)
     logged = (project.time_logged / 3600.0).round(1)
-    public_hrs = ship.approved_public_seconds ? (ship.approved_public_seconds / 3600.0).round(1) : nil
+    # ship.approved_public_seconds is only mirrored from the TA when the ship reaches :approved.
+    # During DR/BR review the ship is still :pending, so fall back to the TA's value once it has
+    # approved — otherwise the sidebar would show project.time_logged, which uses the persisted
+    # youtube stretch_multiplier (not yet synced from TA annotations) and misleads the reviewer.
+    public_seconds = ship.approved_public_seconds || (ship.time_audit_review&.approved? ? ship.time_audit_review.approved_public_seconds : nil)
+    public_hrs = public_seconds ? (public_seconds / 3600.0).round(1) : nil
     internal_hrs = internal_hours_display(ship)
     entry_count = project.kept_journal_entries.size
-    first_ship = project.ships.order(:created_at).first
     {
       id: project.id,
       name: project.name,
@@ -177,6 +191,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       user_display_name: project.user.display_name,
       user_avatar: project.user.avatar,
       user_slack_id: project.user.slack_id, # Admin-only context; review pages are staff-only
+      collaborators: project.collaborator_users.map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } },
       logged_hours: logged,
       approved_public_hours: public_hrs,
       approved_internal_hours: internal_hrs,
@@ -185,7 +200,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       frozen_repo_link: ship.frozen_repo_link,
       frozen_demo_link: ship.frozen_demo_link,
       waiting_since: ship.created_at.iso8601,
-      first_submitted_at: first_ship&.created_at&.iso8601
+      cycle_started_at: ship.cycle_started_at.iso8601
     }
   end
 
@@ -260,6 +275,185 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     seconds = ship.approved_internal_seconds
     return nil if seconds.zero?
     (seconds / 3600.0).round(1)
+  end
+
+  # -- Header stats (index pages) --
+  #
+  # Computes a per-queue snapshot for the review index header. `include` is the
+  # ordered list of stat keys to compute; controllers pass only the keys their
+  # queue surfaces (e.g. TA only wants :turnaround).
+  #
+  # Returned shape (each key is optional, only present if requested):
+  #   {
+  #     hours_pending: { value: 12.3 },                                            # snapshot, no delta
+  #     turnaround:    { ship_days: 3.1, cycle_days: 4.2, count: 7, delta: -0.4 }, # negative delta = faster
+  #     approval_ratio:{ percent: 70.0, count: 10, delta: 5.0 },                   # positive delta = more approvals
+  #     reship_ratio:  { percent: 20.0, count: 10, delta: -3.0 }                   # negative delta = fewer reships
+  #   }
+  #
+  # Windowed stats compare the last 7d against the prior 7d (days 7-14 ago).
+  # Delta is nil when the prior window had zero qualifying reviews — leaving
+  # the chevron off rather than rendering a misleading "infinite improvement".
+  STATS_WINDOW = 7.days
+  STATS_CACHE_TTL = 5.minutes
+
+  # Stats arrive deferred (heavy aggregates off the critical path), but the layout
+  # needs to know which cards are coming so it can reserve their slots and avoid
+  # CLS when the deferred payload lands. Keys are passed eagerly alongside the
+  # deferred `stats` prop.
+  REVIEW_STAT_KEYS = {
+    "TimeAuditReview" => %i[ turnaround ],
+    "RequirementsCheckReview" => %i[ turnaround approval_ratio reship_ratio ],
+    "DesignReview" => %i[ hours_pending turnaround approval_ratio ],
+    "BuildReview" => %i[ hours_pending turnaround approval_ratio ]
+  }.freeze
+
+  def review_stats_props(model)
+    keys = REVIEW_STAT_KEYS.fetch(model.name)
+    {
+      stats_keys: keys,
+      stats: InertiaRails.defer { compute_review_stats(model, include: keys) }
+    }
+  end
+
+  # Cache key is bumped whenever any review of this type is touched (max updated_at).
+  # Means a freshly-submitted review invalidates the cache on the next index load
+  # without per-row tracking. Falls back to a fixed key when the table is empty.
+  #
+  # Perf: MAX(updated_at) without an index does a sequential scan; on current
+  # data sizes (low thousands of reviews) this is sub-millisecond. If the tables
+  # grow significantly, add an index on updated_at or switch to TTL-only invalidation.
+  def compute_review_stats(model, include:)
+    cache_stamp = model.maximum(:updated_at)&.to_i || 0
+    Rails.cache.fetch(
+      "admin/reviews/stats/#{model.name}/v2/#{include.join(',')}/#{cache_stamp}",
+      expires_in: STATS_CACHE_TTL
+    ) do
+      build_review_stats(model, include)
+    end
+  end
+
+  def build_review_stats(model, include)
+    now = Time.current
+    completion_col = model == TimeAuditReview ? :completed_at : :updated_at
+    current_window = (now - STATS_WINDOW)..now
+    prior_window = (now - 2 * STATS_WINDOW)..(now - STATS_WINDOW)
+
+    stats = {}
+    stats[:hours_pending] = stat_hours_pending(model) if include.include?(:hours_pending)
+    stats[:turnaround] = stat_turnaround(model, completion_col, current_window, prior_window) if include.include?(:turnaround)
+    stats[:approval_ratio] = stat_approval_ratio(model, completion_col, current_window, prior_window) if include.include?(:approval_ratio)
+    stats[:reship_ratio] = stat_reship_ratio(model, completion_col, current_window, prior_window) if include.include?(:reship_ratio)
+    stats
+  end
+
+  # Sum of TA-approved hours across ships currently waiting in this queue. DR/BR
+  # only — RC/TA precede the TA-approval gate so the metric is undefined for them.
+  # Uses time_audit_reviews.approved_public_seconds rather than ships.approved_public_seconds
+  # because the latter is only mirrored once the ship reaches :approved (DR/BR phase still pending).
+  def stat_hours_pending(model)
+    seconds = model.pending
+      .joins(ship: :time_audit_review)
+      .where(time_audit_reviews: { status: TimeAuditReview.statuses[:approved] })
+      .sum("time_audit_reviews.approved_public_seconds")
+    { value: (seconds.to_f / 3600.0).round(1) }
+  end
+
+  def stat_turnaround(model, completion_col, current_window, prior_window)
+    current = turnaround_for_window(model, completion_col, current_window)
+    prior = turnaround_for_window(model, completion_col, prior_window)
+    ship_delta = (current[:ship_days] && prior[:ship_days]) ? (current[:ship_days] - prior[:ship_days]).round(1) : nil
+    cycle_delta = (current[:cycle_days] && prior[:cycle_days]) ? (current[:cycle_days] - prior[:cycle_days]).round(1) : nil
+    current.merge(ship_delta: ship_delta, cycle_delta: cycle_delta)
+  end
+
+  # Returns { ship_days:, cycle_days:, count: }. Pluck (completion_at, ship_id)
+  # instead of loading full review rows — review tables carry a jsonb annotations
+  # column we don't need here. Ships are loaded once by id and run through
+  # Ship.preload_cycle_started_at to hit the shared Rails.cache.
+  #
+  # Status filter uses the positive set (decided enum values) so Postgres can hit
+  # the status index directly instead of NOT-IN'ing pending+cancelled.
+  def turnaround_for_window(model, completion_col, window)
+    decided = [ model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected] ]
+    pairs = model.where(completion_col => window)
+      .where(status: decided)
+      .pluck(completion_col, :ship_id)
+    return { ship_days: nil, cycle_days: nil, count: 0 } if pairs.empty?
+
+    ships_by_id = Ship.where(id: pairs.map(&:last).uniq).index_by(&:id)
+    Ship.preload_cycle_started_at(ships_by_id.values)
+
+    ship_sum = 0.0
+    cycle_sum = 0.0
+    pairs.each do |completed, ship_id|
+      ship = ships_by_id[ship_id]
+      next unless ship && completed
+      ship_sum += completed - ship.created_at
+      cycle_sum += completed - ship.cycle_started_at
+    end
+    count = pairs.size
+    {
+      ship_days: (ship_sum / count / 86_400.0).round(1),
+      cycle_days: (cycle_sum / count / 86_400.0).round(1),
+      count: count
+    }
+  end
+
+  def stat_approval_ratio(model, completion_col, current_window, prior_window)
+    current = approval_ratio_for_window(model, completion_col, current_window)
+    prior = approval_ratio_for_window(model, completion_col, prior_window)
+    delta = (current[:percent] && prior[:percent]) ? (current[:percent] - prior[:percent]).round(1) : nil
+    current.merge(delta: delta)
+  end
+
+  # Two simple counts instead of group(:status).count — the latter's hash keys
+  # vary by Rails version (integer raw vs enum string), which silently resolved
+  # `approved` to 0 and reported 0%. Two indexed COUNT queries are cheap and
+  # leave no room for enum-key ambiguity.
+  def approval_ratio_for_window(model, completion_col, window)
+    scope = model.where(completion_col => window).where(status: [
+      model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected]
+    ])
+    total = scope.count
+    return { percent: nil, count: 0 } if total.zero?
+    approved = scope.where(status: model.statuses[:approved]).count
+    { percent: ((approved.to_f / total) * 100).round(1), count: total }
+  end
+
+  def stat_reship_ratio(model, completion_col, current_window, prior_window)
+    current = reship_ratio_for_window(model, completion_col, current_window)
+    prior = reship_ratio_for_window(model, completion_col, prior_window)
+    delta = (current[:percent] && prior[:percent]) ? (current[:percent] - prior[:percent]).round(1) : nil
+    current.merge(delta: delta)
+  end
+
+  # Reship = ship with a prior returned/rejected ship for the same project.
+  # Approved siblings are excluded — a follow-on after a clean approval is a new
+  # cycle, not a "redo" of a failed attempt.
+  #
+  # Two simple counts (total + reships-with-EXISTS) rather than one COUNT FILTER —
+  # keeps the AR-pluck path straightforward and avoids the same Arel.sql-aggregate
+  # pitfall that silently zeroed the approval ratio.
+  def reship_ratio_for_window(model, completion_col, window)
+    decided = [ model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected] ]
+    scope = model.joins(:ship)
+      .where(model.table_name => { completion_col => window })
+      .where(status: decided)
+
+    total = scope.count
+    return { percent: nil, count: 0 } if total.zero?
+
+    reships = scope.where(<<~SQL.squish, returned: Ship.statuses[:returned], rejected: Ship.statuses[:rejected]).count
+      EXISTS (
+        SELECT 1 FROM ships s2
+        WHERE s2.project_id = ships.project_id
+          AND s2.created_at < ships.created_at
+          AND s2.status IN (:returned, :rejected)
+      )
+    SQL
+
+    { percent: ((reships.to_f / total) * 100).round(1), count: total }
   end
 
   # Resolves a verified checkpoint message URL for the project owner.

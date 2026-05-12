@@ -3,13 +3,14 @@ import { router } from '@inertiajs/react'
 import { Modal, ModalLink, useModal } from '@inertiaui/modal-react'
 import { BookOpenIcon, ClockIcon, CheckIcon } from '@heroicons/react/16/solid'
 import { EllipsisHorizontalIcon } from '@heroicons/react/20/solid'
-import { ArrowLeft, Pencil, Trash2, Feather, Loader2 } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Feather, Loader2, Link2, FileDown } from 'lucide-react'
 import { DateTime } from 'luxon'
 import BookLayout from '@/components/shared/BookLayout'
 import Button from '@/components/shared/Button'
 import InlineUser from '@/components/shared/InlineUser'
 import Input from '@/components/shared/Input'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
+import { useClickOutside } from '@/hooks/useClickOutside'
 import { performModalMutation } from '@/lib/modalMutation'
 import { notify } from '@/lib/notifications'
 import { relativeAgeParts } from '@/lib/relativeAge'
@@ -206,6 +207,7 @@ export default function ProjectsShow({
     update: boolean
     destroy: boolean
     export_journal: boolean
+    share: boolean
     ship: boolean
     manage_collaborators: boolean
     create_journal_entry: boolean
@@ -224,6 +226,8 @@ export default function ProjectsShow({
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [actionMenuOpen, setActionMenuOpen] = useState(false)
+  const actionMenuRef = useClickOutside<HTMLDivElement>(() => setActionMenuOpen(false))
   const [journalMenuEntryId, setJournalMenuEntryId] = useState<number | null>(null)
 
   const [switchEntry, setSwitchEntry] = useState<JournalEntryCard | null>(null)
@@ -280,7 +284,19 @@ export default function ProjectsShow({
     onModalEvent?.('projectSaved')
   }
 
+  async function copyShareLink() {
+    setActionMenuOpen(false)
+    const url = `${window.location.origin}/projects/${project.id}`
+    try {
+      await navigator.clipboard.writeText(url)
+      notify('notice', 'Link copied to clipboard')
+    } catch {
+      notify('alert', 'Could not copy link. Please copy it manually.')
+    }
+  }
+
   function deleteProject() {
+    setActionMenuOpen(false)
     if (deleting || !confirm('Delete this project? This will remove it and its journal entries from normal views.'))
       return
 
@@ -632,21 +648,54 @@ export default function ProjectsShow({
                   <TooltipContent>Edit</TooltipContent>
                 </Tooltip>
               )}
-              {can.destroy && (
-                <Tooltip side="top" gap={8}>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={deleteProject}
-                      disabled={deleting}
-                      aria-label="Delete project"
-                      className="bg-coral text-light-brown border-2 border-dark-brown rounded w-10 h-10 flex items-center justify-center hover:opacity-80 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              {(can.share || can.destroy) && (
+                <div ref={actionMenuRef} className="relative">
+                  <Tooltip side="top" gap={8}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setActionMenuOpen((open) => !open)}
+                        aria-haspopup="menu"
+                        aria-expanded={actionMenuOpen}
+                        aria-label="More actions"
+                        className="bg-brown text-light-brown border-2 border-dark-brown rounded w-10 h-10 flex items-center justify-center hover:opacity-80 cursor-pointer"
+                      >
+                        <EllipsisHorizontalIcon className="w-5 h-5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>More actions</TooltipContent>
+                  </Tooltip>
+                  {actionMenuOpen && (
+                    <div
+                      role="menu"
+                      className="absolute left-0 bottom-full mb-2 z-50 min-w-44 bg-light-brown border-2 border-dark-brown rounded shadow-md py-1"
                     >
-                      {deleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Delete project</TooltipContent>
-                </Tooltip>
+                      {can.share && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={copyShareLink}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-dark-brown text-left hover:bg-beige cursor-pointer"
+                        >
+                          <Link2 className="w-4 h-4" />
+                          Copy share link
+                        </button>
+                      )}
+                      {can.destroy && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={deleteProject}
+                          disabled={deleting}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-coral text-left hover:bg-beige cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          Delete project
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
               {can.export_journal && (
                 <Tooltip side="top" gap={8}>
@@ -654,9 +703,9 @@ export default function ProjectsShow({
                     <a
                       href={`/projects/${project.id}/export_journal`}
                       aria-label="Export journal.md"
-                      className="bg-brown text-light-brown border-2 border-dark-brown rounded px-3 h-10 flex items-center justify-center hover:opacity-80 cursor-pointer text-xs font-bold uppercase"
+                      className="bg-brown text-light-brown border-2 border-dark-brown rounded w-10 h-10 flex items-center justify-center hover:opacity-80 cursor-pointer"
                     >
-                      Export
+                      <FileDown className="w-5 h-5" />
                     </a>
                   </TooltipTrigger>
                   <TooltipContent>Export journal.md</TooltipContent>

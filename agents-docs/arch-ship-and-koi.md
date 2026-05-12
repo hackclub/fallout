@@ -6,8 +6,8 @@ originSessionId: bb8ce051-7e1a-4ccd-bd96-7b3a575d339a
 ---
 # Ship Pipeline & Koi Economy
 
-The user's flow: **Project → Journal Entries → Ship → Multi-stage Review → (eventual) Koi/Gold reward**.
-Koi and ships are intertwined because the only intended path for earning ship-related koi is via `koi_adjustment` columns on the Phase 2 reviews. (See "Koi awarding gap" below — that wiring is incomplete as of writing.)
+The user's flow: **Project → Journal Entries → Ship → Multi-stage Review → Koi/Gold reward**.
+Ships and the dual-currency system are tightly coupled: a **design** ship (DR) awards koi when fully approved; a **build** ship (BR) awards gold when fully approved AND — on a project's *first* approved BR — sweeps the project's accumulated koi into gold (`BuiltIrlConversionService`). See §10 for the full ledger model, cap formula, and idempotency guarantees.
 
 ---
 
@@ -131,7 +131,9 @@ Created by `Ship#ensure_phase_two_review!` only after `phase_one_complete?` (bot
 - `DesignReview` if `ship_type == design` (default).
 - `BuildReview` if `ship_type == build`.
 
-Both have identical schema: `feedback`, `internal_reason`, `hours_adjustment` (private add-on to public TA hours), `koi_adjustment` (intended koi reward), `annotations` jsonb. Both gated to `pass2_reviewer` only.
+Both share most schema: `feedback`, `internal_reason`, `hours_adjustment` (private add-on to public TA hours), `annotations` jsonb. The currency-adjustment column differs by type because the two reviews issue different currencies — **DR has `koi_adjustment`** (added to koi award), **BR has `gold_adjustment`** (added to gold award). See §10 for the full DR-koi / BR-gold / built-irl-conversion mechanics. Both reviews are gated to `pass2_reviewer` only.
+
+Admin-only swap (`Ship#swap_phase_two_type!`) moves a pending Phase 2 review between DR and BR. The swap maps DR's `koi_adjustment` ↔ BR's `gold_adjustment` (same semantic knob — a signed integer credit/debit on the hours-derived currency) and preserves the review's `created_at` so queue wait time stays intact.
 
 Time Audit now rejects link-only feedback in the admin controller (`Admin::Reviews::TimeAuditsController#update`). If `feedback` consists only of one or more `http(s)` URLs, the update is rejected with an inline validation error requiring written explanation.
 
@@ -262,11 +264,12 @@ Internal approved time is **derived on read** via `Ship#approved_internal_second
 | User-visible dashboards (path header, project pages) | User-facing approved (or logged time, if not yet approved) | Never internal — users must not see the adjustment |
 | Airtable export (`Project.airtable_sync_preload`) | Logged hours only — "Hours Approved" used to be exported here but was removed; consumers should join from the `Ship.airtable_sync_field_mappings` "Approved Hours" column instead. | Per-project approved totals are no longer denormalized into the Project Airtable row. |
 | YSWS Unified Submissions Airtable upload (`Ship#upload_to_unified_airtable!`) | **Internal approved time** (`internal_hours_for_unified` → `approved_internal_seconds / 3600`) | Pushed to "Optional - Override Hours Spent". This is the operator's view (TA + DR/BR adjustments) — what downstream YSWS automation uses as the official hours. |
-| **Koi awarding** (`ShipKoiAwarder.compute_amount`) | **User-facing approved** | See §10 — explicitly NOT internal. The user's reward must be derivable from what they see. |
+| **Koi awarding** for DR ships (`ShipKoiAwarder.compute_amount`) | **User-facing approved** | See §10 — explicitly NOT internal. The user's reward must be derivable from what they see. |
+| **Gold awarding** for BR ships (`ShipGoldAwarder.compute_amount`) | **User-facing approved** | Same rate (7/hr), same hours basis as koi. BR's own incremental cycle hours only — re-ship cycles award only their delta. |
 | Admin hours display (`HoursDisplay` component) | Internal as the headline; user-facing in parens labeled "User facing" | Reviewers see both side-by-side |
 | Admin sort/filter on hours columns | Internal | Operator-facing analytics |
 | Travel grant payouts | Internal (manually calculated) | Per `mail_intro` content: `$8.5/hour for design + build hours`. Admins compute this off-platform from the internal figure. NOT automated in code today. |
-| Koi preview shown to Phase 2 reviewer (DR/BR show pages, lines 509-514) | User-facing only — `Math.floor(7 * userFacingHours)` | Preview helper; the real award is computed server-side by `ShipKoiAwarder` and is the binding number |
+| Currency preview shown to Phase 2 reviewer (DR/BR show pages) | User-facing only — `Math.floor(7 * userFacingHours)` | Preview helper; the real award is computed server-side by `ShipKoiAwarder` / `ShipGoldAwarder` and is the binding number |
 
 ### Why `hours_adjustment` exists separately
 
@@ -277,17 +280,17 @@ Phase 2 reviewers (DR/BR) sometimes need to credit or debit hours that the TA ca
 
 Decoupling means Phase 2 can adjust internal totals (driving travel grants) without retroactively changing the user-visible "your approved hours" number — which would feel arbitrary to the user and would invalidate the TA's prior decision.
 
-### Why koi follows user-facing only
+### Why koi/gold follows user-facing only
 
-The user-facing approved hours figure is **the contract**. What the user sees as "your approved hours" should be the basis for their koi reward. Decoupling them would mean the user couldn't audit their own koi balance from displayed numbers, and would let Phase 2 reviewers silently inflate or deflate the user's primary reward signal under cover of "internal" adjustments.
+The user-facing approved hours figure is **the contract**. What the user sees as "your approved hours" should be the basis for their koi (DR) or gold (BR) reward. Decoupling them would mean the user couldn't audit their own balance from displayed numbers, and would let Phase 2 reviewers silently inflate or deflate the user's primary reward signal under cover of "internal" adjustments.
 
-If Phase 2 wants to adjust the koi specifically (e.g., quality bonus or deduction), the explicit knob is `koi_adjustment` on DR/BR — added on top of the hours-derived base in `ShipKoiAwarder.compute_amount`. This keeps the adjustment **visible and labeled** in the koi ledger description (`"Ship #X approved — Yh × 7 koi + Z koi review adjustment"`) rather than hidden inside an opaque hours number.
+If Phase 2 wants to adjust the reward specifically (e.g., quality bonus or deduction), the explicit knob is `design_review.koi_adjustment` or `build_review.gold_adjustment` — added on top of the hours-derived base in the respective awarder. This keeps the adjustment **visible and labeled** in the ledger description (`"Ship #X approved — Yh × 7 koi + Z koi review adjustment"`) rather than hidden inside an opaque hours number.
 
-### Quirk: koi preview vs award rounding
+### Quirk: currency preview vs award rounding
 
-The Phase 2 reviewer's koi preview in the DR/BR frontend uses `Math.floor(7 * userFacingHours)` where `userFacingHours` has already been rounded to 1 decimal place. The actual award (`ShipKoiAwarder.compute_amount`) uses `Rational(seconds * 7, 3600).round` on raw seconds.
+The Phase 2 reviewer's currency preview in the DR/BR frontend uses `Math.floor(7 * userFacingHours)` where `userFacingHours` has already been rounded to 1 decimal place. The actual award (`ShipKoiAwarder.compute_amount` / `ShipGoldAwarder.compute_amount`) uses `Rational(seconds * 7, 3600).round` on raw seconds.
 
-These can disagree by 1 koi at certain half-hour boundaries (e.g., exactly 9.5h: preview shows 66, award is 67). Reviewers should treat the preview as approximate. Don't "fix" the preview to match by reading raw seconds — that would tie the reviewer UI to backend rounding policy and make changing either harder. The award is authoritative.
+These can disagree by 1 unit at certain half-hour boundaries (e.g., exactly 9.5h: preview shows 66, award is 67). Reviewers should treat the preview as approximate. Don't "fix" the preview to match by reading raw seconds — that would tie the reviewer UI to backend rounding policy and make changing either harder. The award is authoritative.
 
 ---
 
@@ -329,24 +332,27 @@ The `notify_status_change` callback is wrapped in `rescue => e` and logs but doe
 
 ---
 
-## 10. Koi Economy
+## 10. Koi/Gold Economy
+
+The dual-currency model maps directly onto Phase 2: **DR → koi**, **BR → gold**. The first approved BR per project also triggers a **koi → gold sweep** of accumulated project-koi (the "built irl" conversion).
 
 ### Currency Surface
 
 Three currencies referenced in code:
-- **koi** — earned (intended via ship review), spent on shop items + project grants. The "main" currency.
-- **gold** — premium currency, only ever credited via `admin_adjustment`. Spent on `currency = "gold"` shop items.
+- **koi** — earned via DR (design ship approval) and streak goals. Spent on koi-currency shop items + project grants. Convertible to gold when a project becomes built-irl.
+- **gold** — earned via BR (build ship approval) and the built-irl conversion sweep. Also credited by admin adjustment. Spent on `currency = "gold"` shop items. Premium currency; *not* spendable on project grants.
 - **hours** — pseudo-currency on shop items. Cannot be purchased directly (`ShopOrder#user_can_afford` errors with "This item cannot be purchased directly"). Likely a placeholder for hours-redeemable rewards.
 
 ### Models
 
 `KoiTransaction` (`app/models/koi_transaction.rb`):
-- `user_id`, `actor_id` (nullable — nil for system-generated awards), `amount` (signed integer, validated `other_than: 0`), `reason` (string, must be one of `REASONS = %w[ship_review admin_adjustment streak_goal]`), `description` (text, required).
+- `user_id`, `actor_id` (nullable — nil for system-generated awards), `amount` (signed integer, validated `other_than: 0`), `reason` (string, must be one of `REASONS = %w[ship_review built_irl_conversion admin_adjustment streak_goal]`), `description` (text, required), `ship_id` (required for `SHIP_REASONS = %w[ship_review built_irl_conversion]`, forbidden otherwise — see `ship_id_consistency` validation), `transfer_id` (uuid, set on the koi side of a transfer pair; see "Built-IRL Conversion" below).
 - **Readonly after creation**: `before_update { raise ActiveRecord::ReadonlyRecord }` and same for destroy. Records are the canonical history — never mutated.
 - Has `user_id, created_at` composite index for fast per-user history queries.
 
 `GoldTransaction` (`app/models/gold_transaction.rb`):
-- Identical structure to KoiTransaction, but `REASONS = %w[admin_adjustment]` only. No system-generated source. Same readonly enforcement.
+- Same shape as KoiTransaction but with `REASONS = %w[ship_review built_irl_conversion admin_adjustment]` (no streak source; streak rewards are koi-only). Also has `ship_id` (with the same `SHIP_REASONS` consistency rule) and `transfer_id`.
+- **Maintains a `users.gold_balance` counter cache** via `after_create :increment_user_gold_balance`. ShopOrder credits/debits the counter on order state transitions (see [arch-data-patterns.md](arch-data-patterns.md) — this differs from koi, which is recomputed from the sum). Don't bypass `GoldTransaction.create!` if you want the balance to stay correct.
 
 ### Balance Calculation (`User#koi`, `User#gold`)
 
@@ -358,11 +364,16 @@ def koi
                .where.not(state: :rejected).sum("frozen_price * quantity") -
     project_grant_orders.kept.where.not(state: :rejected).sum(:frozen_koi_amount)
 end
+
+def gold
+  return 0 if trial?
+  gold_balance # counter cache
+end
 ```
 
-Balance = sum of ledger amounts MINUS reservations from non-rejected shop orders MINUS reservations from non-rejected project grant orders (both koi-currency only).
+**Koi balance** = sum of ledger amounts (including negative `built_irl_conversion` debits) MINUS reservations from non-rejected koi-currency shop orders MINUS reservations from non-rejected project grant orders.
 
-`gold` is the same minus the project-grant-orders term and filtering shop orders by `currency: "gold"`.
+**Gold balance** uses the `users.gold_balance` counter cache, maintained by `GoldTransaction#after_create` and `ShopOrder` state-transition callbacks.
 
 **Trial users always have 0** — they cannot earn or spend.
 
@@ -374,49 +385,112 @@ Balance = sum of ledger amounts MINUS reservations from non-rejected shop orders
 
 ### Awarding Sources
 
-| Reason | Created by | Notes |
-|---|---|---|
-| `streak_goal` | `StreakService.check_goal_completion` | `GOAL_KOI_REWARDS = { 3 => 1, 5 => 2, 7 => 5, 14 => 12 }` |
-| `admin_adjustment` | `Admin::KoiTransactionsController#create` | Hard-coded `reason = "admin_adjustment"`; `actor` set to `current_user`. Admin-only via `before_action :require_admin!`. |
-| `ship_review` | `ShipKoiAwarder.call(ship)` invoked from `Ship#award_ship_review_koi!` (after_update_commit) and from `rake koi:reconcile_ship_reviews` | See "Ship Review Awarding" below |
+| Currency | Reason | Created by | Notes |
+|---|---|---|---|
+| koi | `streak_goal` | `StreakService.check_goal_completion` | `GOAL_KOI_REWARDS = { 3 => 1, 5 => 2, 7 => 5, 14 => 12 }` |
+| koi | `admin_adjustment` | `Admin::KoiTransactionsController#create` | Hard-coded reason; `actor` set to `current_user`. Admin-only via `require_admin!`. |
+| koi | `ship_review` | `ShipKoiAwarder.call(ship)` from `Ship#award_ship_review_currency!` | DR ships only. See below. |
+| koi | `built_irl_conversion` | `BuiltIrlConversionService.call(ship)` (NEGATIVE amount, koi debit side of a transfer pair) | Paired with a gold credit row by `transfer_id`. |
+| gold | `admin_adjustment` | `Admin::GoldTransactionsController#create` | Manual admin grant. |
+| gold | `ship_review` | `ShipGoldAwarder.call(ship)` from `Ship#award_ship_review_currency!` | BR ships only. |
+| gold | `built_irl_conversion` | `BuiltIrlConversionService.call(ship)` (POSITIVE amount, gold credit side of a transfer pair) | Paired with a koi debit row by `transfer_id`. |
 
-### Ship Review Awarding
+### Ship Review Awarding (DR koi + BR gold)
 
-When a ship's status transitions to `:approved`, `Ship#award_ship_review_koi!` (an `after_update_commit` callback gated by `saved_change_to_status?`) calls `ShipKoiAwarder.call(self)`. The service is the single source of truth for the formula and is also called from the reconciliation rake task.
+When a ship's status transitions to `:approved`, `Ship#award_ship_review_currency!` (an `after_update_commit` callback gated by `saved_change_to_status?`) dispatches by `ship_type`:
+- `ship_type_design?` → `ShipKoiAwarder.call(self)`
+- `ship_type_build?`  → `ShipGoldAwarder.call(self)` AND `BuiltIrlConversionService.call(self)`
 
-**Formula:**
+Both awarders are the single source of truth for their currency's formula. Each splits the total evenly across non-trial kept project members; the project owner absorbs any integer remainder.
+
+**Formula (both same shape, only adjustment column and partial unique index differ):**
 ```
-amount = round(approved_public_seconds * 7 / 3600) + design_review.koi_adjustment + build_review.koi_adjustment
+koi  = round(approved_public_seconds * 7 / 3600) + design_review.koi_adjustment
+gold = round(approved_public_seconds * 7 / 3600) + build_review.gold_adjustment
 ```
 
-**Hours basis**: `ship.approved_public_seconds` — the **public/user-facing** TA value. The internal `hours_adjustment` columns on DR/BR are deliberately NOT counted toward koi (they only affect internal hours reporting). The rate is **7 koi per hour** (`ShipKoiAwarder::RATE_KOI_PER_HOUR`).
+**Hours basis**: `ship.approved_public_seconds` — the **public/user-facing** TA value. The internal `hours_adjustment` columns on DR/BR are deliberately NOT counted toward the currency (they only affect internal hours reporting). The rate is **7 per hour** for both currencies (`ShipKoiAwarder::RATE_KOI_PER_HOUR` / `ShipGoldAwarder::RATE_GOLD_PER_HOUR`).
 
-**Adjustments**: `koi_adjustment` columns on DesignReview and BuildReview are signed integers a reviewer can set during Phase 2. Both are summed into the award.
+**Adjustments**: `design_review.koi_adjustment` and `build_review.gold_adjustment` are signed integer knobs the Phase 2 reviewer can set. Each only feeds its own currency — DR adjustment never affects gold, BR adjustment never affects koi.
 
-**Re-ship correctness**: `ship.approved_public_seconds` is set by TA from `compute_approved_public_seconds(annotations)` over `new_journal_entries` only — entries created strictly after the previous approved ship's `created_at`. So each cycle's ship records exactly the *new* hours. Summing one award per approved ship gives the correct lifetime total without subtracting prior cycles. Example: ship A approved at 10h → 70 koi; ship B (same project) later approved at 15h *new* hours → +105 koi, lifetime 175 koi.
+**Re-ship correctness**: `ship.approved_public_seconds` is set by TA from `compute_approved_public_seconds(annotations)` over `new_journal_entries` only — entries created strictly after the previous approved ship's `created_at`. Each cycle records exactly the *new* hours. Re-ship BRs award gold for their incremental hours but do NOT re-trigger the built-irl conversion (the conversion is one-shot per project; see below).
 
-**Result tagging**: `ShipKoiAwarder.call` returns a `Result` with `status:` one of `:created`, `:skipped_already_awarded` (DB unique index rejected — race or replay), `:skipped_zero_amount`, `:skipped_trial_user`, `:skipped_not_approved`. Used by the rake task to tally counts.
+**Result tagging**: Each `.call` returns an array of `Result`s (one per member) with `status:` one of `:created`, `:skipped_already_awarded` (DB unique index rejected — race or replay), `:skipped_zero_amount`, `:skipped_trial_user`, `:skipped_not_approved`, `:skipped_wrong_ship_type` (koi awarder skips build ships, gold awarder skips design ships).
+
+### Built-IRL Conversion
+
+When a build ship reaches `:approved` for the **first time on a project**, `BuiltIrlConversionService.call(ship)` runs alongside `ShipGoldAwarder`. The trigger:
+
+```ruby
+other_built = ship.project.ships.approved
+                  .where(ship_type: :build)
+                  .where.not(id: ship.id).exists?
+# Skip conversion if there's already a prior approved BR — sweep is one-shot.
+```
+
+`Project#built_irl?` returns `ships.approved.where(ship_type: :build).exists?` — computed on the fly. Once true, it stays true (terminal status guards prevent un-approving).
+
+**Per-member formula**:
+```
+m_lifetime_koi = sum(KoiTransaction.where(
+                       reason: 'ship_review',
+                       user_id: m.id,
+                       ship_id: project.ship_ids).amount)
+convertible    = min(m.koi_balance_now, m_lifetime_koi)
+```
+
+The `min(balance_now, project_lifetime_award_cap)` formula is **hindsight-optimal for max-gold attribution of past spending** (see proof below). It naturally enforces "non-project koi (streak / admin) never converts" — because non-project sources fall outside the project's award cap.
+
+**Why min(balance, project_award_cap) is hindsight-optimal**: With one project P and one non-project source S (e.g. streak), let `spent` = total spent so far:
+- If `spent ≤ S_award` (no overflow): user balance includes the full `P_award`, so `min(balance, P_award) = P_award`. Convert everything P awarded.
+- If `spent > S_award` (overflow into P): user balance after spending = `P_award + S_award - spent` = `P_remaining`. So `min(balance, P_award) = P_remaining`. Convert what's left of P.
+
+In both cases this matches "attribute past spending to S first, then to P" — the assignment that maximizes convertible-from-P. Generalizes to multiple projects + streak; total gold awarded across the project lifecycle is provably maximal.
+
+**Ledger writes**: Inside a single transaction with a generated `transfer_id = SecureRandom.uuid`:
+```ruby
+KoiTransaction.create!(user: m, ship: br_ship, amount: -convertible,
+                       reason: 'built_irl_conversion', transfer_id:, description: ...)
+GoldTransaction.create!(user: m, ship: br_ship, amount: +convertible,
+                        reason: 'built_irl_conversion', transfer_id:, description: ...)
+```
+
+Both sides share the `transfer_id` so auditors can pair them via `WHERE transfer_id = ?` without a cross-table FK.
+
+**Idempotency**: Partial unique indexes on `koi_transactions(ship_id, user_id) WHERE reason = 'built_irl_conversion'` and `gold_transactions(ship_id, user_id) WHERE reason = 'built_irl_conversion'` guarantee one koi/gold pair per (BR ship, member). The service rescues `ActiveRecord::RecordNotUnique` and returns `:skipped_already_converted`.
+
+**Per-member, not per-project**: a multi-member project's first BR triggers a separate conversion attempt for each non-trial kept member; each member's `convertible` is capped by *their* slice of DR awards for the project.
+
+**Result tagging**: `:converted`, `:skipped_already_converted`, `:skipped_zero_amount`, `:skipped_trial_user`, `:skipped_not_approved`, `:skipped_wrong_ship_type`, `:skipped_not_first_build`.
+
+**BR show preview**: The BR reviewer sees `Approval will convert N koi → N gold` below "Modify Gold" when this approval would be the first build for the project AND `BuiltIrlConversionService.compute_amount(ship, project.user) > 0`. The preview shows the project owner's convertible amount; collaborators get their own conversion at the same trigger.
 
 #### Layered safeguards (financial-grade)
 
-Koi flows downstream into HCB grant orders → real USD. Multiple independent layers prevent double-issuance:
+Both koi and gold flow downstream into HCB grant orders / premium rewards. Independent layers prevent double-issuance:
 
-1. **`saved_change_to_status?` callback gate** — the `after_update_commit` only fires when `status` actually changed. Editing `justification`, `feedback`, or any non-status field on an approved ship will NOT re-trigger the award.
+1. **`saved_change_to_status?` callback gate** — the `after_update_commit` only fires when `status` actually changed. Editing `justification`, `feedback`, or any non-status field on an approved ship will NOT re-trigger awards or conversions.
 2. **`Ship#status_transition_allowed` validation** — blocks transitions out of `approved`/`returned`/`rejected`. Prevents Rails-mediated re-approval.
-3. **`KoiTransaction` is read-only** — `before_update` and `before_destroy` raise `ActiveRecord::ReadonlyRecord`. The ledger cannot be wiped to "reset" dedup.
-4. **Partial unique index** (`index_koi_transactions_on_ship_review_uniqueness`) — `WHERE reason = 'ship_review' AND ship_id IS NOT NULL` enforces at most one ship_review row per ship at the database level. This is the absolute guarantee. `ShipKoiAwarder` rescues `ActiveRecord::RecordNotUnique` and returns `:skipped_already_awarded`.
-5. **`KoiTransaction#ship_id_consistency` validation** — enforces `reason == "ship_review"` ⟺ `ship_id` present, blocking malformed inserts in either direction.
-6. **Reconciliation safety net** — `rake koi:reconcile_ship_reviews` finds approved ships missing their award and re-calls the service. Idempotent (layer 4 absorbs duplicates). See the rake task for usage.
+3. **KoiTransaction / GoldTransaction are read-only** — `before_update` and `before_destroy` raise `ActiveRecord::ReadonlyRecord`. The ledger cannot be wiped to "reset" deduplication.
+4. **Partial unique indexes** — at the DB layer:
+   - `koi_transactions(ship_id, user_id) WHERE reason = 'ship_review'` (one DR koi award per member per ship)
+   - `koi_transactions(ship_id, user_id) WHERE reason = 'built_irl_conversion'` (one conversion debit per member per BR ship)
+   - `gold_transactions(ship_id, user_id) WHERE reason = 'ship_review'` (one BR gold award per member per ship)
+   - `gold_transactions(ship_id, user_id) WHERE reason = 'built_irl_conversion'` (one conversion credit per member per BR ship)
+
+   These are the absolute guarantees. Awarders/conversion service rescue `RecordNotUnique` and return `:skipped_already_*`.
+5. **`ship_id_consistency` validations** on both transaction models — enforce `reason ∈ SHIP_REASONS ⟺ ship_id present`, blocking malformed inserts.
+6. **First-BR check in conversion service** — `BuiltIrlConversionService` early-returns `:skipped_not_first_build` if another approved BR exists on the project, so re-ship BRs don't trigger another sweep. The check + writes run inside `ship.project.with_lock` (pessimistic SELECT FOR UPDATE on the project row) so two concurrent BR approvals on the same project serialize — the second one sees the first's effect and returns `:skipped_not_first_build` cleanly.
 
 #### Failure handling
 
-Any error inside the callback is caught, logged, and reported to `ErrorReporter`. The ship's approval is NOT rolled back — fail-open preserves the reviewer's decision; operators close the gap via `rake koi:reconcile_ship_reviews APPLY=1`.
+Any error inside the callback is caught, logged, and reported to `ErrorReporter`. The ship's approval is NOT rolled back — fail-open preserves the reviewer's decision. For DR-koi misses, operators close the gap via `rake koi:reconcile_ship_reviews APPLY=1`. **No equivalent reconcile task exists for BR gold or conversions today** — since BR is brand new and no projects have been built-irl in production yet, a backfill task wasn't built. If gaps appear, build one mirroring the koi rake.
 
-**Zero-amount transactions are skipped**: KoiTransaction validates `amount: { other_than: 0 }`. If hours-derived koi exactly cancels with a negative `koi_adjustment`, no transaction is created and the result is `:skipped_zero_amount`.
+**Zero-amount transactions are skipped**: both transaction models validate `amount: { other_than: 0 }`. If hours-derived currency exactly cancels with a negative adjustment, no transaction is created and the result is `:skipped_zero_amount`.
 
-#### Reconciliation rake task
+#### Reconciliation rake task (koi only)
 
-`rake koi:reconcile_ship_reviews` (in `lib/tasks/koi.rake`) is the operator tool for backfilling missed awards or recovering from callback failures.
+`rake koi:reconcile_ship_reviews` (in `lib/tasks/koi.rake`) is the operator tool for backfilling missed DR koi awards or recovering from callback failures. Covers DR koi only — BR gold + conversions are not reconciled today.
 
 - **Default mode is dry-run**: prints what would be issued without inserting.
 - `APPLY=1` to actually issue.
@@ -425,7 +499,7 @@ Any error inside the callback is caught, logged, and reported to `ErrorReporter`
 - Output: per-recipient totals, grand koi total, top-10 recipients, per-ship breakdown (first 50). No HCB/USD values are printed — operator does that conversion separately.
 - Always idempotent — safe to run multiple times. Layer 4 absorbs duplicates.
 
-If you change the rate (currently `7`) or the source-of-truth field (currently `approved_public_seconds`), update both this doc and the user-visible documentation under `docs/`. **Historical KoiTransactions are immutable** — a rate change does NOT retroactively re-award; rerunning the rake task will skip already-awarded ships via layer 4.
+If you change the rate (currently `7`) or the source-of-truth field (currently `approved_public_seconds`), update both this doc and the user-visible documentation under `docs/`. **Historical Koi/Gold transactions are immutable** — a rate change does NOT retroactively re-award; rerunning any reconcile task will skip already-awarded ships via layer 4.
 
 ### Where Balance Is Surfaced
 
@@ -456,6 +530,8 @@ If you change the rate (currently `7`) or the source-of-truth field (currently `
 - **Cannot be hard-destroyed** — `destroy` raises. Financial data preserved.
 - Trial users blocked at validation level.
 - `fulfilled → rejected` transition allowed and refunds koi (via the `where.not(state: :rejected)` exclusion in `User#koi`).
+
+For the full ledger system (settle service, card lifecycle including closure refunds, divergence detection, admin UI scoping), see [arch-hcb-ledger.md](arch-hcb-ledger.md).
 
 ### Trial-user Suppression
 
@@ -490,8 +566,9 @@ Both `User#koi` and `User#gold` short-circuit to `0` for trial users. `ShopOrder
 | `pages/admin/reviews/time_audits/{index,show}.tsx` | TA queue + review UI with timeline + segment annotation |
 | `pages/admin/reviews/requirements_checks/{index,show}.tsx` | RC queue + repo tree viewer + Gerber renderer |
 | `pages/admin/reviews/design_reviews/show.tsx` | DR queue (Phase 2 design ships) |
-| `pages/admin/reviews/build_reviews/show.tsx` | BR queue (Phase 2 build ships) |
+| `pages/admin/reviews/build_reviews/show.tsx` | BR queue (Phase 2 build ships). Shows "Approval will convert N koi → N gold" preview below the Modify Gold field when this would be the project's first approved BR and the owner has koi to convert. |
 | `pages/admin/koi_transactions/{index,new}.tsx` | Admin koi ledger + manual adjustment form |
+| `pages/admin/gold_transactions/{index,new}.tsx` | Admin gold ledger + manual adjustment form (if present — admin-only) |
 
 Each show page polls heartbeat and listens for 409 to surface "claim lost" UX.
 
@@ -499,7 +576,9 @@ Each show page polls heartbeat and listens for 409 to surface "claim lost" UX.
 
 ## 13. Open Questions / Watch Items
 
-- **Ship-review koi awarding** is not implemented — `koi_adjustment` is captured but never converted to a `KoiTransaction`. Confirm whether this is intentional (deferred) or a gap before relying on it.
-- **`ship_type` is always `design`** by default; no UI flow currently sets `build`. If/when build-type ships are introduced, the submission form needs a selector and the routing needs to handle both.
+- **No reconciliation rake task for BR gold or built-irl conversions** — only DR koi is reconciled today via `rake koi:reconcile_ship_reviews`. Acceptable while BR is brand new and no projects are built-irl in production. If gaps appear post-launch, build parallel tasks (e.g. `rake gold:reconcile_ship_reviews`, `rake gold:reconcile_built_irl_conversions`) mirroring the koi rake.
+- **`ship_type` selector at submission** — `ship_type` defaults to `design`. The submission form needs a UI selector for users to submit BR ships when ready. Until that lands, BR ships only exist via admin swap (`Ship#swap_phase_two_type!`).
+- **No user-facing notification on built-irl conversion** — `MailDeliveryService.ship_status_changed` notifies users on ship approval but does not call out the koi → gold sweep specifically. Worth adding a dedicated message so users understand the balance shift.
+- **Project grant orders use koi only** — gold is not spendable on HCB-backed project grants. By design today; revisit if gold should also be redeemable for real USD.
 - **Awaiting-identity ships** create no reviews and are invisible to reviewers — but they DO count toward `ProjectPolicy#ship?`'s "pending submission" lock. The user can't ship a different project if they have an awaiting-identity submission on another (intentional? worth confirming).
 - The `feedback` text on a `returned` ship is **a snapshot at the moment of return**. If a reviewer later changes their mind and reopens (which they can't — terminal), the message wouldn't update. Consider this when reading old MailMessages.

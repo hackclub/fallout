@@ -617,10 +617,15 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
     count: EXPLORE_PAGE_SIZE,
   }))
   const [showExploreJump, setShowExploreJump] = useState(false)
+  const [loadMoreErrorKey, setLoadMoreErrorKey] = useState<string | null>(null)
   const isFirstExploreFetchRender = useRef(true)
   const exploreRequestSeq = useRef(0)
   const exploreLoadInFlightRef = useRef(false)
   const previousExploreEntryKeysRef = useRef<Record<string, Set<string>>>({})
+  const loadMoreCallbackRef = useRef<(options?: { manual?: boolean }) => void>(() => {})
+  const exploreLoadCheckFrameRef = useRef(0)
+  const scheduleExploreLoadCheckRef = useRef<() => void>(() => {})
+  const canLoadMoreRef = useRef(false)
 
   // Debounced live refresh of the active explore bucket. Each broadcast on the bulletin_explore
   // stream flips the counter through useLiveReload's `only: ['explore_stats']` partial reload, and
@@ -684,6 +689,8 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
             // anyway, and re-fetching on demand is cheaper than tracking which buckets are still
             // valid against an unknown server-side change.
             setExploreBuckets(() => ({ [deps.activeExploreKey]: data }))
+            setLoadMoreErrorKey(null)
+            scheduleExploreLoadCheckSoon()
           })
           .catch((err) => {
             if (err.name === 'AbortError') return
@@ -737,6 +744,7 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
   const hasHiddenCachedExploreEntries = cachedExploreEntries.length > exploreList.length
   const hasServerExploreEntries = activeExploreBucket?.has_more ?? false
   const hasMoreExplore = hasHiddenCachedExploreEntries || (hasServerExploreEntries && !!nextCursor)
+  const hasLoadMoreError = loadMoreErrorKey === activeExploreKey
   // Sync render-time derived values into the live-refresh ref so the debounced setTimeout reads
   // the latest filter/sort/loaded-count when a broadcast eventually fires.
   liveRefreshDepsRef.current = {
@@ -776,7 +784,13 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
     exploreRequestSeq.current += 1
     exploreLoadInFlightRef.current = false
     setIsLoadingMore(false)
+    setLoadMoreErrorKey(null)
     setExploreVisibleWindow({ key, count: EXPLORE_PAGE_SIZE })
+    scheduleExploreLoadCheckSoon()
+  }
+
+  function scheduleExploreLoadCheckSoon() {
+    window.requestAnimationFrame(() => scheduleExploreLoadCheckRef.current())
   }
 
   function handleQueryChange(value: string) {
@@ -821,7 +835,9 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
     if (exploreBuckets[activeExploreKey]) {
       setIsSearching(false)
       setIsLoadingMore(false)
+      setLoadMoreErrorKey(null)
       exploreLoadInFlightRef.current = false
+      scheduleExploreLoadCheckSoon()
       return
     }
 
@@ -848,7 +864,9 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
         .then((data: ExplorePayload) => {
           if (requestSeq !== exploreRequestSeq.current) return
           setExploreBuckets((buckets) => ({ ...buckets, [requestedKey]: data }))
+          setLoadMoreErrorKey(null)
           setIsSearching(false)
+          scheduleExploreLoadCheckSoon()
         })
         .catch((err) => {
           if (requestSeq !== exploreRequestSeq.current) return
@@ -864,9 +882,10 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
     }
   }, [activeExploreKey, activeQuery, activeSort, category, exploreBuckets])
 
-  function loadMoreExplore() {
+  function loadMoreExplore({ manual = false }: { manual?: boolean } = {}) {
     if (
       (!hasHiddenCachedExploreEntries && !nextCursor) ||
+      (hasLoadMoreError && !manual) ||
       isSearching ||
       isLoadingMore ||
       exploreLoadInFlightRef.current
@@ -879,6 +898,7 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
     const requestedQuery = activeQuery
 
     setIsLoadingMore(true)
+    setLoadMoreErrorKey(null)
     // Hold the spinner visible for at least 100ms so even instant localhost
     // responses surface the loading state to the user.
     if (hasHiddenCachedExploreEntries) {
@@ -895,6 +915,7 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
         })
         exploreLoadInFlightRef.current = false
         setIsLoadingMore(false)
+        scheduleExploreLoadCheckSoon()
       }, 100)
       return
     }
@@ -929,26 +950,30 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
               count: currentCount + data.entries.length,
             }
           })
+          setLoadMoreErrorKey(null)
           exploreLoadInFlightRef.current = false
           setIsLoadingMore(false)
+          scheduleExploreLoadCheckSoon()
         })
         .catch((err) => {
           if (requestSeq !== exploreRequestSeq.current) return
           console.error(err)
+          setLoadMoreErrorKey(requestedKey)
           exploreLoadInFlightRef.current = false
           setIsLoadingMore(false)
         })
     }, 100)
   }
 
-  const loadMoreCallbackRef = useRef(loadMoreExplore)
   loadMoreCallbackRef.current = loadMoreExplore
-  const exploreLoadCheckFrameRef = useRef(0)
-  const scheduleExploreLoadCheckRef = useRef<() => void>(() => {})
 
-  const canLoadMoreRef = useRef(false)
   canLoadMoreRef.current =
-    hasMoreExplore && !isLoadingMore && !isSearching && !isExploreBucketPending && !exploreLoadInFlightRef.current
+    hasMoreExplore &&
+    !hasLoadMoreError &&
+    !isLoadingMore &&
+    !isSearching &&
+    !isExploreBucketPending &&
+    !exploreLoadInFlightRef.current
 
   const scheduleExploreLoadCheck = () => {
     window.cancelAnimationFrame(exploreLoadCheckFrameRef.current)
@@ -1040,6 +1065,7 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
     activeExploreKey,
     exploreList.length,
     hasMoreExplore,
+    hasLoadMoreError,
     isExploreBucketPending,
     isLoadingMore,
     isSearching,
@@ -1257,22 +1283,17 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
 
       <div ref={exploreJumpLayerRef} className={styles.exploreJumpLayer}>
         <div className={styles.exploreJumpInner}>
-          <AnimatePresence initial={false}>
-            {showExploreJump && (
-              <motion.button
-                key="explore-jump"
-                transition={EXPLORE_POSITION_TRANSITION}
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                type="button"
-                className={styles.exploreJumpButton}
-                onClick={scrollToExploreControls}
-              >
-                Scroll to top
-              </motion.button>
-            )}
-          </AnimatePresence>
+          <motion.button
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={EXPLORE_POSITION_TRANSITION}
+            animate={showExploreJump ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 8, scale: 0.98 }}
+            type="button"
+            className={styles.exploreJumpButton}
+            style={{ pointerEvents: showExploreJump ? 'auto' : 'none' }}
+            onClick={scrollToExploreControls}
+          >
+            Scroll to top
+          </motion.button>
         </div>
       </div>
 
@@ -1361,13 +1382,15 @@ const ExploreSection = memo(function ExploreSection({ explore, exploreStats, inn
                         <div className={styles.loadMoreSpinner} role="status" aria-label="Loading more">
                           <div className={styles.spinner} aria-hidden />
                         </div>
-                      ) : (
-                        !isSearching && (
-                          <button type="button" className={styles.loadMoreButton} onClick={loadMoreExplore}>
-                            Not loading automatically? Load more manually.
-                          </button>
-                        )
-                      )}
+                      ) : hasLoadMoreError ? (
+                        <button
+                          type="button"
+                          className={styles.loadMoreButton}
+                          onClick={() => loadMoreExplore({ manual: true })}
+                        >
+                          Couldn't load more. Try again.
+                        </button>
+                      ) : null}
                     </div>
                   )}
                 </motion.div>

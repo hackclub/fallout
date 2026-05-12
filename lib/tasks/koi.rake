@@ -4,7 +4,8 @@ namespace :koi do
 
     Default mode is dry-run — prints what would be issued without inserting any rows.
     Pass APPLY=1 to actually create transactions. Always idempotent: the partial
-    unique index on koi_transactions(ship_id) prevents double-awards regardless.
+    unique index on koi_transactions(ship_id, user_id) prevents double-awards per member.
+    Scans all approved ships so partially-awarded ships (some members missing) are caught.
 
     Filters:
       SINCE=YYYY-MM-DD       Only consider ships approved on or after this date
@@ -21,35 +22,49 @@ namespace :koi do
     since = ENV["SINCE"].presence && Date.parse(ENV["SINCE"])
     exclude_ids = (ENV["EXCLUDE_SHIP_IDS"] || "").split(",").filter_map { |s| Integer(s, exception: false) }
 
-    awarded_ship_ids = KoiTransaction.where(reason: "ship_review").select(:ship_id)
-    ships = Ship.approved.where.not(id: awarded_ship_ids)
+    # Track at (ship_id, user_id) level — a ship is only "done" once every member has a row.
+    awarded_pairs = KoiTransaction.where(reason: "ship_review")
+      .where.not(ship_id: nil)
+      .pluck(:ship_id, :user_id).to_set
+    ships = Ship.approved
     ships = ships.where("ships.updated_at >= ?", since.beginning_of_day) if since
     ships = ships.where.not(id: exclude_ids) if exclude_ids.any?
-    ships = ships.includes(:design_review, :build_review, project: :user)
+    ships = ships.includes(:design_review, :build_review, project: { user: {}, collaborators: :user })
 
-    rows = ships.find_each.map do |ship|
-      amount = ShipKoiAwarder.compute_amount(ship)
-      {
-        ship_id: ship.id,
-        user_id: ship.user.id,
-        user_display_name: ship.user.display_name,
-        project_name: ship.project.name,
-        approved_public_seconds: ship.approved_public_seconds.to_i,
-        hours: (ship.approved_public_seconds.to_i / 3600.0).round(2),
-        amount: amount,
-        trial: ship.user.trial?
-      }
+    skipped_ships = 0
+    # One row per eligible member per ship
+    rows = ships.find_each.flat_map do |ship|
+      members = ShipKoiAwarder.eligible_members(ship).reject { |m| awarded_pairs.include?([ ship.id, m.id ]) }
+      if members.empty?
+        skipped_ships += 1
+        next []
+      end
+      total = ShipKoiAwarder.compute_amount(ship)
+      next [] if total.zero?
+      shares = ShipKoiAwarder.compute_shares(total, members, ship.project.user_id)
+      members.map do |member|
+        {
+          ship_id: ship.id,
+          user_id: member.id,
+          user_display_name: member.display_name,
+          project_name: ship.project.name,
+          approved_public_seconds: ship.approved_public_seconds.to_i,
+          hours: (ship.approved_public_seconds.to_i / 3600.0).round(2),
+          total_amount: total,
+          amount: shares[member.id] || 0,
+          member_count: members.size
+        }
+      end
     end
 
-    eligible = rows.reject { |r| r[:trial] || r[:amount].zero? }
+    eligible = rows.reject { |r| r[:amount].zero? }
 
     mode = apply ? "APPLY" : "DRY RUN"
     puts "ship_review backfill — #{mode}"
     puts "=" * 50
-    puts "Approved ships missing award:    #{rows.size}"
-    puts "  Eligible (non-trial, non-zero):  #{eligible.size}"
-    puts "  Skipped (trial users):           #{rows.count { |r| r[:trial] }}"
-    puts "  Skipped (zero amount):           #{rows.count { |r| !r[:trial] && r[:amount].zero? }}"
+    puts "Approved ships scanned:          #{ships.count}"
+    puts "  Eligible member rows (un-awarded): #{eligible.size}"
+    puts "  Skipped (all trial/discarded):     #{skipped_ships}"
     puts "Total koi to issue:              #{eligible.sum { |r| r[:amount] }}"
     puts ""
 
@@ -67,9 +82,10 @@ namespace :koi do
     end
     puts ""
 
-    puts "Per-ship breakdown (first 50):"
+    puts "Per-ship breakdown (first 50 rows):"
     eligible.first(50).each do |r|
-      puts "  ship_id=#{r[:ship_id]}  user_id=#{r[:user_id]}  project=#{r[:project_name].inspect}  hours=#{r[:hours]}  koi=#{r[:amount]}"
+      split_note = r[:member_count] > 1 ? " (#{r[:member_count]} members, total #{r[:total_amount]})" : ""
+      puts "  ship_id=#{r[:ship_id]}  user_id=#{r[:user_id]}  project=#{r[:project_name].inspect}  hours=#{r[:hours]}  koi=#{r[:amount]}#{split_note}"
     end
     puts "  …(#{eligible.size - 50} more)" if eligible.size > 50
     puts ""
@@ -81,10 +97,10 @@ namespace :koi do
 
     puts "APPLYING — creating koi transactions..."
     counts = Hash.new(0)
-    eligible.each do |r|
-      ship = Ship.find(r[:ship_id])
-      result = ShipKoiAwarder.call(ship)
-      counts[result.status] += 1
+    Ship.where(id: eligible.map { |r| r[:ship_id] }.uniq)
+        .includes(:design_review, :build_review, project: { user: {}, collaborators: :user })
+        .find_each do |ship|
+      ShipKoiAwarder.call(ship).each { |result| counts[result.status] += 1 }
     end
     puts "Done. Results: #{counts.inspect}"
   end

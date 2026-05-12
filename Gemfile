@@ -88,6 +88,8 @@ gem "mission_control-jobs", "~> 1.1"
 gem "sentry-ruby", "~> 6.5"
 gem "sentry-rails", "~> 6.5"
 
+gem "logtail-rails", "~> 0.2"
+
 # Performance profiling — admin-gated in prod, open in dev
 gem "rack-mini-profiler", "~> 4.0"
 gem "stackprof", "~> 0.2"

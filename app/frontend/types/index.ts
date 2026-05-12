@@ -253,6 +253,7 @@ export interface AdminProjectRow {
   is_unlisted: boolean
   is_discarded: boolean
   created_at: string
+  collaborators: { id: number; display_name: string; avatar: string | null }[]
 }
 
 export interface AdminProjectDetail {
@@ -370,6 +371,8 @@ export interface ReviewRow {
   project_flagged: boolean
   reviewer_display_name: string | null
   created_at: string
+  waiting_since: string
+  cycle_started_at: string | null
   is_claimed: boolean
   claimed_by_display_name: string | null
   sibling_approved: boolean
@@ -457,6 +460,7 @@ export interface ReviewProjectContext {
   user_display_name: string
   user_avatar: string
   user_slack_id: string | null
+  collaborators: { id: number; display_name: string; avatar: string }[]
 }
 
 export interface RequirementsCheckProjectContext extends ReviewProjectContext {
@@ -470,7 +474,7 @@ export interface RequirementsCheckProjectContext extends ReviewProjectContext {
   frozen_repo_link: string | null
   frozen_demo_link: string | null
   waiting_since: string
-  first_submitted_at: string | null
+  cycle_started_at: string | null
 }
 
 export interface UnifiedInspectStage {
@@ -612,7 +616,7 @@ export interface BuildReviewDetail {
   feedback: string | null
   internal_reason: string | null
   hours_adjustment: number | null
-  koi_adjustment: number | null
+  gold_adjustment: number | null
   annotations: Record<string, unknown> | null
   reviewer_display_name: string | null
   project_name: string

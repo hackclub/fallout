@@ -9,8 +9,8 @@
     "react-scan": "^0.5.3",
     "sass-embedded": "^1.99.0",
     "shadcn": "^4.1.2",
-    "vite": "^7.3.2",
-    "vite-plugin-ruby": "^5.2.1"
+    "vite": "^8.0.12",
+    "vite-plugin-ruby": "^5.2.2"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -29,8 +29,8 @@
     "@rails/activestorage": "^8.1.200",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
-    "@sentry/react": "^10.43.0",
-    "@sentry/vite-plugin": "^5.1.1",
+    "@sentry/react": "^10.47.0",
+    "@sentry/vite-plugin": "^5.2.0",
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.2.2",
@@ -76,6 +76,7 @@
   },
   "scripts": {
     "check": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
+    "format": "prettier --write 'app/frontend/**/*.{ts,tsx,js}'",
     "format:check": "prettier --check 'app/frontend/**/*.{ts,tsx,js}'"
   }
 }

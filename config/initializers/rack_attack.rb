@@ -2,6 +2,18 @@ class Rack::Attack
   # Cache store for tracking requests
   Rack::Attack.cache.store = Rails.cache
 
+  # Use the Cloudflare-set client IP for all throttling/blocklist keys. Rack's default
+  # `req.ip` walks `X-Forwarded-For` and trusts only RFC1918 proxies, so an attacker
+  # rotating X-Forwarded-For can bypass every IP-keyed throttle. CF-Connecting-IP is set
+  # by Cloudflare's edge and cannot be spoofed when traffic actually flows through CF
+  # (matches the trust model in config/initializers/ahoy.rb).
+  module CFConnectingIp
+    def ip
+      env["HTTP_CF_CONNECTING_IP"].presence || super
+    end
+  end
+  Rack::Attack::Request.prepend(CFConnectingIp)
+
   # Throttle GET /auth/hca/start (signin) by IP (10 per minute)
   throttle("auth/hca/start/ip", limit: 10, period: 1.minute) do |req|
     req.ip if req.path == "/auth/hca/start" && req.get?

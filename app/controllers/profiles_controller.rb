@@ -10,7 +10,7 @@ class ProfilesController < ApplicationController
       avatar: current_user.custom_avatar.attached? ? url_for(current_user.custom_avatar) : current_user.avatar,
       current_streak: StreakDay.current_streak(current_user),
       total_hours: (current_user.total_time_logged_seconds / 3600.0).round(1),
-      approved_hours: (Ship.approved.where(project: current_user.projects.kept).sum(:approved_public_seconds).to_f / 3600.0).round(1),
+      approved_hours: (current_user.approved_time_logged_seconds / 3600.0).round(1),
       body_images: Dir.glob(Rails.root.join("public/pfp/body/*")).map { |f| "/pfp/body/#{File.basename(f)}" }.sort,
       bg_images: Dir.glob(Rails.root.join("public/pfp/bg/*")).map { |f| "/pfp/bg/#{File.basename(f)}" }.sort,
       eye_images: Dir.glob(Rails.root.join("public/pfp/eyes/*")).map { |f| "/pfp/eyes/#{File.basename(f)}" }.sort,
@@ -24,6 +24,8 @@ class ProfilesController < ApplicationController
       email: current_user.email,
       pronouns: current_user.pronouns,
       has_slack_token: current_user.slack_token.present?,
+      has_lapse_token: current_user.lapse_token.present?,
+      hcb_email: current_user.hcb_email,
       is_modal: request.headers["X-InertiaUI-Modal"].present?
     }
   end
@@ -34,9 +36,10 @@ class ProfilesController < ApplicationController
       current_user.custom_avatar.attach(params[:avatar_blob_signed_id])
     end
 
-    profile_attrs = params.permit(:email).to_h.compact_blank
+    profile_attrs = {}
     profile_attrs[:bio] = params[:bio] if params.key?(:bio)
     profile_attrs[:pronouns] = params[:pronouns].presence if params.key?(:pronouns)
+    profile_attrs[:hcb_email] = params[:hcb_email].presence if params.key?(:hcb_email)
 
     if profile_attrs.any? && !current_user.update(profile_attrs)
       return render json: { errors: current_user.errors.full_messages }, status: :unprocessable_entity

@@ -117,15 +117,6 @@ module HcbService
     end.body
   end
 
-  def cancel_card_grant(card_grant_id)
-    stub = noop_write(:cancel_card_grant, { id: card_grant_id, status: "canceled" })
-    return stub if stub
-
-    authenticated_connection.post(
-      "/api/v4/card_grants/#{card_grant_id}/cancel"
-    ).body
-  end
-
   def topup_card_grant(card_grant_id, amount_cents:)
     stub = noop_write(:topup_card_grant, { id: card_grant_id, amount_cents: amount_cents })
     return stub if stub
@@ -167,6 +158,19 @@ module HcbService
 
     authenticated_connection.get(
       "/api/v4/card_grants/#{card_grant_id}/transactions", params
+    ).body
+  end
+
+  # Org-level transactions endpoint. Used by HcbDonationSyncJob to scan for
+  # incoming donations (filters: { revenue: true } limits the page to inflows).
+  # Read-only — no noop_write wrap. Response shape is `{ data: [...], total_count:, has_more: }`.
+  def list_organization_transactions(filters: {}, after: nil, limit: 100)
+    params = { limit: limit }
+    params[:after] = after if after
+    filters.each { |k, v| params["filters[#{k}]"] = v }
+
+    authenticated_connection.get(
+      "/api/v4/organizations/#{ORGANIZATION_ID}/transactions", params
     ).body
   end
 

@@ -4,6 +4,7 @@ import { Link, router, usePage } from '@inertiajs/react'
 import { useReviewHeartbeat } from '@/hooks/useReviewHeartbeat'
 import ReviewLayout from '@/layouts/ReviewLayout'
 import HoursDisplay from '@/components/admin/HoursDisplay'
+import { WaitingLabel } from '@/components/admin/WaitingLabel'
 import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { Separator } from '@/components/admin/ui/separator'
@@ -85,26 +86,6 @@ function SiblingBadge({ label, status }: { label: string; status: string | null 
       {label}: {status}
     </span>
   )
-}
-
-function formatWaitDuration(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(ms / (1000 * 60 * 60 * 24))
-  if (days < 1) return '<1d'
-  return `${days}d`
-}
-
-function WaitingLabel({ waitingSince, firstSubmittedAt }: { waitingSince: string; firstSubmittedAt: string | null }) {
-  const recent = formatWaitDuration(waitingSince)
-  const total = firstSubmittedAt ? formatWaitDuration(firstSubmittedAt) : null
-  if (total && total !== recent) {
-    return (
-      <span>
-        Waiting {recent} ({total})
-      </span>
-    )
-  }
-  return <span>Waiting {recent}</span>
 }
 
 // --- Collapsible Card ---
@@ -385,7 +366,34 @@ function TopBar({
       >
         {project.name}
       </a>
-      <span className="text-sm text-muted-foreground hidden sm:inline">by {project.user_display_name}</span>
+      <span className="text-sm text-muted-foreground hidden sm:inline">
+        by{' '}
+        <a
+          href={`/admin/users/${project.user_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:underline text-foreground"
+        >
+          {project.user_display_name}
+        </a>
+        {project.collaborators.length > 0 && (
+          <>
+            {project.collaborators.map((c, i) => (
+              <span key={c.id}>
+                {i === 0 ? ' with ' : ', '}
+                <a
+                  href={`/admin/users/${c.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline text-foreground"
+                >
+                  {c.display_name}
+                </a>
+              </span>
+            ))}
+          </>
+        )}
+      </span>
 
       <div className="flex items-center flex-wrap gap-2 ml-auto">
         <Button variant="outline" size="sm" asChild>
@@ -702,8 +710,27 @@ export default function RequirementsChecksShow({
                   <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
                 )}
                 <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                  <img src={project.user_avatar} alt="" className="size-4 rounded-full" />
-                  <span className="text-foreground">{project.user_display_name}</span>
+                  <a
+                    href={`/admin/users/${project.user_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-foreground hover:underline"
+                  >
+                    <img src={project.user_avatar} alt="" className="size-4 rounded-full" />
+                    <span>{project.user_display_name}</span>
+                  </a>
+                  {project.collaborators.map((c) => (
+                    <a
+                      key={c.id}
+                      href={`/admin/users/${c.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-foreground hover:underline"
+                    >
+                      <img src={c.avatar} alt="" className="size-4 rounded-full" />
+                      <span>{c.display_name}</span>
+                    </a>
+                  ))}
                   <span>|</span>
                   <span>{project.created_at}</span>
                   {project.tags.length > 0 && (
@@ -713,7 +740,7 @@ export default function RequirementsChecksShow({
                     </>
                   )}
                   <span>|</span>
-                  <WaitingLabel waitingSince={project.waiting_since} firstSubmittedAt={project.first_submitted_at} />
+                  <WaitingLabel waitingSince={project.waiting_since} cycleStartedAt={project.cycle_started_at} />
                 </div>
               </div>
 
@@ -865,11 +892,7 @@ export default function RequirementsChecksShow({
                   </div>
                 }
               >
-                <RepoTree
-                  data={repo_tree}
-                  repoLink={project.repo_link}
-                  bare
-                />
+                <RepoTree data={repo_tree} repoLink={project.repo_link} bare />
               </CollapsibleCard>
             )}
 

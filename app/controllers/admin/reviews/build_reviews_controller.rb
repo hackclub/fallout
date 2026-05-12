@@ -1,17 +1,22 @@
 class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
   def index
     base = policy_scope(BuildReview)
-      .includes(ship: [ :project, project: :user ], reviewer: [])
+      .includes(ship: [ :project, :time_audit_review, project: :user ], reviewer: [])
 
-    pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).order(created_at: :asc).load
+    # Order by ship.created_at so the longest-waiting ship floats to the top —
+    # the BR row is created later (after TA approval), so BR.created_at doesn't
+    # reflect how long the student has actually been waiting.
+    pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).joins(:ship).order("ships.created_at ASC").load
     @pagy, @all_reviews = pagy(base.order(created_at: :desc))
     flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
+    Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
 
     render inertia: {
       pending_reviews: pending_reviews.map { |r| serialize_review_row(r) },
       all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids) },
       pagy: pagy_props(@pagy),
-      start_reviewing_path: next_admin_reviews_build_reviews_path
+      start_reviewing_path: next_admin_reviews_build_reviews_path,
+      **review_stats_props(BuildReview)
     }
   end
 
@@ -21,6 +26,7 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
     ship = @review.ship
     project = ship.project
     time_audit = ship.time_audit_review
+    project_owner = project.user
 
     new_entries = ship.new_journal_entries
       .includes(:user, images_attachments: :blob, recordings: :recordable)
@@ -29,6 +35,17 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
     previous_entries = ship.previous_journal_entries
       .includes(:user, images_attachments: :blob, recordings: :recordable)
       .order(created_at: :asc)
+
+    # Conversion preview — show "Approval will convert N koi → N gold" only when this
+    # BR is the project's first approved build (i.e., would actually trigger conversion).
+    # We preview the project owner's conversion since they're the primary recipient;
+    # collaborators get their own conversion at the same trigger but aren't surfaced here.
+    pending_conversion_koi =
+      if @review.pending? && !project.built_irl?
+        BuiltIrlConversionService.compute_amount(ship, project_owner)
+      else
+        0
+      end
 
     render inertia: {
       review: serialize_review_detail(@review),
@@ -40,17 +57,40 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
       reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
       reviewer_notes_path: admin_project_reviewer_notes_path(project),
       project_flagged: project.flagged?,
-      can: { update: policy(@review).update? },
+      pending_conversion_koi: pending_conversion_koi,
+      can: { update: policy(@review).update?, swap_type: policy(@review).swap_type? },
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_build_review_path(@review),
+      swap_type_path: swap_type_admin_reviews_build_review_path(@review),
       next_path: next_admin_reviews_build_reviews_path,
       index_path: admin_reviews_build_reviews_path
     }
   end
 
+  def swap_type
+    # Inline find — base controller's set_review only fires for show/update/heartbeat,
+    # and redeclaring `before_action :set_review, only: %i[swap_type]` would dedup
+    # against the parent (Rails set_callback removes prior entries with the same
+    # symbol filter), breaking the base's filter for everything else.
+    @review = BuildReview.find(params[:id])
+    authorize @review, :swap_type?
+    new_review = @review.ship.swap_phase_two_type!
+    redirect_to admin_reviews_design_review_path(new_review), notice: "Moved to Design Review."
+  rescue ActiveRecord::RecordInvalid => e
+    redirect_back fallback_location: admin_reviews_build_review_path(@review), alert: "Could not swap: #{e.message}"
+  end
+
   def update
     authorize @review
 
+    # Reviewer can update the project's demo_link from the BR form — optional, blank clears it.
+    # Authorization piggybacks on the BR update permission; we don't go through ProjectPolicy
+    # because pass2 reviewers wouldn't normally have project edit rights.
+    if params.key?(:demo_link)
+      @review.ship.project.update_column(:demo_link, params[:demo_link].presence)
+    end
+
+    stamp_reviewer_for_terminal!(params.dig(:build_review, :status))
     if @review.update(review_params)
       if @review.approved? || @review.returned? || @review.rejected?
         redirect_to_next_or_index(notice: "Build review #{@review.status}.")
@@ -70,7 +110,7 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
   end
 
   def review_params
-    params.expect(build_review: [ :status, :feedback, :internal_reason, :hours_adjustment, :koi_adjustment ])
+    params.expect(build_review: [ :status, :feedback, :internal_reason, :hours_adjustment, :gold_adjustment ])
   end
 
   def serialize_review_detail(review)
@@ -82,7 +122,7 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
       feedback: review.feedback,
       internal_reason: review.internal_reason,
       hours_adjustment: review.hours_adjustment,
-      koi_adjustment: review.koi_adjustment,
+      gold_adjustment: review.gold_adjustment,
       reviewer_display_name: review.reviewer&.display_name,
       project_name: ship.project.name,
       user_display_name: ship.project.user.display_name,

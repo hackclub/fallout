@@ -1,17 +1,22 @@
 class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
   def index
     base = policy_scope(DesignReview)
-      .includes(ship: [ :project, project: :user, requirements_check_review: :reviewer ], reviewer: [])
+      .includes(ship: [ :project, :time_audit_review, project: :user, requirements_check_review: :reviewer ], reviewer: [])
 
-    pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).order(created_at: :asc).load
+    # Order by ship.created_at so the longest-waiting ship floats to the top —
+    # the DR row is created later (after TA approval), so DR.created_at doesn't
+    # reflect how long the student has actually been waiting.
+    pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).joins(:ship).order("ships.created_at ASC").load
     @pagy, @all_reviews = pagy(base.order(created_at: :desc))
     flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
+    Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
 
     render inertia: {
       pending_reviews: pending_reviews.map { |r| serialize_review_row(r) },
       all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids) },
       pagy: pagy_props(@pagy),
-      start_reviewing_path: next_admin_reviews_design_reviews_path
+      start_reviewing_path: next_admin_reviews_design_reviews_path,
+      **review_stats_props(DesignReview)
     }
   end
 
@@ -40,12 +45,27 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
       reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
       reviewer_notes_path: admin_project_reviewer_notes_path(project),
       project_flagged: project.flagged?,
-      can: { update: policy(@review).update? },
+      can: { update: policy(@review).update?, swap_type: policy(@review).swap_type? },
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_design_review_path(@review),
+      swap_type_path: swap_type_admin_reviews_design_review_path(@review),
       next_path: next_admin_reviews_design_reviews_path,
       index_path: admin_reviews_design_reviews_path
     }
+  end
+
+  def swap_type
+    # Inline find — declaring `before_action :set_review, only: %i[swap_type]` in this
+    # subclass would dedup against the parent's set_review (Rails set_callback removes
+    # prior entries with the same symbol filter), nuking the base's `only:` and breaking
+    # show/update/heartbeat. Match the pattern used by RequirementsChecksController's
+    # custom actions instead.
+    @review = DesignReview.find(params[:id])
+    authorize @review, :swap_type?
+    new_review = @review.ship.swap_phase_two_type!
+    redirect_to admin_reviews_build_review_path(new_review), notice: "Moved to Build Review."
+  rescue ActiveRecord::RecordInvalid => e
+    redirect_back fallback_location: admin_reviews_design_review_path(@review), alert: "Could not swap: #{e.message}"
   end
 
   def update
@@ -67,6 +87,7 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
       checkpoint_just_stored = true
     end
 
+    stamp_reviewer_for_terminal!(params.dig(:design_review, :status))
     if @review.update(review_params)
       if @review.approved? || @review.returned? || @review.rejected?
         if checkpoint_just_stored

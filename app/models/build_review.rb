@@ -6,9 +6,9 @@
 #  annotations      :jsonb
 #  claim_expires_at :datetime
 #  feedback         :text
+#  gold_adjustment  :integer
 #  hours_adjustment :integer
 #  internal_reason  :text
-#  koi_adjustment   :integer
 #  lock_version     :integer          default(0), not null
 #  status           :integer          default("pending"), not null
 #  created_at       :datetime         not null
@@ -39,7 +39,7 @@ class BuildReview < ApplicationRecord
     {
       "Internal Reason" => :internal_reason,
       "Hours Adjustment" => :hours_adjustment,
-      "Koi Adjustment" => :koi_adjustment
+      "Currency Adjustment" => :gold_adjustment
     }
   end
 end

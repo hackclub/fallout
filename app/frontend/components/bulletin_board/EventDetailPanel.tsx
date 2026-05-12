@@ -49,13 +49,14 @@ type TimerConfig = {
   label: string
   seconds?: number
   staticText?: string
+  showSeconds?: boolean
   live?: boolean
   happening?: boolean
   progress?: MotionValue<number>
 }
 
 function BigTimer({ config }: { config: TimerConfig }) {
-  const { label, seconds, staticText, live = false, happening = false, progress } = config
+  const { label, seconds, staticText, showSeconds = true, live = false, happening = false, progress } = config
   const pieces = seconds != null ? breakdown(seconds) : null
 
   return (
@@ -109,11 +110,15 @@ function BigTimer({ config }: { config: TimerConfig }) {
             <SlidingNumber value={pieces.minutes} padStart />
             <span className={styles.timerUnitLabel}>m</span>
           </span>
-          <span className={styles.timerSep}>:</span>
-          <span className={styles.timerUnit}>
-            <SlidingNumber value={pieces.seconds} padStart />
-            <span className={styles.timerUnitLabel}>s</span>
-          </span>
+          {showSeconds && (
+            <>
+              <span className={styles.timerSep}>:</span>
+              <span className={styles.timerUnit}>
+                <SlidingNumber value={pieces.seconds} padStart />
+                <span className={styles.timerUnitLabel}>s</span>
+              </span>
+            </>
+          )}
         </div>
       ) : null}
 
@@ -134,8 +139,7 @@ function buildTimer(event: SerializedBulletinEvent, now: Date): TimerConfig | nu
     const startsAt = DateTime.fromISO(event.starts_at)
     const diffHours = startsAt.diff(nowDt, 'hours').hours
     if (diffHours >= 48) {
-      const days = Math.max(1, Math.round(startsAt.diff(nowDt, 'days').days))
-      return { label: 'Starts in', staticText: `${days} ${days === 1 ? 'day' : 'days'}` }
+      return { label: 'Starts in', seconds: Math.max(0, diffHours * 3600), showSeconds: false }
     }
     return { label: 'Starts in', seconds: Math.max(0, diffHours * 3600) }
   }
@@ -145,10 +149,10 @@ function buildTimer(event: SerializedBulletinEvent, now: Date): TimerConfig | nu
       const endsAt = DateTime.fromISO(event.ends_at)
       const diffHours = endsAt.diff(nowDt, 'hours').hours
       if (diffHours >= 48) {
-        const days = Math.max(1, Math.round(endsAt.diff(nowDt, 'days').days))
         return {
           label: 'Ends in',
-          staticText: `${days} ${days === 1 ? 'day' : 'days'}`,
+          seconds: Math.max(0, diffHours * 3600),
+          showSeconds: false,
           live: true,
           happening: true,
         }
@@ -164,10 +168,10 @@ function buildTimer(event: SerializedBulletinEvent, now: Date): TimerConfig | nu
       const startsAt = DateTime.fromISO(event.starts_at)
       const elapsedHours = nowDt.diff(startsAt, 'hours').hours
       if (elapsedHours >= 48) {
-        const days = Math.max(1, Math.round(nowDt.diff(startsAt, 'days').days))
         return {
           label: 'Live for',
-          staticText: `${days} ${days === 1 ? 'day' : 'days'}`,
+          seconds: Math.max(0, elapsedHours * 3600),
+          showSeconds: false,
           live: true,
           happening: true,
         }

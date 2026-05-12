@@ -4,18 +4,7 @@ class Admin::ApplicationController < ApplicationController
   # Sidebar stat pills — deferred so they never block page loads
   inertia_share do
     {
-      admin_stats: InertiaRails.defer do
-        {
-          users_count: User.verified.count,
-          projects_count: Project.count,
-          pending_reviews_count: Ship.pending.count,
-          pending_time_audits_count: TimeAuditReview.pending.count,
-          pending_requirements_checks_count: RequirementsCheckReview.pending.count,
-          pending_design_reviews_count: DesignReview.pending.count,
-          pending_build_reviews_count: BuildReview.pending.count,
-          flagged_projects_count: ProjectFlag.select(:project_id).distinct.count
-        }
-      end,
+      admin_stats: InertiaRails.defer { Admin::ApplicationController.sidebar_stat_counts },
       # Role-based access for sidebar and frontend gating
       admin_permissions: {
         is_admin: current_user&.admin? || false,
@@ -31,6 +20,23 @@ class Admin::ApplicationController < ApplicationController
       # Driven by HCB_OAUTH_HOST so dev/staging/prod all link to the right place.
       hcb_host: HcbService.host
     }
+  end
+
+  # Sidebar counts fire in parallel via async_count so the deferred sidebar fetch
+  # waits ~one round-trip wall-time even though it's 8 separate queries.
+  # Requires DB pool >= 8 to fully parallelize; falls back to serial otherwise.
+  def self.sidebar_stat_counts
+    promises = {
+      users_count: User.verified.async_count,
+      projects_count: Project.async_count,
+      pending_reviews_count: Ship.pending.async_count,
+      pending_time_audits_count: TimeAuditReview.pending.async_count,
+      pending_requirements_checks_count: RequirementsCheckReview.pending.async_count,
+      pending_design_reviews_count: DesignReview.pending.async_count,
+      pending_build_reviews_count: BuildReview.pending.async_count,
+      flagged_projects_count: ProjectFlag.distinct.async_count(:project_id)
+    }
+    promises.transform_values(&:value)
   end
 
   private
