@@ -51,7 +51,8 @@ module ShipCheckService
   INTERNAL_CHECK_MODULES = [
     ShipChecks::AiGeneratedImage,
     ShipChecks::ImageOriginality,
-    ShipChecks::CodePlagiarism
+    ShipChecks::CodePlagiarism,
+    ShipChecks::DuplicateProject
   ].freeze
 
   CHECKS = (USER_CHECK_MODULES + INTERNAL_CHECK_MODULES).freeze
