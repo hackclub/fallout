@@ -53,19 +53,9 @@ export default function TopUpsNew({ user_email, card_last4, card_purpose }: Prop
               <div>
                 <p className="font-bold text-xl sm:text-2xl text-dark-brown">Top up your card</p>
                 <p className="text-dark-brown text-sm">
-                  Donate to Fallout and we'll add the equivalent amount to your HCB grant card. This{' '}
-                  <strong>doesn't</strong> count against your koi-funded project funding — it's your own money, on your
-                  own card.
+                  Donate to Fallout and we'll add the equivalent amount to your HCB grant card.
                 </p>
               </div>
-
-              {(card_last4 || card_purpose) && (
-                <div className="text-dark-brown text-sm">
-                  Destination card{card_purpose ? ` (${card_purpose})` : ''}
-                  {card_last4 ? ` ending in ${card_last4}` : ''}.
-                </div>
-              )}
-
               <div>
                 <p className="block font-bold text-dark-brown mb-2 text-lg">How much do you want to add?</p>
                 <div className="flex items-center gap-2">
@@ -88,12 +78,15 @@ export default function TopUpsNew({ user_email, card_last4, card_purpose }: Prop
           <div className="mb-6 text-dark-brown text-sm space-y-2">
             <p>
               You'll be redirected to HCB to pay with a card on file for <span className="font-bold">{user_email}</span>
-              . Funds land on your card once the payment captures (usually instantly; refunds before deposit are flagged
-              for admin).
+              . We'll add funds to your card once it goes through.
             </p>
             <p className="border-2 border-dark-brown p-3 rounded-xs">
               <span className="font-bold">Don't edit the donation message on HCB.</span> It contains a token we use to
               match the donation back to you. If you change it, the money won't reach your card automatically.
+            </p>
+            <p className="border-2 border-dark-brown p-3 rounded-xs">
+              <span className="font-bold">Top-up funds are non-refundable.</span> They must be spent on the same purpose
+              your grant card was issued for. Donations to Fallout cannot be returned to you once they're processed.
             </p>
           </div>
 
