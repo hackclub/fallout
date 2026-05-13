@@ -507,10 +507,28 @@ class User < ApplicationRecord
       .order(:user_id, started_at: :desc)
       .each_with_object({}) { |v, h| h[v.user_id] = v.country }
 
+    owned = Project.kept.where(user_id: user_ids).pluck(:id, :user_id)
+    collab = Collaborator.kept
+      .joins("INNER JOIN users ON users.id = collaborators.user_id AND users.discarded_at IS NULL AND users.type IS NULL")
+      .where(collaboratable_type: "Project", collaboratable_id: owned.map(&:first))
+      .pluck(:collaboratable_id, :user_id)
+    project_ids_by_user = Hash.new { |h, k| h[k] = [] }
+    owned.each { |pid, uid| project_ids_by_user[uid] << pid }
+    collab.each { |pid, uid| project_ids_by_user[uid] << pid }
+    all_project_ids = project_ids_by_user.values.flatten.uniq
+    seconds_by_project = Project.batch_time_logged(all_project_ids)
+    member_counts = Project.batch_member_counts(all_project_ids)
+    db_hours = user_ids.to_h do |uid|
+      pids = project_ids_by_user[uid]
+      seconds = pids.sum { |pid| m = member_counts[pid].to_i; m > 0 ? seconds_by_project[pid].to_i / m : 0 }
+      [ uid, (seconds / 3600.0).floor ]
+    end
+
     {
       first_project_created_at: Project.kept.where(user_id: user_ids).group(:user_id).minimum(:created_at),
       latest_visit_country: latest_visit_country,
-      last_journal_at: JournalEntry.kept.where(user_id: user_ids).group(:user_id).maximum(:created_at)
+      last_journal_at: JournalEntry.kept.where(user_id: user_ids).group(:user_id).maximum(:created_at),
+      db_hours: db_hours
     }
   end
 
@@ -528,7 +546,8 @@ class User < ApplicationRecord
       "Created At" => ->(u) { u.created_at&.iso8601 },
       "Deleted At" => ->(u) { u.discarded_at&.iso8601 },
       "Email Verified" => ->(u) { !u.trial? },
-      "Is Active" => ->(u, pre) { pre[:last_journal_at][u.id].present? && pre[:last_journal_at][u.id] >= 8.days.ago }
+      "Is Active" => ->(u, pre) { pre[:last_journal_at][u.id].present? && pre[:last_journal_at][u.id] >= 8.days.ago },
+      "DB Hours Logged" => ->(u, pre) { pre[:db_hours][u.id] || 0 }
     }
   end
 
