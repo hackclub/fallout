@@ -4,6 +4,13 @@ import type { SharedProps } from '@/types'
 import { ArrowLeftIcon } from '@heroicons/react/20/solid'
 import Frame from '@/components/shared/Frame'
 
+const SUMMIT_DATES = [
+  { value: '2026-06-29', label: 'June 29' },
+  { value: '2026-06-30', label: 'June 30' },
+  { value: '2026-07-07', label: 'July 7' },
+  { value: '2026-07-08', label: 'July 8' },
+]
+
 type ShopItem = {
   id: number
   name: string
@@ -12,6 +19,7 @@ type ShopItem = {
   image_url: string
   currency: 'koi' | 'gold'
   requires_shipping: boolean
+  requires_date_selection: boolean
 }
 
 export default function ShopOrderNew({
@@ -26,13 +34,20 @@ export default function ShopOrderNew({
   hca_addresses: string[]
 }) {
   const { errors } = usePage<SharedProps>().props
-  const form = useForm({ address_index: '0', quantity: '1', phone: '' })
+  const form = useForm<{ address_index: string; quantity: string; phone: string; selected_dates: string[] }>({
+    address_index: '0',
+    quantity: '1',
+    phone: '',
+    selected_dates: [],
+  })
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const balance = shop_item.currency === 'gold' ? gold_balance : koi_balance
   const currencyLabel = shop_item.currency === 'gold' ? 'gold' : 'koi'
   const currencyIcon = shop_item.currency === 'gold' ? '/gold.webp' : '/koifish.webp'
-  const maxQuantity = Math.floor(balance / shop_item.price)
+  const maxQuantity = shop_item.requires_date_selection
+    ? Math.min(Math.floor(balance / shop_item.price), SUMMIT_DATES.length)
+    : Math.floor(balance / shop_item.price)
   const totalCost = shop_item.price * quantity
   const remaining = balance - totalCost
   const hasAddresses = hca_addresses.length > 0
@@ -51,12 +66,31 @@ export default function ShopOrderNew({
   const phoneDigits = form.data.phone.replace(/\D/g, '')
   const phoneValid = phoneDigits.length >= 7 && phoneDigits.length <= 15
   const shippingReady = !shop_item.requires_shipping || (hasAddresses && phoneValid)
-  const isInteractive = !form.processing && maxQuantity >= 1 && shippingReady
+  const datesReady = !shop_item.requires_date_selection || form.data.selected_dates.length === quantity
+  const isInteractive = !form.processing && maxQuantity >= 1 && shippingReady && datesReady
+
+  function toggleDate(value: string) {
+    const current = form.data.selected_dates
+    if (current.includes(value)) {
+      form.setData(
+        'selected_dates',
+        current.filter((d) => d !== value),
+      )
+    } else if (current.length < quantity) {
+      form.setData('selected_dates', [...current, value])
+    }
+  }
 
   function setQty(n: number) {
     const clamped = Math.max(1, Math.min(n, maxQuantity))
     setQuantity(clamped)
-    form.setData('quantity', String(clamped))
+    form.setData({
+      ...form.data,
+      quantity: String(clamped),
+      selected_dates: shop_item.requires_date_selection
+        ? form.data.selected_dates.slice(0, clamped)
+        : form.data.selected_dates,
+    })
   }
 
   function submit(e: React.FormEvent) {
@@ -268,6 +302,41 @@ export default function ShopOrderNew({
                 {form.data.phone.trim() && !phoneValid && (
                   <p className="text-brown text-sm mt-1">Enter a valid phone number (7–15 digits)</p>
                 )}
+              </div>
+            </div>
+          )}
+
+          {shop_item.requires_date_selection && (
+            <div className="mb-6">
+              <p className="font-bold text-lg text-dark-brown mb-2">
+                Summit dates you can attend{' '}
+                <span className="font-normal text-sm">
+                  ({form.data.selected_dates.length}/{quantity} selected)
+                </span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {SUMMIT_DATES.map((date) => {
+                  const selected = form.data.selected_dates.includes(date.value)
+                  const atLimit = form.data.selected_dates.length >= quantity
+                  const disabled = !selected && atLimit
+                  return (
+                    <button
+                      key={date.value}
+                      type="button"
+                      onClick={() => toggleDate(date.value)}
+                      disabled={disabled}
+                      className={`px-4 py-2 rounded-sm border-2 font-bold text-base transition-all ${
+                        selected
+                          ? 'bg-dark-brown text-light-brown border-dark-brown cursor-pointer'
+                          : disabled
+                            ? 'bg-beige text-dark-brown border-dark-brown opacity-30 cursor-not-allowed'
+                            : 'bg-beige text-dark-brown border-dark-brown cursor-pointer hover:bg-brown hover:text-light-brown'
+                      }`}
+                    >
+                      {date.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}

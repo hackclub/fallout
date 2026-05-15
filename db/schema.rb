@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_15_220949) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_15_223431) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -652,6 +652,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_15_220949) do
     t.string "image_url"
     t.string "name"
     t.integer "price"
+    t.boolean "requires_date_selection", default: false, null: false
     t.boolean "requires_shipping", default: true, null: false
     t.string "status", default: "available", null: false
     t.boolean "ticket", default: false, null: false
@@ -666,6 +667,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_15_220949) do
     t.integer "frozen_price", null: false
     t.text "phone"
     t.integer "quantity", default: 1, null: false
+    t.text "selected_dates", default: [], array: true
     t.bigint "shop_item_id", null: false
     t.string "state", default: "pending", null: false
     t.datetime "updated_at", null: false

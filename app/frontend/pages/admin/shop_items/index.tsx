@@ -18,6 +18,7 @@ type ShopItem = {
   currency: 'koi' | 'gold' | 'hours'
   grants_streak_freeze: boolean
   requires_shipping: boolean
+  requires_date_selection: boolean
 }
 
 type RowState = Omit<ShopItem, 'id'>
@@ -32,6 +33,7 @@ const BLANK_ROW: RowState = {
   currency: 'koi',
   grants_streak_freeze: false,
   requires_shipping: true,
+  requires_date_selection: false,
 }
 
 function itemToRow(item: ShopItem): RowState {
@@ -45,6 +47,7 @@ function itemToRow(item: ShopItem): RowState {
     currency: item.currency,
     grants_streak_freeze: item.grants_streak_freeze,
     requires_shipping: item.requires_shipping,
+    requires_date_selection: item.requires_date_selection,
   }
 }
 
@@ -133,6 +136,14 @@ function EditableRow({
           type="checkbox"
           checked={!!row.requires_shipping}
           onChange={(e) => onChange('requires_shipping', e.target.checked)}
+          className="w-4 h-4 cursor-pointer"
+        />
+      </TableCell>
+      <TableCell className="text-center">
+        <input
+          type="checkbox"
+          checked={!!row.requires_date_selection}
+          onChange={(e) => onChange('requires_date_selection', e.target.checked)}
           className="w-4 h-4 cursor-pointer"
         />
       </TableCell>
@@ -325,6 +336,7 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
               <TableHead className="whitespace-nowrap">Featured</TableHead>
               <TableHead className="whitespace-normal">Streak Freeze</TableHead>
               <TableHead className="whitespace-normal">Needs Shipping</TableHead>
+              <TableHead className="whitespace-normal">Date Picker</TableHead>
               <TableHead className="whitespace-nowrap">Currency</TableHead>
               <TableHead className="min-w-36">Name</TableHead>
               <TableHead className="min-w-24">Price</TableHead>
@@ -364,7 +376,7 @@ export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopIt
             )}
             {shop_items.length === 0 && !newRow && (
               <TableRow>
-                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
                   No shop items yet.
                 </TableCell>
               </TableRow>

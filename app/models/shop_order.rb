@@ -2,17 +2,18 @@
 #
 # Table name: shop_orders
 #
-#  id           :bigint           not null, primary key
-#  address      :text
-#  admin_note   :text
-#  frozen_price :integer          not null
-#  phone        :text
-#  quantity     :integer          default(1), not null
-#  state        :string           default("pending"), not null
-#  created_at   :datetime         not null
-#  updated_at   :datetime         not null
-#  shop_item_id :bigint           not null
-#  user_id      :bigint           not null
+#  id             :bigint           not null, primary key
+#  address        :text
+#  admin_note     :text
+#  frozen_price   :integer          not null
+#  phone          :text
+#  quantity       :integer          default(1), not null
+#  selected_dates :text             default([]), is an Array
+#  state          :string           default("pending"), not null
+#  created_at     :datetime         not null
+#  updated_at     :datetime         not null
+#  shop_item_id   :bigint           not null
+#  user_id        :bigint           not null
 #
 # Indexes
 #
@@ -26,6 +27,8 @@
 #  fk_rails_...  (user_id => users.id)
 #
 class ShopOrder < ApplicationRecord
+  VALID_SUMMIT_DATES = %w[2026-06-29 2026-06-30 2026-07-07 2026-07-08].freeze
+
   # Shipping PII of minors — encrypted at rest. Never queried, so non-deterministic.
   encrypts :phone
   encrypts :address
@@ -45,6 +48,7 @@ class ShopOrder < ApplicationRecord
   validates :address, presence: true, if: -> { shop_item&.requires_shipping? }
   validates :phone, presence: true, if: -> { shop_item&.requires_shipping? }
   validate :phone_digit_count
+  validate :selected_dates_valid, if: -> { shop_item&.requires_date_selection? }
   validate :user_can_afford, on: :create
 
   def self.airtable_sync_base_id
@@ -90,6 +94,13 @@ class ShopOrder < ApplicationRecord
 
   def freeze_price
     self.frozen_price ||= shop_item&.price
+  end
+
+  def selected_dates_valid
+    dates = Array(selected_dates).reject(&:blank?)
+    invalid = dates - VALID_SUMMIT_DATES
+    errors.add(:selected_dates, "contains invalid dates") if invalid.any?
+    errors.add(:selected_dates, "number of dates selected must match quantity") unless dates.length == quantity
   end
 
   def phone_digit_count

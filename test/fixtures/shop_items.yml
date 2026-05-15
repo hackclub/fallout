@@ -4,19 +4,20 @@
 #
 # Table name: shop_items
 #
-#  id                   :bigint           not null, primary key
-#  currency             :string           default("koi"), not null
-#  description          :text
-#  featured             :boolean          default(FALSE), not null
-#  grants_streak_freeze :boolean          default(FALSE), not null
-#  image_url            :string
-#  name                 :string
-#  price                :integer
-#  requires_shipping    :boolean          default(TRUE), not null
-#  status               :string           default("available"), not null
-#  ticket               :boolean          default(FALSE), not null
-#  created_at           :datetime         not null
-#  updated_at           :datetime         not null
+#  id                      :bigint           not null, primary key
+#  currency                :string           default("koi"), not null
+#  description             :text
+#  featured                :boolean          default(FALSE), not null
+#  grants_streak_freeze    :boolean          default(FALSE), not null
+#  image_url               :string
+#  name                    :string
+#  price                   :integer
+#  requires_date_selection :boolean          default(FALSE), not null
+#  requires_shipping       :boolean          default(TRUE), not null
+#  status                  :string           default("available"), not null
+#  ticket                  :boolean          default(FALSE), not null
+#  created_at              :datetime         not null
+#  updated_at              :datetime         not null
 #
 # Indexes
 #

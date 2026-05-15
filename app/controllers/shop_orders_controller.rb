@@ -62,7 +62,16 @@ class ShopOrdersController < ApplicationController
     quantity = params[:quantity].to_i
     quantity = 1 if quantity < 1
 
-    @shop_order = @shop_item.shop_orders.build(address: address, phone: phone, quantity: quantity, user: current_user)
+    selected_dates = []
+    if @shop_item.requires_date_selection?
+      selected_dates = Array(params[:selected_dates]).map(&:to_s).select { |d| ShopOrder::VALID_SUMMIT_DATES.include?(d) }
+      unless selected_dates.length == quantity
+        return redirect_back fallback_location: new_shop_item_shop_order_path(@shop_item),
+          inertia: { errors: { selected_dates: [ "number of dates selected must match quantity" ] } }
+      end
+    end
+
+    @shop_order = @shop_item.shop_orders.build(address: address, phone: phone, quantity: quantity, selected_dates: selected_dates, user: current_user)
     authorize @shop_order
 
     # Lock the user row to prevent concurrent orders from double-spending currency
@@ -132,6 +141,6 @@ class ShopOrdersController < ApplicationController
   end
 
   def serialize_shop_item(item)
-    { id: item.id, name: item.name, description: item.description, price: item.price, image_url: item.image_url, currency: item.currency, requires_shipping: item.requires_shipping? }
+    { id: item.id, name: item.name, description: item.description, price: item.price, image_url: item.image_url, currency: item.currency, requires_shipping: item.requires_shipping?, requires_date_selection: item.requires_date_selection? }
   end
 end
