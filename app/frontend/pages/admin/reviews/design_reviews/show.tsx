@@ -48,6 +48,7 @@ import type {
   RequirementsCheckProjectContext,
   ReviewerNote,
   SiblingStatuses,
+  PreviousReview,
 } from '@/types'
 
 function csrfToken(): string {
@@ -473,6 +474,7 @@ interface PageProps {
   new_entries: RequirementsCheckJournalEntry[]
   previous_entries: RequirementsCheckJournalEntry[]
   sibling_statuses: SiblingStatuses
+  previous_reviews: PreviousReview[]
   repo_tree?: RepoTreeData | null
   reviewer_notes?: ReviewerNote[]
   reviewer_notes_path: string
@@ -491,6 +493,7 @@ export default function DesignReviewsShow({
   new_entries,
   previous_entries,
   sibling_statuses,
+  previous_reviews,
   repo_tree,
   reviewer_notes,
   reviewer_notes_path,
@@ -779,6 +782,67 @@ export default function DesignReviewsShow({
                 <SiblingBadge label="Build" status={sibling_statuses.build_review} />
               </div>
             </div>
+
+            {/* Previous reviews from prior ships */}
+            {previous_reviews.length > 0 && (
+              <CollapsibleCard
+                title="Previous Reviews"
+                storageKey="design-previous-reviews"
+                summary={
+                  <span className="flex items-center gap-1">
+                    {[...previous_reviews].reverse().map((r) => (
+                      <span
+                        key={r.ship_id}
+                        className={`shrink-0 text-xs px-1.5 py-0.5 rounded border font-medium ${
+                          r.status === 'approved'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800'
+                            : r.status === 'returned'
+                              ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800'
+                              : 'bg-red-50 text-red-600 border-red-300 dark:bg-red-950 dark:text-red-400 dark:border-red-800'
+                        }`}
+                      >
+                        {r.status}
+                      </span>
+                    ))}
+                  </span>
+                }
+              >
+                <div className="divide-y divide-border">
+                  {previous_reviews.map((r) => (
+                    <div key={r.ship_id} className="p-3 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded border font-medium ${
+                            r.status === 'approved'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800'
+                              : r.status === 'returned'
+                                ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800'
+                                : 'bg-red-50 text-red-600 border-red-300 dark:bg-red-950 dark:text-red-400 dark:border-red-800'
+                          }`}
+                        >
+                          {r.status}
+                        </span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {r.reviewer_display_name && `${r.reviewer_display_name} · `}{r.reviewed_at}
+                        </span>
+                      </div>
+                      {r.feedback && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Feedback</p>
+                          <p className="text-sm whitespace-pre-wrap">{r.feedback}</p>
+                        </div>
+                      )}
+                      {r.internal_reason && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Internal Reason</p>
+                          <p className="text-sm whitespace-pre-wrap text-muted-foreground">{r.internal_reason}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleCard>
+            )}
 
             {/* Preflight checks */}
             {preflight.length > 0 && <PreflightResults checks={preflight} />}

@@ -53,6 +53,7 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
       new_entries: new_entries.map { |je| serialize_journal_entry(je, time_audit) },
       previous_entries: previous_entries.map { |je| serialize_journal_entry(je, time_audit) },
       sibling_statuses: serialize_sibling_statuses(ship),
+      previous_reviews: serialize_previous_reviews(project, ship, BuildReview),
       repo_tree: ship.requirements_check_review&.repo_tree,
       reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
       reviewer_notes_path: admin_project_reviewer_notes_path(project),
