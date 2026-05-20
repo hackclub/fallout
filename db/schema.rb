@@ -935,6 +935,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_15_223431) do
     t.integer "streak_freezes", default: 1, null: false
     t.boolean "streak_in_app_notifications", default: true, null: false
     t.boolean "streak_slack_notifications", default: true, null: false
+    t.string "summit_rsvp"
     t.string "timezone", null: false
     t.string "type"
     t.datetime "updated_at", null: false
@@ -996,7 +997,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_15_223431) do
   add_foreign_key "critters", "users"
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
-  add_foreign_key "dialog_campaigns", "users"
+  add_foreign_key "dialog_campaigns", "users", name: "dialog_campaigns_user_id_fkey"
   add_foreign_key "gold_transactions", "ships"
   add_foreign_key "gold_transactions", "users"
   add_foreign_key "gold_transactions", "users", column: "actor_id"
