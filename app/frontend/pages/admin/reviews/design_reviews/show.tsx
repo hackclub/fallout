@@ -5,6 +5,7 @@ import { useReviewHeartbeat } from '@/hooks/useReviewHeartbeat'
 import ReviewLayout from '@/layouts/ReviewLayout'
 import HoursDisplay from '@/components/admin/HoursDisplay'
 import { WaitingLabel } from '@/components/admin/WaitingLabel'
+import { ReviewStatusBadge } from '@/components/admin/ReviewStatusBadge'
 import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { Separator } from '@/components/admin/ui/separator'
@@ -48,6 +49,7 @@ import type {
   RequirementsCheckProjectContext,
   ReviewerNote,
   SiblingStatuses,
+  PreviousReview,
 } from '@/types'
 
 function csrfToken(): string {
@@ -473,6 +475,7 @@ interface PageProps {
   new_entries: RequirementsCheckJournalEntry[]
   previous_entries: RequirementsCheckJournalEntry[]
   sibling_statuses: SiblingStatuses
+  previous_reviews: PreviousReview[]
   repo_tree?: RepoTreeData | null
   reviewer_notes?: ReviewerNote[]
   reviewer_notes_path: string
@@ -491,6 +494,7 @@ export default function DesignReviewsShow({
   new_entries,
   previous_entries,
   sibling_statuses,
+  previous_reviews,
   repo_tree,
   reviewer_notes,
   reviewer_notes_path,
@@ -779,6 +783,46 @@ export default function DesignReviewsShow({
                 <SiblingBadge label="Build" status={sibling_statuses.build_review} />
               </div>
             </div>
+
+            {/* Previous reviews from prior ships */}
+            {previous_reviews.length > 0 && (
+              <CollapsibleCard
+                title="Previous Reviews"
+                storageKey="design-previous-reviews"
+                summary={
+                  <span className="flex items-center gap-1">
+                    {[...previous_reviews].reverse().map((r) => (
+                      <ReviewStatusBadge key={r.ship_id} status={r.status} className="shrink-0" />
+                    ))}
+                  </span>
+                }
+              >
+                <div className="divide-y divide-border">
+                  {previous_reviews.map((r) => (
+                    <div key={r.ship_id} className="p-3 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <ReviewStatusBadge status={r.status} />
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {r.reviewer_display_name && `${r.reviewer_display_name} · `}{r.reviewed_at}
+                        </span>
+                      </div>
+                      {r.feedback && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Feedback</p>
+                          <p className="text-sm whitespace-pre-wrap">{r.feedback}</p>
+                        </div>
+                      )}
+                      {r.internal_reason && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Internal Reason</p>
+                          <p className="text-sm whitespace-pre-wrap text-muted-foreground">{r.internal_reason}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleCard>
+            )}
 
             {/* Preflight checks */}
             {preflight.length > 0 && <PreflightResults checks={preflight} />}

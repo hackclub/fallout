@@ -556,6 +556,15 @@ export interface UnifiedInspectData {
   time_audit: UnifiedInspectTimeAudit | null
 }
 
+export interface PreviousReview {
+  ship_id: number
+  status: 'approved' | 'returned' | 'rejected'
+  feedback: string | null
+  internal_reason: string | null
+  reviewer_display_name: string | null
+  reviewed_at: string
+}
+
 export interface SiblingStatuses {
   time_audit: string | null
   requirements_check: string | null
