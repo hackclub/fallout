@@ -28,6 +28,7 @@ import {
   ReceiptText,
   Megaphone,
   BarChart2,
+  BadgeAlert,
   Ticket,
 } from 'lucide-react'
 
@@ -67,6 +68,11 @@ function buildNavSections(): { items: NavItem[] }[] {
   return [
     {
       items: [{ label: 'Dashboard', href: '/admin', icon: LayoutDashboard, statKey: null }],
+    },
+    {
+      items: [
+        { label: 'RC Returns', href: '/admin/dashboard/requirements_design', icon: BadgeAlert, statKey: null },
+      ],
     },
     {
       items: [
