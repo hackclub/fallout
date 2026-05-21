@@ -1,8 +1,6 @@
 class Admin::DashboardController < Admin::ApplicationController
-  skip_after_action :verify_authorized, only: %i[index ] # No authorizable resource; staff access enforced by Admin::ApplicationController
-  skip_after_action :verify_policy_scoped, only: %i[index] # No scoped collection
-  skip_after_action :verify_policy_scoped, only: %i[requirements_design]
-  skip_after_action :verify_authorized, only: %i[requirements_design]
+  skip_after_action :verify_authorized, only: %i[index requirements_design] # No authorizable resource; staff access enforced by Admin::ApplicationController
+  skip_after_action :verify_policy_scoped, only: %i[index requirements_design] # No scoped collection
   def index
     # Lambdas so these only run for the initial page render — Inertia partial
     # reloads (e.g. the sidebar's deferred admin_stats) skip lambda evaluation
