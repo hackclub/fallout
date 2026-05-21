@@ -1,7 +1,6 @@
 class Admin::DashboardController < Admin::ApplicationController
-  skip_after_action :verify_authorized, only: %i[index] # No authorizable resource; staff access enforced by Admin::ApplicationController
-  skip_after_action :verify_policy_scoped, only: %i[index] # No scoped collection
-
+  skip_after_action :verify_authorized, only: %i[index requirements_design] # No authorizable resource; staff access enforced by Admin::ApplicationController
+  skip_after_action :verify_policy_scoped, only: %i[index requirements_design] # No scoped collection
   def index
     # Lambdas so these only run for the initial page render — Inertia partial
     # reloads (e.g. the sidebar's deferred admin_stats) skip lambda evaluation
@@ -21,6 +20,13 @@ class Admin::DashboardController < Admin::ApplicationController
       },
       backlog_chart: -> { backlog_by_day },
       recent_activity: -> { recent_24h_activity }
+    }
+  end
+
+  def requirements_design
+    render inertia: "admin/dashboard/requirements_design", props: {
+      leaderboard: -> { requirements_to_design_return_leaderboard },
+      totals: -> { requirements_to_design_return_totals }
     }
   end
 
@@ -183,5 +189,60 @@ class Admin::DashboardController < Admin::ApplicationController
       cumulative_completed += completed_by_day[date].to_i
       { date: date.iso8601, backlog: cumulative_ships - cumulative_completed }
     end
+  end
+
+  def requirements_to_design_return_scope
+    RequirementsCheckReview
+      .approved
+      .where.not(reviewer_id: nil)
+      .joins(ship: :project)
+      .joins("LEFT JOIN design_reviews ON design_reviews.ship_id = ships.id")
+  end
+
+  def requirements_to_design_return_leaderboard
+    returned_project_count_sql = ActiveRecord::Base.sanitize_sql_array([
+      "COUNT(DISTINCT CASE WHEN design_reviews.status = ? THEN projects.id END)",
+      DesignReview.statuses[:returned]
+    ])
+
+    rows = requirements_to_design_return_scope
+      .group("requirements_check_reviews.reviewer_id")
+      .pluck(
+        "requirements_check_reviews.reviewer_id",
+        Arel.sql("COUNT(DISTINCT projects.id)"),
+        Arel.sql(returned_project_count_sql)
+      )
+
+    users = User.where(id: rows.map(&:first)).index_by(&:id)
+
+    rows.filter_map do |reviewer_id, approved_projects, returned_projects|
+      user = users[reviewer_id]
+      next unless user
+
+      approved_projects = approved_projects.to_i
+      returned_projects = returned_projects.to_i
+      return_rate = approved_projects.positive? ? (returned_projects.to_f / approved_projects) : 0.0
+
+      {
+        id: reviewer_id,
+        display_name: user.display_name,
+        avatar: user.avatar,
+        approved_projects: approved_projects,
+        design_returned_projects: returned_projects,
+        return_rate: return_rate
+      }
+    end.sort_by { |row| [ -row[:design_returned_projects], -row[:return_rate], -row[:approved_projects] ] }
+  end
+
+  def requirements_to_design_return_totals
+    scope = requirements_to_design_return_scope
+    approved_projects = scope.distinct.count("projects.id")
+    returned_projects = scope.where("design_reviews.status = ?", DesignReview.statuses[:returned]).distinct.count("projects.id")
+
+    {
+      approved_projects: approved_projects,
+      design_returned_projects: returned_projects,
+      return_rate: approved_projects.positive? ? (returned_projects.to_f / approved_projects) : 0.0
+    }
   end
 end
