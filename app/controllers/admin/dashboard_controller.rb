@@ -217,7 +217,7 @@ class Admin::DashboardController < Admin::ApplicationController
 
     rows.filter_map do |reviewer_id, approved_projects, returned_projects|
       user = users[reviewer_id]
-      next unless user
+      next unless user && approved_projects + returned_projects >= 3
 
       approved_projects = approved_projects.to_i
       returned_projects = returned_projects.to_i
@@ -231,7 +231,7 @@ class Admin::DashboardController < Admin::ApplicationController
         design_returned_projects: returned_projects,
         return_rate: return_rate
       }
-    end.sort_by { |row| [ -row[:design_returned_projects], -row[:return_rate], -row[:approved_projects] ] }
+    end.sort_by { |row| [ -row[:return_rate], -row[:design_returned_projects], -row[:approved_projects] ] }
   end
 
   def requirements_to_design_return_totals
