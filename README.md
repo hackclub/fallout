@@ -100,3 +100,6 @@ R2_SECRET_ACCESS_KEY=your_secret_access_key
 R2_BUCKET=your_bucket_name
 R2_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com
 ```
+
+
+:3 Have fun!
