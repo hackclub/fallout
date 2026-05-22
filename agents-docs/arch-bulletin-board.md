@@ -25,7 +25,7 @@ GET /bulletin_board/events/:id.ics     # bulletin_board#event_ics — single-eve
 
 All five are `allow_unauthenticated_access`, `allow_trial_access`, `skip_onboarding_redirect`. Pundit verification is skipped because the controller renders explicit public scopes (`BulletinEvent.where.not(starts_at: nil)` for events, `*.public_for_explore` for explore content). **Drafts are filtered out** of every public response by the `where.not(starts_at: nil)` predicate.
 
-The ICS endpoints reuse the same draft filter and are served as `text/calendar; charset=utf-8`. The feed sets `Cache-Control: public, max-age=300` so CDNs/proxies can share responses across subscribers — new events propagate within ~5 minutes plus the client's own refresh interval (`REFRESH-INTERVAL` advertises 1 hour).
+The ICS endpoints reuse the same draft filter and are served as `text/calendar; charset=utf-8`. The feed sets `Cache-Control: no-store, max-age=0`, and the generator emits `REFRESH-INTERVAL` / `X-PUBLISHED-TTL` of `PT5M` (5 minutes), so clients should treat the feed as non-cacheable while refreshing on roughly a 5-minute cadence if they honor the calendar metadata.
 
 `/bulletin_board?project=:id` also sets OG/Twitter meta tags for the selected public project so Slack unfurls can render a project card for bulletin-board links.
 
