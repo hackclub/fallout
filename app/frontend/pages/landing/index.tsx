@@ -543,27 +543,41 @@ export default function LandingIndex() {
               paddingClasses="p-0 md:max-w-6xl md:mx-auto"
               closeButton={false}
               maxWidth="7xl"
-              className="group flex items-center gap-3 mt-2 mb-4 px-3 py-2 rounded-sm"
+              className="clickme group mt-1 mb-4 max-w-full inline-flex items-center gap-2 xs:gap-3 sm:gap-4 border-2 border-dark-brown bg-brown text-light-brown active:bg-dark-brown rounded-sm pl-2 pr-3 xs:pl-3 xs:pr-4 sm:pl-4 sm:pr-5 py-2 sm:py-2.5 transition-colors"
+              aria-label="See what teens are building — explore the bulletin board"
             >
-              <span className="text-sm sm:text-base font-medium text-light-brown text-shadow-sm whitespace-nowrap">
-                See what teens are building
+              <span className="relative overflow-hidden block leading-none text-sm sm:text-base font-bold">
+                <span className="block transition-transform duration-300 group-hover:translate-y-full">
+                  See what teens are building
+                </span>
+                <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">
+                  Explore <span aria-hidden>→</span>
+                </span>
               </span>
-              <ul className="flex items-center">
+
+              <span aria-hidden className="hidden xs:block h-8 w-px bg-dark-brown" />
+
+              <ul aria-hidden className="flex items-end pr-1">
                 {PROJECTS.slice(0, 4).map((project, i) => (
                   <li
                     key={i}
-                    className="w-12 h-12 sm:w-14 sm:h-14 first:ml-0 -ml-3 border-2 border-dark-brown bg-light-brown rounded-xs bg-center bg-cover transition-transform duration-300 group-hover:rotate-0 group-hover:translate-x-0"
+                    className="relative w-10 h-11 xs:w-12 xs:h-13 sm:w-14 sm:h-15 first:ml-0 -ml-3 bg-beige p-1 pb-2 border border-dark-brown transition-transform duration-300 ease-out group-hover:rotate-0 group-hover:-translate-y-0.5"
                     style={{
-                      backgroundImage: `url(${project.image})`,
-                      transform: `rotate(${(i - 1.5) * 4}deg)`,
+                      transform: `rotate(${(i - 1.5) * 5}deg)`,
                       zIndex: 4 - i,
                     }}
-                  />
+                  >
+                    <span
+                      className="block w-full h-full bg-center bg-cover bg-dark-brown"
+                      style={{ backgroundImage: `url(${project.image})` }}
+                    />
+                    <span
+                      aria-hidden
+                      className="absolute -top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-coral border border-dark-brown"
+                    />
+                  </li>
                 ))}
               </ul>
-              <span className="text-sm sm:text-base font-bold text-light-brown text-shadow-sm whitespace-nowrap transition-transform duration-300 group-hover:translate-x-1">
-                Explore →
-              </span>
             </ModalLink>
             <FlashMessages />
           </div>
@@ -722,7 +736,7 @@ export default function LandingIndex() {
               </h2>
               <p className="text-base md:text-lg text-brown mt-2">Past projects from previous Hack Club events</p>
             </div>
-            <section ref={carouselSectionRef} className="w-full h-120 mt-8 overflow-hidden">
+            <section ref={carouselSectionRef} className="w-full h-120 mt-8 overflow-x-clip">
               <ul
                 ref={carouselTrackRef}
                 className="w-max h-full flex gap-4 text-base leading-tight will-change-transform"
@@ -1231,14 +1245,14 @@ export default function LandingIndex() {
       </div>
       <div
         ref={customCursorRef}
-        className="fixed top-0 left-0 z-[10001] pointer-events-none select-none"
+        className="fixed top-0 left-0 z-[99999] pointer-events-none select-none"
         style={{ opacity: 0 }}
       >
         <img src="/cursors/arrowhead.svg" width="36" height="36" />
       </div>
       <div
         ref={pointerCursorRef}
-        className="fixed top-0 left-0 z-[10001] pointer-events-none select-none"
+        className="fixed top-0 left-0 z-[99999] pointer-events-none select-none"
         style={{ opacity: 0 }}
       >
         <img src="/cursors/pointer.svg" width="36" height="36" />

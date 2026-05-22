@@ -4,6 +4,7 @@ import { animate, AnimatePresence, motion, useSpring, type MotionValue } from 'm
 import { ArrowLeftIcon } from '@heroicons/react/20/solid'
 import { CalendarDaysIcon, ClockIcon, PhotoIcon } from '@heroicons/react/24/outline'
 import { DateTime } from 'luxon'
+import AddToCalendarButton from '@/components/bulletin_board/AddToCalendarButton'
 import Frame from '@/components/shared/Frame'
 import { SlidingNumber } from '@/components/shared/SlidingNumber'
 import TextMorph from '@/components/shared/TextMorph'
@@ -426,6 +427,14 @@ export default function EventDetailPanel({ event, onBack }: Props) {
           </motion.div>
 
           {timer && <BigTimer config={{ ...timer, progress: showProgress ? progressSpring : undefined }} />}
+
+          <motion.div
+            layout="position"
+            transition={{ type: 'spring', stiffness: 320, damping: 28, mass: 0.5 }}
+            className={styles.actionsRow}
+          >
+            <AddToCalendarButton event={event} variant="labeled" />
+          </motion.div>
 
           <motion.div
             layout="position"

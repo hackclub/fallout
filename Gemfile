@@ -120,3 +120,5 @@ gem "flipper-ui", "~> 1.4"
 gem "ruby_llm", "~> 1.14"
 
 gem "scoped_search", "~> 4.3"
+
+gem "icalendar", "~> 2.10"

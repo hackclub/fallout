@@ -138,6 +138,14 @@ $shadow-hover:
   font-variant-numeric: tabular-nums;
 }
 
+.statusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-self: stretch;
+}
+
 .status {
   position: relative;
   display: inline-flex;

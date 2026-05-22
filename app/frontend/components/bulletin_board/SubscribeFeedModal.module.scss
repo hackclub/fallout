@@ -1,0 +1,208 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  // Above the Inertia modal stack (which uses up to 10000) so this opens on top of the
+  // bulletin board even when it itself is rendered as a modal.
+  z-index: 10040;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+
+  background-color: rgba(58, 36, 25, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.panel {
+  position: relative;
+  width: min(34rem, 100%);
+  max-height: 92vh;
+
+  display: flex;
+  flex-direction: column;
+
+  // Matches the event card background ($card-bg in EventCard.module.scss).
+  background-color: #f4dfc0;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  box-shadow:
+    0 6px 16px rgba(58, 36, 25, 0.2),
+    0 24px 48px rgba(58, 36, 25, 0.24);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-dark-brown) 16%, transparent);
+}
+
+.title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-dark-brown);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 2.25rem;
+  height: 2.25rem;
+
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  background-color: color-mix(in oklab, var(--color-light-brown) 60%, transparent);
+  color: var(--color-dark-brown);
+
+  cursor: pointer;
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out;
+
+  &:hover {
+    background-color: var(--color-light-brown);
+    border-color: color-mix(in oklab, var(--color-dark-brown) 45%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-brown);
+    outline-offset: 2px;
+  }
+}
+
+.iconButtonIcon {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  padding: 1.1rem 1.25rem 1.25rem;
+}
+
+.urlRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.urlInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  background-color: color-mix(in oklab, var(--color-light-brown) 30%, transparent);
+  color: var(--color-dark-brown);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.8125rem;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-brown);
+    outline-offset: -1px;
+  }
+}
+
+.copyButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 30%, transparent);
+  background-color: var(--color-brown);
+  color: var(--color-light-brown);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  transition:
+    background-color 140ms ease-out,
+    color 140ms ease-out;
+
+  &:hover {
+    background-color: var(--color-dark-brown);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-dark-brown);
+    outline-offset: 2px;
+  }
+}
+
+.copyButtonSuccess {
+  background-color: var(--color-green);
+  color: #f5fff5;
+
+  &:hover {
+    background-color: color-mix(in oklab, var(--color-green) 80%, black);
+  }
+}
+
+.copyIcon {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.providerGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.providerButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  background-color: var(--color-light-brown);
+  color: var(--color-dark-brown);
+
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 140ms ease-out;
+
+  &:hover {
+    background-color: color-mix(in oklab, var(--color-light-brown) 70%, var(--color-brown));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-brown);
+    outline-offset: 2px;
+  }
+}
+
+.providerButtonIcon {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--color-brown);
+  flex-shrink: 0;
+}
+
+.providerLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+}

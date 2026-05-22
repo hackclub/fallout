@@ -435,6 +435,10 @@ Rails.application.routes.draw do
   get "path" => "path#index", as: :path
   get "bulletin_board" => "bulletin_board#index", as: :bulletin_board
   get "bulletin_board/search" => "bulletin_board#search", as: :bulletin_board_search # JSON endpoint for debounced explore search; stays on the page instead of re-rendering via Inertia
+  # ICS endpoints must precede the bare `events/:id` route because that route's implicit
+  # `(.:format)` extension would otherwise swallow `.ics` paths.
+  get "bulletin_board/events.ics" => "bulletin_board#events_feed", as: :bulletin_board_events_feed, defaults: { format: "ics" }
+  get "bulletin_board/events/:id.ics" => "bulletin_board#event_ics", as: :bulletin_board_event_ics, constraints: { id: /\d+/ }, defaults: { format: "ics" }
   get "bulletin_board/events/:id" => "bulletin_board#event", as: :bulletin_board_event
 
   resource :profile, only: [ :show, :update ] do

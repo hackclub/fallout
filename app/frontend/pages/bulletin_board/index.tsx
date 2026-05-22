@@ -3,15 +3,17 @@ import { createPortal } from 'react-dom'
 import { Link } from '@inertiajs/react'
 import { Modal, useModalStack } from '@inertiaui/modal-react'
 import { ArrowLeftIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Rss } from 'lucide-react'
 import clsx from 'clsx'
 import { AnimatePresence, LayoutGroup, motion, type Transition } from 'motion/react'
 import { DateTime } from 'luxon'
 import MarqueeText from '@/components/shared/MarqueeText'
 import { SlidingNumber } from '@/components/shared/SlidingNumber'
 import TextMorph from '@/components/shared/TextMorph'
+import CalendarViewModal from '@/components/bulletin_board/CalendarViewModal'
 import EventCard from '@/components/bulletin_board/EventCard'
 import ExploreCard from '@/components/bulletin_board/ExploreCard'
+import SubscribeFeedModal from '@/components/bulletin_board/SubscribeFeedModal'
 import Masonry from 'react-masonry-css'
 import { computeBulletinEventStatus, type SerializedBulletinEvent } from '@/lib/bulletinEventStatus'
 import { formatRelativeAgeLabel, relativeAgeParts, type RelativeAgeParts } from '@/lib/relativeAge'
@@ -285,6 +287,8 @@ const EventsSection = memo(function EventsSection({ events }: EventsSectionProps
   const liveEventProps = useLiveReload<Pick<PageProps, 'events'>>({ stream: 'bulletin_events', only: ['events'] })
   const now = useNowTick(1000)
   const liveEvents = liveEventProps?.events ?? events
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [subscribeOpen, setSubscribeOpen] = useState(false)
 
   const eventCounts = useMemo(
     () =>
@@ -457,30 +461,50 @@ const EventsSection = memo(function EventsSection({ events }: EventsSectionProps
 
               <motion.div layout className={styles.eventsFooter}>
                 <span className={styles.tzNote}>times shown in your local timezone</span>
-                <div className={styles.pagination}>
+                <div className={styles.eventsActions}>
                   <button
                     type="button"
-                    className={styles.pageButton}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={effectivePage === 0 || totalPages <= 1}
-                    aria-label="Previous page"
+                    className={styles.toolbarButton}
+                    onClick={() => setCalendarOpen(true)}
+                    aria-label="Open calendar view of all events"
                   >
-                    <ChevronLeft className={styles.pageArrow} />
+                    <CalendarDays className={styles.toolbarIcon} aria-hidden />
+                    <span className={styles.toolbarLabel}>Calendar view</span>
                   </button>
-                  <span className={styles.pageInfo} aria-live="polite">
-                    <TextMorph as="span">{(effectivePage + 1).toString()}</TextMorph>
-                    <span className={styles.pageInfoSep}>/</span>
-                    <TextMorph as="span">{totalPages.toString()}</TextMorph>
-                  </span>
                   <button
                     type="button"
-                    className={styles.pageButton}
-                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                    disabled={effectivePage >= totalPages - 1 || totalPages <= 1}
-                    aria-label="Next page"
+                    className={styles.toolbarButton}
+                    onClick={() => setSubscribeOpen(true)}
+                    aria-label="Subscribe to event feed"
                   >
-                    <ChevronRight className={styles.pageArrow} />
+                    <Rss className={styles.toolbarIcon} aria-hidden />
+                    <span className={styles.toolbarLabel}>Subscribe</span>
                   </button>
+                  <div className={styles.pagination}>
+                    <button
+                      type="button"
+                      className={styles.pageButton}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={effectivePage === 0 || totalPages <= 1}
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft className={styles.pageArrow} />
+                    </button>
+                    <span className={styles.pageInfo} aria-live="polite">
+                      <TextMorph as="span">{(effectivePage + 1).toString()}</TextMorph>
+                      <span className={styles.pageInfoSep}>/</span>
+                      <TextMorph as="span">{totalPages.toString()}</TextMorph>
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.pageButton}
+                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={effectivePage >= totalPages - 1 || totalPages <= 1}
+                      aria-label="Next page"
+                    >
+                      <ChevronRight className={styles.pageArrow} />
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>
@@ -499,6 +523,18 @@ const EventsSection = memo(function EventsSection({ events }: EventsSectionProps
           @tanishq!
         </a>
       </motion.div>
+
+      {/* AnimatePresence lives outside the conditional so the modal's motion.div gets to play
+          its exit animation before unmounting. Without this wrapper, flipping calendarOpen to
+          false would tear the portal subtree out immediately and skip the fade. */}
+      <AnimatePresence>
+        {calendarOpen && (
+          <CalendarViewModal key="calendar" events={liveEvents} onClose={() => setCalendarOpen(false)} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {subscribeOpen && <SubscribeFeedModal key="subscribe" onClose={() => setSubscribeOpen(false)} />}
+      </AnimatePresence>
     </motion.section>
   )
 })

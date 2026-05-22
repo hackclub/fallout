@@ -19,9 +19,13 @@ The Bulletin Board (`/bulletin_board`) is the program's public community hub: a 
 GET /bulletin_board                    # bulletin_board#index — Inertia page
 GET /bulletin_board/search             # bulletin_board#search — JSON, used by debounced explore filtering
 GET /bulletin_board/events/:id         # bulletin_board#event — public event detail (Inertia, modal-aware)
+GET /bulletin_board/events.ics         # bulletin_board#events_feed — iCalendar subscription feed (all non-draft events; expired older than 30 days are dropped)
+GET /bulletin_board/events/:id.ics     # bulletin_board#event_ics — single-event ICS download for "Add to calendar"
 ```
 
-All three are `allow_unauthenticated_access`, `allow_trial_access`, `skip_onboarding_redirect`. Pundit verification is skipped because the controller renders explicit public scopes (`BulletinEvent.where.not(starts_at: nil)` for events, `*.public_for_explore` for explore content). **Drafts are filtered out** of every public response by the `where.not(starts_at: nil)` predicate.
+All five are `allow_unauthenticated_access`, `allow_trial_access`, `skip_onboarding_redirect`. Pundit verification is skipped because the controller renders explicit public scopes (`BulletinEvent.where.not(starts_at: nil)` for events, `*.public_for_explore` for explore content). **Drafts are filtered out** of every public response by the `where.not(starts_at: nil)` predicate.
+
+The ICS endpoints reuse the same draft filter and are served as `text/calendar; charset=utf-8`. The feed sets `Cache-Control: no-store, max-age=0`, and the generator emits `REFRESH-INTERVAL` / `X-PUBLISHED-TTL` of `PT5M` (5 minutes), so clients should treat the feed as non-cacheable while refreshing on roughly a 5-minute cadence if they honor the calendar metadata.
 
 `/bulletin_board?project=:id` also sets OG/Twitter meta tags for the selected public project so Slack unfurls can render a project card for bulletin-board links.
 
@@ -122,10 +126,26 @@ Frontend subscriptions (via [`useLiveReload`](app/frontend/lib/useLiveReload.ts)
 Single multi-section Inertia page:
 
 - **Featured** — currently a hardcoded array of 4 placeholder cards in `BulletinBoardController#placeholder_featured` (real images on cdn.hackclub.com but treat as a stub until properly modeled).
-- **Events** — server-rendered via `real_events`, sorted with the `COALESCE(...)` trick. Client uses `useNowTick` to re-evaluate event status (`upcoming → happening → expired`) without waiting for a broadcast.
+- **Events** — server-rendered via `real_events`, sorted with the `COALESCE(...)` trick. Client uses `useNowTick` to re-evaluate event status (`upcoming → happening → expired`) without waiting for a broadcast. The events section header has a small toolbar with **Calendar view** and **Subscribe** buttons.
 - **Explore** — embedded discovery feed. See [arch-explore.md](arch-explore.md) for the full feed mechanics. The page passes initial server-rendered slices for both `projects` and `journals` so first paint requires no client fetch.
 
 The `is_modal: request.headers["X-InertiaUI-Modal"].present?` prop tells the page whether it was opened inside a modal overlay (e.g., navigated into from elsewhere) so it can adjust layout.
+
+---
+
+## Calendar integration
+
+Three user-facing affordances let visitors save events to external calendars; all are powered by the `text/calendar` endpoints listed above.
+
+| Component | File | Behavior |
+|---|---|---|
+| `AddToCalendarButton` | `app/frontend/components/bulletin_board/AddToCalendarButton.tsx` | Per-event popover with Google Calendar URL, .ics download (Apple/Outlook), and Outlook.com deeplink. Rendered icon-only on `EventCard` and labeled on `EventDetailPanel`. Stops click propagation so it doesn't trigger the card's wrapping `ModalLink`. |
+| `CalendarViewModal` | `app/frontend/components/bulletin_board/CalendarViewModal.tsx` | Month-grid modal showing every non-draft event. Expired events are visually dimmed. Each chip is a `ModalLink` that opens the existing event detail modal. Built with Luxon, no extra fetch (consumes the same `events` array the page already has). |
+| `SubscribeFeedModal` | `app/frontend/components/bulletin_board/SubscribeFeedModal.tsx` | Surfaces the feed URL with copy-to-clipboard plus one-click Google/Apple/Outlook subscribe buttons. URLs are generated client-side from `window.location.origin` so previews/staging share the same UI. |
+
+Shared link helpers live in `app/frontend/lib/bulletinCalendarLinks.ts` (`googleCalendarUrl`, `outlookCalendarUrl`, `icsDownloadUrl`, `subscriptionUrls`).
+
+Backend ICS rendering lives in `app/services/bulletin_event_ics_generator.rb` (uses the `icalendar` gem). Times are emitted in UTC (`DTSTART;TZID=UTC:...`). Each `VEVENT` carries a stable UID (`bulletin-event-<id>@<host>`) so calendar apps dedupe on edit instead of creating ghost copies. The feed variant adds `X-WR-CALNAME`, `X-WR-CALDESC`, `X-PUBLISHED-TTL:PT5M`, and `REFRESH-INTERVAL;VALUE=DURATION:PT5M`.
 
 ---
 

@@ -1,0 +1,411 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  // Above the Inertia modal stack (which uses up to 10000) so this opens on top of the
+  // bulletin board even when it itself is rendered as a modal.
+  z-index: 10040;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+
+  background-color: rgba(58, 36, 25, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.panel {
+  position: relative;
+  width: min(56rem, 100%);
+  max-height: 92vh;
+
+  display: flex;
+  flex-direction: column;
+
+  // Matches the event card background ($card-bg in EventCard.module.scss).
+  background-color: #f4dfc0;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  box-shadow:
+    0 6px 16px rgba(58, 36, 25, 0.2),
+    0 24px 48px rgba(58, 36, 25, 0.24);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-dark-brown) 16%, transparent);
+}
+
+.titleGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-dark-brown);
+  line-height: 1.15;
+}
+
+.monthLabel {
+  font-variant-numeric: tabular-nums;
+}
+
+.todayHint {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-brown);
+  font-variant-numeric: tabular-nums;
+}
+
+.headerLegend {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  font-size: 0.72rem;
+  color: var(--color-dark-brown);
+  min-width: 0;
+}
+
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .headerLegend {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+  .headerActions {
+    margin-left: auto;
+  }
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 2.25rem;
+  height: 2.25rem;
+
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  background-color: color-mix(in oklab, var(--color-light-brown) 60%, transparent);
+  color: var(--color-dark-brown);
+
+  cursor: pointer;
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out;
+
+  &:hover {
+    background-color: var(--color-light-brown);
+    border-color: color-mix(in oklab, var(--color-dark-brown) 45%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-brown);
+    outline-offset: 2px;
+  }
+}
+
+.iconButtonIcon {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.todayButton {
+  padding: 0 0.85rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  background-color: color-mix(in oklab, var(--color-light-brown) 60%, transparent);
+  color: var(--color-dark-brown);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease-out,
+    opacity 140ms ease-out;
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-light-brown);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-brown);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.closeButton {
+  composes: iconButton;
+}
+
+.body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0.75rem 1rem 1.1rem;
+}
+
+.weekRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-dark-brown) 12%, transparent);
+}
+
+.weekCell {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-brown);
+  text-align: center;
+  padding: 0.3rem 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: minmax(6.25rem, auto);
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+
+  padding: 0.4rem;
+  border-radius: 0.55rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 14%, transparent);
+  background-color: color-mix(in oklab, var(--color-light-brown) 40%, transparent);
+
+  font-size: 0.8125rem;
+  color: var(--color-dark-brown);
+  min-width: 0;
+}
+
+.dayOutside {
+  opacity: 0.35;
+}
+
+.dayToday {
+  border-color: var(--color-brown);
+  border-width: 2px;
+  background-color: color-mix(in oklab, var(--color-light-brown) 75%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-brown) 30%, transparent);
+  padding: calc(0.4rem - 1px);
+}
+
+.dayNumber {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-dark-brown);
+  font-variant-numeric: tabular-nums;
+  align-self: flex-start;
+}
+
+.dayTodayNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 9999px;
+  background-color: var(--color-brown);
+  color: var(--color-beige);
+}
+
+.eventList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.eventChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+
+  border: none;
+  background-color: var(--color-brown);
+  color: var(--color-beige);
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
+
+  &:hover {
+    background-color: var(--color-dark-brown);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-dark-brown);
+    outline-offset: 2px;
+  }
+}
+
+.eventChipHappening {
+  background-color: var(--color-green);
+  color: #f5fff5;
+
+  &:hover {
+    background-color: color-mix(in oklab, var(--color-green) 80%, black);
+  }
+}
+
+.eventChipExpired {
+  background-color: color-mix(in oklab, var(--color-dark-brown) 35%, var(--color-light-brown));
+  color: var(--color-dark-brown);
+  opacity: 0.6;
+
+  &:hover {
+    background-color: color-mix(in oklab, var(--color-dark-brown) 45%, var(--color-light-brown));
+    opacity: 0.75;
+  }
+}
+
+.eventChipLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.moreLink {
+  align-self: flex-start;
+  margin-top: 0.05rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+  border: 1px dashed color-mix(in oklab, var(--color-dark-brown) 35%, transparent);
+  background: transparent;
+  color: var(--color-dark-brown);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease-out,
+    border-style 140ms ease-out,
+    border-color 140ms ease-out;
+
+  &:hover {
+    background-color: color-mix(in oklab, var(--color-light-brown) 60%, transparent);
+    border-style: solid;
+    border-color: color-mix(in oklab, var(--color-dark-brown) 45%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-brown);
+    outline-offset: 2px;
+  }
+}
+
+.legendDot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.legendSwatch {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 0.2rem;
+}
+
+.legendSwatchUpcoming {
+  background-color: var(--color-brown);
+}
+
+.legendSwatchHappening {
+  background-color: var(--color-green);
+}
+
+.legendSwatchExpired {
+  background-color: color-mix(in oklab, var(--color-dark-brown) 35%, var(--color-light-brown));
+}
+
+.dayDetail {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 2;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  margin-top: 0.4rem;
+  padding: 0.6rem;
+  border-radius: 0.65rem;
+  // Matches the event card background ($card-bg in EventCard.module.scss).
+  background-color: #f4dfc0;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  box-shadow: 0 4px 12px rgba(58, 36, 25, 0.18);
+}
+
+.dayDetailUp {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 0.4rem;
+}
+
+.dayDetailHeader {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-brown);
+}

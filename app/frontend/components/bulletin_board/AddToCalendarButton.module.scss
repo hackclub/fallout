@@ -1,0 +1,139 @@
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  background-color: color-mix(in oklab, var(--color-light-brown) 60%, transparent);
+  color: var(--color-dark-brown);
+
+  cursor: pointer;
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out,
+    color 160ms ease-out;
+
+  &:hover {
+    background-color: var(--color-light-brown);
+    border-color: color-mix(in oklab, var(--color-dark-brown) 45%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-brown);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.triggerIconOnly {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+}
+
+.triggerLabeled {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.triggerIcon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.popoverShield {
+  position: fixed;
+  inset: 0;
+  // Must sit above the highest-bumped Inertia modal — application.css bumps the event detail
+  // modal to z-index 10100 when it stacks on top of the CalendarViewModal (10040), so the
+  // popover (opened from the event detail's "Add to calendar" button) needs to clear that.
+  z-index: 10120;
+  background-color: rgba(58, 36, 25, 0.18);
+}
+
+.popover {
+  position: fixed;
+  // See .popoverShield — must clear the event detail modal's bumped z-index of 10100.
+  z-index: 10121;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+
+  min-width: 14rem;
+  padding: 0.4rem;
+  border-radius: 0.75rem;
+  // Matches the event card background ($card-bg in EventCard.module.scss).
+  background-color: #f4dfc0;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 30%, transparent);
+  box-shadow:
+    0 4px 12px rgba(58, 36, 25, 0.18),
+    0 16px 32px rgba(58, 36, 25, 0.16);
+}
+
+.popoverHeading {
+  padding: 0.4rem 0.6rem 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-brown);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--color-dark-brown);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 140ms ease-out;
+
+  &:hover {
+    background-color: color-mix(in oklab, var(--color-light-brown) 70%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-brown);
+    outline-offset: -2px;
+  }
+}
+
+.optionIcon {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  color: var(--color-brown);
+}
+
+.optionLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.optionSub {
+  font-size: 0.6875rem;
+  color: var(--color-brown);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

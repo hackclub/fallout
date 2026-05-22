@@ -20,13 +20,14 @@ class BulletinBoardController < ApplicationController
   ].join(" OR ").freeze
   PROJECT_ACTIVITY_NULL_CURSOR_SQL = "#{PROJECT_ACTIVITY_SQL} IS NULL AND projects.id < :cursor_id".freeze
 
-  allow_unauthenticated_access only: %i[index search event] # Public community hub and Explore feed.
-  allow_trial_access only: %i[index search event] # Public community hub, trial users welcome
-  skip_onboarding_redirect only: %i[index search event] # Public pages should not force account onboarding.
-  skip_after_action :verify_authorized, only: %i[index search event] # No authorizable resource (event detail is public)
+  allow_unauthenticated_access only: %i[index search event events_feed event_ics] # Public community hub, Explore feed, and ICS exports.
+  allow_trial_access only: %i[index search event events_feed event_ics] # Public community hub, trial users welcome
+  skip_onboarding_redirect only: %i[index search event events_feed event_ics] # Public pages should not force account onboarding.
+  skip_after_action :verify_authorized, only: %i[index search event events_feed event_ics] # No authorizable resource (event detail and ICS are public)
   # Explore uses explicit public_for_explore scopes for projects and journals, so public visibility
   # is enforced without exposing owner/collaborator-only policy scopes through this public page.
-  skip_after_action :verify_policy_scoped, only: %i[index search event]
+  # ICS endpoints only expose public bulletin events (drafts excluded at the query level).
+  skip_after_action :verify_policy_scoped, only: %i[index search event events_feed event_ics]
   before_action :set_project_unfurl_meta, only: :index
 
   def index
@@ -66,6 +67,30 @@ class BulletinBoardController < ApplicationController
       event: serialize_bulletin_event(@event),
       is_modal: request.headers["X-InertiaUI-Modal"].present?
     }
+  end
+
+  # iCalendar subscription feed — drafts excluded; events expired more than ~30 days ago
+  # are dropped so the feed doesn't grow without bound while subscribers still see a short
+  # history window after an event ends.
+  def events_feed
+    events = BulletinEvent.where.not(starts_at: nil)
+                          .where("ends_at IS NULL OR ends_at > ?", 30.days.ago)
+                          .order(starts_at: :asc)
+
+    body = BulletinEventIcsGenerator.call(events: events, host: request.host, feed: true)
+
+    # Bypass CDN/proxy caching so admin edits reach subscribers as fast as their calendar
+    # client refreshes (cadence is hinted via REFRESH-INTERVAL in the ICS body, not the server).
+    response.set_header("Cache-Control", "no-store, max-age=0")
+    send_data body, type: "text/calendar; charset=utf-8", disposition: "inline", filename: "fallout-events.ics"
+  end
+
+  # Single-event ICS download for "Add to calendar". Drafts excluded same as #event.
+  def event_ics
+    event = BulletinEvent.where.not(starts_at: nil).find(params[:id])
+    body = BulletinEventIcsGenerator.call(events: [ event ], host: request.host, feed: false)
+
+    send_data body, type: "text/calendar; charset=utf-8", disposition: "attachment", filename: "fallout-event-#{event.id}.ics"
   end
 
   private

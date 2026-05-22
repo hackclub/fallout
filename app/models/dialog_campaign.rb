@@ -16,7 +16,7 @@
 #
 # Foreign Keys
 #
-#  fk_rails_...  (user_id => users.id)
+#  dialog_campaigns_user_id_fkey  (user_id => users.id)
 #
 class DialogCampaign < ApplicationRecord
   belongs_to :user

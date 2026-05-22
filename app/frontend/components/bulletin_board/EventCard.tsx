@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { AnimatePresence, motion, useIsPresent, useSpring, type MotionValue } from 'motion/react'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { DateTime } from 'luxon'
+import AddToCalendarButton from '@/components/bulletin_board/AddToCalendarButton'
 import ImagePlaceholder from '@/components/shared/ImagePlaceholder'
 import MarqueeText from '@/components/shared/MarqueeText'
 import { SlidingNumber } from '@/components/shared/SlidingNumber'
@@ -242,14 +243,17 @@ export default function EventCard({ event, now }: Props) {
             <MarqueeText text={whenText} className={styles.whenPrimary} />
             {detailText && <span className={styles.whenSecondary}>{detailText}</span>}
           </div>
-          <motion.span
-            layout
-            transition={{ type: 'spring', stiffness: 320, damping: 28, mass: 0.5 }}
-            className={clsx(styles.status, status === 'happening' && styles.statusHappening)}
-            style={{ backgroundColor: pillBg, color: pillColor }}
-          >
-            {status === 'happening' ? 'Happening now' : 'Upcoming'}
-          </motion.span>
+          <div className={styles.statusRow}>
+            <motion.span
+              layout
+              transition={{ type: 'spring', stiffness: 320, damping: 28, mass: 0.5 }}
+              className={clsx(styles.status, status === 'happening' && styles.statusHappening)}
+              style={{ backgroundColor: pillBg, color: pillColor }}
+            >
+              {status === 'happening' ? 'Happening now' : 'Upcoming'}
+            </motion.span>
+            <AddToCalendarButton event={event} variant="iconOnly" />
+          </div>
         </div>
 
         {timer && <EventTimer config={timer} progress={showProgressBar ? progressSpring : undefined} />}

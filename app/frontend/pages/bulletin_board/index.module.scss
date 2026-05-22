@@ -96,6 +96,7 @@ $beige: var(--color-light-brown);
   gap: 0.75rem;
 }
 
+
 .eventCountLine {
   display: inline-flex;
   flex-wrap: wrap;
@@ -171,6 +172,58 @@ $beige: var(--color-light-brown);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.eventsActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.toolbarButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  padding: 0.4rem 0.8rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
+  background-color: color-mix(in oklab, var(--color-light-brown) 55%, transparent);
+  color: var(--color-dark-brown);
+
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out;
+
+  &:hover {
+    background-color: var(--color-light-brown);
+    border-color: color-mix(in oklab, var(--color-dark-brown) 45%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-brown);
+    outline-offset: 2px;
+  }
+}
+
+.toolbarIcon {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+
+.toolbarLabel {
+  white-space: nowrap;
 }
 
 .pagination {
@@ -183,34 +236,26 @@ $beige: var(--color-light-brown);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.25rem;
+  height: 2.25rem;
   padding: 0;
-  border: 2px solid var(--color-dark-brown);
-  border-bottom-width: 4px;
-  border-right-width: 4px;
+  border: 1px solid color-mix(in oklab, var(--color-dark-brown) 25%, transparent);
   border-radius: 0.5rem;
-  background-color: var(--color-light-brown);
+  background-color: color-mix(in oklab, var(--color-light-brown) 55%, transparent);
   color: var(--color-dark-brown);
   cursor: pointer;
   transition:
-    transform 100ms ease-out,
-    border-width 100ms ease-out,
-    background-color 120ms ease-out,
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
     opacity 120ms ease-out;
 
   &:hover:not(:disabled) {
-    background-color: $beige;
-  }
-
-  &:active:not(:disabled) {
-    transform: translate(2px, 2px);
-    border-bottom-width: 2px;
-    border-right-width: 2px;
+    background-color: var(--color-light-brown);
+    border-color: color-mix(in oklab, var(--color-dark-brown) 45%, transparent);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--color-dark-brown);
+    outline: 2px solid var(--color-brown);
     outline-offset: 2px;
   }
 
@@ -221,8 +266,8 @@ $beige: var(--color-light-brown);
 }
 
 .pageArrow {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .pageInfo {
@@ -318,7 +363,7 @@ $beige: var(--color-light-brown);
 .lightbox {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 10200;
 
   display: flex;
   align-items: center;
