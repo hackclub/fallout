@@ -11,7 +11,7 @@ class YouTubeVideoRefetchJob < ApplicationJob
     video = YouTubeVideo.find_by(id: video_id)
     return unless video
 
-    video.refetch_data! if video.duration_seconds.nil?
+    video.refetch_data! if video.duration_seconds.nil? || video.was_live?
     return unless video.duration_seconds.present?
 
     recording = video.recording

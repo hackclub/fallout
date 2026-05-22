@@ -47,6 +47,8 @@ module YouTubeService
 
     video = YouTubeVideo.create!(attrs.merge(last_refreshed_at: Time.current))
     YouTubeVideoRefetchJob.perform_later(video.id) if video.duration_seconds.nil?
+    # Re-fetch after 1 day for recently ended live streams so YouTube's processed duration replaces the fallback.
+    YouTubeVideoRefetchJob.set(wait: 1.day).perform_later(video.id) if video.was_live?
     video
   rescue Faraday::Error
     nil
@@ -84,6 +86,13 @@ module YouTubeService
     streaming = item["liveStreamingDetails"]
 
     duration = parse_iso8601_duration(content["duration"])
+    # For recently ended live streams, YouTube may return "P0D" until processing completes.
+    # Fall back to actualEndTime - actualStartTime from liveStreamingDetails.
+    if duration.nil? || duration == 0
+      start_time = streaming&.dig("actualStartTime")
+      end_time = streaming&.dig("actualEndTime")
+      duration = (Time.parse(end_time) - Time.parse(start_time)).to_i if start_time.present? && end_time.present?
+    end
     # `liveBroadcastContent` is "live"/"upcoming" only while the stream is active;
     # finished live streams return "none". `liveStreamingDetails.actualStartTime`
     # is set on any video that was ever a live broadcast (past or present).
