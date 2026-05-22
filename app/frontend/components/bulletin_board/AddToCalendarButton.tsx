@@ -86,73 +86,77 @@ export default function AddToCalendarButton({ event, variant = 'iconOnly', ariaL
   const downloadUrl = icsDownloadUrl(event.id)
 
   const popover =
-    open && position && typeof document !== 'undefined'
+    typeof document !== 'undefined'
       ? createPortal(
           <AnimatePresence>
-            <motion.div
-              key="shield"
-              className={styles.popoverShield}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                closePopover()
-              }}
-              role="presentation"
-            />
-            <motion.div
-              key="popover"
-              role="menu"
-              className={styles.popover}
-              style={{ top: position.top, left: position.left, width: POPOVER_WIDTH }}
-              initial={{ opacity: 0, y: -4, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.97 }}
-              transition={{ type: 'spring', stiffness: 360, damping: 28, mass: 0.4 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className={styles.popoverHeading}>Add to calendar</div>
-              {googleUrl && (
-                <a
-                  href={googleUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.option}
-                  role="menuitem"
-                  onClick={closePopover}
-                >
-                  <ExternalLink className={styles.optionIcon} aria-hidden />
-                  <span className={styles.optionLabel}>Google Calendar</span>
-                </a>
-              )}
-              <a
-                href={downloadUrl}
-                className={styles.option}
-                role="menuitem"
-                download={`fallout-event-${event.id}.ics`}
-                onClick={closePopover}
+            {open && position && (
+              <motion.div
+                key="shield"
+                className={styles.popoverShield}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  closePopover()
+                }}
+                role="presentation"
+              />
+            )}
+            {open && position && (
+              <motion.div
+                key="popover"
+                role="menu"
+                className={styles.popover}
+                style={{ top: position.top, left: position.left, width: POPOVER_WIDTH }}
+                initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                transition={{ type: 'spring', stiffness: 360, damping: 28, mass: 0.4 }}
+                onClick={(e) => e.stopPropagation()}
               >
-                <Download className={styles.optionIcon} aria-hidden />
-                <span className={styles.optionLabel}>Apple / Outlook</span>
-                <span className={styles.optionSub}>.ics file</span>
-              </a>
-              {outlookUrl && (
+                <div className={styles.popoverHeading}>Add to calendar</div>
+                {googleUrl && (
+                  <a
+                    href={googleUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.option}
+                    role="menuitem"
+                    onClick={closePopover}
+                  >
+                    <ExternalLink className={styles.optionIcon} aria-hidden />
+                    <span className={styles.optionLabel}>Google Calendar</span>
+                  </a>
+                )}
                 <a
-                  href={outlookUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={downloadUrl}
                   className={styles.option}
                   role="menuitem"
+                  download={`fallout-event-${event.id}.ics`}
                   onClick={closePopover}
                 >
-                  <ExternalLink className={styles.optionIcon} aria-hidden />
-                  <span className={styles.optionLabel}>Outlook.com</span>
+                  <Download className={styles.optionIcon} aria-hidden />
+                  <span className={styles.optionLabel}>Apple / Outlook</span>
+                  <span className={styles.optionSub}>.ics file</span>
                 </a>
-              )}
-            </motion.div>
+                {outlookUrl && (
+                  <a
+                    href={outlookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.option}
+                    role="menuitem"
+                    onClick={closePopover}
+                  >
+                    <ExternalLink className={styles.optionIcon} aria-hidden />
+                    <span className={styles.optionLabel}>Outlook.com</span>
+                  </a>
+                )}
+              </motion.div>
+            )}
           </AnimatePresence>,
           document.body,
         )

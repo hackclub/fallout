@@ -42,10 +42,11 @@ function buildMonthGrid(monthAnchor: DateTime, events: SerializedBulletinEvent[]
       if (!event.starts_at) return false
       const start = DateTime.fromISO(event.starts_at)
       if (!start.isValid) return false
-      const end = event.ends_at ? DateTime.fromISO(event.ends_at) : start
+      if (!event.ends_at) return start.hasSame(cursor, 'day')
+      const end = DateTime.fromISO(event.ends_at)
       if (!end.isValid) return false
       const eventInterval = Interval.fromDateTimes(start, end < start ? start : end)
-      return eventInterval.overlaps(dayInterval) || eventInterval.contains(dayStart) || eventInterval.contains(dayEnd)
+      return eventInterval.overlaps(dayInterval)
     })
 
     cells.push({
