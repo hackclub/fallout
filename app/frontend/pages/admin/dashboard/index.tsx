@@ -4,6 +4,7 @@ import { usePage } from '@inertiajs/react'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/admin/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/admin/ui/chart'
+import NumberPopIn from '@/components/admin/NumberPopIn'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 
 interface ReviewCountStat {
@@ -62,7 +63,10 @@ interface RowItem {
 
 function RankRow({ item, rank }: { item: RowItem; rank: number }) {
   return (
-    <div className="flex items-center gap-3 py-2 border-b last:border-0">
+    <div
+      className="t-row-enter flex items-center gap-3 py-2 border-b last:border-0"
+      style={{ animationDelay: `${Math.min(rank - 1, 8) * 30}ms` }}
+    >
       <div className="w-6 text-center text-sm font-bold text-muted-foreground shrink-0">{rank}</div>
       {item.avatar ? (
         <img src={item.avatar} className="size-7 rounded-full shrink-0" alt="" />
@@ -94,7 +98,7 @@ function LeaderboardCard({ title, this_week, all_time }: { title: string; this_w
   const direction = tab === 'this_week' ? 'slide-in-from-left-2' : 'slide-in-from-right-2'
 
   return (
-    <Card className="max-w-full">
+    <Card className="t-card-lift max-w-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
       </CardHeader>
@@ -170,7 +174,7 @@ export default function AdminDashboardIndex() {
           all_time={toTimeRows(stats.all_time)}
         />
         <div className="flex flex-col gap-4 min-w-0">
-          <Card className="max-w-full">
+          <Card className="t-card-lift max-w-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Unreviewed Ships</CardTitle>
             </CardHeader>
@@ -221,24 +225,28 @@ export default function AdminDashboardIndex() {
               </ChartContainer>
             </CardContent>
           </Card>
-          <Card className="max-w-full">
+          <Card className="t-card-lift max-w-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Requirements Checks (Last 24h)</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold tabular-nums">{recent_activity.count}</p>
+              <p className="text-3xl font-bold tabular-nums">
+                <NumberPopIn value={recent_activity.count} />
+              </p>
               <p className="text-sm text-muted-foreground mt-1">ships reviewed</p>
             </CardContent>
           </Card>
-          <Card className="max-w-full">
+          <Card className="t-card-lift max-w-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Avg. Requirements Check Turnaround (24h)</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold tabular-nums">
-                {recent_activity.avg_turnaround_seconds != null
-                  ? formatDuration(recent_activity.avg_turnaround_seconds)
-                  : '—'}
+                {recent_activity.avg_turnaround_seconds != null ? (
+                  <NumberPopIn value={formatDuration(recent_activity.avg_turnaround_seconds)} />
+                ) : (
+                  '—'
+                )}
               </p>
             </CardContent>
           </Card>
