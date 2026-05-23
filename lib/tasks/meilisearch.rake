@@ -4,7 +4,7 @@ namespace :meilisearch do
   # resources. Pending MeilisearchReindexJob ready/failed executions are cleared first
   # — the bulk reindex makes them redundant. Live enqueues that arrive while paused
   # also get cleared at the end (same reasoning) before the queue is unpaused.
-  desc "Reindex all searchable models into Meilisearch (Project + JournalEntry)"
+  desc "Reindex all searchable models into Meilisearch (Project + JournalEntry + User)"
   task reindex: :environment do
     queue = "meilisearch"
     paused = SolidQueue::Pause.find_or_create_by!(queue_name: queue)
@@ -13,7 +13,7 @@ namespace :meilisearch do
     begin
       clear_redundant_meilisearch_jobs!
 
-      [ Project, JournalEntry ].each_with_index do |model, i|
+      [ Project, JournalEntry, User ].each_with_index do |model, i|
         sleep 5 if i.positive? # let Meilisearch settle between models so memory spikes don't overlap
         puts "Reindexing #{model.name} (#{model.count} records)…"
         model.ms_reindex!

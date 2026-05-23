@@ -7,8 +7,21 @@ class Admin::ProjectsController < Admin::ApplicationController
     base_scope = base_scope.where(is_unlisted: false) if params[:hide_unlisted] == "1"
     base_scope = base_scope.where("EXISTS (SELECT 1 FROM journal_entries WHERE journal_entries.project_id = projects.id AND journal_entries.discarded_at IS NULL)") if params[:with_journals] == "1"
     search_scope = base_scope
-    search_scope = search_scope.search_for(params[:query]) if params[:query].present?
-    @pagy, @projects = pagy(search_scope.order(created_at: :desc))
+    if params[:query].present?
+      # Meilisearch returns a relevance-ordered list of IDs. Re-apply via a positional
+      # ORDER to preserve relevance — keeps typo-tolerant / partial-word matches at the
+      # top instead of sinking to the bottom under created_at desc.
+      ranked_ids = Project.ms_search(params[:query], limit: 200).map(&:id)
+      if ranked_ids.any?
+        order_sql = ActiveRecord::Base.send(:sanitize_sql_array, [ "array_position(ARRAY[?]::bigint[], projects.id)", ranked_ids ])
+        search_scope = search_scope.where(id: ranked_ids).reorder(Arel.sql(order_sql))
+      else
+        search_scope = search_scope.none
+      end
+      @pagy, @projects = pagy(search_scope)
+    else
+      @pagy, @projects = pagy(search_scope.order(created_at: :desc))
+    end
     project_ids = @projects.map(&:id)
     @entry_counts = JournalEntry.where(project_id: project_ids, discarded_at: nil).group(:project_id).count
     @last_entries = JournalEntry.where(project_id: project_ids, discarded_at: nil).group(:project_id).maximum(:created_at)

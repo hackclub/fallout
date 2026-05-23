@@ -1,16 +1,20 @@
-import { useState, useMemo, useCallback, useEffect, memo } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react'
 import type { ReactNode } from 'react'
 import { Link, router, usePage } from '@inertiajs/react'
 import { useReviewHeartbeat } from '@/hooks/useReviewHeartbeat'
+import { useReviewShortcuts } from '@/hooks/useReviewShortcuts'
 import ReviewLayout from '@/layouts/ReviewLayout'
 import HoursDisplay from '@/components/admin/HoursDisplay'
 import { WaitingLabel } from '@/components/admin/WaitingLabel'
 import { ReviewStatusBadge } from '@/components/admin/ReviewStatusBadge'
+import { ShortcutHelpDialog, type ShortcutEntry } from '@/components/admin/ShortcutHelpDialog'
 import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
+import { Kbd } from '@/components/admin/ui/kbd'
 import { Separator } from '@/components/admin/ui/separator'
 import { Input } from '@/components/admin/ui/input'
 import { Textarea } from '@/components/admin/ui/textarea'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/admin/ui/tooltip'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -37,6 +41,8 @@ import {
   ChevronDownIcon,
   ArrowUpRightIcon,
   CopyIcon,
+  KeyboardIcon,
+  CornerDownLeftIcon,
 } from 'lucide-react'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import RepoTree from '@/components/admin/RepoTree'
@@ -196,6 +202,7 @@ function CollapsibleCard({
     }
     return defaultOpen
   })
+  const bodyRef = useRef<HTMLDivElement>(null)
   const toggle = () =>
     setOpen((v) => {
       const next = !v
@@ -206,21 +213,47 @@ function CollapsibleCard({
       }
       return next
     })
+
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el) return
+    if (open) {
+      el.style.maxHeight = el.scrollHeight + 'px'
+    } else {
+      // Snap to current rendered height first (avoids jump when collapsing mid-animation)
+      el.style.maxHeight = el.scrollHeight + 'px'
+      // Force reflow so the browser registers the explicit value before animating to 0
+      el.getBoundingClientRect()
+      el.style.maxHeight = '0px'
+    }
+  }, [open])
+
   return (
     <div className={`rounded-md border overflow-hidden ${borderClass || 'border-border'}`}>
       <button
         onClick={toggle}
         className="w-full flex items-center gap-2 px-3 py-2 bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer text-left"
+        data-card-key={storageKey}
       >
         <span className="text-sm font-semibold shrink-0">{title}</span>
         {summary && <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate">{summary}</span>}
         {!summary && <span className="flex-1" />}
         {trailing}
         <ChevronDownIcon
-          className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`}
+          className={`size-3.5 shrink-0 text-muted-foreground transition-transform duration-500 ${open ? '' : '-rotate-90'}`}
+          style={{ transitionTimingFunction: 'cubic-bezier(0.19, 1, 0.22, 1)' }}
         />
       </button>
-      {open && children}
+      <div
+        ref={bodyRef}
+        style={{
+          maxHeight: open ? (bodyRef.current?.scrollHeight ?? 'none') : '0px',
+          overflow: 'hidden',
+          transition: 'max-height 500ms cubic-bezier(0.19, 1, 0.22, 1)',
+        }}
+      >
+        {children}
+      </div>
     </div>
   )
 }
@@ -265,6 +298,7 @@ function PreflightResults({ checks }: { checks: PreflightCheck[] }) {
       defaultOpen={issueCount > 0}
       storageKey="design-preflight"
       borderClass={issueCount > 0 ? 'border-amber-300 dark:border-amber-800' : 'border-border'}
+      trailing={<Kbd variant="muted">1</Kbd>}
     >
       <div className="p-3 space-y-2">
         {issueCount > 0 && (
@@ -347,123 +381,210 @@ function TopBar({
   onFlag: (reason: string) => void
 }) {
   const [flagReason, setFlagReason] = useState('')
+  const hurtUrl = project.repo_link ? `https://hurt-xi.vercel.app/?repo=${encodeURIComponent(project.repo_link)}` : null
 
   return (
-    <div className="z-50 bg-muted/40 border-b border-border px-4 py-2 flex items-center gap-3 shrink-0">
-      <Button variant="outline" size="sm" asChild>
-        <Link href="/admin/reviews/design_reviews">End Session</Link>
-      </Button>
-      <Button variant="ghost" size="sm" onClick={onSkip}>
-        Skip
-      </Button>
+    <TooltipProvider delayDuration={150}>
+      <div className="z-50 bg-muted/40 border-b border-border px-4 py-3 flex flex-wrap items-center gap-2 shrink-0">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="default" asChild>
+              <Link href="/admin/reviews/design_reviews">
+                End Session
+                <Kbd variant="muted" className="ml-1">
+                  E
+                </Kbd>
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>End session</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="default" onClick={onSkip}>
+              Skip
+              <Kbd variant="muted" className="ml-1">
+                S
+              </Kbd>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Skip to next</TooltipContent>
+        </Tooltip>
 
-      <Separator orientation="vertical" className="h-6" />
+        <Separator orientation="vertical" className="h-6 hidden sm:block" />
 
-      <a
-        href={`/admin/projects/${project.id}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="font-semibold truncate hover:underline"
-      >
-        {project.name}
-      </a>
-      <span className="text-sm text-muted-foreground">
-        by{' '}
         <a
-          href={`/admin/users/${project.user_id}`}
+          href={`/admin/projects/${project.id}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:underline text-foreground"
+          className="font-semibold truncate hover:underline"
         >
-          {project.user_display_name}
+          {project.name}
         </a>
-        {project.collaborators.length > 0 && (
-          <>
-            {project.collaborators.map((c, i) => (
-              <span key={c.id}>
-                {i === 0 ? ' with ' : ', '}
-                <a
-                  href={`/admin/users/${c.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:underline text-foreground"
-                >
-                  {c.display_name}
-                </a>
-              </span>
-            ))}
-          </>
-        )}
-      </span>
-
-      <div className="flex items-center gap-2 ml-auto">
-        <Button variant="outline" size="sm" asChild>
-          <a href={`/admin/users/${project.user_id}`} target="_blank" rel="noopener noreferrer">
-            <UserIcon data-icon="inline-start" />
-            See User
+        <span className="text-sm text-muted-foreground hidden sm:inline">
+          by{' '}
+          <a
+            href={`/admin/users/${project.user_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline text-foreground"
+          >
+            {project.user_display_name}
           </a>
-        </Button>
-        {isSafeUrl(project.repo_link) && (
-          <Button variant="outline" size="sm" asChild>
-            <a href={project.repo_link!} target="_blank" rel="noopener noreferrer">
-              <GitBranchIcon data-icon="inline-start" />
-              Repo
-            </a>
-          </Button>
-        )}
-        {isSafeUrl(project.demo_link) && (
-          <Button variant="outline" size="sm" asChild>
-            <a href={project.demo_link!} target="_blank" rel="noopener noreferrer">
-              <GlobeIcon data-icon="inline-start" />
-              Demo
-            </a>
-          </Button>
-        )}
+          {project.collaborators.length > 0 && (
+            <>
+              {project.collaborators.map((c, i) => (
+                <span key={c.id}>
+                  {i === 0 ? ' with ' : ', '}
+                  <a
+                    href={`/admin/users/${c.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline text-foreground"
+                  >
+                    {c.display_name}
+                  </a>
+                </span>
+              ))}
+            </>
+          )}
+        </span>
 
-        <Button variant="outline" size="sm" onClick={onToggleNotes}>
-          <MessageSquareTextIcon data-icon="inline-start" />
-          Notes{notesCount > 0 && ` (${notesCount})`}
-        </Button>
-
-        {projectFlagged ? (
-          <Badge variant="destructive">Flagged</Badge>
-        ) : (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
-                <FlagIcon data-icon="inline-start" />
-                Flag Project
+        <div className="flex items-center flex-wrap gap-2 ml-auto">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="default" asChild>
+                <a href={`/admin/users/${project.user_id}`} target="_blank" rel="noopener noreferrer">
+                  <UserIcon data-icon="inline-start" />
+                  See User
+                  <Kbd variant="muted" className="ml-1">
+                    U
+                  </Kbd>
+                </a>
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Flag Project for Fraud</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will remove the project from all review queues. The user will not be notified — the project will
-                  still appear as pending to them.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <Textarea
-                placeholder="Reason for flagging..."
-                value={flagReason}
-                onChange={(e) => setFlagReason(e.target.value)}
-                className="min-h-20"
-              />
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  disabled={!flagReason.trim() || flagging}
-                  onClick={() => onFlag(flagReason.trim())}
-                >
+            </TooltipTrigger>
+            <TooltipContent>Open user in new tab</TooltipContent>
+          </Tooltip>
+          {isSafeUrl(project.repo_link) && (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="default" asChild>
+                    <a href={project.repo_link!} target="_blank" rel="noopener noreferrer">
+                      <GitBranchIcon data-icon="inline-start" />
+                      Repo
+                      <Kbd variant="muted" className="ml-1">
+                        G
+                      </Kbd>
+                    </a>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open repo on GitHub</TooltipContent>
+              </Tooltip>
+              {hurtUrl && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="default" asChild>
+                      <a href={hurtUrl} target="_blank" rel="noopener noreferrer">
+                        <ArrowUpRightIcon data-icon="inline-start" />
+                        HURT
+                        <Kbd variant="muted" className="ml-1">
+                          H
+                        </Kbd>
+                      </a>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Open repo in HURT</TooltipContent>
+                </Tooltip>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={() => navigator.clipboard.writeText(project.repo_link!)}
+                  >
+                    <CopyIcon className="size-3.5" />
+                    Copy
+                    <Kbd variant="muted" className="ml-1">
+                      C
+                    </Kbd>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy repo URL</TooltipContent>
+              </Tooltip>
+            </>
+          )}
+          {isSafeUrl(project.demo_link) && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="default" asChild>
+                  <a href={project.demo_link!} target="_blank" rel="noopener noreferrer">
+                    <GlobeIcon data-icon="inline-start" />
+                    Demo
+                    <Kbd variant="muted" className="ml-1">
+                      D
+                    </Kbd>
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Open demo</TooltipContent>
+            </Tooltip>
+          )}
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="default" onClick={onToggleNotes}>
+                <MessageSquareTextIcon data-icon="inline-start" />
+                Notes{notesCount > 0 && ` (${notesCount})`}
+                <Kbd variant="muted" className="ml-1">
+                  N
+                </Kbd>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Toggle notes</TooltipContent>
+          </Tooltip>
+
+          {projectFlagged ? (
+            <Badge variant="destructive">Flagged</Badge>
+          ) : (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="default">
+                  <FlagIcon data-icon="inline-start" />
                   Flag Project
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Flag Project for Fraud</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove the project from all review queues. The user will not be notified — the project
+                    will still appear as pending to them.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <Textarea
+                  placeholder="Reason for flagging..."
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  className="min-h-20"
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    disabled={!flagReason.trim() || flagging}
+                    onClick={() => onFlag(flagReason.trim())}
+                  >
+                    Flag Project
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   )
 }
 
@@ -523,6 +644,10 @@ export default function DesignReviewsShow({
   const [notes, setNotes] = useState<ReviewerNote[]>(reviewer_notes ?? [])
   const [checkpointLinkInput, setCheckpointLinkInput] = useState('')
   const [pendingStatus, setPendingStatus] = useState<'approved' | 'returned' | null>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [buildDialogOpen, setBuildDialogOpen] = useState(false)
+  const feedbackRef = useRef<HTMLTextAreaElement>(null)
+  const internalReasonRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (reviewer_notes) setNotes(reviewer_notes)
@@ -636,6 +761,138 @@ export default function DesignReviewsShow({
     },
     [review.id, feedback, internalReason, hoursAdjInput, koiAdjInput, skip],
   )
+
+  // Open a URL in a new tab — shared between toolbar buttons and shortcut handlers.
+  const openExternal = useCallback((url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }, [])
+
+  // Cmd/Ctrl+Enter inside the feedback textarea: choose between Approve and Return.
+  // Approve when an internal reason is present (it's required for approval anyway);
+  // otherwise treat the draft as a Return if feedback exists. Falls back to focusing
+  // the right textarea so the reviewer sees what's missing.
+  const handleModifierEnter = useCallback(() => {
+    if (isTerminal || submitting) return
+    const hasReason = internalReason.trim().length > 0
+    const hasFeedback = feedback.trim().length > 0
+    if (hasReason) {
+      handleSubmit('approved')
+    } else if (hasFeedback) {
+      handleSubmit('returned')
+    }
+  }, [isTerminal, submitting, feedback, internalReason, handleSubmit])
+
+  const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+  const modKey = isMac ? '⌘' : 'Ctrl'
+
+  const shortcutEntries: ShortcutEntry[] = useMemo(
+    () => [
+      { combo: [modKey, 'P'], key: 'cmd+p', description: 'Approve' },
+      { combo: [modKey, 'E'], key: 'cmd+e', description: 'Return (focus feedback if empty)' },
+      { key: 'S', description: 'Skip to next review' },
+      { key: 'E', description: 'End session' },
+      { key: 'N', description: 'Toggle reviewer notes' },
+      { key: 'U', description: 'Open user in new tab' },
+      { key: 'G', description: 'Open repo on GitHub' },
+      { key: 'H', description: 'Open repo in HURT' },
+      { key: 'D', description: 'Open demo link' },
+      { key: 'C', description: 'Copy repo URL' },
+      { combo: [modKey, 'B'], key: 'cmd+b', description: 'Move to Build Review' },
+      { combo: [modKey, 'J'], key: 'cmd+j', description: 'Focus Internal Reason' },
+      { combo: [modKey, 'F'], key: 'cmd+f', description: 'Focus Feedback' },
+      { combo: [modKey, '↵'], key: 'cmd+enter', description: 'Submit current draft' },
+      { key: '?', description: 'Show this cheatsheet' },
+      { key: '1', description: 'Toggle Preflight Checks' },
+      { key: '2', description: 'Toggle Previous Reviews' },
+      { key: '3', description: 'Toggle Repo Info' },
+      { key: '4', description: 'Toggle Journal' },
+    ],
+    [modKey],
+  )
+
+  useReviewShortcuts({
+    p: {
+      handler: () => {
+        if (isTerminal || submitting) return
+        if (!internalReason.trim()) {
+          notify('alert', 'Internal reason is required when approving.')
+          return
+        }
+        handleSubmit('approved')
+      },
+      requireModifier: true,
+    },
+    e: {
+      handler: (ev) => {
+        if (ev.metaKey || ev.ctrlKey) {
+          // ⌘E — Return
+          if (isTerminal || submitting) return
+          if (!feedback.trim()) {
+            feedbackRef.current?.focus()
+          } else {
+            handleSubmit('returned')
+          }
+        } else {
+          // E — End session
+          router.visit('/admin/reviews/design_reviews')
+        }
+      },
+      acceptsModifier: true,
+    },
+    s: { handler: () => !isTerminal && !submitting && handleSkip() },
+    n: { handler: () => setNotesOpen((v) => !v) },
+    u: { handler: () => openExternal(`/admin/users/${project.user_id}`) },
+    g: {
+      handler: () => {
+        if (isSafeUrl(project.repo_link)) openExternal(project.repo_link!)
+      },
+    },
+    h: {
+      handler: () => {
+        if (isSafeUrl(project.repo_link)) {
+          openExternal(`https://hurt-xi.vercel.app/?repo=${encodeURIComponent(project.repo_link!)}`)
+        }
+      },
+    },
+    d: {
+      handler: () => {
+        if (isSafeUrl(project.demo_link)) openExternal(project.demo_link!)
+      },
+    },
+    c: {
+      handler: () => {
+        if (project.repo_link) navigator.clipboard.writeText(project.repo_link)
+      },
+    },
+    '?': { handler: () => setShortcutsOpen((v) => !v) },
+    enter: { handler: handleModifierEnter, allowInTyping: true, requireModifier: true },
+    j: {
+      handler: () => {
+        internalReasonRef.current?.focus()
+        internalReasonRef.current?.select()
+      },
+      requireModifier: true,
+    },
+    f: {
+      handler: () => {
+        feedbackRef.current?.focus()
+        feedbackRef.current?.select()
+      },
+      requireModifier: true,
+    },
+    b: {
+      handler: () => {
+        if (can.swap_type && !isTerminal && !submitting) setBuildDialogOpen(true)
+      },
+      requireModifier: true,
+    },
+    '1': { handler: () => (document.querySelector('[data-card-key="design-preflight"]') as HTMLElement)?.click() },
+    '2': {
+      handler: () => (document.querySelector('[data-card-key="design-previous-reviews"]') as HTMLElement)?.click(),
+    },
+    '3': { handler: () => (document.querySelector('[data-card-key="design-repo"]') as HTMLElement)?.click() },
+    '4': { handler: () => (document.querySelector('[data-card-key="design-journal"]') as HTMLElement)?.click() },
+  })
 
   return (
     <>
@@ -796,6 +1053,7 @@ export default function DesignReviewsShow({
                     ))}
                   </span>
                 }
+                trailing={<Kbd variant="muted">2</Kbd>}
               >
                 <div className="divide-y divide-border">
                   {previous_reviews.map((r) => (
@@ -803,7 +1061,8 @@ export default function DesignReviewsShow({
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <ReviewStatusBadge status={r.status} />
                         <span className="text-xs text-muted-foreground shrink-0">
-                          {r.reviewer_display_name && `${r.reviewer_display_name} · `}{r.reviewed_at}
+                          {r.reviewer_display_name && `${r.reviewer_display_name} · `}
+                          {r.reviewed_at}
                         </span>
                       </div>
                       {r.feedback && (
@@ -849,14 +1108,19 @@ export default function DesignReviewsShow({
                     >
                       Open in HURT
                       <ArrowUpRightIcon className="size-3" />
+                      <Kbd className="ml-0.5 border-white/30 bg-white/10 text-white/80">H</Kbd>
                     </a>
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(project.repo_link!) }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigator.clipboard.writeText(project.repo_link!)
+                      }}
                       title="Copy repo URL"
                       className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                     >
                       <CopyIcon className="size-3.5" />
                     </button>
+                    <Kbd variant="muted">3</Kbd>
                   </div>
                 }
               >
@@ -880,6 +1144,7 @@ export default function DesignReviewsShow({
                   </>
                 }
                 defaultOpen
+                trailing={<Kbd variant="muted">4</Kbd>}
               >
                 <JournalEntriesList entries={allEntries} />
               </CollapsibleCard>
@@ -954,10 +1219,12 @@ export default function DesignReviewsShow({
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Submit Review</h3>
 
                 <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">
+                  <label className="text-xs text-muted-foreground flex items-center gap-1.5">
                     Internal Reason <span className="text-muted-foreground/60">(not shown to user)</span>
+                    <Kbd variant="muted">{modKey}J</Kbd>
                   </label>
                   <Textarea
+                    ref={internalReasonRef}
                     value={internalReason}
                     onChange={(e) => setInternalReason(e.target.value)}
                     placeholder="Justify your decision..."
@@ -966,10 +1233,12 @@ export default function DesignReviewsShow({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">
+                  <label className="text-xs text-muted-foreground flex items-center gap-1.5">
                     Feedback <span className="text-muted-foreground/60">(shown to user)</span>
+                    <Kbd variant="muted">{modKey}F</Kbd>
                   </label>
                   <Textarea
+                    ref={feedbackRef}
                     value={feedback}
                     onChange={(e) => setFeedback(e.target.value)}
                     placeholder="Feedback for the project author..."
@@ -1034,37 +1303,51 @@ export default function DesignReviewsShow({
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-2">
-                  <Button
-                    className="w-full"
-                    variant="default"
-                    disabled={submitting || !internalReason.trim()}
-                    onClick={() => handleSubmit('approved')}
-                    title={!internalReason.trim() ? 'Internal reason is required when approving' : undefined}
-                  >
-                    {submitting ? (
-                      <LoaderIcon className="size-4 animate-spin mr-1" />
-                    ) : (
-                      <CheckIcon data-icon="inline-start" />
-                    )}
-                    Approve
-                  </Button>
+                <div className="pt-2 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      disabled={submitting || !internalReason.trim()}
+                      onClick={() => handleSubmit('approved')}
+                      title={!internalReason.trim() ? 'Internal reason is required when approving' : undefined}
+                      className="border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-700 disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900"
+                    >
+                      {submitting && pendingStatus === 'approved' ? (
+                        <LoaderIcon data-icon="inline-start" className="animate-spin" />
+                      ) : (
+                        <CheckIcon data-icon="inline-start" />
+                      )}
+                      Approve
+                      <Kbd className="ml-1 border-emerald-300 bg-emerald-100 text-emerald-600 dark:border-emerald-700 dark:bg-emerald-900 dark:text-emerald-400">
+                        {modKey}P
+                      </Kbd>
+                    </Button>
 
-                  <Button
-                    className="w-full"
-                    variant="outline"
-                    disabled={submitting || !feedback.trim()}
-                    onClick={() => handleSubmit('returned')}
-                    title={!feedback.trim() ? 'Feedback is required when returning' : undefined}
-                  >
-                    Return (Needs Changes)
-                  </Button>
+                    <Button
+                      variant="outline"
+                      disabled={submitting || !feedback.trim()}
+                      onClick={() => handleSubmit('returned')}
+                      title={!feedback.trim() ? 'Feedback is required when returning' : undefined}
+                      className="border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-700 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+                    >
+                      {submitting && pendingStatus === 'returned' ? (
+                        <LoaderIcon data-icon="inline-start" className="animate-spin" />
+                      ) : (
+                        <CornerDownLeftIcon data-icon="inline-start" />
+                      )}
+                      Return
+                      <Kbd className="ml-1 border-amber-300 bg-amber-100 text-amber-600 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-400">
+                        {modKey}E
+                      </Kbd>
+                    </Button>
+                  </div>
 
                   {can.swap_type && (
-                    <AlertDialog>
+                    <AlertDialog open={buildDialogOpen} onOpenChange={setBuildDialogOpen}>
                       <AlertDialogTrigger asChild>
-                        <Button className="w-full" variant="ghost" size="sm" disabled={submitting}>
+                        <Button className="w-full justify-between" variant="ghost" size="sm" disabled={submitting}>
                           Move to Build Review
+                          <Kbd variant="muted">{modKey}B</Kbd>
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
@@ -1128,6 +1411,7 @@ export default function DesignReviewsShow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ShortcutHelpDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} entries={shortcutEntries} />
     </>
   )
 }
