@@ -146,15 +146,18 @@ module Reviewable
     end
 
     # Find the next review available for this user, respecting skip list.
-    # Prioritises the user's own claim first, then oldest pending.
+    # Prioritises the user's own claim first, then oldest ship (matches the
+    # pending queue table ordering — ship age is the true "how long the
+    # student has been waiting" signal, since DR/BR rows are created later
+    # than the ship.
     def next_eligible(user, skip_ids: [])
-      scope = available_for(user)
+      scope = available_for(user).joins(:ship)
       scope = scope.where.not(id: skip_ids) if skip_ids.present?
       scope.order(
         Arel::Nodes::Case.new
           .when(arel_table[:reviewer_id].eq(user.id)).then(0)
           .else(1),
-        :created_at
+        "ships.created_at ASC"
       ).first
     end
   end
