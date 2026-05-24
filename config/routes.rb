@@ -447,6 +447,11 @@ Rails.application.routes.draw do
 
   resource :streak_goal, only: [ :show, :create, :destroy ]
 
+  # Self-enrollment to the Professor (mentor) Slack channel — singleton because each user
+  # has at most one enrollment. `new` renders the confirmation modal page; `create` POSTs
+  # to the Professor API and stamps the timestamp.
+  resource :professor_enrollment, only: [ :new, :create ]
+
   # Campaign-based dialog system — marks a one-time dialog as seen via plain fetch (not Inertia)
   post "dialog_campaigns/:key/mark_seen", to: "dialog_campaigns#mark_seen", as: :mark_seen_dialog_campaign
 

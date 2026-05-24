@@ -71,6 +71,26 @@ class AuthController < ApplicationController
         SlackChannelInviteJob.perform_later(user.slack_id, User::SLACK_WELCOME_CHANNELS)
       end
 
+      # Trial users can sign up for a mentor during onboarding before they have a slack_id.
+      # Their intent is stored in onboarding_responses and applied here once HCA promotion
+      # gives them a slack_id. Mirrors the success path in OnboardingController#update.
+      #
+      # Non-blocking: a false/raise from ProfessorService leaves professor_enrolled_at nil
+      # and the auth flow continues — the bulletin board CTA stays visible so the user can
+      # retry from there. Don't fail the auth flow over a mentor-channel hiccup.
+      if trial_conversion && user.professor_enrollment_eligible? && !user.professor_enrolled?
+        intent = user.onboarding_responses.find_by(question_key: "professor_enrollment")
+        if intent&.answer_text == "enrolled"
+          begin
+            if ProfessorService.manual_add(slack_id: user.normalized_slack_id)
+              user.update!(professor_enrolled_at: Time.current)
+            end
+          rescue ProfessorService::ConfigError => e
+            ErrorReporter.capture_exception(e, level: :error, contexts: { professor: { action: "auth_create_promotion" } })
+          end
+        end
+      end
+
       # Claim any pending collaboration invites matching this user's email
       PendingCollaborationInvite.claim_all_for_email!(user.email, user)
 

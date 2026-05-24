@@ -11,6 +11,9 @@ export interface User {
   ban_type: BanType | null
   is_trial: boolean
   is_onboarded: boolean
+  professor_enrolled: boolean
+  professor_recently_enrolled: boolean
+  professor_enrollment_eligible: boolean
 }
 
 export type FlashData = Record<string, string>

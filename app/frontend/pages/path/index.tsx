@@ -444,7 +444,10 @@ export default function PathIndex() {
         initial={false}
         animate={{ opacity: pathIntro.flashVisible ? 1 : 0 }}
         transition={PATH_ENTRY_FADE_TRANSITION}
-        className="relative z-30"
+        // z must sit above .im-modal-container (z-index: 10000 in application.css) so toasts
+        // fired from inside a modal — like the professor enrollment success notice — are not
+        // hidden behind the modal backdrop while the modal plays its 300ms exit animation.
+        className="relative z-[10200]"
         style={{ pointerEvents: pathIntro.flashVisible ? 'auto' : 'none' }}
       >
         <FlashMessages />

@@ -35,7 +35,40 @@ class OnboardingController < ApplicationController
       return
     end
 
-    unless step["type"] == "dialogue"
+    case step["type"]
+    when "dialogue"
+      current_user.onboarding_responses.find_or_create_by!(question_key: step["key"])
+    when "professor_enrollment_cta"
+      action_taken = params[:action_taken].to_s
+      unless %w[enrolled skipped].include?(action_taken)
+        redirect_to onboarding_path, alert: "Invalid answer."
+        return
+      end
+
+      # "enrolled" hits the Professor API for eligible (non-trial + slack_id) users; on success we
+      # stamp professor_enrolled_at. On API failure or for ineligible users (trial users without a
+      # slack_id yet, or the rare verified user without one), we preserve the "enrolled" intent and
+      # leave professor_enrolled_at nil — the bulletin board CTA stays visible so the user can retry
+      # without seeing a misleading "skipped" state. AuthController#create re-attempts trial users'
+      # enrollment after HCA promotion populates slack_id, reading the same intent record.
+      if action_taken == "enrolled" && current_user.professor_enrollment_eligible? && !current_user.professor_enrolled?
+        begin
+          if ProfessorService.manual_add(slack_id: current_user.normalized_slack_id)
+            current_user.update!(professor_enrolled_at: Time.current)
+          end
+        rescue ProfessorService::ConfigError => e
+          ErrorReporter.capture_exception(e, level: :error, contexts: { professor: { action: "onboarding_update" } })
+        end
+      end
+
+      response = current_user.onboarding_responses.find_or_initialize_by(question_key: step["key"])
+      response.answer_text = action_taken
+      response.is_other = false
+      unless response.save
+        redirect_to onboarding_path, inertia: { errors: response.errors.messages }
+        return
+      end
+    else
       answer_text = params[:answer_text].to_s
       is_other = params[:is_other] == true || params[:is_other] == "true"
 
@@ -60,8 +93,6 @@ class OnboardingController < ApplicationController
         redirect_to onboarding_path, inertia: { errors: response.errors.messages }
         return
       end
-    else
-      current_user.onboarding_responses.find_or_create_by!(question_key: step["key"])
     end
 
     if last_step?(step["key"])

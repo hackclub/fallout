@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_15_223431) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_23_135240) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -928,6 +928,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_15_223431) do
     t.string "last_name"
     t.boolean "onboarded", default: false, null: false
     t.string "pending_lookout_tokens", default: [], null: false, array: true
+    t.datetime "professor_enrolled_at"
     t.string "pronouns"
     t.string "roles", default: [], null: false, array: true
     t.string "slack_id"

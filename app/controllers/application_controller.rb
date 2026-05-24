@@ -36,7 +36,13 @@ class ApplicationController < ActionController::Base
           is_banned: u.is_banned,
           ban_type: u.ban_type,
           is_trial: u.trial?,
-          is_onboarded: u.onboarded?
+          is_onboarded: u.onboarded?,
+          professor_enrolled: u.professor_enrolled?,
+          # True only during the ~24h window between signup and the Professor bot adding them to
+          # the Slack channel. Bulletin board uses this to switch from the "you'll get added in
+          # ~24 hours" wait message to the steady-state "you're signed up" message.
+          professor_recently_enrolled: u.professor_enrolled? && u.professor_enrolled_at > 24.hours.ago,
+          professor_enrollment_eligible: u.professor_enrollment_eligible? && !u.professor_enrolled?
         }
       }
     }
