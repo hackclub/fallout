@@ -59,11 +59,17 @@ class User < ApplicationRecord
   # generic MeilisearchReindexJob (auto_index/auto_remove are off for parity
   # with Project / JournalEntry — we control reindex enqueueing ourselves).
   meilisearch auto_index: false, auto_remove: false do
-    attribute :display_name, :email, :slack_id
+    attribute :display_name, :email, :slack_id, :hca_id, :first_name, :last_name
+    attribute :id_str do
+      id.to_s
+    end
+    attribute :full_name do
+      [ first_name, last_name ].compact.join(" ").presence
+    end
     attribute :created_at do
       created_at.to_i
     end
-    searchable_attributes %w[display_name email slack_id]
+    searchable_attributes %w[display_name full_name first_name last_name email slack_id hca_id id_str]
     ranking_rules %w[words typo proximity attribute sort exactness]
     sortable_attributes %w[created_at]
   end
