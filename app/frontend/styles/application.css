@@ -196,6 +196,9 @@
 .im-modal-wrapper:has(> .event-detail-modal-panel) {
   @apply flex items-center justify-center;
 }
+.im-modal-wrapper:has(> .professor-enrollment-modal-panel) {
+  @apply flex items-center justify-center;
+}
 /* Event detail modal sits above the state-driven CalendarViewModal overlay (z-index 10040) so
    clicking an event chip in the calendar opens the detail on top instead of behind it. */
 .im-dialog:has(.event-detail-modal-panel),

@@ -8,13 +8,7 @@ export function reviewStatusColor(status: string): string {
   return 'bg-zinc-100 text-zinc-600 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
 }
 
-export function ReviewStatusBadge({
-  status,
-  className,
-}: {
-  status: string
-  className?: string
-}) {
+export function ReviewStatusBadge({ status, className }: { status: string; className?: string }) {
   return (
     <span
       className={`text-xs px-1.5 py-0.5 rounded border font-medium ${reviewStatusColor(status)} ${className ?? ''}`}

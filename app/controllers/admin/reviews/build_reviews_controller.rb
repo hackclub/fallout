@@ -38,10 +38,13 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
 
     # Conversion preview — show "Approval will convert N koi → N gold" only when this
     # BR is the project's first approved build (i.e., would actually trigger conversion).
-    # We preview the project owner's conversion since they're the primary recipient;
-    # collaborators get their own conversion at the same trigger but aren't surfaced here.
+    # `project.built_irl?` now reflects the user's declaration, not history, so check the
+    # canonical ship history directly. We preview the project owner's conversion since
+    # they're the primary recipient; collaborators get their own conversion at the same
+    # trigger but aren't surfaced here.
+    already_built = project.ships.approved.where(ship_type: :build).exists?
     pending_conversion_koi =
-      if @review.pending? && !project.built_irl?
+      if @review.pending? && !already_built
         BuiltIrlConversionService.compute_amount(ship, project_owner)
       else
         0

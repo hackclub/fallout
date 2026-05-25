@@ -1,5 +1,13 @@
 import { useState, useMemo, useRef } from 'react'
-import { FolderIcon, FileIcon, ChevronRightIcon, ChevronDownIcon, RefreshCwIcon, ArrowUpRightIcon, CopyIcon } from 'lucide-react'
+import {
+  FolderIcon,
+  FileIcon,
+  ChevronRightIcon,
+  ChevronDownIcon,
+  RefreshCwIcon,
+  ArrowUpRightIcon,
+  CopyIcon,
+} from 'lucide-react'
 import type { RepoTreeEntry, RepoTreeData } from '@/types'
 
 function formatFileSize(bytes: number): string {
@@ -47,15 +55,7 @@ function buildTree(entries: RepoTreeEntry[]): TreeNode[] {
   return root
 }
 
-function TreeFolder({
-  node,
-  depth,
-  fileUrl,
-}: {
-  node: TreeNode
-  depth: number
-  fileUrl: (path: string) => string
-}) {
+function TreeFolder({ node, depth, fileUrl }: { node: TreeNode; depth: number; fileUrl: (path: string) => string }) {
   const [open, setOpen] = useState(depth === 0)
   const contentRef = useRef<HTMLDivElement>(null)
   const fullHeightRef = useRef<number>(0)
@@ -138,15 +138,7 @@ function TreeFolder({
   )
 }
 
-function FileEntry({
-  node,
-  depth,
-  fileUrl,
-}: {
-  node: TreeNode
-  depth: number
-  fileUrl: (path: string) => string
-}) {
+function FileEntry({ node, depth, fileUrl }: { node: TreeNode; depth: number; fileUrl: (path: string) => string }) {
   return (
     <a
       href={fileUrl(node.path)}

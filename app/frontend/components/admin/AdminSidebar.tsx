@@ -70,9 +70,7 @@ function buildNavSections(): { items: NavItem[] }[] {
       items: [{ label: 'Dashboard', href: '/admin', icon: LayoutDashboard, statKey: null }],
     },
     {
-      items: [
-        { label: 'RC Returns', href: '/admin/dashboard/requirements_design', icon: BadgeAlert, statKey: null },
-      ],
+      items: [{ label: 'RC Returns', href: '/admin/dashboard/requirements_design', icon: BadgeAlert, statKey: null }],
     },
     {
       items: [
@@ -220,10 +218,11 @@ function renderNavItem(item: NavItem, pathname: string, collapsed: boolean, admi
       key={item.href}
       {...linkProps}
       title={item.label}
-      className={`flex items-center gap-2 rounded-md px-2 py-1.5 h-8 text-sm whitespace-nowrap transition-colors ${
+      data-active={isActive}
+      className={`t-nav-item flex items-center gap-2 rounded-md px-2 py-1.5 h-8 text-sm whitespace-nowrap transition-[background-color,color,transform] duration-200 ease-out ${
         isActive
           ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-          : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+          : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:translate-x-0.5'
       }`}
     >
       <Icon className="size-4 shrink-0" />
@@ -231,7 +230,10 @@ function renderNavItem(item: NavItem, pathname: string, collapsed: boolean, admi
         <>
           <span className="flex-1">{item.label}</span>
           {stat != null && (
-            <span className="text-[10px] leading-none font-medium rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground">
+            <span
+              key={stat}
+              className="t-nav-badge text-[10px] leading-none font-medium rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground"
+            >
               {stat}
             </span>
           )}

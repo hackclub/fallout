@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { router, Link } from '@inertiajs/react'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -13,7 +13,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/admin/ui/dropdown-menu'
 import { DataTable } from '@/components/admin/DataTable'
-import { SearchIcon, SlidersHorizontalIcon } from 'lucide-react'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { SearchIcon, SlidersHorizontalIcon, Loader2 } from 'lucide-react'
 import type { AdminProjectRow, PagyProps } from '@/types'
 
 const columns: ColumnDef<AdminProjectRow>[] = [
@@ -113,6 +114,9 @@ export default function AdminProjectsIndex({
   const [includeDeleted, setIncludeDeleted] = useState(include_deleted)
   const [hideUnlisted, setHideUnlisted] = useState(hide_unlisted)
   const [withJournals, setWithJournals] = useState(with_journals)
+  const [searching, setSearching] = useState(false)
+  const debouncedQuery = useDebouncedValue(searchQuery, 250)
+  const initialQueryRef = useRef(query)
 
   function buildParams(
     overrides: Partial<{ query: string; deleted: boolean; unlisted: boolean; journals: boolean }> = {},
@@ -129,24 +133,58 @@ export default function AdminProjectsIndex({
     return params
   }
 
+  // Live search via Inertia partial reload — see admin/users/index for rationale.
+  useEffect(() => {
+    if (debouncedQuery === initialQueryRef.current) {
+      initialQueryRef.current = '__INITIAL_DONE__'
+      return
+    }
+    setSearching(true)
+    router.get('/admin/projects', buildParams({ query: debouncedQuery }), {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+      only: ['projects', 'pagy', 'query', 'total_count'],
+      onFinish: () => setSearching(false),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery])
+
   function search(e: React.FormEvent) {
     e.preventDefault()
-    router.get('/admin/projects', buildParams(), { preserveState: true })
+    router.get('/admin/projects', buildParams(), {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+      only: ['projects', 'pagy', 'query', 'total_count'],
+    })
   }
 
   function toggleDeleted(checked: boolean) {
     setIncludeDeleted(checked)
-    router.get('/admin/projects', buildParams({ deleted: checked }), { preserveState: true })
+    router.get('/admin/projects', buildParams({ deleted: checked }), {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+    })
   }
 
   function toggleUnlisted(checked: boolean) {
     setHideUnlisted(checked)
-    router.get('/admin/projects', buildParams({ unlisted: checked }), { preserveState: true })
+    router.get('/admin/projects', buildParams({ unlisted: checked }), {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+    })
   }
 
   function toggleJournals(checked: boolean) {
     setWithJournals(checked)
-    router.get('/admin/projects', buildParams({ journals: checked }), { preserveState: true })
+    router.get('/admin/projects', buildParams({ journals: checked }), {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+    })
   }
 
   return (
@@ -170,10 +208,12 @@ export default function AdminProjectsIndex({
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
               placeholder="Search projects..."
             />
+            {searching && (
+              <InputGroupAddon align="inline-end">
+                <Loader2 className="animate-spin text-muted-foreground" />
+              </InputGroupAddon>
+            )}
           </InputGroup>
-          <Button type="submit" variant="outline" className="hidden sm:flex">
-            Search
-          </Button>
         </form>
 
         <div className="ml-auto">

@@ -23,6 +23,7 @@
 #  last_name                   :string
 #  onboarded                   :boolean          default(FALSE), not null
 #  pending_lookout_tokens      :string           default([]), not null, is an Array
+#  professor_enrolled_at       :datetime
 #  pronouns                    :string
 #  roles                       :string           default([]), not null, is an Array
 #  slack_token                 :text
@@ -48,11 +49,26 @@
 class User < ApplicationRecord
   include Discardable
   include PgSearch::Model
+  include MeiliSearch::Rails
   include Flipper::Identifier # Enables per-user feature flags via Flipper
 
   has_paper_trail
 
   pg_search_scope :search, against: [ :display_name, :email ], using: { tsearch: { prefix: true } }
+
+  # Indexed in meilisearch for live admin search. Reindex happens via the
+  # generic MeilisearchReindexJob (auto_index/auto_remove are off for parity
+  # with Project / JournalEntry — we control reindex enqueueing ourselves).
+  meilisearch auto_index: false, auto_remove: false do
+    attribute :display_name, :email, :slack_id
+    attribute :created_at do
+      created_at.to_i
+    end
+    searchable_attributes %w[display_name email slack_id]
+    ranking_rules %w[words typo proximity attribute sort exactness]
+    sortable_attributes %w[created_at]
+  end
+  after_commit :enqueue_meilisearch_reindex
 
   scoped_search on: :id
   scoped_search on: :display_name, aliases: [ :name, :username ]
@@ -208,6 +224,17 @@ class User < ApplicationRecord
 
   def trial?
     false
+  end
+
+  def professor_enrolled?
+    professor_enrolled_at.present?
+  end
+
+  # Enrolling in the Professor program (signing up to be guided by a professor) requires a full
+  # HCA-linked account with a Slack ID, since the Professor API adds the user to a private Slack
+  # channel by their slack_id.
+  def professor_enrollment_eligible?
+    !trial? && slack_id.present?
   end
 
   def verified?
@@ -644,6 +671,10 @@ class User < ApplicationRecord
 
     invalid = roles - VALID_ROLES
     errors.add(:roles, "contain invalid values: #{invalid.join(', ')}") if invalid.any?
+  end
+
+  def enqueue_meilisearch_reindex
+    MeilisearchReindexJob.perform_later(self.class.name, id)
   end
 
   def self.determine_is_adult(identity)

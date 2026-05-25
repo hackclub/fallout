@@ -1,17 +1,20 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { router } from '@inertiajs/react'
+import { router, usePage } from '@inertiajs/react'
 import DialogueStep from '../../components/onboarding/DialogueStep'
 import SingleChoiceStep from '../../components/onboarding/SingleChoiceStep'
 import MultiChoiceStep from '../../components/onboarding/MultiChoiceStep'
+import ProfessorEnrollmentCtaStep from '../../components/onboarding/ProfessorEnrollmentCtaStep'
 import NavigationButtons from '../../components/onboarding/NavigationButtons'
 import ProgressBar from '@/components/shared/ProgressBar'
 import { clearPathEntryTransition, rememberPathEntryTransition } from '@/lib/pathTransition'
+import type { SharedProps } from '@/types'
 
 interface OnboardingStep {
   key: string
-  type: 'dialogue' | 'single_choice' | 'multi_choice'
+  type: 'dialogue' | 'single_choice' | 'multi_choice' | 'professor_enrollment_cta'
   prompt: string
   options?: string[]
+  body?: string
 }
 
 interface PageProps {
@@ -36,6 +39,7 @@ function parseExistingMulti(existing: { answer_text: string } | null): string[] 
 }
 
 function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_step_key }: PageProps) {
+  const authUser = usePage<SharedProps>().props.auth.user
   const [selected, setSelected] = useState<string | null>(
     step.type === 'single_choice' ? (existing_answer?.answer_text ?? null) : null,
   )
@@ -63,6 +67,9 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
   const hideGoBackForTransition = navigatingBack && step_index <= 1
 
   const isPromptComplete = !stepJustChanged && completedPromptStepKey === step.key
+  // professor_enrollment_cta has its own inline buttons, so the global Continue/Submit button is
+  // intentionally hidden for that step (hasAnswer stays false). The inline buttons drive submission
+  // via handleProfessorEnrollmentAction.
   const hasAnswer =
     step.type === 'dialogue' ||
     (step.type === 'single_choice' && !!selected) ||
@@ -141,6 +148,42 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
     )
   }
 
+  function submitProfessorEnrollment(stepKey: string, actionTaken: 'enrolled' | 'skipped') {
+    setProcessing(true)
+    router.post(
+      '/onboarding',
+      {
+        question_key: stepKey,
+        action_taken: actionTaken,
+      },
+      {
+        onFinish: () => {
+          if (window.location.pathname.startsWith('/onboarding')) clearPathEntryTransition()
+          setProcessing(false)
+          setFinalizingSubmit(false)
+          setExitingStepKey((current) => (current === stepKey ? null : current))
+        },
+      },
+    )
+  }
+
+  function handleProfessorEnrollmentAction(action: 'enrolled' | 'skipped') {
+    if (isBusy) return
+
+    setFinalizingSubmit(true)
+    if (isFinalStep) {
+      pendingFinalSubmissionRef.current = { stepKey: step.key, answerText: action }
+      setFinalStepSubmitted(true)
+      return
+    }
+
+    submitDelayRef.current = setTimeout(() => {
+      submitDelayRef.current = null
+      setExitingStepKey(step.key)
+      submitProfessorEnrollment(step.key, action)
+    }, submitMorphDelayMs)
+  }
+
   function handleContinue() {
     if (isBusy || !canContinue) return
 
@@ -172,7 +215,11 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
     submitDelayRef.current = setTimeout(() => {
       submitDelayRef.current = null
       rememberPathEntryTransition('onboarding-complete')
-      submitAnswer(stepKey, answerText)
+      if (step.type === 'professor_enrollment_cta') {
+        submitProfessorEnrollment(stepKey, answerText as 'enrolled' | 'skipped')
+      } else {
+        submitAnswer(stepKey, answerText)
+      }
     }, finalPathTransitionDelayMs)
   }
 
@@ -331,6 +378,18 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
             step={{ prompt: step.prompt, options: step.options }}
             selected={multiSelected}
             onToggle={handleMultiToggle}
+            onPromptComplete={() => setCompletedPromptStepKey(step.key)}
+          />
+        )}
+
+        {step.type === 'professor_enrollment_cta' && (
+          <ProfessorEnrollmentCtaStep
+            step={{ prompt: step.prompt, body: step.body }}
+            canEnroll={!!authUser?.professor_enrollment_eligible}
+            isTrial={!!authUser?.is_trial}
+            submitting={isBusy}
+            onEnroll={() => handleProfessorEnrollmentAction('enrolled')}
+            onSkip={() => handleProfessorEnrollmentAction('skipped')}
             onPromptComplete={() => setCompletedPromptStepKey(step.key)}
           />
         )}

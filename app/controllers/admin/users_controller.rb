@@ -6,8 +6,21 @@ class Admin::UsersController < Admin::ApplicationController
     base_scope = base_scope.verified unless params[:include_trial] == "1"
     base_scope = base_scope.kept unless params[:include_deleted] == "1"
     search_scope = base_scope
-    search_scope = search_scope.search_for(params[:query]) if params[:query].present?
-    @pagy, @users = pagy(search_scope.order(created_at: :desc))
+    if params[:query].present?
+      # Meilisearch returns a relevance-ordered list of IDs. Re-apply via a
+      # positional ORDER to preserve that order, otherwise typo-tolerant matches
+      # sink to the bottom and the visible result feels broken for short queries.
+      ranked_ids = User.ms_search(params[:query], limit: 200).map(&:id)
+      if ranked_ids.any?
+        order_sql = ActiveRecord::Base.send(:sanitize_sql_array, [ "array_position(ARRAY[?]::bigint[], users.id)", ranked_ids ])
+        search_scope = search_scope.where(id: ranked_ids).reorder(Arel.sql(order_sql))
+      else
+        search_scope = search_scope.none
+      end
+      @pagy, @users = pagy(search_scope)
+    else
+      @pagy, @users = pagy(search_scope.order(created_at: :desc))
+    end
     @projects_counts = Project.where(user_id: @users.map(&:id)).group(:user_id).count
 
     render inertia: {

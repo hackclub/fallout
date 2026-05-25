@@ -104,7 +104,7 @@ class ProjectsController < ApplicationController
     authorize @project
 
     render inertia: "projects/form", props: {
-      project: { name: "", description: "", repo_link: "" },
+      project: { name: "", description: "", repo_link: "", built_irl: false, demo_video_link: "" },
       title: "New Project",
       submit_url: projects_path,
       method: "post",
@@ -148,7 +148,9 @@ class ProjectsController < ApplicationController
         id: @project.id,
         name: @project.name,
         description: @project.description.to_s,
-        repo_link: @project.repo_link.to_s
+        repo_link: @project.repo_link.to_s,
+        built_irl: @project.built_irl?,
+        demo_video_link: @project.demo_video_link.to_s
       },
       title: "Edit Project",
       submit_url: project_path(@project),
@@ -217,7 +219,7 @@ class ProjectsController < ApplicationController
   end
 
   def project_params
-    params.expect(project: [ :name, :description, :repo_link ])
+    params.expect(project: [ :name, :description, :repo_link, :built_irl, :demo_video_link ])
   end
 
   def serialize_project_card(project)

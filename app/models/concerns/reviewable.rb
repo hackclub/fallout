@@ -18,9 +18,14 @@ module Reviewable
 
     scope :actively_claimed, -> { where("claim_expires_at > ?", Time.current) }
     scope :available_for, ->(user) {
+      # Use Arel so column refs are auto-qualified — callers may join :ship,
+      # which also has reviewer_id/claim_expires_at and would otherwise collide.
+      claim_expires_at = arel_table[:claim_expires_at]
+      reviewer_id = arel_table[:reviewer_id]
       pending.where(
-        "claim_expires_at IS NULL OR claim_expires_at <= :now OR reviewer_id = :uid",
-        now: Time.current, uid: user.id
+        claim_expires_at.eq(nil)
+          .or(claim_expires_at.lteq(Time.current))
+          .or(reviewer_id.eq(user.id))
       ).where.not(
         ship_id: Ship.where(project_id: ProjectFlag.select(:project_id)).select(:id)
       )
@@ -146,15 +151,18 @@ module Reviewable
     end
 
     # Find the next review available for this user, respecting skip list.
-    # Prioritises the user's own claim first, then oldest pending.
+    # Prioritises the user's own claim first, then oldest ship (matches the
+    # pending queue table ordering — ship age is the true "how long the
+    # student has been waiting" signal, since DR/BR rows are created later
+    # than the ship.
     def next_eligible(user, skip_ids: [])
-      scope = available_for(user)
+      scope = available_for(user).joins(:ship)
       scope = scope.where.not(id: skip_ids) if skip_ids.present?
       scope.order(
         Arel::Nodes::Case.new
           .when(arel_table[:reviewer_id].eq(user.id)).then(0)
           .else(1),
-        :created_at
+        "ships.created_at ASC"
       ).first
     end
   end

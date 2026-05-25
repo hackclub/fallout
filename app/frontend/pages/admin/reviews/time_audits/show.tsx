@@ -51,6 +51,7 @@ import {
   PauseIcon,
 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/admin/ui/tooltip'
+import { Kbd } from '@/components/admin/ui/kbd'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import type {
   TimeAuditReviewDetail,
@@ -1432,7 +1433,12 @@ function RecordingBlock({
               placeholder="1-2 line summary for downstream reviewers"
               className="h-14 text-sm resize-none"
             />
-            <Button variant={saved ? 'outline' : 'default'} className="w-full" disabled={saving} onClick={onSave}>
+            <Button
+              variant={saved ? 'outline' : 'default'}
+              className="w-full justify-between"
+              disabled={saving}
+              onClick={onSave}
+            >
               {saving ? (
                 <>
                   <LoaderIcon className="size-4 animate-spin mr-1" />
@@ -1447,6 +1453,7 @@ function RecordingBlock({
                 <>
                   <SaveIcon className="size-4 mr-1" />
                   Save
+                  <Kbd className="ml-1 border-white/30 bg-white/10 text-white/80">Shift↵</Kbd>
                 </>
               )}
             </Button>
@@ -1945,6 +1952,56 @@ export default function TimeAuditsShow({
     )
   }, [review.id, approvedSeconds, skip])
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Shift+Enter: save all unsaved recordings in the currently visible entry, then
+  // scroll to the next snap child. Works regardless of focus context.
+  const handleSaveAndNext = useCallback(async () => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const children = Array.from(container.children) as HTMLElement[]
+    // Find the child closest to the current scrollTop (snap-start alignment)
+    const scrollTop = container.scrollTop
+    const containerHeight = container.clientHeight
+    let currentIndex = 0
+    let minDist = Infinity
+    children.forEach((child, i) => {
+      const dist = Math.abs(child.offsetTop - scrollTop)
+      if (dist < minDist) {
+        minDist = dist
+        currentIndex = i
+      }
+    })
+    const entry = allEntries[currentIndex]
+    if (entry) {
+      // Save all recordings in the entry that have a non-empty description but aren't saved yet
+      const unsaved = entry.recordings.filter((r) => {
+        const recId = String(r.id)
+        const desc = annotations.recordings?.[recId]?.description?.trim() ?? ''
+        return desc.length > 0 && !savedRecordings.has(recId)
+      })
+      if (unsaved.length > 0) {
+        await Promise.all(unsaved.map((r) => handleSaveRecording(r.id)))
+      }
+    }
+    // Scroll to the next entry
+    const nextIndex = currentIndex + 1
+    if (nextIndex < children.length) {
+      children[nextIndex].scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [allEntries, annotations, savedRecordings, handleSaveRecording])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault()
+        handleSaveAndNext()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [handleSaveAndNext])
+
   return (
     <div className="h-screen flex flex-col overflow-hidden border-t-3 border-blue-500">
       <ReviewTopBar
@@ -1975,7 +2032,7 @@ export default function TimeAuditsShow({
         />
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto snap-y snap-mandatory">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto snap-y snap-mandatory">
         {allEntries.map((entry, i) => (
           <EntrySection
             key={entry.id}

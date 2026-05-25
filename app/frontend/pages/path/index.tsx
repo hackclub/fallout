@@ -9,6 +9,7 @@ import PathNode from '@/components/path/PathNode'
 import SignUpCta from '@/components/path/SignUpCta'
 import BgmPlayer from '@/components/path/BgmPlayer'
 import Header from '@/components/path/Header'
+import SubmissionCountdown from '@/components/path/SubmissionCountdown'
 import AnnouncementsBar from '@/components/announcements/AnnouncementsBar'
 import FlashMessages from '@/components/FlashMessages'
 import { notify } from '@/lib/notifications'
@@ -297,7 +298,15 @@ export default function PathIndex() {
           dialogOverlayOpen={isDialogOverlayOpen}
         />
       )),
-    [pathNodeCount, has_projects, journal_entry_count, critter_variants, pathIntro.active, readDocsNudge, isDialogOverlayOpen],
+    [
+      pathNodeCount,
+      has_projects,
+      journal_entry_count,
+      critter_variants,
+      pathIntro.active,
+      readDocsNudge,
+      isDialogOverlayOpen,
+    ],
   )
 
   useEffect(() => {
@@ -444,7 +453,10 @@ export default function PathIndex() {
         initial={false}
         animate={{ opacity: pathIntro.flashVisible ? 1 : 0 }}
         transition={PATH_ENTRY_FADE_TRANSITION}
-        className="relative z-30"
+        // z must sit above .im-modal-container (z-index: 10000 in application.css) so toasts
+        // fired from inside a modal — like the professor enrollment success notice — are not
+        // hidden behind the modal backdrop while the modal plays its 300ms exit animation.
+        className="relative z-[10200]"
         style={{ pointerEvents: pathIntro.flashVisible ? 'auto' : 'none' }}
       >
         <FlashMessages />
@@ -459,6 +471,16 @@ export default function PathIndex() {
       >
         <Header koiBalance={user.koi} goldBalance={user.gold} avatar={user.avatar} displayName={user.display_name} />
         <AnnouncementsBar />
+      </motion.div>
+
+      <motion.div
+        initial={false}
+        animate={{ opacity: pathIntro.hudVisible ? 1 : 0 }}
+        transition={PATH_ENTRY_FADE_TRANSITION}
+        className="fixed z-20 top-3 left-1/2 -translate-x-1/2 pointer-events-none"
+        style={{ pointerEvents: pathIntro.hudVisible ? 'auto' : 'none' }}
+      >
+        <SubmissionCountdown />
       </motion.div>
 
       <motion.div

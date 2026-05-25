@@ -30,6 +30,8 @@ export default function ProjectsForm({
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description)
   const [repoLink, setRepoLink] = useState(project.repo_link)
+  const [builtIrl, setBuiltIrl] = useState(project.built_irl)
+  const [demoVideoLink, setDemoVideoLink] = useState(project.demo_video_link)
   const [processing, setProcessing] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string[]>>({})
   const errors = Object.keys(formErrors).length > 0 ? formErrors : pageErrors
@@ -39,7 +41,15 @@ export default function ProjectsForm({
     if (processing) return
     setProcessing(true)
     setFormErrors({})
-    const data = { project: { name, description, repo_link: repoLink } }
+    const data = {
+      project: {
+        name,
+        description,
+        repo_link: repoLink,
+        built_irl: builtIrl,
+        demo_video_link: builtIrl ? demoVideoLink : '',
+      },
+    }
 
     if (!is_modal) {
       const options = {
@@ -128,6 +138,34 @@ export default function ProjectsForm({
               placeholder="https://github.com/..."
             />
           </div>
+
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={builtIrl}
+                onChange={(e) => setBuiltIrl(e.target.checked)}
+                className="accent-brown w-4 h-4"
+              />
+              <span className="text-sm font-bold text-dark-brown">Built irl?</span>
+            </label>
+          </div>
+
+          {builtIrl && (
+            <div>
+              <label htmlFor="demo_video_link" className="block text-sm font-bold text-dark-brown mb-1">
+                Demo video link
+              </label>
+              <Input
+                type="url"
+                id="demo_video_link"
+                value={demoVideoLink}
+                onChange={(e) => setDemoVideoLink(e.target.value)}
+                placeholder="https://youtube.com/..."
+                required
+              />
+            </div>
+          )}
 
           <div className="pt-2 mb-2">
             <Button type="submit" disabled={processing}>

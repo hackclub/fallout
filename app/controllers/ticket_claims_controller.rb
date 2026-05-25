@@ -16,7 +16,7 @@ class TicketClaimsController < ApplicationController
       can_claim: approved_hours >= TICKET_HOURS_THRESHOLD && !identity_blocked,
       identity_blocked: identity_blocked,
       identity_state: current_user.identity_gate_state,
-      already_claimed: current_user.ticket_claim.present?,
+      already_claimed: current_user.ticket_claim.present?
     }
   end
 

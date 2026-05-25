@@ -21,7 +21,7 @@ interface Totals {
   return_rate: number
 }
 
-interface Props extends PageProps{
+interface Props extends PageProps {
   leaderboard: LeaderboardRow[]
   totals: Totals
 }
@@ -66,7 +66,8 @@ export default function RequirementsDesignDashboard() {
         </Card>
       </div>
 
-      <Card><CardContent>
+      <Card>
+        <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
