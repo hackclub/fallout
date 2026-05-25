@@ -12,12 +12,21 @@ import type { PreflightCheck } from '@/types'
 
 type Step = 'guidelines' | 'checklist' | 'scan' | 'submitted'
 
-const CHECKLIST_ITEMS = [
+const DESIGN_CHECKLIST_ITEMS = [
   "My digital design is complete and I've tried my best to make sure it'll work",
   "I've documented my design and README so that others can replicate my design and understand how it works.",
   'My design is closer to a product than a demo. Components are well integrated: not handing in mid air, glued, taped, etc.',
   'My work is original. If I followed a tutorial, I made significant modifications and improvements to make it my own.',
   'I have an zine page: A5 sized, with required information and renders of my design.',
+]
+
+const BUILD_CHECKLIST_ITEMS = [
+  'I have a complete digital design that is up to date with my build.',
+  "I've built my digital design irl and updated my GitHub readme, repo, and zine to include details of it (i.e photos)",
+  "I've documented both my design, build process and README so that others can replicate my project and understand how it works.",
+  'My project is closer to a product than a demo. Components are well integrated: not handing in mid air, glued, taped, etc.',
+  'My work is original. If I followed a tutorial, I made significant modifications and improvements to make it my own.',
+  'I have an zine page: A5 sized, with required information and photos of my IRL build.',
 ]
 
 function SubmissionLayout({ title, children }: { title?: string; children: React.ReactNode }) {
@@ -46,17 +55,29 @@ function SubmissionLayout({ title, children }: { title?: string; children: React
   )
 }
 
-function GuidelinesStep({ onContinue }: { onContinue: () => void }) {
+function GuidelinesStep({ builtIrl, onContinue }: { builtIrl: boolean; onContinue: () => void }) {
   const [confirmed, setConfirmed] = useState(false)
 
   return (
     <SubmissionLayout title="Read The Guidelines">
       <p className="max-w-sm pb-6 py-4">
         Please read through our{' '}
-        <a href="/docs/requirements/submitting-design" className="underline uppercase" target="_blank">
+        <a
+          href={builtIrl ? '/docs/requirements/submitting-build' : '/docs/requirements/submitting-design'}
+          className="underline uppercase"
+          target="_blank"
+        >
           submission guidelines
         </a>{' '}
         before continuing.
+        {!builtIrl && (
+          <>
+            <br />
+            <span className="block pt-3 text-sm">
+              Already built your project IRL? You need to edit your project and mark it as built.
+            </span>
+          </>
+        )}
       </p>
       <div className="my-auto flex flex-col items-center pb-20">
         <img src="/icon/project.webp" className="w-24" alt="Project Icon"></img>
@@ -81,14 +102,17 @@ function GuidelinesStep({ onContinue }: { onContinue: () => void }) {
 
 function ChecklistStep({
   projectName,
+  builtIrl,
   onBack,
   onContinue,
 }: {
   projectName: string
+  builtIrl: boolean
   onBack: () => void
   onContinue: () => void
 }) {
-  const [checked, setChecked] = useState<boolean[]>(new Array(CHECKLIST_ITEMS.length).fill(false))
+  const items = builtIrl ? BUILD_CHECKLIST_ITEMS : DESIGN_CHECKLIST_ITEMS
+  const [checked, setChecked] = useState<boolean[]>(new Array(items.length).fill(false))
   const allChecked = checked.every(Boolean)
 
   function toggle(index: number) {
@@ -107,7 +131,7 @@ function ChecklistStep({
         projects.
       </p>
       <div className="w-full px-8 text-left space-y-3">
-        {CHECKLIST_ITEMS.map((item, i) => (
+        {items.map((item, i) => (
           <label key={i} className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -433,17 +457,18 @@ function SubmittedStep({ projectName, awaitingIdentity }: { projectName: string;
   )
 }
 
-export default function ShipsPreflight({ project }: { project: { id: number; name: string } }) {
+export default function ShipsPreflight({ project }: { project: { id: number; name: string; built_irl: boolean } }) {
   const [step, setStep] = useState<Step>('guidelines')
   const [runId, setRunId] = useState<number | null>(null)
   const [awaitingIdentity, setAwaitingIdentity] = useState(false)
 
   return (
     <>
-      {step === 'guidelines' && <GuidelinesStep onContinue={() => setStep('checklist')} />}
+      {step === 'guidelines' && <GuidelinesStep builtIrl={project.built_irl} onContinue={() => setStep('checklist')} />}
       {step === 'checklist' && (
         <ChecklistStep
           projectName={project.name}
+          builtIrl={project.built_irl}
           onBack={() => setStep('guidelines')}
           onContinue={() => setStep('scan')}
         />

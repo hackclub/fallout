@@ -23,6 +23,7 @@
 #  last_name                   :string
 #  onboarded                   :boolean          default(FALSE), not null
 #  pending_lookout_tokens      :string           default([]), not null, is an Array
+#  professor_enrolled_at       :datetime
 #  pronouns                    :string
 #  roles                       :string           default([]), not null, is an Array
 #  slack_token                 :text
@@ -229,6 +230,17 @@ class User < ApplicationRecord
 
   def trial?
     false
+  end
+
+  def professor_enrolled?
+    professor_enrolled_at.present?
+  end
+
+  # Enrolling in the Professor program (signing up to be guided by a professor) requires a full
+  # HCA-linked account with a Slack ID, since the Professor API adds the user to a private Slack
+  # channel by their slack_id.
+  def professor_enrollment_eligible?
+    !trial? && slack_id.present?
   end
 
   def verified?

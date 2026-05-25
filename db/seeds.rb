@@ -14,7 +14,7 @@ shop_items = [
     featured: false,
     ticket: false,
     requires_shipping: true,
-    grants_streak_freeze: false,
+    grants_streak_freeze: false
   },
   {
     name: "Streak Freeze",
@@ -26,7 +26,7 @@ shop_items = [
     featured: false,
     ticket: false,
     requires_shipping: false,
-    grants_streak_freeze: true,
+    grants_streak_freeze: true
   },
   {
     name: "Ticket to Fallout",
@@ -38,8 +38,8 @@ shop_items = [
     featured: true,
     ticket: true,
     requires_shipping: false,
-    grants_streak_freeze: false,
-  },
+    grants_streak_freeze: false
+  }
 ]
 
 shop_items.each do |attrs|

@@ -36,3 +36,8 @@ steps:
       - "I've made guided projects!"
       - "I've made projects beyond guides!"
       - 'I live and breathe hardware'
+
+  - key: professor_enrollment
+    type: professor_enrollment_cta
+    prompt: 'Want to sign up for a mentor?'
+    body: 'A mentor is an experienced volunteer who will guide you when you are stuck or need direction! (You can also do this later from the bulletin board)'

@@ -3,6 +3,7 @@
 # Routes for application:
 #                                             Prefix Verb   URI Pattern                                                                                   Controller#Action
 #                                                    GET    /(*path)(.:format)                                                                            redirect(301) {host: "127.0.0.1"}
+#                admin_requirements_design_dashboard GET    /admin/dashboard/requirements_design(.:format)                                                admin/dashboard#requirements_design
 #                                         admin_root GET    /admin(.:format)                                                                              admin/dashboard#index
 #                 heartbeat_admin_reviews_time_audit POST   /admin/reviews/time_audits/:id/heartbeat(.:format)                                            admin/reviews/time_audits#heartbeat
 #                     next_admin_reviews_time_audits GET    /admin/reviews/time_audits/next(.:format)                                                     admin/reviews/time_audits#next
@@ -74,6 +75,8 @@
 #                                   admin_shop_order GET    /admin/shop_orders/:id(.:format)                                                              admin/shop_orders#show
 #                                                    PATCH  /admin/shop_orders/:id(.:format)                                                              admin/shop_orders#update
 #                                                    PUT    /admin/shop_orders/:id(.:format)                                                              admin/shop_orders#update
+#                         approve_admin_ticket_claim PATCH  /admin/ticket_claims/:id/approve(.:format)                                                    admin/ticket_claims#approve
+#                                admin_ticket_claims GET    /admin/ticket_claims(.:format)                                                                admin/ticket_claims#index
 #                             admin_koi_transactions GET    /admin/koi_transactions(.:format)                                                             admin/koi_transactions#index
 #                                                    POST   /admin/koi_transactions(.:format)                                                             admin/koi_transactions#create
 #                          new_admin_koi_transaction GET    /admin/koi_transactions/new(.:format)                                                         admin/koi_transactions#new
@@ -125,6 +128,8 @@
 #                                               path GET    /path(.:format)                                                                               path#index
 #                                     bulletin_board GET    /bulletin_board(.:format)                                                                     bulletin_board#index
 #                              bulletin_board_search GET    /bulletin_board/search(.:format)                                                              bulletin_board#search
+#                         bulletin_board_events_feed GET    /bulletin_board/events.ics(.:format)                                                          bulletin_board#events_feed {format: "ics"}
+#                           bulletin_board_event_ics GET    /bulletin_board/events/:id.ics(.:format)                                                      bulletin_board#event_ics {format: "ics", id: /\d+/}
 #                               bulletin_board_event GET    /bulletin_board/events/:id(.:format)                                                          bulletin_board#event
 #                            set_slack_photo_profile POST   /profile/set_slack_photo(.:format)                                                            profiles#set_slack_photo
 #                              custom_avatar_profile DELETE /profile/custom_avatar(.:format)                                                              profiles#custom_avatar
@@ -134,6 +139,8 @@
 #                                        streak_goal GET    /streak_goal(.:format)                                                                        streak_goals#show
 #                                                    DELETE /streak_goal(.:format)                                                                        streak_goals#destroy
 #                                                    POST   /streak_goal(.:format)                                                                        streak_goals#create
+#                           new_professor_enrollment GET    /professor_enrollment/new(.:format)                                                           professor_enrollments#new
+#                               professor_enrollment POST   /professor_enrollment(.:format)                                                               professor_enrollments#create
 #                          mark_seen_dialog_campaign POST   /dialog_campaigns/:key/mark_seen(.:format)                                                    dialog_campaigns#mark_seen
 #                                        summit_rsvp PATCH  /profile/summit_rsvp(.:format)                                                                profiles#summit_rsvp
 #                                            critter GET    /spin/:id(.:format)                                                                           critters#show
@@ -174,6 +181,8 @@
 #                              lookup_you_tube_video POST   /you_tube_videos/lookup(.:format)                                                             you_tube_videos#lookup
 #                            record_lookout_sessions GET    /lookout_sessions/record(.:format)                                                            lookout_sessions#record
 #                                new_lookout_session GET    /lookout_sessions/new(.:format)                                                               lookout_sessions#new
+#                                       claim_ticket GET    /claim-ticket(.:format)                                                                       ticket_claims#new
+#                                                    POST   /claim-ticket(.:format)                                                                       ticket_claims#create
 #                              shop_item_shop_orders POST   /shop/:shop_item_id/orders(.:format)                                                          shop_orders#create
 #                           new_shop_item_shop_order GET    /shop/:shop_item_id/orders/new(.:format)                                                      shop_orders#new
 #                               shop_item_shop_order GET    /shop/:shop_item_id/orders/:id(.:format)                                                      shop_orders#show
@@ -182,6 +191,9 @@
 #                                     project_grants GET    /project_grants(.:format)                                                                     project_grants#index
 #                                                    POST   /project_grants(.:format)                                                                     project_grants#create
 #                                  new_project_grant GET    /project_grants/new(.:format)                                                                 project_grants#new
+#                                            top_ups GET    /top_ups(.:format)                                                                            top_ups#index
+#                                                    POST   /top_ups(.:format)                                                                            top_ups#create
+#                                         new_top_up GET    /top_ups/new(.:format)                                                                        top_ups#new
 #                                             infill GET    /infill(.:format)                                                                             tracking_redirects#show {slug: "infill"}
 #                                              rmrrf GET    /rmrrf(.:format)                                                                              tracking_redirects#show {slug: "rmrrf"}
 #                                        infill_2026 GET    /infill-2026(.:format)                                                                        tracking_redirects#show {slug: "infill-2026"}
@@ -447,6 +459,11 @@ Rails.application.routes.draw do
   end
 
   resource :streak_goal, only: [ :show, :create, :destroy ]
+
+  # Self-enrollment to the Professor (mentor) Slack channel — singleton because each user
+  # has at most one enrollment. `new` renders the confirmation modal page; `create` POSTs
+  # to the Professor API and stamps the timestamp.
+  resource :professor_enrollment, only: [ :new, :create ]
 
   # Campaign-based dialog system — marks a one-time dialog as seen via plain fetch (not Inertia)
   post "dialog_campaigns/:key/mark_seen", to: "dialog_campaigns#mark_seen", as: :mark_seen_dialog_campaign

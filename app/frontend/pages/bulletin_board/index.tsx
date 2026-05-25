@@ -1,7 +1,8 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from '@inertiajs/react'
-import { Modal, useModalStack } from '@inertiaui/modal-react'
+import { Link, usePage } from '@inertiajs/react'
+import { Modal, ModalLink, useModalStack } from '@inertiaui/modal-react'
+import type { SharedProps } from '@/types'
 import { ArrowLeftIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid'
 import { CalendarDays, ChevronLeft, ChevronRight, Rss } from 'lucide-react'
 import clsx from 'clsx'
@@ -289,6 +290,11 @@ const EventsSection = memo(function EventsSection({ events }: EventsSectionProps
   const liveEvents = liveEventProps?.events ?? events
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [subscribeOpen, setSubscribeOpen] = useState(false)
+  // Read auth from shared Inertia props so the "sign up for a mentor" CTA shows the right state.
+  // usePage triggers re-renders when shared props change, so memo's prop-comparison short-circuit
+  // does not block reactivity here.
+  const { auth, sign_in_path: signInPath } = usePage<SharedProps>().props
+  const authUser = auth.user
 
   const eventCounts = useMemo(
     () =>
@@ -512,16 +518,47 @@ const EventsSection = memo(function EventsSection({ events }: EventsSectionProps
         </AnimatePresence>
       </motion.div>
 
-      <motion.div layout className={styles.dmNotice}>
-        want to run one? DM
-        <a
-          href="https://hackclub.enterprise.slack.com/team/U08R4Q9H8EB"
-          className={styles.dmNoticeLink}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          @tanishq!
-        </a>
+      <motion.div layout className="flex flex-col items-center" style={{ gap: '0.25rem' }}>
+        <div className={styles.dmNotice}>
+          want to run one? DM
+          <a
+            href="https://hackclub.enterprise.slack.com/team/U08R4Q9H8EB"
+            className={styles.dmNoticeLink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            @tanishq!
+          </a>
+        </div>
+
+        <div className={styles.dmNotice}>
+          {authUser?.professor_enrolled ? (
+            authUser.professor_recently_enrolled ? (
+              <>you&apos;re signed up for a mentor, you&apos;ll get added to the slack channel in ~24 hours.</>
+            ) : (
+              <>you&apos;re signed up for a mentor!</>
+            )
+          ) : authUser?.professor_enrollment_eligible ? (
+            <>
+              want guidance on your project?{' '}
+              <ModalLink href="/professor_enrollment/new" className={styles.dmNoticeLink}>
+                sign up for a mentor
+              </ModalLink>
+            </>
+          ) : !authUser ? (
+            <>
+              you must{' '}
+              <a href={signInPath} className={styles.dmNoticeLink}>
+                sign in
+              </a>{' '}
+              to sign up for a mentor
+            </>
+          ) : authUser.is_trial ? (
+            <>you must finish setting up your full hack club account to sign up for a mentor</>
+          ) : (
+            <>you must link a slack account to your hack club account to sign up for a mentor</>
+          )}
+        </div>
       </motion.div>
 
       {/* AnimatePresence lives outside the conditional so the modal's motion.div gets to play

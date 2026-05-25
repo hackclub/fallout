@@ -10,7 +10,7 @@ class Projects::ShipsController < ApplicationController
   def preflight
     authorize @project, :ship?
     render inertia: "projects/ships/preflight", props: {
-      project: { id: @project.id, name: @project.name }
+      project: { id: @project.id, name: @project.name, built_irl: @project.built_irl? }
     }
   end
 
@@ -93,8 +93,13 @@ class Projects::ShipsController < ApplicationController
     # They still get to "ship" in the UX sense; HcaIdentityRefreshJob promotes to :pending once gated.
     initial_status = current_user.fully_identity_gated? ? :pending : :awaiting_identity
 
+    # Project-declared built_irl flag determines the review queue:
+    # true → build review (BR/gold), false → design review (DR/koi).
+    ship_type = @project.built_irl? ? :build : :design
+
     ship = @project.ships.build(
       preflight_run: preflight_run,
+      ship_type: ship_type,
       frozen_demo_link: @project.demo_link,
       frozen_repo_link: @project.repo_link,
       preflight_results: snapshot,

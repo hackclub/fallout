@@ -797,7 +797,8 @@ export default function BuildReviewsShow({
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <ReviewStatusBadge status={r.status} />
                       <span className="text-xs text-muted-foreground shrink-0">
-                        {r.reviewer_display_name && `${r.reviewer_display_name} · `}{r.reviewed_at}
+                        {r.reviewer_display_name && `${r.reviewer_display_name} · `}
+                        {r.reviewed_at}
                       </span>
                     </div>
                     {r.feedback && (

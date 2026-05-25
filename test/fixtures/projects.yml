@@ -5,7 +5,9 @@
 # Table name: projects
 #
 #  id                    :bigint           not null, primary key
+#  built_irl             :boolean          default(FALSE), not null
 #  demo_link             :string
+#  demo_video_link       :string
 #  description           :text
 #  discarded_at          :datetime
 #  inactivity_dm_sent_at :datetime
