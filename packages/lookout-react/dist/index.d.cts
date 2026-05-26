@@ -41,6 +41,12 @@ interface CaptureResult {
     blob: Blob;
     width: number;
     height: number;
+    /** ms since epoch, in the client's clock. Recorded at the moment the
+     *  screenshot was taken (vs. when the upload arrives at the server).
+     *  Forwarded to the server as `capturedAt` to drive credit-mode tracking.
+     *  Optional — older capture code may omit it; the uploader falls back to
+     *  Date.now() at enqueue time. */
+    capturedAtMs?: number;
 }
 interface UploadState {
     pending: number;
@@ -169,7 +175,12 @@ interface LookoutActions {
 interface LookoutClient {
     resolveToken(): Promise<string>;
     getSession(): Promise<SessionResponse>;
-    getUploadUrl(): Promise<UploadUrlResponse>;
+    /** `capturedAt` is optional. Sending it on the first request of a new
+     *  session opts the session into credit-mode tracking; subsequent
+     *  requests must keep sending it. Omit for legacy bucket-count behavior. */
+    getUploadUrl(opts?: {
+        capturedAt?: string;
+    }): Promise<UploadUrlResponse>;
     confirmScreenshot(body: ConfirmScreenshotRequest): Promise<ConfirmScreenshotResponse>;
     uploadToR2(uploadUrl: string, blob: Blob): Promise<void>;
     pause(): Promise<PauseResponse>;
@@ -356,6 +367,11 @@ interface UploaderResult {
     lastScreenshotUrl: string | null;
     /** ISO timestamp: when the server expects the next screenshot. */
     nextExpectedAt: string | null;
+    /** Snapshot of the latest `nextExpectedAt` from the ref — for callers
+     *  (e.g. capture-loop schedulers) that need the freshest value without
+     *  re-rendering. Returns the same string `nextExpectedAt` does, but
+     *  available synchronously from within effects. */
+    getNextExpectedAt: () => string | null;
     /** Last upload error message, if any. */
     lastError: string | null;
     /** True when a 409 conflict was received (session paused server-side). */

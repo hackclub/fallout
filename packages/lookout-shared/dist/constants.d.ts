@@ -9,6 +9,26 @@ export declare const SCREENSHOT_INTERVAL_MS = 60000;
  *  Used when validating timestamps in requests.
  *  Default: 5000 (5 seconds) */
 export declare const MAX_CLOCK_SKEW_MS = 5000;
+/** Trust envelope: how far in the past `capturedAt` may be relative
+ *  to server `now()` before being rejected. Wide enough to absorb
+ *  normal client-clock skew and buffered uploads.
+ *  Default: 300000 (5 minutes) */
+export declare const CAPTURED_AT_PAST_TOLERANCE_MS = 300000;
+/** Trust envelope: how far in the future `capturedAt` may be relative
+ *  to server `now()` before being rejected. Symmetric with the past
+ *  bound to handle clients with fast-skewed clocks.
+ *  Default: 300000 (5 minutes) */
+export declare const CAPTURED_AT_FUTURE_TOLERANCE_MS = 300000;
+/** Credit-mode streak window: |capturedAt - expectedAt| ≤ this credits
+ *  60s; outside resets the streak to a fresh anchor with 0 credit.
+ *  Tightly coupled to SCREENSHOT_INTERVAL_MS — keep at half-interval.
+ *  Default: 30000 (30 seconds) */
+export declare const STREAK_WINDOW_MS = 30000;
+/** Seconds awarded per in-window capture in credit mode.
+ *  Equals SCREENSHOT_INTERVAL_MS / 1000. Don't hardcode 60 in the
+ *  credit path — derive from this constant.
+ *  Default: 60 */
+export declare const CREDIT_PER_CAPTURE_S = 60;
 /** Auto-pause a session after this many minutes without a
  *  screenshot upload. The session moves to "paused" status.
  *  Default: 10 minutes */
