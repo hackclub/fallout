@@ -2,22 +2,10 @@
 
 export PORT="${PORT:-3000}"
 
-if command -v overmind 1> /dev/null 2>&1
-then
-  overmind start -f Procfile.dev "$@"
-  exit $?
-fi
+ruby bin/rails server &
+RAILS_PID=$!
 
-if command -v hivemind 1> /dev/null 2>&1
-then
-  echo "Hivemind is installed. Running the application with Hivemind..."
-  exec hivemind Procfile.dev "$@"
-  exit $?
-fi
+node node_modules/vite/bin/vite.js
 
-if gem list --no-installed --exact --silent foreman; then
-  echo "Installing foreman..."
-  gem install foreman
-fi
-
-foreman start -f Procfile.dev "$@"
+kill $RAILS_PID 2>/dev/null
+wait $RAILS_PID 2>/dev/null

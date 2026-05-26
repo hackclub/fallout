@@ -93,7 +93,7 @@ gem "logtail-rails", "~> 0.2"
 
 # Performance profiling — admin-gated in prod, open in dev
 gem "rack-mini-profiler", "~> 4.0"
-gem "stackprof", "~> 0.2"
+gem "stackprof", "~> 0.2", platforms: %i[ruby]
 gem "rails_performance", "~> 1.6"
 gem "query_count", "~> 1.1"
 
