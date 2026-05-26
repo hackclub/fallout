@@ -4,6 +4,8 @@ import AdminLayout from '@/layouts/AdminLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/admin/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/admin/ui/table'
 import { Badge } from '@/components/admin/ui/badge'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/admin/ui/chart'
+import { Bar, BarChart } from 'recharts'
 import { PageProps } from '@inertiajs/core'
 
 interface LeaderboardRow {
@@ -21,17 +23,73 @@ interface Totals {
   return_rate: number
 }
 
+interface ReviewWeek {
+  week: string
+  count: number
+}
+
+interface ReviewerProfile {
+  id: number
+  display_name: string
+  avatar: string | null
+  total_reviews: number
+  reviews_by_week: ReviewWeek[]
+}
+
 interface Props extends PageProps {
   leaderboard: LeaderboardRow[]
   totals: Totals
+  reviewer_profiles: ReviewerProfile[]
 }
 
 function formatRate(value: number): string {
   return `${Math.round(value * 1000) / 10}%`
 }
 
+const profileChartConfig: ChartConfig = {
+  count: { label: 'Reviews', color: 'hsl(217, 91%, 60%)' },
+}
+
+function ReviewerProfileCard({ profile }: { profile: ReviewerProfile }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-3">
+          {profile.avatar ? (
+            <img src={profile.avatar} className="size-9 rounded-full shrink-0" alt="" />
+          ) : (
+            <div className="size-9 rounded-full bg-muted shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm truncate">{profile.display_name}</p>
+            <p className="text-xs text-muted-foreground">{profile.total_reviews} reviews total</p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <ChartContainer config={profileChartConfig} className="h-16 w-full">
+          <BarChart data={profile.reviews_by_week} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  hideLabel={false}
+                  labelFormatter={(v: string) => {
+                    const d = new Date(v + 'T00:00:00')
+                    return `Week of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  }}
+                />
+              }
+            />
+            <Bar dataKey="count" fill="var(--color-count)" radius={[2, 2, 0, 0]} />
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function RequirementsDesignDashboard() {
-  const { leaderboard, totals } = usePage<Props>().props
+  const { leaderboard, totals, reviewer_profiles } = usePage<Props>().props
 
   return (
     <div className="space-y-6">
@@ -117,6 +175,15 @@ export default function RequirementsDesignDashboard() {
           </Table>
         </CardContent>
       </Card>
+
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight mb-4">Reviewer Profiles</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {reviewer_profiles.map((profile) => (
+            <ReviewerProfileCard key={profile.id} profile={profile} />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

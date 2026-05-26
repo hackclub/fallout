@@ -289,6 +289,7 @@ Rails.application.routes.draw do
   constraints Constraints::StaffConstraint.new do
     namespace :admin do
       get "dashboard/requirements_design" => "dashboard#requirements_design", as: :requirements_design_dashboard
+      get "dashboard/dev" => "dashboard#dev", as: :dev_dashboard
       get "/" => "dashboard#index", as: :root
 
       # Per-type review queues must be defined before the catch-all ships resource

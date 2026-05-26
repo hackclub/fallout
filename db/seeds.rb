@@ -50,8 +50,71 @@ end
 
 puts "Seeded #{ShopItem.count} shop items"
 
-# Dev-only: give user 2 a project with 50 approved hours for testing
+# Dev-only seeds
 if Rails.env.development?
+  # RC reviewer profiles sample data
+  reviewer_attrs = [
+    { display_name: "Alice Chen",   email: "alice.rc@seed.dev",  roles: %w[requirements_checker] },
+    { display_name: "Bob Kim",      email: "bob.rc@seed.dev",    roles: %w[requirements_checker] },
+    { display_name: "Carol Wu",     email: "carol.rc@seed.dev",  roles: %w[requirements_checker pass2_reviewer] },
+    { display_name: "Dave Torres",  email: "dave.rc@seed.dev",   roles: %w[requirements_checker] }, # zero reviews
+  ]
+
+  reviewers = reviewer_attrs.map do |attrs|
+    User.find_or_create_by!(email: attrs[:email]) do |u|
+      u.display_name = attrs[:display_name]
+      u.avatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=#{attrs[:email]}"
+      u.timezone = "America/New_York"
+      u.hca_id = "seed_rc_#{attrs[:email].split('@').first}"
+      u.roles = attrs[:roles]
+      u.onboarded = true
+    end
+  end
+
+  student = User.find_or_create_by!(email: "seed.rc.student@seed.dev") do |u|
+    u.display_name = "RC Seed Student"
+    u.avatar = "https://api.dicebear.com/9.x/thumbs/svg?seed=rcstudent"
+    u.timezone = "America/New_York"
+    u.hca_id = "seed_rc_student_001"
+    u.roles = []
+    u.onboarded = true
+  end
+
+  # [reviewer_index, week_offset_from_apr7, count]
+  distribution = [
+    [ 0, 0, 2 ], [ 0, 1, 5 ], [ 0, 2, 4 ], [ 0, 3, 6 ], [ 0, 4, 3 ],
+    [ 1, 0, 3 ], [ 1, 1, 4 ], [ 1, 2, 2 ], [ 1, 3, 5 ], [ 1, 5, 3 ],
+    [ 2, 2, 5 ], [ 2, 3, 3 ], [ 2, 4, 6 ],
+    # Dave (index 3) intentionally has no reviews
+  ]
+
+  rc_reviews = []
+  start_date = Date.new(2026, 4, 7)
+
+  distribution.each do |(reviewer_idx, week_offset, count)|
+    week_start = start_date + (week_offset * 7)
+    next if week_start > Date.today
+
+    count.times do
+      project = Project.create!(user: student, name: "RC Seed #{SecureRandom.hex(3)}")
+      # status: approved (1) prevents create_initial_reviews! callback (only fires if pending?)
+      ship = Ship.create!(project: project, ship_type: 0, status: 1)
+      review_time = week_start + rand(0..6).days
+
+      rc_reviews << {
+        ship_id: ship.id,
+        reviewer_id: reviewers[reviewer_idx].id,
+        status: 1, # approved
+        lock_version: 0,
+        created_at: review_time,
+        updated_at: review_time
+      }
+    end
+  end
+
+  RequirementsCheckReview.insert_all!(rc_reviews) if rc_reviews.any?
+  puts "Seeded #{rc_reviews.size} RC reviews across #{reviewers.size} reviewers (#{reviewers.last.display_name} has 0)"
+
   user = User.find_by(id: 2)
   if user
     hours = 50

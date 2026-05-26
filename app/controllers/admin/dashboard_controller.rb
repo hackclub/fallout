@@ -1,6 +1,6 @@
 class Admin::DashboardController < Admin::ApplicationController
-  skip_after_action :verify_authorized, only: %i[index requirements_design] # No authorizable resource; staff access enforced by Admin::ApplicationController
-  skip_after_action :verify_policy_scoped, only: %i[index requirements_design] # No scoped collection
+  skip_after_action :verify_authorized, only: %i[index requirements_design dev] # No authorizable resource; staff access enforced by Admin::ApplicationController
+  skip_after_action :verify_policy_scoped, only: %i[index requirements_design dev] # No scoped collection
   def index
     # Lambdas so these only run for the initial page render — Inertia partial
     # reloads (e.g. the sidebar's deferred admin_stats) skip lambda evaluation
@@ -26,8 +26,13 @@ class Admin::DashboardController < Admin::ApplicationController
   def requirements_design
     render inertia: "admin/dashboard/requirements_design", props: {
       leaderboard: -> { requirements_to_design_return_leaderboard },
-      totals: -> { requirements_to_design_return_totals }
+      totals: -> { requirements_to_design_return_totals },
+      reviewer_profiles: -> { requirements_check_reviewer_profiles }
     }
+  end
+
+  def dev
+    render inertia: "admin/dashboard/dev"
   end
 
   private
@@ -189,6 +194,46 @@ class Admin::DashboardController < Admin::ApplicationController
       cumulative_completed += completed_by_day[date].to_i
       { date: date.iso8601, backlog: cumulative_ships - cumulative_completed }
     end
+  end
+
+  def requirements_check_reviewer_profiles
+    start_week = Date.new(2026, 4, 7).beginning_of_week(:monday)
+    today_week = Date.today.beginning_of_week(:monday)
+
+    weeks = []
+    w = start_week
+    while w <= today_week
+      weeks << w.iso8601
+      w += 7
+    end
+
+    # All users who can review requirements checks, including those with zero reviews
+    reviewers = User.where("roles && ARRAY['requirements_checker', 'pass2_reviewer']::varchar[]")
+
+    # Completed RC reviews grouped by reviewer and ISO week (Monday-anchored)
+    rows = RequirementsCheckReview
+      .where(status: %w[approved returned rejected])
+      .where.not(reviewer_id: nil)
+      .where("updated_at >= ?", start_week)
+      .group(:reviewer_id)
+      .group(Arel.sql("TO_CHAR(DATE_TRUNC('week', updated_at), 'YYYY-MM-DD')"))
+      .count
+
+    by_reviewer = Hash.new { |h, k| h[k] = Hash.new(0) }
+    rows.each do |(reviewer_id, week_str), count|
+      by_reviewer[reviewer_id][week_str] = count
+    end
+
+    reviewers.map do |user|
+      weekly = weeks.map { |week| { week: week, count: by_reviewer[user.id][week] } }
+      {
+        id: user.id,
+        display_name: user.display_name,
+        avatar: user.avatar,
+        total_reviews: weekly.sum { |entry| entry[:count] },
+        reviews_by_week: weekly
+      }
+    end.sort_by { |r| -r[:total_reviews] }
   end
 
   def requirements_to_design_return_scope
