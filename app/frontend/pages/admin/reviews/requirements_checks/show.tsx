@@ -1097,7 +1097,7 @@ export default function RequirementsChecksShow({
                 summary={
                   <span className="flex items-center gap-1">
                     {[...previous_reviews].reverse().map((r) => (
-                      <ReviewStatusBadge key={r.ship_id} status={r.status} className="shrink-0" />
+                      <ReviewStatusBadge key={`${r.ship_id}-${r.review_type}`} status={r.status} className="shrink-0" />
                     ))}
                   </span>
                 }
@@ -1105,9 +1105,14 @@ export default function RequirementsChecksShow({
               >
                 <div className="divide-y divide-border">
                   {previous_reviews.map((r) => (
-                    <div key={r.ship_id} className="p-3 space-y-1.5">
+                    <div key={`${r.ship_id}-${r.review_type}`} className="p-3 space-y-1.5">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <ReviewStatusBadge status={r.status} />
+                        <div className="flex items-center gap-2">
+                          <ReviewStatusBadge status={r.status} />
+                          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+                            {r.review_type === 'design_review' ? 'Design' : 'RC'}
+                          </span>
+                        </div>
                         <span className="text-xs text-muted-foreground shrink-0">
                           {r.reviewer_display_name && `${r.reviewer_display_name} · `}
                           {r.reviewed_at}

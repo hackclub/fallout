@@ -38,7 +38,7 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
       new_entries: new_entries.map { |je| serialize_journal_entry(je, time_audit) },
       previous_entries: previous_entries.map { |je| serialize_journal_entry(je, time_audit) },
       sibling_statuses: serialize_sibling_statuses(ship),
-      previous_reviews: serialize_previous_reviews(project, ship, RequirementsCheckReview),
+      previous_reviews: serialize_previous_reviews(project, ship, RequirementsCheckReview, DesignReview),
       repo_tree: @review.repo_tree,
       refresh_tree_path: refresh_tree_admin_reviews_requirements_check_path(@review),
       reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
