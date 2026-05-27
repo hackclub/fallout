@@ -566,6 +566,7 @@ export interface UnifiedInspectData {
 
 export interface PreviousReview {
   ship_id: number
+  review_type: string
   status: 'approved' | 'returned' | 'rejected'
   feedback: string | null
   internal_reason: string | null

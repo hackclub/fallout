@@ -1,6 +1,6 @@
 class Admin::DashboardController < Admin::ApplicationController
-  skip_after_action :verify_authorized, only: %i[index requirements_design] # No authorizable resource; staff access enforced by Admin::ApplicationController
-  skip_after_action :verify_policy_scoped, only: %i[index requirements_design] # No scoped collection
+  skip_after_action :verify_authorized, only: %i[index requirements_design dev] # No authorizable resource; staff access enforced by Admin::ApplicationController
+  skip_after_action :verify_policy_scoped, only: %i[index requirements_design dev] # No scoped collection
   def index
     # Lambdas so these only run for the initial page render — Inertia partial
     # reloads (e.g. the sidebar's deferred admin_stats) skip lambda evaluation
@@ -26,8 +26,14 @@ class Admin::DashboardController < Admin::ApplicationController
   def requirements_design
     render inertia: "admin/dashboard/requirements_design", props: {
       leaderboard: -> { requirements_to_design_return_leaderboard },
-      totals: -> { requirements_to_design_return_totals }
+      totals: -> { requirements_to_design_return_totals },
+      reviewer_profiles: -> { requirements_check_reviewer_profiles },
+      non_reviewer_channel_members: -> { slack_channel_non_reviewers("C0AGEPQ63DY") }
     }
+  end
+
+  def dev
+    render inertia: "admin/dashboard/dev"
   end
 
   private
@@ -189,6 +195,80 @@ class Admin::DashboardController < Admin::ApplicationController
       cumulative_completed += completed_by_day[date].to_i
       { date: date.iso8601, backlog: cumulative_ships - cumulative_completed }
     end
+  end
+
+  def requirements_check_reviewer_profiles
+    start_week = Date.new(2026, 1, 5) # First Monday of 2026 — earliest reviewer onboarding
+    today_week = Date.today.beginning_of_week(:monday)
+
+    weeks = []
+    w = start_week
+    while w <= today_week
+      weeks << w.iso8601
+      w += 7
+    end
+
+    # All users who can review requirements checks, including those with zero reviews
+    reviewers = User.where("roles && ARRAY['requirements_checker', 'pass2_reviewer']::varchar[]")
+
+    # Completed RC reviews grouped by reviewer and ISO week (Monday-anchored)
+    rows = RequirementsCheckReview
+      .where(status: %w[approved returned rejected])
+      .where.not(reviewer_id: nil)
+      .where("updated_at >= ?", start_week)
+      .group(:reviewer_id)
+      .group(Arel.sql("TO_CHAR(DATE_TRUNC('week', updated_at), 'YYYY-MM-DD')"))
+      .count
+
+    by_reviewer = Hash.new { |h, k| h[k] = Hash.new(0) }
+    rows.each do |(reviewer_id, week_str), count|
+      by_reviewer[reviewer_id][week_str] = count
+    end
+
+    reviewers.map do |user|
+      weekly = weeks.map { |week| { week: week, count: by_reviewer[user.id][week] } }
+      {
+        id: user.id,
+        display_name: user.display_name,
+        avatar: user.avatar,
+        total_reviews: weekly.sum { |entry| entry[:count] },
+        reviews_by_week: weekly
+      }
+    end.sort_by { |r| -r[:total_reviews] }
+  end
+
+  # Fetches members of the RC reviewer Slack channel and returns those who have a
+  # Fallout account but haven't been granted requirements_checker or pass2_reviewer yet.
+  # In development without a bot token, falls back to all non-reviewer users with a slack_id
+  # so seed data is visible without needing a real Slack connection.
+  def slack_channel_non_reviewers(channel_id)
+    if Rails.env.development? && ENV["SLACK_BOT_TOKEN"].blank?
+      return User
+        .where.not(slack_id: [ nil, "" ])
+        .where.not("roles && ARRAY['requirements_checker', 'pass2_reviewer']::varchar[]")
+        .map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
+        .sort_by { |u| u[:display_name] }
+    end
+
+    client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
+
+    member_slack_ids = []
+    cursor = nil
+    loop do
+      response = client.conversations_members(channel: channel_id, limit: 1000, cursor: cursor)
+      member_slack_ids.concat(response.members)
+      cursor = response.response_metadata&.next_cursor
+      break if cursor.blank?
+    end
+
+    User
+      .where(slack_id: member_slack_ids)
+      .where.not("roles && ARRAY['requirements_checker', 'pass2_reviewer']::varchar[]")
+      .map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
+      .sort_by { |u| u[:display_name] }
+  rescue => e
+    Rails.logger.error("slack_channel_non_reviewers failed: #{e.message}")
+    []
   end
 
   def requirements_to_design_return_scope

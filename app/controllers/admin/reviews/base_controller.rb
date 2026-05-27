@@ -132,24 +132,26 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     url_for(controller: params[:controller], action: :next, only_path: true, **opts)
   end
 
-  def serialize_previous_reviews(project, current_ship, review_class)
-    review_class
-      .joins(:ship)
-      .where(ships: { project_id: project.id })
-      .where.not(ship_id: current_ship.id)
-      .where.not(status: review_class.statuses[:pending])
-      .includes(:reviewer)
-      .order(updated_at: :desc)
-      .map do |review|
-        {
-          ship_id: review.ship_id,
-          status: review.status,
-          feedback: review.feedback,
-          internal_reason: review.internal_reason,
-          reviewer_display_name: review.reviewer&.display_name,
-          reviewed_at: review.updated_at.strftime("%b %d, %Y")
-        }
-      end
+  def serialize_previous_reviews(project, current_ship, *review_classes)
+    review_classes.flat_map do |review_class|
+      review_class
+        .joins(:ship)
+        .where(ships: { project_id: project.id })
+        .where.not(ship_id: current_ship.id)
+        .where.not(status: review_class.statuses[:pending])
+        .includes(:reviewer)
+        .map do |review|
+          [ review.updated_at, {
+            ship_id: review.ship_id,
+            review_type: review_class.name.underscore,
+            status: review.status,
+            feedback: review.feedback,
+            internal_reason: review.internal_reason,
+            reviewer_display_name: review.reviewer&.display_name,
+            reviewed_at: review.updated_at.strftime("%b %d, %Y")
+          } ]
+        end
+    end.sort_by { |updated_at, _| -updated_at.to_i }.map(&:last)
   end
 
   def serialize_reviewer_notes(project)

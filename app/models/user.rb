@@ -30,7 +30,6 @@
 #  streak_freezes              :integer          default(1), not null
 #  streak_in_app_notifications :boolean          default(TRUE), not null
 #  streak_slack_notifications  :boolean          default(TRUE), not null
-#  summit_rsvp                 :string
 #  timezone                    :string           not null
 #  type                        :string
 #  verification_status         :string
@@ -127,6 +126,9 @@ class User < ApplicationRecord
   has_one :ticket_claim, dependent: :destroy
   has_many :project_funding_topups, dependent: :restrict_with_error
   has_many :reviewer_notes
+  has_many :reviewer_admin_notes, foreign_key: :reviewer_id, dependent: :destroy, inverse_of: :reviewer
+  has_many :reviewer_unavailabilities, foreign_key: :reviewer_id, dependent: :destroy, inverse_of: :reviewer
+  has_many :reviewer_week_resolutions, foreign_key: :reviewer_id, dependent: :destroy, inverse_of: :reviewer
   has_many :project_flags
 
   encrypts :hca_token
