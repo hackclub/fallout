@@ -12,9 +12,9 @@
 #
 # Indexes
 #
-#  index_reviewer_week_resolutions_on_author_id                    (author_id)
-#  index_reviewer_week_resolutions_on_reviewer_id                  (reviewer_id)
-#  index_reviewer_week_resolutions_on_reviewer_id_and_week_start   (reviewer_id,week_start) UNIQUE
+#  index_reviewer_week_resolutions_on_author_id                   (author_id)
+#  index_reviewer_week_resolutions_on_reviewer_id                 (reviewer_id)
+#  index_reviewer_week_resolutions_on_reviewer_id_and_week_start  (reviewer_id,week_start) UNIQUE
 #
 # Foreign Keys
 #

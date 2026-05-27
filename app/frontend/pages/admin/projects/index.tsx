@@ -14,7 +14,7 @@ import {
 } from '@/components/admin/ui/dropdown-menu'
 import { DataTable } from '@/components/admin/DataTable'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-import { SearchIcon, SlidersHorizontalIcon, Loader2 } from 'lucide-react'
+import { SearchIcon, SlidersHorizontalIcon, Loader2, Star } from 'lucide-react'
 import type { AdminProjectRow, PagyProps } from '@/types'
 
 const columns: ColumnDef<AdminProjectRow>[] = [
@@ -27,7 +27,10 @@ const columns: ColumnDef<AdminProjectRow>[] = [
     accessorKey: 'name',
     header: 'Name',
     cell: ({ row }) => (
-      <div className="font-medium">
+      <div className="font-medium inline-flex items-center gap-1.5">
+        {row.original.is_featured && (
+          <Star className="size-3.5 fill-amber-400 text-amber-500 shrink-0" aria-label="Featured" />
+        )}
         <Link href={`/admin/projects/${row.original.id}`} className="text-primary hover:underline">
           {row.original.name}
         </Link>

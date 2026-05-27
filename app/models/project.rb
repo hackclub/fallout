@@ -2,29 +2,33 @@
 #
 # Table name: projects
 #
-#  id                    :bigint           not null, primary key
-#  built_irl             :boolean          default(FALSE), not null
-#  demo_link             :string
-#  demo_video_link       :string
-#  description           :text
-#  discarded_at          :datetime
-#  inactivity_dm_sent_at :datetime
-#  is_unlisted           :boolean          default(FALSE), not null
-#  manual_seconds        :integer          default(0), not null
-#  name                  :string           not null
-#  repo_link             :string
-#  tags                  :string           default([]), not null, is an Array
-#  created_at            :datetime         not null
-#  updated_at            :datetime         not null
-#  user_id               :bigint           not null
+#  id                           :bigint           not null, primary key
+#  built_irl                    :boolean          default(FALSE), not null
+#  demo_link                    :string
+#  demo_video_link              :string
+#  description                  :text
+#  discarded_at                 :datetime
+#  inactivity_dm_sent_at        :datetime
+#  is_unlisted                  :boolean          default(FALSE), not null
+#  manual_seconds               :integer          default(0), not null
+#  name                         :string           not null
+#  repo_link                    :string
+#  tags                         :string           default([]), not null, is an Array
+#  unified_thumbnail_checked_at :datetime
+#  unified_thumbnail_etag       :string
+#  unified_thumbnail_source_url :string
+#  created_at                   :datetime         not null
+#  updated_at                   :datetime         not null
+#  user_id                      :bigint           not null
 #
 # Indexes
 #
-#  index_projects_on_discarded_at  (discarded_at)
-#  index_projects_on_is_unlisted   (is_unlisted)
-#  index_projects_on_name_trgm     (name) USING gin
-#  index_projects_on_tags          (tags) USING gin
-#  index_projects_on_user_id       (user_id)
+#  index_projects_on_discarded_at                  (discarded_at)
+#  index_projects_on_is_unlisted                   (is_unlisted)
+#  index_projects_on_name_trgm                     (name) USING gin
+#  index_projects_on_tags                          (tags) USING gin
+#  index_projects_on_unified_thumbnail_checked_at  (unified_thumbnail_checked_at)
+#  index_projects_on_user_id                       (user_id)
 #
 # Foreign Keys
 #
@@ -44,6 +48,7 @@ class Project < ApplicationRecord
   # Dirty-only public stats refresh; payload intentionally omits project IDs.
   after_commit :broadcast_bulletin_explore_update
   after_commit :enqueue_meilisearch_reindex
+  after_commit :enqueue_unified_thumbnail_compute_if_repo_changed
 
   pg_search_scope :search, against: [ :name, :description ], using: { tsearch: { prefix: true } }
 
@@ -86,6 +91,13 @@ class Project < ApplicationRecord
   has_many :pending_collaboration_invites, -> { kept }, dependent: :destroy
   has_many :reviewer_notes, dependent: :destroy
   has_many :project_flags, dependent: :destroy
+
+  # Cached, pre-rasterized zine/poster image used as the project's cover on the
+  # bulletin board explore feed and the public /api/v1/explore API. Populated
+  # by ComputeProjectUnifiedThumbnailJob (zine source URL discovered via
+  # ShipChecks::UnifiedScreenshotFinder, then transcoded to JPEG via
+  # ShipChecks::UnifiedScreenshotProcessor which also handles PDF rasterization).
+  has_one_attached :unified_thumbnail
 
   def discard
     transaction do
@@ -331,6 +343,21 @@ class Project < ApplicationRecord
 
   def enqueue_meilisearch_reindex
     MeilisearchReindexJob.perform_later(self.class.name, id)
+  end
+
+  def enqueue_unified_thumbnail_compute_if_repo_changed
+    return if destroyed?
+    # Enqueue when there's actually work to do:
+    # - created with a repo_link → fetch + attach
+    # - repo_link changed (in either direction) → fetch+re-attach, OR clear+purge if now blank
+    # - undiscarded with a repo_link → re-verify the cached attachment
+    should_enqueue =
+      (previously_new_record? && repo_link.present?) ||
+      saved_change_to_repo_link? ||
+      (saved_change_to_discarded_at? && discarded_at.nil? && repo_link.present?)
+    return unless should_enqueue
+
+    ComputeProjectUnifiedThumbnailJob.perform_later(id)
   end
 
   def broadcast_bulletin_explore_update

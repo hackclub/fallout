@@ -63,10 +63,7 @@ module ShipChecks
 
     def self.download_images(urls)
       urls.filter_map do |url|
-        uri = URI(url)
-        response = Net::HTTP.get_response(uri)
-        # Follow redirects (GitHub user-attachment URLs redirect to S3)
-        response = Net::HTTP.get_response(URI(response["location"])) if response.is_a?(Net::HTTPRedirection)
+        response = safe_get(url)
         next unless response.is_a?(Net::HTTPSuccess)
 
         ext = detect_extension(response)
@@ -78,6 +75,33 @@ module ShipChecks
       rescue StandardError
         nil
       end
+    end
+
+    # SSRF-safe GET. URLs come from user-controlled README markdown — every
+    # outbound fetch must go through SafeHttp to reject private IPs and pin
+    # the connection against DNS rebinding. Redirects (GitHub user-
+    # attachment → S3) are re-validated on the second hop.
+    def self.safe_get(url, follow_redirect: true)
+      uri = URI.parse(url)
+      return nil unless uri.is_a?(URI::HTTP)
+
+      safe_ip = ShipChecks::SafeHttp.resolve_safe_ip(uri.host)
+      return nil unless safe_ip
+
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = (uri.scheme == "https")
+      http.ipaddr = safe_ip
+      response = http.start { |conn| conn.get(uri.request_uri) }
+
+      if follow_redirect && response.is_a?(Net::HTTPRedirection)
+        location = response["location"].to_s
+        return nil if location.empty?
+        safe_get(URI.join(uri.to_s, location).to_s, follow_redirect: false)
+      else
+        response
+      end
+    rescue StandardError
+      nil
     end
 
     def self.badge_or_svg?(url)

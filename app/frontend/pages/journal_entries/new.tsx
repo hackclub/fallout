@@ -186,7 +186,7 @@ function NewJournal({
   const recordingCount = selectedTimelapses.size + youtubeVideos.length + selectedLookoutTokens.size
   const hasRecording = recordingCount > 0
   const isBurnout = selectedProject?.burnout ?? false
-  const burnoutDurationSeconds = (parseInt(burnoutHours || '0') * 3600) + (parseInt(burnoutMinutes || '0') * 60)
+  const burnoutDurationSeconds = parseInt(burnoutHours || '0') * 3600 + parseInt(burnoutMinutes || '0') * 60
   const canSubmit = selectedProject && (hasRecording || isBurnout) && hasEnoughImages && hasEnoughChars
 
   const streakWarningMessage = useMemo(() => {
@@ -460,7 +460,9 @@ function NewJournal({
         )}
         {isBurnout && (
           <div className="mt-4">
-            <p className="font-bold italic text-sm mb-1.5">Duration <span className="font-normal not-italic text-brown">(optional - for streaks)</span></p>
+            <p className="font-bold italic text-sm mb-1.5">
+              Duration <span className="font-normal not-italic text-brown">(optional - for streaks)</span>
+            </p>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
                 <Input

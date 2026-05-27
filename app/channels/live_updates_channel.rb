@@ -5,6 +5,7 @@ class LiveUpdatesChannel < ApplicationCable::Channel
   STREAMS = {
     "bulletin_events" => ->(user, _match) { user.present? }, # Any authenticated user (incl. trial)
     "bulletin_explore" => ->(user, _match) { user.present? }, # Public Explore stats live refresh.
+    "featured_projects" => ->(user, _match) { user.present? }, # Public bulletin board featured grid refresh.
     /\Apath_user_(\d+)\z/ => ->(user, match) { user.present? && user.id == match[1].to_i } # Per-user path progression
   }.freeze
 

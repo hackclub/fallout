@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_27_040705) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -196,6 +196,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_040705) do
     t.bigint "user_id", null: false
     t.index ["user_id", "key"], name: "index_dialog_campaigns_on_user_id_and_key", unique: true
     t.index ["user_id"], name: "index_dialog_campaigns_on_user_id"
+  end
+
+  create_table "featured_projects", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "discarded_at"
+    t.datetime "featured_at", null: false
+    t.bigint "featured_by_user_id", null: false
+    t.text "note"
+    t.integer "position", default: 0, null: false
+    t.bigint "project_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["discarded_at"], name: "index_featured_projects_on_discarded_at"
+    t.index ["featured_by_user_id"], name: "index_featured_projects_on_featured_by_user_id"
+    t.index ["position"], name: "index_featured_projects_on_position"
+    t.index ["project_id"], name: "index_featured_projects_on_project_id"
+    t.index ["project_id"], name: "index_featured_projects_unique_active_project", unique: true, where: "(discarded_at IS NULL)"
   end
 
   create_table "flipper_features", force: :cascade do |t|
@@ -571,12 +587,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_040705) do
     t.string "name", null: false
     t.string "repo_link"
     t.string "tags", default: [], null: false, array: true
+    t.datetime "unified_thumbnail_checked_at"
+    t.string "unified_thumbnail_etag"
+    t.string "unified_thumbnail_source_url"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["discarded_at"], name: "index_projects_on_discarded_at"
     t.index ["is_unlisted"], name: "index_projects_on_is_unlisted"
     t.index ["name"], name: "index_projects_on_name_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["tags"], name: "index_projects_on_tags", using: :gin
+    t.index ["unified_thumbnail_checked_at"], name: "index_projects_on_unified_thumbnail_checked_at"
     t.index ["user_id"], name: "index_projects_on_user_id"
   end
 
@@ -1033,6 +1053,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_040705) do
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
   add_foreign_key "dialog_campaigns", "users"
+  add_foreign_key "featured_projects", "projects"
+  add_foreign_key "featured_projects", "users", column: "featured_by_user_id"
   add_foreign_key "gold_transactions", "ships"
   add_foreign_key "gold_transactions", "users"
   add_foreign_key "gold_transactions", "users", column: "actor_id"

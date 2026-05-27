@@ -12,6 +12,7 @@ export const ADMIN_NAV_ORDER: string[] = [
   '/admin/hours_stats',
   '/admin/project_flags',
   '/admin/bulletin_events',
+  '/admin/featured_projects',
   '/admin/shop_items',
   '/admin/shop_orders',
   '/admin/ticket_claims',

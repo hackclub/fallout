@@ -20,6 +20,7 @@ import {
   BriefcaseBusiness,
   Activity,
   Ticket,
+  Star,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -75,6 +76,7 @@ const ALL_NAV: NavEntry[] = [
   { group: 'Data', label: 'Projects', href: '/admin/projects', icon: FolderOpen },
   { group: 'Data', label: 'Users', href: '/admin/users', icon: Users },
   { group: 'Data', label: 'Flagged Projects', href: '/admin/project_flags', icon: Flag, requirePermission: 'is_admin' },
+  { group: 'Data', label: 'Featured Projects', href: '/admin/featured_projects', icon: Star },
   { group: 'Shop', label: 'Shop Items', href: '/admin/shop_items', icon: Store, requirePermission: 'is_admin' },
   {
     group: 'Shop',

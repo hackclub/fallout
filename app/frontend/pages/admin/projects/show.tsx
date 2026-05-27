@@ -7,11 +7,22 @@ import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { Card, CardContent } from '@/components/admin/ui/card'
 import { Input } from '@/components/admin/ui/input'
+import { Textarea } from '@/components/admin/ui/textarea'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/admin/ui/alert-dialog'
 import { DataTable } from '@/components/admin/DataTable'
 import HoursDisplay from '@/components/admin/HoursDisplay'
 import AuditLog, { AuditLogLoading } from '@/components/admin/AuditLog'
 import type { AuditLogEntry } from '@/components/admin/AuditLog'
-import { ChevronLeftIcon, ExternalLinkIcon, ClockIcon } from 'lucide-react'
+import { ChevronLeftIcon, ExternalLinkIcon, ClockIcon, StarIcon } from 'lucide-react'
+import { useLiveReload } from '@/lib/useLiveReload'
 import type { AdminProjectDetail, PagyProps, SiblingStatuses, SharedProps } from '@/types'
 
 function BurnoutToggle({ projectId, isBurnout }: { projectId: number; isBurnout: boolean }) {
@@ -254,8 +265,47 @@ export default function AdminProjectsShow({
   pagy_entries: PagyProps
   audit_log?: AuditLogEntry[]
 }) {
-  const { auth } = usePage<SharedProps>().props
+  const { auth, admin_permissions } = usePage<SharedProps & { admin_permissions?: { is_admin: boolean } }>().props
   const isAdmin = auth.user?.is_admin ?? false
+  const canFeature = admin_permissions?.is_admin ?? false
+
+  // Keep the Feature/Featured button in sync when this project gets (un)featured from
+  // anywhere else (the Featured Projects admin page, another admin, etc.). Without this,
+  // a stale featured_project_id leads to DELETE on a missing record and a Ruby 404.
+  const liveProps = useLiveReload<{ project: AdminProjectDetail }>({
+    stream: 'featured_projects',
+    only: ['project'],
+  })
+  const liveProject = liveProps?.project ?? project
+
+  const [featureDialogOpen, setFeatureDialogOpen] = useState(false)
+  const [featureNote, setFeatureNote] = useState('')
+  const [featuring, setFeaturing] = useState(false)
+
+  function toggleFeatured() {
+    if (liveProject.featured_project_id) {
+      router.delete(`/admin/featured_projects/${liveProject.featured_project_id}`, { preserveScroll: true })
+    } else {
+      setFeatureNote('')
+      setFeatureDialogOpen(true)
+    }
+  }
+
+  function submitFeature() {
+    setFeaturing(true)
+    router.post(
+      '/admin/featured_projects',
+      { featured_project: { project_id: project.id, note: featureNote.trim() || null } },
+      {
+        preserveScroll: true,
+        onFinish: () => {
+          setFeaturing(false)
+          setFeatureDialogOpen(false)
+        },
+      },
+    )
+  }
+
   return (
     <div>
       <button
@@ -320,6 +370,20 @@ export default function AdminProjectsShow({
         </div>
 
         <div className="flex items-center gap-2">
+          {canFeature && !project.is_discarded && !project.is_unlisted && (
+            <Button
+              variant={liveProject.featured_project_id ? 'default' : 'outline'}
+              size="sm"
+              onClick={toggleFeatured}
+              title={liveProject.featured_project_id ? 'Click to unfeature' : 'Click to feature on the bulletin board'}
+            >
+              <StarIcon
+                data-icon="inline-start"
+                className={liveProject.featured_project_id ? 'fill-current' : undefined}
+              />
+              {liveProject.featured_project_id ? 'Featured' : 'Feature'}
+            </Button>
+          )}
           <Button variant="outline" size="sm" asChild>
             <Link href={`/projects/${project.id}`}>
               <ExternalLinkIcon data-icon="inline-start" />
@@ -510,6 +574,32 @@ export default function AdminProjectsShow({
           </Deferred>
         </div>
       )}
+
+      <AlertDialog open={featureDialogOpen} onOpenChange={(o) => !featuring && setFeatureDialogOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Feature {project.name}?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <label htmlFor="feature-note" className="text-sm font-medium">
+              Note <span className="text-muted-foreground">(optional)</span>
+            </label>
+            <Textarea
+              id="feature-note"
+              rows={3}
+              value={featureNote}
+              onChange={(e) => setFeatureNote(e.target.value)}
+              placeholder="Why this project?"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={featuring}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={submitFeature} disabled={featuring}>
+              {featuring ? 'Featuring…' : 'Feature'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
