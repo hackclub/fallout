@@ -36,6 +36,10 @@ class ProjectPolicy < ApplicationPolicy
     admin? # Admin-only: manual time overrides for legacy projects
   end
 
+  def toggle_burnout?
+    admin? # Admin-only: burnout tag waives recording requirement on journal entries and ships
+  end
+
   def destroy?
     return false if record.discarded?
     return false if record.ships.exists? # Once submitted (any status — pending, awaiting_identity, approved, returned, rejected), the project is locked from deletion for audit integrity.

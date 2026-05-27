@@ -596,6 +596,11 @@ export default function ProjectsShow({
                 <span className="text-brown">({formatTime(project.user_time_logged)} yours)</span>
               )}
             </span>
+            {project.tags.includes('burnout') && (
+              <span className="text-light-brown font-medium bg-dark-brown px-2 py-0.5 rounded-full text-xs">
+                Burnout
+              </span>
+            )}
           </div>
 
           {can.manage_collaborators && (

@@ -74,6 +74,19 @@ class Admin::ProjectsController < Admin::ApplicationController
     redirect_back fallback_location: admin_project_path(@project)
   end
 
+  def toggle_burnout
+    @project = Project.find(params[:id])
+    authorize @project, :toggle_burnout?
+    tags = @project.tags.dup
+    if tags.include?("burnout")
+      tags.delete("burnout")
+    else
+      tags << "burnout"
+    end
+    @project.update!(tags:)
+    redirect_back fallback_location: admin_project_path(@project)
+  end
+
   private
 
   def serialize_project_row(project)

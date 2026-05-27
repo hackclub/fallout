@@ -14,6 +14,37 @@ import type { AuditLogEntry } from '@/components/admin/AuditLog'
 import { ChevronLeftIcon, ExternalLinkIcon, ClockIcon } from 'lucide-react'
 import type { AdminProjectDetail, PagyProps, SiblingStatuses, SharedProps } from '@/types'
 
+function BurnoutToggle({ projectId, isBurnout }: { projectId: number; isBurnout: boolean }) {
+  const [saving, setSaving] = useState(false)
+
+  function handleToggle() {
+    setSaving(true)
+    router.patch(
+      `/admin/projects/${projectId}/toggle_burnout`,
+      {},
+      {
+        preserveScroll: true,
+        onFinish: () => setSaving(false),
+      },
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      <Button
+        type="button"
+        size="sm"
+        variant={isBurnout ? 'destructive' : 'outline'}
+        className="h-7 text-xs"
+        disabled={saving}
+        onClick={handleToggle}
+      >
+        {saving ? 'Saving…' : isBurnout ? 'Remove Burnout' : 'Add Burnout'}
+      </Button>
+    </div>
+  )
+}
+
 function ManualHoursForm({ projectId, initialHours }: { projectId: number; initialHours: number }) {
   const [hours, setHours] = useState(String(initialHours))
   const [saving, setSaving] = useState(false)
@@ -249,6 +280,11 @@ export default function AdminProjectsShow({
                 Deleted {project.discarded_at}
               </Badge>
             )}
+            {project.tags.includes('burnout') && (
+              <Badge variant="secondary" className="ml-2 align-middle">
+                Burnout
+              </Badge>
+            )}
           </h1>
           <div className="flex items-center flex-wrap gap-1 text-sm text-muted-foreground mt-1">
             <span>by</span>
@@ -335,6 +371,11 @@ export default function AdminProjectsShow({
               )}
             </Field>
             <Field label="Tags">{project.tags.length > 0 ? project.tags.join(', ') : '—'}</Field>
+            {isAdmin && (
+              <Field label="Burnout">
+                <BurnoutToggle projectId={project.id} isBurnout={project.tags.includes('burnout')} />
+              </Field>
+            )}
             <Field label="Created">{project.created_at}</Field>
           </dl>
           {project.description && (

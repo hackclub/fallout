@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_26_174233) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_27_040705) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -333,6 +333,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_26_174233) do
   end
 
   create_table "journal_entries", force: :cascade do |t|
+    t.integer "burnout_duration_seconds"
     t.text "content"
     t.datetime "created_at", null: false
     t.datetime "discarded_at"

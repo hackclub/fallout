@@ -64,7 +64,7 @@ class JournalEntriesController < ApplicationController
 
   def create
     @project = Project.kept.find(params[:project_id]) # Pundit enforces access via JournalEntryPolicy#create?
-    @journal_entry = @project.journal_entries.build(user: current_user, content: params[:content])
+    @journal_entry = @project.journal_entries.build(user: current_user, content: params[:content], burnout_duration_seconds: params[:burnout_duration_seconds].presence&.to_i)
     authorize @journal_entry
 
     timelapse_ids = Array(params[:timelapse_ids]).map(&:to_s).uniq
@@ -121,7 +121,7 @@ class JournalEntriesController < ApplicationController
 
     critter = maybe_award_critter(@journal_entry, current_user)
     award_critters_to_collaborators(@journal_entry)
-    StreakService.record_activity(current_user)
+    StreakService.record_activity(current_user, skip_threshold: @project.tags.include?("burnout") && @journal_entry.burnout_duration_seconds.to_i >= StreakService::STREAK_THRESHOLD_SECONDS)
 
     # Invalidate the streak-warning cache for today (see streak_data_for_warning) so the next /journal_entries/new
     # reflects the just-added recordings rather than a stale 30s-cached value.
@@ -223,7 +223,7 @@ class JournalEntriesController < ApplicationController
       []
     end
 
-    { id: project.id, name: project.name, potential_collaborators: potential }
+    { id: project.id, name: project.name, burnout: project.tags.include?("burnout"), potential_collaborators: potential }
   end
 
   def streak_data_for_warning(user)

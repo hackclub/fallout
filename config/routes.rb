@@ -364,6 +364,7 @@ Rails.application.routes.draw do
       resources :projects, only: [] do
         member do
           patch :update_manual_seconds # Admin-only manual time override for legacy projects
+          patch :toggle_burnout # Admin-only burnout tag toggle — waives recording requirement
         end
       end
       resources :users, only: [] do

@@ -5,7 +5,7 @@ class StreakService
   GOAL_KOI_REWARDS = { 3 => 1, 5 => 2, 7 => 5, 14 => 12 }.freeze
   STREAK_ANNOUNCEMENT_CHANNEL = "C037157AL30" # Public channel for streak goal announcements
 
-  def self.record_activity(user, date: nil)
+  def self.record_activity(user, date: nil, skip_threshold: false)
     return if user.trial?
 
     reconcile_missed_days(user)
@@ -14,7 +14,7 @@ class StreakService
     streak_day = StreakDay.find_or_initialize_by(user: user, date: date)
     return if streak_day.status_active?
     return if streak_day.status_frozen? || streak_day.status_missed?
-    return unless daily_seconds_logged(user, date) >= STREAK_THRESHOLD_SECONDS - 8.minutes.to_i
+    return unless skip_threshold || daily_seconds_logged(user, date) >= STREAK_THRESHOLD_SECONDS - 8.minutes.to_i
 
     streak_day.status = :active
     streak_day.save!
