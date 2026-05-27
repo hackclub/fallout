@@ -54,13 +54,24 @@ export default function RequirementsChecksIndex({
           columns={buildPendingColumns(BASE_PATH, 'Time Audit done')}
           data={pending_reviews}
           noun="pending reviews"
-          rowClassName={(row) => (row.sibling_approved ? 'bg-yellow-50 dark:bg-yellow-950/20' : undefined)}
+          rowClassName={(row) => {
+            const parts: string[] = []
+            if (row.previously_reviewed_by_me) parts.push('bg-blue-50 dark:bg-blue-950/20')
+            if (row.sibling_approved) parts.push('bg-yellow-50 dark:bg-yellow-950/20')
+            return parts.length > 0 ? parts.join(' ') : undefined
+          }}
         />
       </div>
 
       <div>
         <h2 className="text-lg font-semibold tracking-tight mb-3">All Requirements Checks</h2>
-        <DataTable columns={buildAllColumns(isAdmin, BASE_PATH)} data={all_reviews} pagy={pagy} noun="reviews" />
+        <DataTable
+          columns={buildAllColumns(isAdmin, BASE_PATH)}
+          data={all_reviews}
+          pagy={pagy}
+          noun="reviews"
+          rowClassName={(row) => (row.previously_reviewed_by_me ? 'bg-blue-50 dark:bg-blue-950/20' : undefined)}
+        />
       </div>
     </div>
   )

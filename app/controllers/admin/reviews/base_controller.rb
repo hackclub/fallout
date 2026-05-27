@@ -170,7 +170,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     end
   end
 
-  def serialize_review_row(review, flagged_project_ids: Set.new)
+  def serialize_review_row(review, flagged_project_ids: Set.new, previously_reviewed_project_ids: Set.new)
     ship = review.ship
     sibling = review.is_a?(TimeAuditReview) ? ship.requirements_check_review : ship.time_audit_review
     {
@@ -187,8 +187,23 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       is_claimed: review.claimed?,
       claimed_by_display_name: review.claimed? ? review.reviewer&.display_name : nil,
       sibling_approved: sibling&.approved? || false,
-      requirements_check_reviewer_display_name: review.is_a?(DesignReview) ? ship.requirements_check_review&.reviewer&.display_name : nil
+      requirements_check_reviewer_display_name: review.is_a?(DesignReview) ? ship.requirements_check_review&.reviewer&.display_name : nil,
+      previously_reviewed_by_me: previously_reviewed_project_ids.include?(ship.project_id)
     }
+  end
+
+  def precompute_previously_reviewed_project_ids
+    rc_ids = RequirementsCheckReview
+      .where(reviewer_id: current_user.id, status: %i[approved returned rejected])
+      .joins(:ship)
+      .distinct
+      .pluck("ships.project_id")
+    dr_ids = DesignReview
+      .where(reviewer_id: current_user.id, status: %i[approved returned rejected])
+      .joins(:ship)
+      .distinct
+      .pluck("ships.project_id")
+    (rc_ids + dr_ids).to_set
   end
 
   def serialize_project_context(project, ship)

@@ -10,10 +10,11 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
     @pagy, @all_reviews = pagy(base.order(created_at: :desc))
     flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
     Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
+    previously_reviewed = precompute_previously_reviewed_project_ids
 
     render inertia: {
-      pending_reviews: pending_reviews.map { |r| serialize_review_row(r) },
-      all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids) },
+      pending_reviews: pending_reviews.map { |r| serialize_review_row(r, previously_reviewed_project_ids: previously_reviewed) },
+      all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids, previously_reviewed_project_ids: previously_reviewed) },
       pagy: pagy_props(@pagy),
       start_reviewing_path: next_admin_reviews_design_reviews_path,
       **review_stats_props(DesignReview)

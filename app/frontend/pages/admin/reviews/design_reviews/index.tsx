@@ -61,6 +61,7 @@ export default function DesignReviewsIndex({
           columns={buildPendingColumns(BASE_PATH, undefined, [reqCheckColumn])}
           data={pending_reviews}
           noun="pending reviews"
+          rowClassName={(row) => (row.previously_reviewed_by_me ? 'bg-blue-50 dark:bg-blue-950/20' : undefined)}
         />
       </div>
 
@@ -71,6 +72,7 @@ export default function DesignReviewsIndex({
           data={all_reviews}
           pagy={pagy}
           noun="reviews"
+          rowClassName={(row) => (row.previously_reviewed_by_me ? 'bg-blue-50 dark:bg-blue-950/20' : undefined)}
         />
       </div>
     </div>
