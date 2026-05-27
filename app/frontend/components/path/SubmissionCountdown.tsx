@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { FocusEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Clock, Lock } from 'lucide-react'
 import Confetti from '@/components/shared/Confetti'
@@ -51,7 +51,10 @@ function ariaLabel(split: Split, tier: Tier): string {
 
 function useExpanded(disabled: boolean, canHover: boolean) {
   const [expanded, setExpanded] = useState(false)
-  const focusedRef = useRef(false)
+  // Only set true when focus came from keyboard nav (Tab/arrows) — pointer focus (click)
+  // is ignored so mouseleave can still collapse the pill. Detected via :focus-visible
+  // inside onFocus, which the browser sets synchronously with the focus event.
+  const keyboardFocusedRef = useRef(false)
   const leaveTimer = useRef<number | null>(null)
   const autoCollapseTimer = useRef<number | null>(null)
 
@@ -87,19 +90,24 @@ function useExpanded(disabled: boolean, canHover: boolean) {
       setExpanded(true)
     },
     onMouseLeave: () => {
-      if (disabled || focusedRef.current) return
+      if (disabled || keyboardFocusedRef.current) return
       clearLeave()
       leaveTimer.current = window.setTimeout(() => setExpanded(false), 80)
     },
-    onFocus: () => {
+    onFocus: (event: FocusEvent<HTMLDivElement>) => {
       if (disabled) return
-      focusedRef.current = true
+      // Only retain expanded for keyboard-induced focus. The browser sets :focus-visible
+      // synchronously when dispatching the focus event (true for Tab/arrow nav, false
+      // for pointer clicks), so reading it here is race-free.
+      if (event.currentTarget.matches(':focus-visible')) {
+        keyboardFocusedRef.current = true
+      }
       clearLeave()
       setExpanded(true)
     },
     onBlur: () => {
       if (disabled) return
-      focusedRef.current = false
+      keyboardFocusedRef.current = false
       setExpanded(false)
     },
     // Tap-to-toggle only on devices without hover — desktop already handles via hover,
@@ -127,17 +135,13 @@ function LiveDot({ tier }: { tier: Tier }) {
   if (tier !== 'soon' && tier !== 'urgent') return null
   const pingDuration = tier === 'urgent' ? '1s' : '2s'
   return (
-    <motion.span
-      layoutId="countdown-live-dot"
-      transition={LAYOUT_SPRING}
-      className="relative inline-flex h-1.5 w-1.5 shrink-0"
-    >
+    <span className="relative inline-flex h-1.5 w-1.5 shrink-0">
       <span
         className="absolute inline-flex h-full w-full rounded-full bg-coral opacity-75 motion-safe:animate-ping"
         style={{ animationDuration: pingDuration }}
       />
       <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-coral" />
-    </motion.span>
+    </span>
   )
 }
 
@@ -170,19 +174,49 @@ export default function SubmissionCountdown() {
   const [diffMs, setDiffMs] = useState<number | null>(null)
   const [confettiActive, setConfettiActive] = useState(false)
   const prevDiffRef = useRef<number | null>(null)
+  // Mirrors `expanded` so the self-rescheduling tick can read current state without
+  // resetting on every hover. Synced in the effect below the `expanded` declaration.
+  const expandedRef = useRef(false)
+  const rescheduleRef = useRef<(() => void) | null>(null)
   const reducedMotion = useReducedMotion() ?? false
   const canHover = useMemo(() => {
     if (typeof window === 'undefined') return true
     return window.matchMedia('(hover: hover)').matches
   }, [])
 
+  // Self-rescheduling tick — collapsed pill only re-renders at the smallest visible boundary
+  // (hour at 24+ days out, minute under 24h). Avoids 1Hz re-renders that drive 8 spring
+  // animations off-screen and compete with hover/layout transitions.
   useEffect(() => {
-    function tick() {
-      setDiffMs(TARGET_UTC.getTime() - Date.now())
+    let cancelled = false
+    let timeoutId: number | undefined
+
+    function schedule() {
+      if (cancelled) return
+      if (timeoutId != null) window.clearTimeout(timeoutId)
+      const ms = TARGET_UTC.getTime() - Date.now()
+      setDiffMs(ms)
+      if (ms <= 0) return
+
+      let nextMs: number
+      if (expandedRef.current) {
+        nextMs = 1000 - (Date.now() % 1000)
+      } else if (ms > ONE_DAY_MS) {
+        nextMs = ONE_HOUR_MS - (ms % ONE_HOUR_MS)
+      } else if (ms > ONE_HOUR_MS) {
+        nextMs = 60_000 - (ms % 60_000)
+      } else {
+        nextMs = 1000 - (Date.now() % 1000)
+      }
+      timeoutId = window.setTimeout(schedule, Math.max(nextMs, 50))
     }
-    tick()
-    const id = window.setInterval(tick, 1000)
-    return () => window.clearInterval(id)
+    rescheduleRef.current = schedule
+    schedule()
+    return () => {
+      cancelled = true
+      rescheduleRef.current = null
+      if (timeoutId != null) window.clearTimeout(timeoutId)
+    }
   }, [])
 
   // Fire confetti exactly once, on the tick that crosses the deadline mid-session.
@@ -204,6 +238,15 @@ export default function SubmissionCountdown() {
   const closed = tier === 'closed'
   const { expanded: openState, handlers } = useExpanded(closed, canHover)
   const expanded = openState && !closed
+
+  // Sync expandedRef and reschedule the tick so cadence switches immediately on
+  // expand/collapse (otherwise an in-flight hour-long collapsed timeout would delay
+  // seconds appearing after expand).
+  useEffect(() => {
+    if (expandedRef.current === expanded) return
+    expandedRef.current = expanded
+    rescheduleRef.current?.()
+  }, [expanded])
 
   const Icon = closed ? Lock : Clock
   const compactText = closed ? 'Deadline passed' : compactDisplay(split)
@@ -232,27 +275,53 @@ export default function SubmissionCountdown() {
         style={{ borderRadius: expanded ? 24 : 9999 }}
         className="pointer-events-auto bg-dark-brown shadow-xl cursor-pointer overflow-hidden max-w-[calc(100vw-1.5rem)] focus-visible:outline-2 focus-visible:outline-coral focus-visible:outline-offset-2"
       >
-        <AnimatePresence mode="popLayout" initial={false}>
-          {expanded ? (
-            <motion.div
-              key="expanded"
-              initial={contentHidden}
-              animate={contentVisible}
-              exit={contentHidden}
-              transition={contentTransition}
-              className="flex flex-col items-center px-6 py-3 xs:px-7"
+        <div className={`flex flex-col items-center ${expanded ? 'px-6 py-3 xs:px-7' : 'px-3.5 py-1.5'}`}>
+          <div className="flex items-center gap-2">
+            <motion.span
+              layout
+              transition={LAYOUT_SPRING}
+              className={`inline-flex ${expanded ? titleColor : compactColor}`}
             >
-              <div
-                className={`mb-2 flex items-center gap-2 text-[10px] xs:text-xs uppercase tracking-[0.24em] ${titleColor}`}
-              >
-                <motion.span layoutId="countdown-icon" transition={LAYOUT_SPRING} className="inline-flex">
-                  <Icon className="size-3.5 shrink-0" strokeWidth={2.5} />
+              <Icon className="size-3.5 shrink-0" strokeWidth={2.5} />
+            </motion.span>
+            <AnimatePresence mode="popLayout" initial={false}>
+              {expanded ? (
+                <motion.span
+                  key="title"
+                  initial={contentHidden}
+                  animate={contentVisible}
+                  exit={contentHidden}
+                  transition={contentTransition}
+                  className={`whitespace-nowrap text-[10px] xs:text-xs uppercase tracking-[0.24em] ${titleColor}`}
+                >
+                  60-hour deadline in
                 </motion.span>
-                <span className="whitespace-nowrap">60-hour deadline in</span>
-                <LiveDot tier={tier} />
-              </div>
+              ) : (
+                <motion.span
+                  key="compact"
+                  initial={contentHidden}
+                  animate={contentVisible}
+                  exit={contentHidden}
+                  transition={contentTransition}
+                  className={`font-semibold tabular-nums text-sm leading-none whitespace-nowrap ${compactColor}`}
+                >
+                  {compactText}
+                </motion.span>
+              )}
+            </AnimatePresence>
+            <LiveDot tier={tier} />
+          </div>
 
-              <div className="flex items-center gap-2.5 xs:gap-4">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {expanded && (
+              <motion.div
+                key="numbers"
+                initial={contentHidden}
+                animate={contentVisible}
+                exit={contentHidden}
+                transition={contentTransition}
+                className="mt-2 flex items-center gap-2.5 xs:gap-4"
+              >
                 <Unit value={split.days} label="Days" numberClass={numberClass} labelClass={labelClass} />
                 <Sep color={sepClass} />
                 <Unit value={split.hours} label="Hrs" numberClass={numberClass} labelClass={labelClass} />
@@ -260,31 +329,10 @@ export default function SubmissionCountdown() {
                 <Unit value={split.mins} label="Min" numberClass={numberClass} labelClass={labelClass} />
                 <Sep color={sepClass} />
                 <Unit value={split.secs} label="Sec" numberClass={numberClass} labelClass={labelClass} />
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="collapsed"
-              initial={contentHidden}
-              animate={contentVisible}
-              exit={contentHidden}
-              transition={contentTransition}
-              className="flex items-center gap-2 px-3.5 py-1.5"
-            >
-              <motion.span
-                layoutId="countdown-icon"
-                transition={LAYOUT_SPRING}
-                className={`inline-flex ${compactColor}`}
-              >
-                <Icon className="size-3.5 shrink-0" strokeWidth={2.5} />
-              </motion.span>
-              <span className={`font-semibold tabular-nums text-sm leading-none whitespace-nowrap ${compactColor}`}>
-                {compactText}
-              </span>
-              <LiveDot tier={tier} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </motion.div>
     </>
   )

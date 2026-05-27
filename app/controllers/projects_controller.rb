@@ -19,7 +19,7 @@ class ProjectsController < ApplicationController
       collaborated_ids = Collaborator.kept.where(user: current_user, collaboratable_type: "Project").select(:collaboratable_id)
       scope = scope.or(Project.kept.where(id: collaborated_ids))
     end
-    scope = scope.includes(kept_journal_entries: { images_attachments: :blob })
+    scope = scope.includes(kept_journal_entries: { images_attachments: :blob }, unified_thumbnail_attachment: :blob)
     scope = scope.search(params[:query]) if params[:query].present?
     @pagy, @projects = pagy(scope.order(created_at: :desc))
     project_ids = @projects.map(&:id)
@@ -87,11 +87,11 @@ class ProjectsController < ApplicationController
         share: project_policy.share?, # Gates the "Copy share link" overflow menu item — true only for listed, non-discarded projects
         ship: project_policy.ship?,
         manage_collaborators: collab_enabled && project_policy.manage_collaborators?,
-        create_journal_entry: JournalEntryPolicy.new(current_user, @project.journal_entries.build(user: current_user)).create?,
-        # Trial collaborator who would gain create access on verifying — drives the "locked" feather button.
-        # Owners are already allowed to create regardless of trial state, so they fall under create_journal_entry.
+        # JournalEntriesController only allows trial access on :preview — exclude trial users so they fall through to the locked button below.
+        create_journal_entry: !current_user&.trial? && JournalEntryPolicy.new(current_user, @project.journal_entries.build(user: current_user)).create?,
+        # Trial owner or trial collaborator who would gain create access on verifying — drives the "locked" feather button with a verify prompt.
         # Strangers (incl. unauthenticated visitors on the public project page) get false and see no button.
-        create_journal_entry_locked_for_trial: current_user&.trial? && collab_enabled && @project.collaborator?(current_user)
+        create_journal_entry_locked_for_trial: current_user&.trial? && (@project.user_id == current_user.id || (collab_enabled && @project.collaborator?(current_user)))
       },
       initial_tab: highlighted_journal_entry_id ? "journal" : "timeline",
       highlight_journal_entry_id: highlighted_journal_entry_id,
@@ -214,7 +214,7 @@ class ProjectsController < ApplicationController
 
   def set_project
     scope = Project.kept
-    scope = scope.includes(:user) if action_name == "show"
+    scope = scope.includes(:user, unified_thumbnail_attachment: :blob) if action_name == "show"
     @project = scope.find(params[:id])
   end
 
@@ -231,7 +231,11 @@ class ProjectsController < ApplicationController
       description: project.description&.truncate(200),
       is_unlisted: project.is_unlisted,
       tags: project.tags,
-      cover_image_url: cover_entry&.images&.first&.then { |img| url_for(img) },
+      cover_image_url: if project.unified_thumbnail.attached?
+                         url_for(project.unified_thumbnail)
+                       else
+                         cover_entry&.images&.first&.then { |img| url_for(img) }
+                       end,
       journal_entries_count: kept_entries.size,
       time_logged: @time_logged_by_project[project.id] || 0,
       user_time_logged: @user_time_logged_by_project[project.id] || 0,
@@ -258,7 +262,8 @@ class ProjectsController < ApplicationController
       # — public viewers on a listed project shouldn't see a "0h yours" hint that just
       # reveals they aren't a member.
       user_time_logged: current_user && project.owner_or_collaborator?(current_user) ? project.user_logged_seconds(current_user) : nil,
-      journal_entries_count: journal_entries_count
+      journal_entries_count: journal_entries_count,
+      unified_thumbnail_url: project.unified_thumbnail.attached? ? url_for(project.unified_thumbnail) : nil
     }
   end
 

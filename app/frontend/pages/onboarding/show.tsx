@@ -53,6 +53,7 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
   const [exitingStepKey, setExitingStepKey] = useState<string | null>(null)
   const [navigatingBack, setNavigatingBack] = useState(false)
   const [completedPromptStepKey, setCompletedPromptStepKey] = useState<string | null>(null)
+  const [pendingProfessorAction, setPendingProfessorAction] = useState<'enrolled' | 'skipped' | null>(null)
   const submitDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const backDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingFinalSubmissionRef = useRef<{ stepKey: string; answerText: string } | null>(null)
@@ -110,6 +111,7 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
     setExitingStepKey(null)
     setNavigatingBack(false)
     setCompletedPromptStepKey(null)
+    setPendingProfessorAction(null)
     pendingFinalSubmissionRef.current = null
 
     if (step.type === 'single_choice') {
@@ -170,6 +172,7 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
   function handleProfessorEnrollmentAction(action: 'enrolled' | 'skipped') {
     if (isBusy) return
 
+    setPendingProfessorAction(action)
     setFinalizingSubmit(true)
     if (isFinalStep) {
       pendingFinalSubmissionRef.current = { stepKey: step.key, answerText: action }
@@ -387,7 +390,8 @@ function OnboardingShow({ step, step_index, total_steps, existing_answer, prev_s
             step={{ prompt: step.prompt, body: step.body }}
             canEnroll={!!authUser?.professor_enrollment_eligible}
             isTrial={!!authUser?.is_trial}
-            submitting={isBusy}
+            disabled={isBusy}
+            enrolling={isBusy && pendingProfessorAction === 'enrolled'}
             onEnroll={() => handleProfessorEnrollmentAction('enrolled')}
             onSkip={() => handleProfessorEnrollmentAction('skipped')}
             onPromptComplete={() => setCompletedPromptStepKey(step.key)}

@@ -82,3 +82,8 @@ production:
   hours_stats_refresh:
     command: 'Rails.cache.delete("admin/hours_stats/logged"); Rails.cache.delete("admin/hours_stats/build_approved")'
     schedule: every day at 5am
+
+  refresh_unified_thumbnails:
+    class: RefreshStaleUnifiedThumbnailsJob
+    queue: background
+    schedule: every hour

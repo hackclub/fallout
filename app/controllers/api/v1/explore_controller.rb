@@ -21,7 +21,7 @@ class Api::V1::ExploreController < Api::V1::BaseController
     query = params[:query].to_s.strip.presence
     page_limit = limit
 
-    scope = Project.public_for_explore.preload(:user)
+    scope = Project.public_for_explore.preload(:user, unified_thumbnail_attachment: :blob)
 
     if query.present?
       offset = decode_project_search_cursor(params[:cursor])
@@ -96,9 +96,10 @@ class Api::V1::ExploreController < Api::V1::BaseController
     has_more = entries.size > page_limit
     entries = entries.first(page_limit)
 
+    # Preload project's unified_thumbnail blob so serialize_journal can fall back to it without N+1.
     ActiveRecord::Associations::Preloader.new(
       records: entries,
-      associations: [ :user, :project, { images_attachments: :blob } ]
+      associations: [ :user, { project: { unified_thumbnail_attachment: :blob } }, { images_attachments: :blob } ]
     ).call
 
     render json: build_response(
@@ -253,7 +254,11 @@ class Api::V1::ExploreController < Api::V1::BaseController
   def serialize_project(project)
     latest_entry = @latest_entries[project.id]
     cover_entry = @cover_entries[project.id]
-    cover_url = cover_entry ? url_for(cover_entry.images.first) : nil
+    cover_url = if project.unified_thumbnail.attached?
+      url_for(project.unified_thumbnail)
+    elsif cover_entry
+      url_for(cover_entry.images.first)
+    end
     last_activity_at = (project.has_attribute?("explore_activity_at") && project.read_attribute("explore_activity_at").presence) || latest_entry&.created_at
 
     {
@@ -298,12 +303,18 @@ class Api::V1::ExploreController < Api::V1::BaseController
   end
 
   def serialize_journal(entry)
+    cover_image_url = if entry.images.attached?
+      url_for(entry.images.first)
+    elsif entry.project.unified_thumbnail.attached?
+      url_for(entry.project.unified_thumbnail)
+    end
+
     {
       id: entry.id,
       project_id: entry.project_id,
       project_name: entry.project.name,
       excerpt: plain_text_excerpt(entry.content.to_s, 180),
-      cover_image_url: entry.images.attached? ? url_for(entry.images.first) : nil,
+      cover_image_url: cover_image_url,
       tags: entry.project.tags,
       author: serialize_user(entry.user),
       date: entry.created_at.iso8601,

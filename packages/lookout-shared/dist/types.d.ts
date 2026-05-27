@@ -55,12 +55,19 @@ export interface SessionResponse {
     videoWebmUrl?: string | null;
     metadata: Record<string, unknown>;
 }
+export type TrackingMode = "bucket" | "credit";
 export interface UploadUrlResponse {
     uploadUrl: string;
     r2Key: string;
     screenshotId: string;
     minuteBucket: number;
     nextExpectedAt: string;
+    /** Server wall-clock time at the moment this response was generated.
+     *  Optional — not present on responses from pre-0.3 servers. Clients
+     *  may use it for diagnostics; scheduling needs only `nextExpectedAt`. */
+    serverTime?: string;
+    /** Sticky tracking mode for the session. Optional for backwards compat. */
+    trackingMode?: TrackingMode;
 }
 export interface ConfirmScreenshotRequest {
     screenshotId: string;
@@ -72,6 +79,8 @@ export interface ConfirmScreenshotResponse {
     confirmed: true;
     trackedSeconds: number;
     nextExpectedAt: string;
+    /** Server wall-clock time. Optional for backwards compat. */
+    serverTime?: string;
 }
 export interface PauseResponse {
     status: "paused";
@@ -80,6 +89,8 @@ export interface PauseResponse {
 export interface ResumeResponse {
     status: "active";
     nextExpectedAt: string;
+    /** Optional server wall-clock time. */
+    serverTime?: string;
 }
 export interface StopResponse {
     status: "stopped";

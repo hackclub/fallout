@@ -171,6 +171,41 @@ The public `/api/v1/explore/...` API is unaffected by ActionCable — clients po
 ### Public API (lean)
 `serialize_project`, `serialize_journal` — plain text excerpts, single `cover_image_url` field, absolute URLs (`#{request.base_url}/...`).
 
+### Cover image priority (both surfaces)
+
+Project cards:
+1. `project.unified_thumbnail` (cached zine/poster, see below)
+2. The most recent public journal entry that has an attached image (in-app calls this the "cover entry")
+3. In-app only: the first markdown image extracted from the latest entry
+4. Otherwise `nil`
+
+Journal cards:
+1. The entry's own attached image
+2. In-app only: the first markdown image extracted from the entry
+3. `project.unified_thumbnail` (so journal cards still anchor visually to the project even when the entry has no media)
+4. Otherwise `nil`
+
+`unified_thumbnail` is a `has_one_attached` ActiveStorage attachment on Project populated by [`ComputeProjectUnifiedThumbnailJob`](../app/jobs/compute_project_unified_thumbnail_job.rb) — wraps `ShipChecks::UnifiedScreenshotFinder` (zine detection in repo, LLM-assisted) + `ShipChecks::UnifiedScreenshotProcessor` (PDF/raster → JPEG bytes). Cache key columns: `unified_thumbnail_source_url` (raw URL the rasterization is from), `unified_thumbnail_etag` (HTTP ETag for conditional GET), and `unified_thumbnail_checked_at` (last attempt timestamp). Both controllers preload via `.preload(unified_thumbnail_attachment: :blob)` on the project scope and `{ project: { unified_thumbnail_attachment: :blob } }` on journal preloads — the bare `with_attached_*` macro also drags in `variant_records` and `preview_image_attachment` (Bullet's "AVOID eager loading" warning), which we don't use.
+
+#### Refresh contract
+
+The job is enqueued from three places:
+- `Project` after_commit when (a) a new project with a `repo_link` is created, (b) `repo_link` changes in either direction (set, edited, or cleared), or (c) a project is undiscarded and still has a `repo_link`.
+- `AttachShipUnifiedScreenshotJob` after a ship's `frozen_screenshot` is populated.
+- [`RefreshStaleUnifiedThumbnailsJob`](../app/jobs/refresh_stale_unified_thumbnails_job.rb) — recurring hourly, picks up projects with `unified_thumbnail_checked_at IS NULL OR < 24h ago`, jittered across a 30-minute window, capped at `PER_RUN_LIMIT = 200` per run.
+
+Inside the job, the freshness model is **never purge without positive proof**:
+- `repo_link` blank → purge directly.
+- Finder returns a URL → conditional GET with `If-None-Match: <stored etag>`. `304` bumps `checked_at` only. `200` re-rasterizes via `UnifiedScreenshotProcessor.transcode_to_jpeg` and stores the new etag. `404`/`410` or any error raises `TransientError` (no purge — `retry_on` re-enqueues with polynomial backoff, capped at 5 attempts).
+- Finder returns `nil` but an attachment exists → probe the cached source URL via the same conditional GET. `304`/`200` keeps or refreshes the attachment. `404` is the only path that purges. Errors raise `TransientError`. This is the regression guard against the prior false-purge bug where transient finder failures (`SharedContext` swallows all HTTP errors to nil) would purge a working attachment.
+
+Other safety rails:
+- `download_with_etag` caps body size at `MAX_DOWNLOAD_BYTES = 50.megabytes` (via `Content-Length` and a defensive post-read check) so a giant file can't blow worker memory.
+- Solid Queue `limits_concurrency to: 1, key: "unified_thumbnail:<project_id>"` serializes per-project runs so concurrent triggers don't race on `ActiveStorage.attach`.
+- Kill switch: `Rails.cache.write("unified_thumbnail:paused", true)` makes every run a no-op without a deploy.
+
+Backfill rake task: `bin/rake fallout:backfill_unified_thumbnails` (envs `BATCH_SIZE`, `DELAY_SECONDS`) enqueues every kept project with a `repo_link`, throttled. Safe to re-run — repeat invocations hit the 304 fast-path.
+
 ### Markdown image extraction (security)
 `journal_markdown_image_url` rejects `//evil.example` (protocol-relative) and any `data:`/`javascript:` URLs. Only `http(s)://` and same-origin paths (`/`, `./`, `../`) are returned. Without this, a hostile journal entry could inject an `<img src>` into the public feed that leaks viewer IPs to attacker hosts.
 

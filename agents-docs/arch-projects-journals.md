@@ -50,6 +50,7 @@ Ship (audit-trailed)
 - **URL validations** on `demo_link`, `repo_link`
 - **`is_unlisted`**: controls public visibility (default false)
 - **PaperTrail** for audit history
+- **`unified_thumbnail` (ActiveStorage attachment)** + `unified_thumbnail_source_url` / `unified_thumbnail_etag` / `unified_thumbnail_checked_at` columns: cached, pre-rasterized zine/poster image used as the project's cover on the bulletin board explore feed and `/api/v1/explore`. Populated by [`ComputeProjectUnifiedThumbnailJob`](../app/jobs/compute_project_unified_thumbnail_job.rb) (uses `ShipChecks::UnifiedScreenshotFinder` + `ShipChecks::UnifiedScreenshotProcessor.download_with_etag` for conditional GET freshness), enqueued via Project after_commit on create / `repo_link` change / undiscard, from `AttachShipUnifiedScreenshotJob` after a ship's zine is discovered, and by the hourly [`RefreshStaleUnifiedThumbnailsJob`](../app/jobs/refresh_stale_unified_thumbnails_job.rb). See [arch-explore.md](arch-explore.md) for the cover-image priority chain and the full refresh contract.
 
 **Key methods:**
 - `time_logged` — aggregates duration from LapseTimelapse, LookoutTimelapse, and YouTubeVideo (stretch-multiplied) recordings across all kept journal entries on the project, plus admin-set `manual_seconds`.

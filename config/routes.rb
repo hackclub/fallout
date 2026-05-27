@@ -4,7 +4,18 @@
 #                                             Prefix Verb   URI Pattern                                                                                   Controller#Action
 #                                                    GET    /(*path)(.:format)                                                                            redirect(301) {host: "127.0.0.1"}
 #                admin_requirements_design_dashboard GET    /admin/dashboard/requirements_design(.:format)                                                admin/dashboard#requirements_design
+#                                admin_dev_dashboard GET    /admin/dashboard/dev(.:format)                                                                admin/dashboard#dev
 #                                         admin_root GET    /admin(.:format)                                                                              admin/dashboard#index
+#                admin_reviewer_reviewer_admin_notes POST   /admin/reviewers/:reviewer_id/notes(.:format)                                                 admin/reviewer_admin_notes#create
+#                 admin_reviewer_reviewer_admin_note PATCH  /admin/reviewers/:reviewer_id/notes/:id(.:format)                                             admin/reviewer_admin_notes#update
+#                                                    PUT    /admin/reviewers/:reviewer_id/notes/:id(.:format)                                             admin/reviewer_admin_notes#update
+#                                                    DELETE /admin/reviewers/:reviewer_id/notes/:id(.:format)                                             admin/reviewer_admin_notes#destroy
+#           admin_reviewer_reviewer_unavailabilities POST   /admin/reviewers/:reviewer_id/unavailabilities(.:format)                                      admin/reviewer_unavailabilities#create
+#             admin_reviewer_reviewer_unavailability DELETE /admin/reviewers/:reviewer_id/unavailabilities/:id(.:format)                                  admin/reviewer_unavailabilities#destroy
+#      bulk_admin_reviewer_reviewer_week_resolutions POST   /admin/reviewers/:reviewer_id/week_resolutions/bulk(.:format)                                 admin/reviewer_week_resolutions#bulk_create
+#           admin_reviewer_reviewer_week_resolutions POST   /admin/reviewers/:reviewer_id/week_resolutions(.:format)                                      admin/reviewer_week_resolutions#create
+#            admin_reviewer_reviewer_week_resolution DELETE /admin/reviewers/:reviewer_id/week_resolutions/:id(.:format)                                  admin/reviewer_week_resolutions#destroy
+#                                     admin_reviewer GET    /admin/reviewers/:id(.:format)                                                                admin/reviewers#show
 #                 heartbeat_admin_reviews_time_audit POST   /admin/reviews/time_audits/:id/heartbeat(.:format)                                            admin/reviews/time_audits#heartbeat
 #                     next_admin_reviews_time_audits GET    /admin/reviews/time_audits/next(.:format)                                                     admin/reviews/time_audits#next
 #                          admin_reviews_time_audits GET    /admin/reviews/time_audits(.:format)                                                          admin/reviews/time_audits#index
@@ -55,9 +66,17 @@
 #                               admin_bulletin_event PATCH  /admin/bulletin_events/:id(.:format)                                                          admin/bulletin_events#update
 #                                                    PUT    /admin/bulletin_events/:id(.:format)                                                          admin/bulletin_events#update
 #                                                    DELETE /admin/bulletin_events/:id(.:format)                                                          admin/bulletin_events#destroy
+#            projects_search_admin_featured_projects GET    /admin/featured_projects/projects_search(.:format)                                            admin/featured_projects#projects_search
+#                    reorder_admin_featured_projects PATCH  /admin/featured_projects/reorder(.:format)                                                    admin/featured_projects#reorder
+#                 update_note_admin_featured_project PATCH  /admin/featured_projects/:id/update_note(.:format)                                            admin/featured_projects#update_note
+#                     restore_admin_featured_project PATCH  /admin/featured_projects/:id/restore(.:format)                                                admin/featured_projects#restore
+#                            admin_featured_projects GET    /admin/featured_projects(.:format)                                                            admin/featured_projects#index
+#                                                    POST   /admin/featured_projects(.:format)                                                            admin/featured_projects#create
+#                             admin_featured_project DELETE /admin/featured_projects/:id(.:format)                                                        admin/featured_projects#destroy
 #                               mission_control_jobs        /jobs                                                                                         MissionControl::Jobs::Engine
 #                                                           /flipper                                                                                      Flipper::UI
 #                update_manual_seconds_admin_project PATCH  /admin/projects/:id/update_manual_seconds(.:format)                                           admin/projects#update_manual_seconds
+#                       toggle_burnout_admin_project PATCH  /admin/projects/:id/toggle_burnout(.:format)                                                  admin/projects#toggle_burnout
 #                            update_roles_admin_user PATCH  /admin/users/:id/update_roles(.:format)                                                       admin/users#update_roles
 #                       update_streak_day_admin_user PATCH  /admin/users/:id/update_streak_day(.:format)                                                  admin/users#update_streak_day
 #                     restore_streak_goal_admin_user PATCH  /admin/users/:id/restore_streak_goal(.:format)                                                admin/users#restore_streak_goal
@@ -349,6 +368,19 @@ Rails.application.routes.draw do
           patch :start_now
           patch :force_start_now
           patch :end_now
+        end
+      end
+
+      # Staff-readable index; controller enforces admin-only for mutations.
+      resources :featured_projects, only: [ :index, :create, :destroy ] do
+        collection do
+          get :projects_search
+          patch :reorder
+        end
+
+        member do
+          patch :update_note
+          patch :restore
         end
       end
     end

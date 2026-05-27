@@ -26,6 +26,7 @@ class Admin::ProjectsController < Admin::ApplicationController
     @entry_counts = JournalEntry.where(project_id: project_ids, discarded_at: nil).group(:project_id).count
     @last_entries = JournalEntry.where(project_id: project_ids, discarded_at: nil).group(:project_id).maximum(:created_at)
     @hours_tracked = Project.batch_time_logged(project_ids)
+    @featured_project_ids = FeaturedProject.kept.where(project_id: project_ids).pluck(:project_id).to_set
 
     render inertia: {
       projects: @projects.map { |p| serialize_project_row(p) },
@@ -101,6 +102,7 @@ class Admin::ProjectsController < Admin::ApplicationController
       last_entry_at: @last_entries[project.id]&.strftime("%b %d, %Y"),
       is_unlisted: project.is_unlisted,
       is_discarded: project.discarded?,
+      is_featured: @featured_project_ids&.include?(project.id) || false,
       created_at: project.created_at.strftime("%b %d, %Y")
     }
   end
@@ -108,6 +110,7 @@ class Admin::ProjectsController < Admin::ApplicationController
   def serialize_project_detail(project)
     entry_count = project.journal_entries.where(discarded_at: nil).count
     last_entry = project.journal_entries.where(discarded_at: nil).maximum(:created_at)
+    featured_project_id = FeaturedProject.kept.where(project_id: project.id).pick(:id)
 
     {
       id: project.id,
@@ -127,7 +130,8 @@ class Admin::ProjectsController < Admin::ApplicationController
       manual_hours: (project.manual_seconds / 3600.0).round(2),
       last_entry_at: last_entry&.strftime("%b %d, %Y"),
       created_at: project.created_at.strftime("%b %d, %Y"),
-      collaborators: project.collaborator_users.map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
+      collaborators: project.collaborator_users.map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } },
+      featured_project_id: featured_project_id
     }
   end
 

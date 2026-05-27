@@ -27,7 +27,12 @@ class AttachShipUnifiedScreenshotJob < ApplicationJob
     # is fine since the fastest path (filename regex over the tree) is cheap.
     if ship.frozen_screenshot.blank?
       source_url = ShipChecks::UnifiedScreenshotFinder.find_url(ship.project)
-      ship.update_column(:frozen_screenshot, source_url) if source_url.present?
+      if source_url.present?
+        ship.update_column(:frozen_screenshot, source_url)
+        # Zine just discovered for this project — refresh the cached thumbnail
+        # used on the bulletin board explore feed.
+        ComputeProjectUnifiedThumbnailJob.perform_later(ship.project_id)
+      end
     end
 
     source_url = ship.frozen_screenshot

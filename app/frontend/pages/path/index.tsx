@@ -477,7 +477,7 @@ export default function PathIndex() {
         initial={false}
         animate={{ opacity: pathIntro.hudVisible ? 1 : 0 }}
         transition={PATH_ENTRY_FADE_TRANSITION}
-        className="fixed z-20 top-3 left-1/2 -translate-x-1/2 pointer-events-none"
+        className="fixed z-[20001] top-3 left-1/2 -translate-x-1/2 pointer-events-none"
         style={{ pointerEvents: pathIntro.hudVisible ? 'auto' : 'none' }}
       >
         <SubmissionCountdown />

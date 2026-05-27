@@ -33,7 +33,7 @@ class BulletinBoardController < ApplicationController
   def index
     render inertia: "bulletin_board/index", props: {
       events: real_events,
-      featured: placeholder_featured,
+      featured: real_featured,
       explore: {
         default_category: "projects",
         default_project_sort: "active",
@@ -102,13 +102,32 @@ class BulletinBoardController < ApplicationController
                  .map { |e| serialize_bulletin_event(e) }
   end
 
-  def placeholder_featured
-    [
-      { image: "https://cdn.hackclub.com/019da253-bf73-7076-84c4-14ca42fe4781/jesuskeyboard.webp", title: "The biblically accurate keyboard", username: "Alex Tran" },
-      { image: "https://cdn.hackclub.com/019da254-32dd-7eff-a250-15f538271cc1/minimaimai.webp", title: "Mini Maimai", username: "Tongyu" },
-      { image: "https://cdn.hackclub.com/019da254-2ec5-719c-bd5e-b31f9a6a8be8/icepizero.webp", title: "Icepi Zero", username: "Cyao" },
-      { image: "https://cdn.hackclub.com/019da254-3669-72bc-baf5-c0d7a0f5da52/splitwave.webp", title: "Split Wave", username: "Antush" }
-    ]
+  def real_featured
+    # SQL-level filter for discarded/unlisted so every preloaded :user and
+    # :unified_thumbnail_attachment is read by serialize_featured_card — keeps Bullet from
+    # flagging dropped rows' eager loads as unused.
+    FeaturedProject
+      .kept
+      .ordered
+      .joins(:project)
+      .merge(Project.kept.listed)
+      .preload(project: :user)
+      .preload(project: { unified_thumbnail_attachment: :blob })
+      .map { |fp| serialize_featured_card(fp) }
+  end
+
+  def serialize_featured_card(featured)
+    project = featured.project
+    cover_url = project.unified_thumbnail.attached? ? url_for(project.unified_thumbnail) : nil
+
+    {
+      project_id: project.id,
+      image: cover_url,
+      title: project.name,
+      username: project.user.display_name,
+      href: "/projects/#{project.id}",
+      repo_link: project.repo_link.presence
+    }
   end
 
   def explore_stats
@@ -161,6 +180,7 @@ class BulletinBoardController < ApplicationController
       projects = scope.where(id: page_ids)
                       .order(Arel.sql("array_position(ARRAY[#{page_ids.join(',')}]::bigint[], projects.id)"))
                       .preload(:user)
+                      .preload(unified_thumbnail_attachment: :blob)
                       .to_a
       preload_project_explore_context(projects)
 
@@ -174,9 +194,19 @@ class BulletinBoardController < ApplicationController
     scope = order_projects_for_explore(scope, sort)
     scope = apply_project_cursor(scope, sort: sort, cursor: cursor)
 
-    projects = scope.limit(limit + 1).preload(:user).to_a
+    projects = scope.limit(limit + 1).to_a
     has_more = projects.size > limit
     projects = projects.first(limit)
+    # Preload after slicing so Bullet doesn't flag the discarded +1 row's user/thumbnail
+    # associations as unused — same rationale as journal_explore_entries' Preloader call below.
+    # Split into two Preloader calls (rather than one with an array of associations) so each
+    # registers a single non-array shape in Bullet's eager_loadings registry. The array form
+    # gets handled inconsistently by Bullet's overlap-split logic (`<<` on a Set treats arrays
+    # as one element while the parallel object_associations add splits them), which trips the
+    # unused-eager-loading detector when a project sits in both this browse list and the
+    # real_featured grid.
+    ActiveRecord::Associations::Preloader.new(records: projects, associations: :user).call
+    ActiveRecord::Associations::Preloader.new(records: projects, associations: { unified_thumbnail_attachment: :blob }).call
     preload_project_explore_context(projects)
 
     [
@@ -222,9 +252,10 @@ class BulletinBoardController < ApplicationController
     has_more = entries.size > limit
     entries = entries.first(limit)
     # Preload after slicing so Bullet doesn't flag the discarded +1 row's associations as unused.
+    # Includes project's unified_thumbnail blob so journal_media can fall back to it without N+1.
     ActiveRecord::Associations::Preloader.new(
       records: entries,
-      associations: [ :user, :project, { images_attachments: :blob } ]
+      associations: [ :user, { project: { unified_thumbnail_attachment: :blob } }, { images_attachments: :blob } ]
     ).call
     markdown_docs = rendered_journal_markdown_documents(entries)
 
@@ -397,7 +428,9 @@ class BulletinBoardController < ApplicationController
     latest_entry = @explore_latest_entries[project.id]
     latest_markdown_doc = latest_entry && rendered_user_markdown_document(latest_entry.content.to_s)
     cover_entry = @explore_cover_entries[project.id]
-    cover_url = if cover_entry
+    cover_url = if project.unified_thumbnail.attached?
+      url_for(project.unified_thumbnail)
+    elsif cover_entry
       url_for(cover_entry.images.first)
     elsif latest_entry
       journal_cover_url(latest_entry, latest_markdown_doc)
@@ -447,6 +480,12 @@ class BulletinBoardController < ApplicationController
 
     markdown_image_url = journal_markdown_image_url(markdown_doc)
     return { kind: "image", url: markdown_image_url } if markdown_image_url
+
+    # Fall back to the project's cached zine when the entry itself has no media,
+    # so journal cards on the explore feed visually anchor to the project.
+    if entry.project.unified_thumbnail.attached?
+      return { kind: "image", url: url_for(entry.project.unified_thumbnail) }
+    end
 
     # Recordings are intentionally NOT shown on the public explore feed — they are
     # restricted to the journal author, project owner, and project collaborators only.
