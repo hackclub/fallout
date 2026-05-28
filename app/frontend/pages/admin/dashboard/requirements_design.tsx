@@ -28,7 +28,11 @@ interface Totals {
 
 interface ReviewWeek {
   week: string
-  count: number
+  rc: number
+  dr: number
+  ta: number
+  ta_hours: number
+  low: boolean
 }
 
 interface ReviewerProfile {
@@ -36,6 +40,7 @@ interface ReviewerProfile {
   display_name: string
   avatar: string | null
   total_reviews: number
+  rc_reviews: number
   reviews_by_week: ReviewWeek[]
 }
 
@@ -57,7 +62,9 @@ function formatRate(value: number): string {
 }
 
 const profileChartConfig: ChartConfig = {
-  count: { label: 'Reviews', color: 'hsl(217, 91%, 60%)' },
+  rc: { label: 'RC', color: 'hsl(217, 91%, 60%)' },
+  dr: { label: 'DR', color: 'hsl(142, 71%, 45%)' },
+  ta: { label: 'Time Audit', color: 'hsl(38, 92%, 50%)' },
 }
 
 const DM_PREFIX = 'reviewer_dm:'
@@ -115,7 +122,7 @@ function ReviewerProfileCard({
   dmDate: Date | null
   onToggle: () => void
 }) {
-  const hasLowWeek = profile.reviews_by_week.some((w) => w.count > 0 && w.count < 15)
+  const hasLowWeek = profile.reviews_by_week.some((w) => w.low)
   return (
     <Link href={`/admin/reviewers/${profile.id}`} className="block hover:no-underline">
       <Card className="hover:bg-muted/50 transition-colors">
@@ -129,7 +136,7 @@ function ReviewerProfileCard({
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">{profile.display_name}</p>
               <div className="flex items-center gap-1.5">
-                <p className="text-xs text-muted-foreground">{profile.total_reviews} reviews total</p>
+                <p className="text-xs text-muted-foreground">{profile.rc_reviews} RC · {profile.total_reviews} all-time</p>
                 {hasLowWeek && (
                   <span title="Has weeks below 15 reviews" className="text-yellow-500">
                     ⚠
@@ -164,10 +171,16 @@ function ReviewerProfileCard({
                       const d = new Date(v + 'T00:00:00')
                       return `Week of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                     }}
+                    formatter={(value, name, item) => {
+                      if (name === 'ta') return [`${item.payload.ta_hours} hrs`, 'Time Audit']
+                      return [value, (name as string).toUpperCase()]
+                    }}
                   />
                 }
               />
-              <Bar dataKey="count" fill="var(--color-count)" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="rc" stackId="a" fill="var(--color-rc)" />
+              <Bar dataKey="dr" stackId="a" fill="var(--color-dr)" />
+              <Bar dataKey="ta" stackId="a" radius={[2, 2, 0, 0]} fill="var(--color-ta)" />
             </BarChart>
           </ChartContainer>
         </CardContent>
