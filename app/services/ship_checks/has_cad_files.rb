@@ -16,17 +16,17 @@ module ShipChecks
 
       extensions = tree.map { |p| File.extname(p).downcase }
       has_model = %w[.stl .obj .3mf .stp .step].any? { |ext| extensions.include?(ext) }
-      has_source = %w[.f3d .fcstd .sldprt].any? { |ext| extensions.include?(ext) }
+      has_source = %w[.f3d .f3z .fcstd .sldprt].any? { |ext| extensions.include?(ext) }
       has_onshape = onshape_link_in_docs?(ctx)
       passed = has_model && (has_source || has_onshape)
       message = if passed
         nil
       elsif has_model
-        "Add CAD source files (.f3d, .FCStd, .sldprt, or Onshape link) alongside your 3D exports"
+        "Add CAD source files (.f3d, .f3z, .FCStd, .sldprt, or Onshape link) alongside your 3D exports"
       elsif has_source || has_onshape
         "Add exported 3D model files (.step) alongside your CAD source"
       else
-        "Add 3D model exports (.step) and CAD source (.f3d, .FCStd, .sldprt, or Onshape link) if your project has 3D models"
+        "Add 3D model exports (.step) and CAD source (.f3d, .f3z, .FCStd, .sldprt, or Onshape link) if your project has 3D models"
       end
       ShipCheckService::CheckResult.new(
         key: "has_cad_files",

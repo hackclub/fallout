@@ -84,12 +84,17 @@ module ShipChecks
       filter_known_urls(match_urls.uniq, repo_nwo, readme)
     end
 
-    # Filter out the project's own repo and any URLs already referenced in the README
+    IGNORED_MATCH_HOSTS = %w[youtube.com youtu.be].freeze
+
+    # Filter out the project's own repo and any URLs already referenced in the README.
+    # YouTube is ignored because auto-extracted video thumbnails cause frequent false positives.
     def self.filter_known_urls(urls, repo_nwo, readme)
       readme_urls = readme&.scan(%r{https?://[^\s)\]>"]+})&.map { |u| URI(u).host rescue nil }&.compact&.uniq || [] # rubocop:disable Style/RescueModifier
       urls.reject do |u|
+        host = URI(u).host rescue nil # rubocop:disable Style/RescueModifier
         (repo_nwo && u.include?(repo_nwo)) ||
-          readme_urls.any? { |host| u.include?(host) }
+          readme_urls.any? { |h| u.include?(h) } ||
+          (host && IGNORED_MATCH_HOSTS.any? { |ignored| host == ignored || host.end_with?(".#{ignored}") })
       end
     end
 
