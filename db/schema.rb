@@ -974,7 +974,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_28_130000) do
     t.boolean "excluded_from_reviewer_suggestions", default: false, null: false
     t.string "first_name"
     t.integer "gold_balance", default: 0, null: false
-    t.integer "hacker_value", default: 0, null: false
     t.boolean "has_hca_address", default: false, null: false
     t.string "hca_id"
     t.text "hca_token"
