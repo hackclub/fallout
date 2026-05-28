@@ -264,10 +264,13 @@ class Admin::DashboardController < Admin::ApplicationController
   # In development without a bot token, falls back to all non-reviewer users with a slack_id
   # so seed data is visible without needing a real Slack connection.
   def slack_channel_non_reviewers(channel_id)
+    reviewer_roles = %w[requirements_checker pass2_reviewer time_auditor admin]
+
     if Rails.env.development? && ENV["SLACK_BOT_TOKEN"].blank?
       return User
         .where.not(slack_id: [ nil, "" ])
-        .where.not("roles && ARRAY['requirements_checker', 'pass2_reviewer']::varchar[]")
+        .where.not("roles && ARRAY[?]::varchar[]", reviewer_roles)
+        .where(excluded_from_reviewer_suggestions: false)
         .map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
         .sort_by { |u| u[:display_name] }
     end
@@ -285,7 +288,8 @@ class Admin::DashboardController < Admin::ApplicationController
 
     User
       .where(slack_id: member_slack_ids)
-      .where.not("roles && ARRAY['requirements_checker', 'pass2_reviewer']::varchar[]")
+      .where.not("roles && ARRAY[?]::varchar[]", reviewer_roles)
+      .where(excluded_from_reviewer_suggestions: false)
       .map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
       .sort_by { |u| u[:display_name] }
   rescue => e

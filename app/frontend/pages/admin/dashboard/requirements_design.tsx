@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { usePage, Link } from '@inertiajs/react'
+import { usePage, Link, router } from '@inertiajs/react'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/admin/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/admin/ui/table'
@@ -8,7 +8,7 @@ import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/admin/ui/chart'
 import { Bar, BarChart } from 'recharts'
-import { MessageCircleIcon } from 'lucide-react'
+import { MessageCircleIcon, X } from 'lucide-react'
 import { PageProps } from '@inertiajs/core'
 
 interface LeaderboardRow {
@@ -341,14 +341,30 @@ export default function RequirementsDesignDashboard() {
         ) : (
           <div className="flex flex-wrap gap-3">
             {non_reviewer_channel_members.map((member) => (
-              <div key={member.id} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+              <Link
+                key={member.id}
+                href={`/admin/users/${member.id}`}
+                className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+              >
                 {member.avatar ? (
                   <img src={member.avatar} className="size-6 rounded-full shrink-0" alt="" />
                 ) : (
                   <div className="size-6 rounded-full bg-muted shrink-0" />
                 )}
                 <span>{member.display_name}</span>
-              </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    router.patch(`/admin/users/${member.id}/toggle_reviewer_suggestion`, {}, { preserveScroll: true })
+                  }}
+                  title="Exclude from suggestions"
+                  className="text-muted-foreground hover:text-destructive ml-1"
+                >
+                  <X className="size-3" />
+                </button>
+              </Link>
             ))}
           </div>
         )}

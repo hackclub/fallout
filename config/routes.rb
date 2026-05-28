@@ -405,6 +405,7 @@ Rails.application.routes.draw do
           patch :update_streak_day # Admin streak day status override
           patch :restore_streak_goal # Admin streak goal restore (fills blank/missed days with frozen)
           patch :update_ban # Admin ban/unban — admin-only
+          patch :toggle_reviewer_suggestion # Exclude/include from "Not Yet a Reviewer" list
         end
       end
       resources :activity_checks, only: [ :new, :create ]
@@ -460,6 +461,10 @@ Rails.application.routes.draw do
   end
 
   get "up" => "rails/health#show", as: :rails_health_check
+
+  if Rails.env.development?
+    get "dev/login/:user_id" => "dev_sessions#create", as: :dev_login
+  end
 
   root "landing#index"
 
