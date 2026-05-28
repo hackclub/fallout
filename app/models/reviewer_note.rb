@@ -36,7 +36,13 @@ class ReviewerNote < ApplicationRecord
   validates :review_stage, inclusion: { in: REVIEW_STAGES }, allow_nil: true
   validate :ship_belongs_to_project, if: -> { ship_id.present? }
 
+  before_validation :expand_slack_urls_in_body, if: :body_changed?
+
   private
+
+  def expand_slack_urls_in_body
+    self.body = SlackMessageFetcher.expand_urls(body)
+  end
 
   def ship_belongs_to_project
     errors.add(:ship, "must belong to this project") unless ship&.project_id == project_id
