@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "net/http"
-require "json"
 require "base64"
 
 module ShipChecks
@@ -82,22 +80,13 @@ module ShipChecks
 
     def github_api(path)
       return nil unless github_nwo
-      uri = URI("https://api.github.com#{path}")
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-      http.open_timeout = ShipCheckService::GITHUB_TIMEOUT
-      http.read_timeout = ShipCheckService::GITHUB_TIMEOUT
-      request = Net::HTTP::Get.new(uri)
-      request["Accept"] = "application/vnd.github.v3+json"
-      request["User-Agent"] = "Fallout-Preflight"
-      request["Authorization"] = "Bearer #{ENV['GITHUB_TOKEN']}" if ENV["GITHUB_TOKEN"].present?
-      response = http.request(request)
-      if response.code == "429" || (response.code == "403" && response["x-ratelimit-remaining"] == "0")
-        @github_rate_limited = true
-        return nil
-      end
-      return nil unless response.is_a?(Net::HTTPSuccess)
-      JSON.parse(response.body)
+      clean_path = path.sub(%r{\A/}, "")
+      uri = URI(clean_path)
+      params = uri.query ? URI.decode_www_form(uri.query).to_h : {}
+      GithubService.get(uri.path, params)
+    rescue GithubService::Error => e
+      @github_rate_limited = true if e.message.include?("rate limit")
+      nil
     rescue StandardError
       nil
     end

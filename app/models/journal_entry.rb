@@ -2,15 +2,14 @@
 #
 # Table name: journal_entries
 #
-#  id                       :bigint           not null, primary key
-#  burnout_duration_seconds :integer
-#  content                  :text
-#  discarded_at             :datetime
-#  created_at               :datetime         not null
-#  updated_at               :datetime         not null
-#  project_id               :bigint           not null
-#  ship_id                  :bigint
-#  user_id                  :bigint           not null
+#  id           :bigint           not null, primary key
+#  content      :text
+#  discarded_at :datetime
+#  created_at   :datetime         not null
+#  updated_at   :datetime         not null
+#  project_id   :bigint           not null
+#  ship_id      :bigint
+#  user_id      :bigint           not null
 #
 # Indexes
 #

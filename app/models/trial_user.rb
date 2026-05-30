@@ -23,13 +23,13 @@
 #  last_name                   :string
 #  onboarded                   :boolean          default(FALSE), not null
 #  pending_lookout_tokens      :string           default([]), not null, is an Array
-#  professor_enrolled_at       :datetime
 #  pronouns                    :string
 #  roles                       :string           default([]), not null, is an Array
 #  slack_token                 :text
 #  streak_freezes              :integer          default(1), not null
 #  streak_in_app_notifications :boolean          default(TRUE), not null
 #  streak_slack_notifications  :boolean          default(TRUE), not null
+#  summit_rsvp                 :string
 #  timezone                    :string           not null
 #  type                        :string
 #  verification_status         :string

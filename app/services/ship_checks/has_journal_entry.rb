@@ -7,14 +7,19 @@ module ShipChecks
     def self.call(ctx)
       project = ctx.project
       has_entries = project.kept_journal_entries.size > 0
-      has_time = project.time_logged.to_i > 300
-      passed = has_entries && has_time
+
+      if project.tags.include?("burnout")
+        status = has_entries ? :passed : :failed
+        message = has_entries ? nil : "Add at least one journal entry"
+      else
+        passed = has_entries && project.time_logged.to_i > 300
+        status = passed ? :passed : :failed
+        message = passed ? nil : "Journal your progress with time-lapse recordings"
+      end
+
       ShipCheckService::CheckResult.new(
-        key: "has_journal_entry",
-        label: DEFINITION[:label],
-        status: passed ? :passed : :failed,
-        message: passed ? nil : "Journal your progress with time-lapse recordings",
-        visibility: :user
+        key: "has_journal_entry", label: DEFINITION[:label],
+        status: status, message: message, visibility: :user
       )
     end
   end

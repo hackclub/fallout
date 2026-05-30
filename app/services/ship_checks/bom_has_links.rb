@@ -48,7 +48,10 @@ module ShipChecks
         res = http.head(uri.request_uri)
         res.is_a?(Net::HTTPSuccess) || res.is_a?(Net::HTTPRedirection) ? res : http.get(uri.request_uri)
       end
-      response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
+      return true if response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
+      # Cloudflare bot challenges return 403 with a "Just a moment..." interstitial
+      # we can't solve — lean safe and treat the link as valid rather than failing the user.
+      response.code.to_i == 403 && response.body.to_s.include?("Just a moment...")
     rescue StandardError
       retry if (retries -= 1) >= 0
       false
