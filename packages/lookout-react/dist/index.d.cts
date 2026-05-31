@@ -356,22 +356,22 @@ declare function useCameraCapture(overrides?: CaptureSettings): {
     stopPreview: () => void;
 };
 
+interface UploadConfirmResult {
+    trackedSeconds: number;
+    nextExpectedAt: string;
+}
 interface UploaderResult {
-    /** Add a capture to the upload queue. */
-    enqueue: (capture: CaptureResult) => void;
-    /** Current upload queue state. */
+    /** Run the full pipeline serially: upload + confirm. Returns the
+     *  fresh `nextExpectedAt` from THIS capture's confirm response.
+     *  Throws on failure (after retries) — the caller (the capture-loop
+     *  scheduler) catches and falls back to a local interval. */
+    captureUploadConfirm: (capture: CaptureResult) => Promise<UploadConfirmResult>;
+    /** Current upload state. */
     uploads: UploadState;
     /** Server-reported tracked seconds after latest confirmation. */
     trackedSeconds: number;
     /** Object URL of last successfully uploaded screenshot. */
     lastScreenshotUrl: string | null;
-    /** ISO timestamp: when the server expects the next screenshot. */
-    nextExpectedAt: string | null;
-    /** Snapshot of the latest `nextExpectedAt` from the ref — for callers
-     *  (e.g. capture-loop schedulers) that need the freshest value without
-     *  re-rendering. Returns the same string `nextExpectedAt` does, but
-     *  available synchronously from within effects. */
-    getNextExpectedAt: () => string | null;
     /** Last upload error message, if any. */
     lastError: string | null;
     /** True when a 409 conflict was received (session paused server-side). */
@@ -379,6 +379,19 @@ interface UploaderResult {
     /** Clear the sessionConflict flag after handling. */
     resetConflict: () => void;
 }
+/**
+ * Serial upload pipeline. Matches the desktop Rust loop: each call to
+ * `captureUploadConfirm` runs upload + confirm to completion before
+ * returning, and returns the FRESH `nextExpectedAt` from that capture's
+ * own confirm response.
+ *
+ * Replaces the pre-0.2.4 queue-and-fire-and-forget model. The previous
+ * model was racy: the tick chain read a shared `nextExpectedAt` ref that
+ * lagged behind the in-flight upload by one round-trip, so the ref was
+ * always stale → `delay=0` → burst captures (3-5/min instead of 1/min).
+ * Serial eliminates the race entirely; the chain knows exactly when to
+ * fire next because the value comes from the same capture's response.
+ */
 declare function useUploader(): UploaderResult;
 
 declare function useSession(): {
