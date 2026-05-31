@@ -65,8 +65,10 @@ function createLookoutClient(options) {
     async getSession() {
       return fetchJson(await sessionUrl());
     },
-    async getUploadUrl() {
-      return fetchJson(await sessionUrl("/upload-url"));
+    async getUploadUrl(opts) {
+      const base = await sessionUrl("/upload-url");
+      const url = opts?.capturedAt ? `${base}?capturedAt=${encodeURIComponent(opts.capturedAt)}` : base;
+      return fetchJson(url);
     },
     async confirmScreenshot(body) {
       return fetchJson(await sessionUrl("/screenshots"), {
@@ -220,11 +222,12 @@ function captureFrameAsJpeg(video, canvas, settings) {
     return Promise.resolve(null);
   }
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const capturedAtMs = Date.now();
   const toBlobPromise = new Promise((resolve) => {
     canvas.toBlob(
       (blob) => {
         resolve(
-          blob ? { blob, width: canvas.width, height: canvas.height } : null
+          blob ? { blob, width: canvas.width, height: canvas.height, capturedAtMs } : null
         );
       },
       "image/jpeg",
@@ -489,6 +492,7 @@ function useCameraCapture(overrides) {
     stopPreview
   };
 }
+var ENABLE_CREDIT_MODE = true;
 async function retry(fn, maxRetries, delays) {
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -503,7 +507,7 @@ async function retry(fn, maxRetries, delays) {
 }
 function useUploader() {
   const { client, config } = useLookoutContext();
-  const { maxRetries, retryDelays, maxPendingBuffer } = config.retry;
+  const { maxRetries, retryDelays } = config.retry;
   const [uploads, setUploads] = react.useState({
     pending: 0,
     completed: 0,
@@ -513,23 +517,17 @@ function useUploader() {
   const [lastScreenshotUrl, setLastScreenshotUrl] = react.useState(null);
   const [lastError, setLastError] = react.useState(null);
   const [sessionConflict, setSessionConflict] = react.useState(false);
-  const nextExpectedAtRef = react.useRef(null);
-  const bufferRef = react.useRef([]);
-  const processingRef = react.useRef(false);
   const resetConflict = react.useCallback(() => setSessionConflict(false), []);
-  const processQueue = react.useCallback(async () => {
-    if (processingRef.current) return;
-    processingRef.current = true;
-    while (bufferRef.current.length > 0) {
-      const capture = bufferRef.current.shift();
-      setUploads((s) => ({ ...s, pending: s.pending - 1 }));
+  const captureUploadConfirm = react.useCallback(
+    async (capture) => {
+      setUploads((s) => ({ ...s, pending: s.pending + 1 }));
       try {
-        const { uploadUrl, screenshotId, nextExpectedAt } = await retry(
-          () => client.getUploadUrl(),
+        const capturedAt = ENABLE_CREDIT_MODE ? new Date(capture.capturedAtMs ?? Date.now()).toISOString() : void 0;
+        const { uploadUrl, screenshotId } = await retry(
+          () => client.getUploadUrl({ capturedAt }),
           maxRetries,
           retryDelays
         );
-        nextExpectedAtRef.current = nextExpectedAt;
         await retry(
           () => client.uploadToR2(uploadUrl, capture.blob),
           maxRetries,
@@ -546,52 +544,45 @@ function useUploader() {
           retryDelays
         );
         setTrackedSeconds(result.trackedSeconds);
-        nextExpectedAtRef.current = result.nextExpectedAt;
         setLastScreenshotUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
           return URL.createObjectURL(capture.blob);
         });
-        setUploads((s) => ({ ...s, completed: s.completed + 1 }));
+        setUploads((s) => ({
+          ...s,
+          pending: s.pending - 1,
+          completed: s.completed + 1
+        }));
         config.callbacks.onUploadSuccess?.({
           screenshotId,
           trackedSeconds: result.trackedSeconds
         });
+        return {
+          trackedSeconds: result.trackedSeconds,
+          nextExpectedAt: result.nextExpectedAt
+        };
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Upload failed";
         setLastError(msg);
-        setUploads((s) => ({ ...s, failed: s.failed + 1 }));
+        setUploads((s) => ({
+          ...s,
+          pending: s.pending - 1,
+          failed: s.failed + 1
+        }));
         config.callbacks.onUploadFailure?.(err instanceof Error ? err : new Error(msg));
         if (err instanceof HttpError && err.status === 409) {
           setSessionConflict(true);
-          const remaining = bufferRef.current.length;
-          if (remaining > 0) {
-            bufferRef.current.length = 0;
-            setUploads((s) => ({ ...s, pending: 0, failed: s.failed + remaining }));
-          }
-          break;
         }
+        throw err;
       }
-    }
-    processingRef.current = false;
-  }, [client, maxRetries, retryDelays]);
-  const enqueue = react.useCallback(
-    (capture) => {
-      if (bufferRef.current.length >= maxPendingBuffer) {
-        bufferRef.current.shift();
-        setUploads((s) => ({ ...s, pending: s.pending - 1, failed: s.failed + 1 }));
-      }
-      bufferRef.current.push(capture);
-      setUploads((s) => ({ ...s, pending: s.pending + 1 }));
-      processQueue();
     },
-    [maxPendingBuffer, processQueue]
+    [client, maxRetries, retryDelays, config.callbacks]
   );
   return {
-    enqueue,
+    captureUploadConfirm,
     uploads,
     trackedSeconds,
     lastScreenshotUrl,
-    nextExpectedAt: nextExpectedAtRef.current,
     lastError,
     sessionConflict,
     resetConflict
@@ -768,19 +759,13 @@ function useSession() {
     setError
   };
 }
+var MAX_INTERPOLATION_S = Math.floor(shared.SCREENSHOT_INTERVAL_MS / 1e3);
 function useSessionTimer(serverTrackedSeconds, isActive) {
   const [displaySeconds, setDisplaySeconds] = react.useState(serverTrackedSeconds);
   const lastSyncRef = react.useRef(Date.now());
   const baseRef = react.useRef(serverTrackedSeconds);
-  const DRIFT_CORRECTION_THRESHOLD = 180;
   react.useEffect(() => {
-    const drift = baseRef.current - serverTrackedSeconds;
-    let newBase;
-    if (drift > DRIFT_CORRECTION_THRESHOLD) {
-      newBase = serverTrackedSeconds;
-    } else {
-      newBase = Math.max(baseRef.current, serverTrackedSeconds);
-    }
+    const newBase = Math.max(baseRef.current, serverTrackedSeconds);
     if (newBase !== baseRef.current) {
       baseRef.current = newBase;
       setDisplaySeconds(newBase);
@@ -788,12 +773,18 @@ function useSessionTimer(serverTrackedSeconds, isActive) {
     }
   }, [serverTrackedSeconds]);
   react.useEffect(() => {
-    if (!isActive) return;
+    if (!isActive) {
+      setDisplaySeconds(baseRef.current);
+      return;
+    }
     lastSyncRef.current = Date.now();
     let raf;
     let lastRenderedSecond = -1;
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - lastSyncRef.current) / 1e3);
+      const elapsed = Math.min(
+        MAX_INTERPOLATION_S,
+        Math.floor((Date.now() - lastSyncRef.current) / 1e3)
+      );
       if (elapsed !== lastRenderedSecond) {
         lastRenderedSecond = elapsed;
         setDisplaySeconds(baseRef.current + elapsed);
@@ -803,8 +794,6 @@ function useSessionTimer(serverTrackedSeconds, isActive) {
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      baseRef.current += Math.floor((Date.now() - lastSyncRef.current) / 1e3);
-      lastSyncRef.current = Date.now();
     };
   }, [isActive, serverTrackedSeconds]);
   return displaySeconds;
@@ -825,6 +814,41 @@ function formatTrackedTime(totalSeconds) {
   if (h > 0) return `${h}h`;
   if (m > 0) return `${m}min`;
   return "< 1min";
+}
+function useSilentAudioKeepAlive(enabled) {
+  const contextRef = react.useRef(null);
+  const oscillatorRef = react.useRef(null);
+  react.useEffect(() => {
+    if (!enabled) return;
+    const Ctor = typeof window === "undefined" ? void 0 : window.AudioContext ?? window.webkitAudioContext;
+    if (!Ctor) return;
+    let ctx;
+    try {
+      ctx = new Ctor();
+    } catch {
+      return;
+    }
+    contextRef.current = ctx;
+    try {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      oscillator.connect(gain).connect(ctx.destination);
+      oscillator.start();
+      oscillatorRef.current = oscillator;
+    } catch {
+    }
+    return () => {
+      try {
+        oscillatorRef.current?.stop();
+      } catch {
+      }
+      oscillatorRef.current = null;
+      contextRef.current?.close().catch(() => {
+      });
+      contextRef.current = null;
+    };
+  }, [enabled]);
 }
 
 // src/hooks/useLookout.ts
@@ -869,31 +893,45 @@ function useLookout() {
       prevStatusRef.current = next;
     }
   }, [session.status]);
-  const captureAndUploadRef = react.useRef(async () => {
-    const result = await capture.takeScreenshot();
-    if (result) {
-      callbacksRef.current.onCapture?.(result);
-      uploader.enqueue(result);
-    }
-  });
-  captureAndUploadRef.current = async () => {
-    const result = await capture.takeScreenshot();
-    if (result) {
-      callbacksRef.current.onCapture?.(result);
-      uploader.enqueue(result);
-    }
-  };
+  const takeScreenshotRef = react.useRef(capture.takeScreenshot);
+  takeScreenshotRef.current = capture.takeScreenshot;
+  const captureUploadConfirmRef = react.useRef(uploader.captureUploadConfirm);
+  captureUploadConfirmRef.current = uploader.captureUploadConfirm;
   const isActive = session.status === "active" || session.status === "pending";
+  useSilentAudioKeepAlive(capture.isSharing && isActive);
   react.useEffect(() => {
     if (!capture.isSharing || !isActive) return;
     capturingRef.current = true;
-    captureAndUploadRef.current();
-    const id = setInterval(() => captureAndUploadRef.current(), config.capture.intervalMs);
-    intervalRef.current = id;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      let nextExpectedAt = null;
+      try {
+        const captureResult = await takeScreenshotRef.current();
+        if (captureResult) {
+          callbacksRef.current.onCapture?.(captureResult);
+          const result = await captureUploadConfirmRef.current(captureResult);
+          nextExpectedAt = result.nextExpectedAt;
+        }
+      } catch (err) {
+        console.warn("[lookout] capture cycle failed:", err);
+      }
+      if (cancelled) return;
+      const target = nextExpectedAt ? Date.parse(nextExpectedAt) : Date.now() + config.capture.intervalMs;
+      const delay = Math.min(
+        config.capture.intervalMs * 2,
+        Math.max(0, target - Date.now())
+      );
+      intervalRef.current = setTimeout(tick, delay);
+    };
+    tick();
     return () => {
       capturingRef.current = false;
-      clearInterval(id);
-      intervalRef.current = null;
+      cancelled = true;
+      if (intervalRef.current !== null) {
+        clearTimeout(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [capture.isSharing, isActive, config.capture.intervalMs]);
   const wasSharingRef = react.useRef(capture.isSharing);

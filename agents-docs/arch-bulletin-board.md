@@ -125,7 +125,7 @@ Frontend subscriptions (via [`useLiveReload`](app/frontend/lib/useLiveReload.ts)
 
 Single multi-section Inertia page:
 
-- **Featured** — currently a hardcoded array of 4 placeholder cards in `BulletinBoardController#placeholder_featured` (real images on cdn.hackclub.com but treat as a stub until properly modeled).
+- **Featured** — admin-curated `FeaturedProject` records (see "Featured Projects" section below). Server renders all kept rows via `BulletinBoardController#real_featured`; the client paginates 4-per-page on the existing 2-col mobile / 4-col desktop grid. Subscribes to the `featured_projects` ActionCable stream so admin curation flows through `useLiveReload`.
 - **Events** — server-rendered via `real_events`, sorted with the `COALESCE(...)` trick. Client uses `useNowTick` to re-evaluate event status (`upcoming → happening → expired`) without waiting for a broadcast. The events section header has a small toolbar with **Calendar view** and **Subscribe** buttons.
 - **Explore** — embedded discovery feed. See [arch-explore.md](arch-explore.md) for the full feed mechanics. The page passes initial server-rendered slices for both `projects` and `journals` so first paint requires no client fetch.
 
@@ -159,6 +159,25 @@ Backend ICS rendering lives in `app/services/bulletin_event_ics_generator.rb` (u
 | Manual `force_start_now!` racing with a scheduled `start_now!` | `start_now!` is idempotent (checks `starts_at.present?`); `force_start_now!` always overwrites. Admin uses `force_start_now!` when intentional. |
 | Validation of unschedulable events with future `ends_at` | `ends_at_after_starts_at` validates only when both are present — manual events with `starts_at: nil` and a future `ends_at` would pass, but the form path doesn't allow that combo. |
 | Public broadcast leaking attributes | `Broadcastable#broadcast_live_update` only sends `{stream, id, action}`. Frontend re-fetches through the controller, which re-runs Pundit/serializers — the policy + serializer are the source of truth for what's exposed. |
+
+---
+
+## Featured Projects
+
+The Featured row at the top of `/bulletin_board` is curated by admins via `FeaturedProject` records — a soft-deletable join row between `projects` and `users` (the curator).
+
+| File | Notes |
+|---|---|
+| `app/models/featured_project.rb` | `Discardable` + `Broadcastable :featured_projects`. `belongs_to :project`, `belongs_to :featured_by_user, class_name: "User"`. Validates project is kept + listed on create. `ordered` scope sorts by `position, featured_at`. |
+| `db/migrate/20260527053922_create_featured_projects.rb` | Partial unique index `index_featured_projects_unique_active_project` (where `discarded_at IS NULL`) — a project may only be actively featured once but can re-appear in archive history. |
+| `app/policies/featured_project_policy.rb` | Staff read; admin create/update_note/destroy/restore/reorder. |
+| `app/controllers/admin/featured_projects_controller.rb` | Tabs: `active` / `archived`. Custom actions: `projects_search` (Meilisearch autocomplete excluding already-featured), `reorder` (bulk position update inside a transaction — explicit broadcast since `update_column` skips callbacks), `update_note`, `restore` (re-validates project is kept/listed before un-discarding, appends to end of position list). |
+| `app/frontend/pages/admin/featured_projects/index.tsx` | Active tab uses `@dnd-kit/sortable` for drag-reorder cards; Archive tab is a shadcn `Table` with restore buttons. Note editing via `AlertDialog` + `Textarea`. |
+| `app/frontend/pages/admin/featured_projects/FeaturedProjectFormSheet.tsx` | `cmdk` Command search hits `/admin/featured_projects/projects_search`. Debounced 250 ms with AbortController so out-of-order responses can't paint stale results. |
+
+The public payload (`BulletinBoardController#real_featured` → `serialize_featured_card`) intentionally omits `slack_id` and any owner-PII — the only owner field exposed is `display_name`. Cards link to the project via `ModalLink`; the GitHub icon renders only when `repo_link` is present. Slack button is deliberately not rendered to avoid exposing `slack_id` publicly (see AGENTS.md "PII must only be exposed to admins").
+
+Admins can also quick-feature/unfeature from `/admin/projects/:id` (Star toggle next to "User Facing") and see a star indicator on `/admin/projects` rows — backed by `featured_project_id` (show) and `is_featured` (index) exposed by `Admin::ProjectsController`.
 
 ---
 

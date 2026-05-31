@@ -13,7 +13,7 @@ const MIN_IMAGES = 1
 const MIN_CHARS = 100
 
 type PotentialCollaborator = { id: number; display_name: string; avatar: string }
-type Project = { id: number; name: string; potential_collaborators: PotentialCollaborator[] }
+type Project = { id: number; name: string; burnout: boolean; potential_collaborators: PotentialCollaborator[] }
 
 type Timelapse = {
   id: string
@@ -132,6 +132,8 @@ function NewJournal({
   const [selectedLookoutTokens, setSelectedLookoutTokens] = useState<Set<string>>(new Set())
   const [fullscreenEditor, setFullscreenEditor] = useState(false)
   const [showStreakWarning, setShowStreakWarning] = useState(false)
+  const [burnoutHours, setBurnoutHours] = useState('')
+  const [burnoutMinutes, setBurnoutMinutes] = useState('')
 
   const draftKey = selectedProject ? `journal-draft-${selectedProject.id}` : null
   const [markdown, setMarkdown] = useState(() => {
@@ -183,9 +185,12 @@ function NewJournal({
   const hasEnoughChars = charCount >= MIN_CHARS
   const recordingCount = selectedTimelapses.size + youtubeVideos.length + selectedLookoutTokens.size
   const hasRecording = recordingCount > 0
-  const canSubmit = selectedProject && hasRecording && hasEnoughImages && hasEnoughChars
+  const isBurnout = selectedProject?.burnout ?? false
+  const burnoutDurationSeconds = parseInt(burnoutHours || '0') * 3600 + parseInt(burnoutMinutes || '0') * 60
+  const canSubmit = selectedProject && (hasRecording || isBurnout) && hasEnoughImages && hasEnoughChars
 
   const streakWarningMessage = useMemo(() => {
+    if (isBurnout) return null
     if (streak_seconds_logged == null || streak_threshold == null) return null
     if (youtubeVideos.some((v) => v.duration_seconds == null)) return null
     const selectedLapseDuration = (timelapses ?? [])
@@ -201,6 +206,7 @@ function NewJournal({
     const remainingMinutes = Math.ceil((streak_threshold - totalAfterSubmit) / 60)
     return `This journal alone won't count toward your daily streak! you need ${remainingMinutes} more minute${remainingMinutes !== 1 ? 's' : ''} of recordings today to reach 1 hour. You can journal more later today to reach 1 hour.`
   }, [
+    isBurnout,
     streak_seconds_logged,
     streak_threshold,
     selectedTimelapses,
@@ -313,6 +319,7 @@ function NewJournal({
       content: markdown,
       images: blobSignedIds,
     }
+    if (isBurnout) data.burnout_duration_seconds = burnoutDurationSeconds
     if (is_modal) data.return_to = 'path'
     router.post(`/projects/${selectedProject.id}/journal_entries`, data, {
       onSuccess: () => {
@@ -448,6 +455,39 @@ function NewJournal({
               <span className={hasEnoughImages ? 'text-dark-brown' : 'text-red-500'}>
                 Min images {markdownImageCount}/{MIN_IMAGES}
               </span>
+            </div>
+          </div>
+        )}
+        {isBurnout && (
+          <div className="mt-4">
+            <p className="font-bold italic text-sm mb-1.5">
+              Duration <span className="font-normal not-italic text-brown">(optional - for streaks)</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  min="0"
+                  max="23"
+                  value={burnoutHours}
+                  onChange={(e) => setBurnoutHours(e.target.value.replace(/\D/g, ''))}
+                  placeholder="0"
+                  className="w-16 text-center"
+                />
+                <span className="text-sm text-dark-brown">h</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={burnoutMinutes}
+                  onChange={(e) => setBurnoutMinutes(e.target.value.replace(/\D/g, ''))}
+                  placeholder="0"
+                  className="w-16 text-center"
+                />
+                <span className="text-sm text-dark-brown">m</span>
+              </div>
             </div>
           </div>
         )}

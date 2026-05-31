@@ -5,6 +5,7 @@ import { useCameraCapture } from "./useCameraCapture.js";
 import { useUploader } from "./useUploader.js";
 import { useSession } from "./useSession.js";
 import { useSessionTimer } from "./useSessionTimer.js";
+import { useSilentAudioKeepAlive } from "./useSilentAudioKeepAlive.js";
 import type { LookoutState, LookoutActions, RecorderStatus } from "../types.js";
 
 /**
@@ -46,7 +47,9 @@ export function useLookout(): { state: LookoutState; actions: LookoutActions } {
     capture.isSharing && (session.status === "active" || session.status === "pending"),
   );
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Holds either a setInterval ID (legacy bucket-mode fallback) or
+  // setTimeout ID (credit-mode self-scheduling chain). Cleared on unmount.
+  const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const capturingRef = useRef(false);
   const prevStatusRef = useRef<RecorderStatus>(session.status);
   const intentionalPauseRef = useRef(false);
@@ -71,40 +74,79 @@ export function useLookout(): { state: LookoutState; actions: LookoutActions } {
     }
   }, [session.status]);
 
-  // Capture callback stored in a ref so the interval always calls the latest
-  // version without needing to clear/recreate the interval on every render.
-  const captureAndUploadRef = useRef(async () => {
-    const result = await capture.takeScreenshot();
-    if (result) {
-      callbacksRef.current.onCapture?.(result);
-      uploader.enqueue(result);
-    }
-  });
-  captureAndUploadRef.current = async () => {
-    const result = await capture.takeScreenshot();
-    if (result) {
-      callbacksRef.current.onCapture?.(result);
-      uploader.enqueue(result);
-    }
-  };
+  // Refs to the latest action implementations so the chain's tick body
+  // always calls the freshest function without re-running the effect.
+  const takeScreenshotRef = useRef(capture.takeScreenshot);
+  takeScreenshotRef.current = capture.takeScreenshot;
+  const captureUploadConfirmRef = useRef(uploader.captureUploadConfirm);
+  captureUploadConfirmRef.current = uploader.captureUploadConfirm;
 
   // Start/stop capture interval based on sharing + session state.
-  // Uses a ref for the callback so the interval survives re-renders
-  // without being cleared (fixes React StrictMode + parent re-render issues).
   const isActive = session.status === "active" || session.status === "pending";
+
+  // Keep the page "audible" while recording so the browser doesn't
+  // throttle our setTimeout chain when the user backgrounds the tab or
+  // enables Low Power Mode. The live MediaStream track already exempts
+  // us from some throttling, but Low Power Mode user reports suggest
+  // it's not enough on its own. Harmless on desktop (Tauri) — the Rust
+  // capture loop is independent of this.
+  useSilentAudioKeepAlive(capture.isSharing && isActive);
 
   useEffect(() => {
     if (!capture.isSharing || !isActive) return;
 
     capturingRef.current = true;
-    captureAndUploadRef.current();
-    const id = setInterval(() => captureAndUploadRef.current(), config.capture.intervalMs);
-    intervalRef.current = id;
+    let cancelled = false;
+
+    // Serial capture-upload chain — matches the desktop Rust loop in
+    // `clients/desktop/src-tauri/src/lib.rs::capture_loop_task`. Each
+    // tick takes a screenshot, awaits the full upload+confirm round
+    // trip, and reads the FRESH `nextExpectedAt` from THIS capture's
+    // own confirm response. No shared ref, no race.
+    //
+    // As long as the round trip stays under config.capture.intervalMs,
+    // captures land exactly on the server's authoritative schedule. If
+    // it exceeds the interval, delay clamps to 0 (one catch-up fire)
+    // and the next cycle is back on schedule.
+    const tick = async () => {
+      if (cancelled) return;
+      let nextExpectedAt: string | null = null;
+      try {
+        const captureResult = await takeScreenshotRef.current();
+        if (captureResult) {
+          callbacksRef.current.onCapture?.(captureResult);
+          const result = await captureUploadConfirmRef.current(captureResult);
+          nextExpectedAt = result.nextExpectedAt;
+        }
+      } catch (err) {
+        // Pipeline failure (network / server / 409). Schedule next tick
+        // on the local fallback so the chain stays alive.
+        console.warn("[lookout] capture cycle failed:", err);
+      }
+      if (cancelled) return;
+
+      const target = nextExpectedAt
+        ? Date.parse(nextExpectedAt)
+        : Date.now() + config.capture.intervalMs;
+      // Defensive upper bound: never sleep longer than 2x interval.
+      // Matches desktop's same clamp — protects against malformed
+      // server timestamps.
+      const delay = Math.min(
+        config.capture.intervalMs * 2,
+        Math.max(0, target - Date.now()),
+      );
+      intervalRef.current = setTimeout(tick, delay);
+    };
+
+    tick();
 
     return () => {
       capturingRef.current = false;
-      clearInterval(id);
-      intervalRef.current = null;
+      cancelled = true;
+      if (intervalRef.current !== null) {
+        clearTimeout(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [capture.isSharing, isActive, config.capture.intervalMs]);
 

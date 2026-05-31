@@ -8,7 +8,8 @@ interface ProfessorEnrollmentCtaStepProps {
   }
   canEnroll: boolean
   isTrial: boolean
-  submitting: boolean
+  disabled: boolean
+  enrolling: boolean
   onEnroll: () => void
   onSkip: () => void
   onPromptComplete?: () => void
@@ -18,7 +19,8 @@ export default function ProfessorEnrollmentCtaStep({
   step,
   canEnroll,
   isTrial,
-  submitting,
+  disabled,
+  enrolling,
   onEnroll,
   onSkip,
   onPromptComplete,
@@ -63,15 +65,15 @@ export default function ProfessorEnrollmentCtaStep({
           type="button"
           className="w-full min-h-14 rounded-xl cursor-pointer ease-in-out transition-all hover:scale-104 p-2 border-2 border-dark-brown bg-dark-brown text-light-brown disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           onClick={onEnroll}
-          disabled={submitting || (!canEnroll && !isTrial)}
+          disabled={disabled || (!canEnroll && !isTrial)}
         >
-          {submitting ? 'signing up…' : 'sign me up'}
+          {enrolling ? 'signing up…' : 'sign me up'}
         </button>
         <button
           type="button"
           className="w-full min-h-14 rounded-xl cursor-pointer ease-in-out transition-all hover:scale-104 p-2 border-2 border-dark-brown bg-white text-dark-brown disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           onClick={onSkip}
-          disabled={submitting}
+          disabled={disabled}
         >
           maybe later
         </button>

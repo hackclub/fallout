@@ -27,6 +27,7 @@ import {
   Soup,
   ReceiptText,
   Megaphone,
+  Star,
   BarChart2,
   BadgeAlert,
   Ticket,
@@ -132,6 +133,7 @@ function buildNavSections(): { items: NavItem[] }[] {
     {
       items: [
         { label: 'Bulletin Events', href: '/admin/bulletin_events', icon: Megaphone, statKey: null },
+        { label: 'Featured Projects', href: '/admin/featured_projects', icon: Star, statKey: null },
         { label: 'Shop Items', href: '/admin/shop_items', icon: Store, statKey: null, requirePermission: 'is_admin' },
         {
           label: 'Shop Orders',

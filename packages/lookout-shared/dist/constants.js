@@ -23,6 +23,29 @@ export const SCREENSHOT_INTERVAL_MS = 60_000;
  *  Default: 5000 (5 seconds) */
 export const MAX_CLOCK_SKEW_MS = 5_000;
 // ──────────────────────────────────────────────────────────
+// Credit-mode tracking (see plan: server-authoritative wall-clock)
+// ──────────────────────────────────────────────────────────
+/** Trust envelope: how far in the past `capturedAt` may be relative
+ *  to server `now()` before being rejected. Wide enough to absorb
+ *  normal client-clock skew and buffered uploads.
+ *  Default: 300000 (5 minutes) */
+export const CAPTURED_AT_PAST_TOLERANCE_MS = 300_000;
+/** Trust envelope: how far in the future `capturedAt` may be relative
+ *  to server `now()` before being rejected. Symmetric with the past
+ *  bound to handle clients with fast-skewed clocks.
+ *  Default: 300000 (5 minutes) */
+export const CAPTURED_AT_FUTURE_TOLERANCE_MS = 300_000;
+/** Credit-mode streak window: |capturedAt - expectedAt| ≤ this credits
+ *  60s; outside resets the streak to a fresh anchor with 0 credit.
+ *  Tightly coupled to SCREENSHOT_INTERVAL_MS — keep at half-interval.
+ *  Default: 30000 (30 seconds) */
+export const STREAK_WINDOW_MS = 30_000;
+/** Seconds awarded per in-window capture in credit mode.
+ *  Equals SCREENSHOT_INTERVAL_MS / 1000. Don't hardcode 60 in the
+ *  credit path — derive from this constant.
+ *  Default: 60 */
+export const CREDIT_PER_CAPTURE_S = 60;
+// ──────────────────────────────────────────────────────────
 // Auto-timeout thresholds
 // ──────────────────────────────────────────────────────────
 /** Auto-pause a session after this many minutes without a
@@ -47,17 +70,21 @@ export const MAX_COMPILE_ATTEMPTS = 3;
 // Rate limiting & abuse prevention
 // ──────────────────────────────────────────────────────────
 /** Max upload-url requests per 60-second window per session.
- *  Allows for hedging while preventing spam.
- *  Default: 3 */
-export const RATE_LIMIT_PER_MINUTE = 3;
+ *  Sized for: 1 nominal capture/min + occasional burst (race in the
+ *  client's fire-and-forget scheduling chain) + up to 3 client-side
+ *  retries on transient network errors. 3 was too tight: any hiccup
+ *  blew the budget and the chain stalled.
+ *  Default: 10 */
+export const RATE_LIMIT_PER_MINUTE = 10;
 /** Max confirmed screenshots per session.
  *  At 1/min this equals 12 hours of recording.
  *  Default: 720 */
 export const MAX_SCREENSHOTS_PER_SESSION = 720;
 /** Max total upload-url requests per session (confirmed + unconfirmed).
- *  Set to 2x the screenshot cap for hedging headroom.
- *  Default: 1440 */
-export const MAX_UPLOAD_REQUESTS_PER_SESSION = 1440;
+ *  Sized at ~6x the screenshot cap to absorb client retries and burst
+ *  races without truncating long sessions.
+ *  Default: 4320 */
+export const MAX_UPLOAD_REQUESTS_PER_SESSION = 4320;
 /** Max screenshot file size in bytes.
  *  Validated server-side via HeadObject after upload.
  *  Default: 2097152 (2 MB) */

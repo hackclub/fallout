@@ -41,6 +41,12 @@ interface CaptureResult {
     blob: Blob;
     width: number;
     height: number;
+    /** ms since epoch, in the client's clock. Recorded at the moment the
+     *  screenshot was taken (vs. when the upload arrives at the server).
+     *  Forwarded to the server as `capturedAt` to drive credit-mode tracking.
+     *  Optional — older capture code may omit it; the uploader falls back to
+     *  Date.now() at enqueue time. */
+    capturedAtMs?: number;
 }
 interface UploadState {
     pending: number;
@@ -169,7 +175,12 @@ interface LookoutActions {
 interface LookoutClient {
     resolveToken(): Promise<string>;
     getSession(): Promise<SessionResponse>;
-    getUploadUrl(): Promise<UploadUrlResponse>;
+    /** `capturedAt` is optional. Sending it on the first request of a new
+     *  session opts the session into credit-mode tracking; subsequent
+     *  requests must keep sending it. Omit for legacy bucket-count behavior. */
+    getUploadUrl(opts?: {
+        capturedAt?: string;
+    }): Promise<UploadUrlResponse>;
     confirmScreenshot(body: ConfirmScreenshotRequest): Promise<ConfirmScreenshotResponse>;
     uploadToR2(uploadUrl: string, blob: Blob): Promise<void>;
     pause(): Promise<PauseResponse>;
@@ -345,17 +356,22 @@ declare function useCameraCapture(overrides?: CaptureSettings): {
     stopPreview: () => void;
 };
 
+interface UploadConfirmResult {
+    trackedSeconds: number;
+    nextExpectedAt: string;
+}
 interface UploaderResult {
-    /** Add a capture to the upload queue. */
-    enqueue: (capture: CaptureResult) => void;
-    /** Current upload queue state. */
+    /** Run the full pipeline serially: upload + confirm. Returns the
+     *  fresh `nextExpectedAt` from THIS capture's confirm response.
+     *  Throws on failure (after retries) — the caller (the capture-loop
+     *  scheduler) catches and falls back to a local interval. */
+    captureUploadConfirm: (capture: CaptureResult) => Promise<UploadConfirmResult>;
+    /** Current upload state. */
     uploads: UploadState;
     /** Server-reported tracked seconds after latest confirmation. */
     trackedSeconds: number;
     /** Object URL of last successfully uploaded screenshot. */
     lastScreenshotUrl: string | null;
-    /** ISO timestamp: when the server expects the next screenshot. */
-    nextExpectedAt: string | null;
     /** Last upload error message, if any. */
     lastError: string | null;
     /** True when a 409 conflict was received (session paused server-side). */
@@ -363,6 +379,19 @@ interface UploaderResult {
     /** Clear the sessionConflict flag after handling. */
     resetConflict: () => void;
 }
+/**
+ * Serial upload pipeline. Matches the desktop Rust loop: each call to
+ * `captureUploadConfirm` runs upload + confirm to completion before
+ * returning, and returns the FRESH `nextExpectedAt` from that capture's
+ * own confirm response.
+ *
+ * Replaces the pre-0.2.4 queue-and-fire-and-forget model. The previous
+ * model was racy: the tick chain read a shared `nextExpectedAt` ref that
+ * lagged behind the in-flight upload by one round-trip, so the ref was
+ * always stale → `delay=0` → burst captures (3-5/min instead of 1/min).
+ * Serial eliminates the race entirely; the chain knows exactly when to
+ * fire next because the value comes from the same capture's response.
+ */
 declare function useUploader(): UploaderResult;
 
 declare function useSession(): {
@@ -384,12 +413,22 @@ declare function useSession(): {
 };
 
 /**
- * Client-side interpolated timer. Uses server-provided trackedSeconds
- * as ground truth, interpolates between updates for smooth display.
+ * Display timer for the recording session.
  *
- * The server already accounts for the first screenshot at t=0 by using
- * (count(distinct minute_buckets) - 1) * 60, so no client-side offset
- * is needed.
+ * `serverTrackedSeconds` is the ground truth. We interpolate at
+ * wall-clock rate between credits for liveness, but the interpolation
+ * is **capped at one capture interval**. Display never overshoots the
+ * next credit by more than that, so stop/compile reveals at most one
+ * minute of drop — no "halving" surprise.
+ *
+ * `baseRef` ratchets forward (never backward) so a stale-read
+ * idempotent retry returning a lower `trackedSeconds` doesn't cause
+ * the display to jump back. With the cap, ratcheting can only get the
+ * display 60s ahead of the true value, bounded.
+ *
+ * Unfreeze contract: when `serverTrackedSeconds` advances, `baseRef`
+ * ratchets up and `lastSyncRef` resets — display jumps to the new
+ * value and the next interpolation cycle starts from there.
  */
 declare function useSessionTimer(serverTrackedSeconds: number, isActive: boolean): number;
 /** Format seconds as H:MM:SS or M:SS (for live timer display). */

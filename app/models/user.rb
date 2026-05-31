@@ -23,7 +23,6 @@
 #  last_name                   :string
 #  onboarded                   :boolean          default(FALSE), not null
 #  pending_lookout_tokens      :string           default([]), not null, is an Array
-#  professor_enrolled_at       :datetime
 #  pronouns                    :string
 #  roles                       :string           default([]), not null, is an Array
 #  slack_token                 :text
@@ -127,6 +126,9 @@ class User < ApplicationRecord
   has_one :ticket_claim, dependent: :destroy
   has_many :project_funding_topups, dependent: :restrict_with_error
   has_many :reviewer_notes
+  has_many :reviewer_admin_notes, foreign_key: :reviewer_id, dependent: :destroy, inverse_of: :reviewer
+  has_many :reviewer_unavailabilities, foreign_key: :reviewer_id, dependent: :destroy, inverse_of: :reviewer
+  has_many :reviewer_week_resolutions, foreign_key: :reviewer_id, dependent: :destroy, inverse_of: :reviewer
   has_many :project_flags
 
   encrypts :hca_token

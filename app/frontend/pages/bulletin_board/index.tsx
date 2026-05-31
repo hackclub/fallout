@@ -14,6 +14,7 @@ import TextMorph from '@/components/shared/TextMorph'
 import CalendarViewModal from '@/components/bulletin_board/CalendarViewModal'
 import EventCard from '@/components/bulletin_board/EventCard'
 import ExploreCard from '@/components/bulletin_board/ExploreCard'
+import ImagePlaceholder from '@/components/shared/ImagePlaceholder'
 import SubscribeFeedModal from '@/components/bulletin_board/SubscribeFeedModal'
 import Masonry from 'react-masonry-css'
 import { computeBulletinEventStatus, type SerializedBulletinEvent } from '@/lib/bulletinEventStatus'
@@ -50,7 +51,14 @@ const EXPLORE_FADE_TRANSITION: Transition = {
   ease: 'easeOut',
 }
 
-type Featured = { image: string; title: string; username: string }
+type Featured = {
+  project_id: number
+  image: string | null
+  title: string
+  username: string
+  href: string
+  repo_link: string | null
+}
 type ExploreProject = {
   id: number
   type: 'project'
@@ -582,50 +590,127 @@ type FeaturedSectionProps = {
   onImageOpen: (image: string) => void
 }
 
-// Memoized so parent state changes (lightbox open/close, live-reload broadcasts) don't re-run
-// motion.section layout measurements or MarqueeText ResizeObservers. `featured` comes from a
-// static controller payload and `onImageOpen` is a stable useState setter, so memo's default
-// referential check is sufficient.
+const FEATURED_PAGE_SIZE = 4
+
+// Memoized so parent state changes (lightbox open/close) don't re-run motion.section layout
+// measurements or MarqueeText ResizeObservers. Subscribes to `featured_projects` for live updates
+// when admins curate the list (the public board re-fetches via Inertia partial reload).
 const FeaturedSection = memo(function FeaturedSection({ featured, activeLightbox, onImageOpen }: FeaturedSectionProps) {
+  const liveProps = useLiveReload<Pick<PageProps, 'featured'>>({ stream: 'featured_projects', only: ['featured'] })
+  const liveFeatured = liveProps?.featured ?? featured
+
+  const [page, setPage] = useState(0)
+  const totalPages = Math.max(1, Math.ceil(liveFeatured.length / FEATURED_PAGE_SIZE))
+  const effectivePage = Math.min(page, totalPages - 1)
+  useEffect(() => {
+    if (page !== effectivePage) setPage(effectivePage)
+  }, [effectivePage, page])
+  const pageItems = liveFeatured.slice(effectivePage * FEATURED_PAGE_SIZE, (effectivePage + 1) * FEATURED_PAGE_SIZE)
+
   return (
     <motion.section layout className={styles.section}>
       <h2 className={styles.sectionHeading}>Featured</h2>
-      <div className={styles.featuredGrid}>
-        {featured.length === 0 ? (
-          <div className={styles.emptyState}>nothing shipped yet — ship something cool!</div>
-        ) : (
-          featured.map((item) => (
-            <div key={item.image} className={styles.featuredCard}>
-              <button
-                type="button"
-                className={styles.featuredImageButton}
-                onClick={() => onImageOpen(item.image)}
-                aria-label={`View ${item.title} full size`}
-              >
-                <motion.img
-                  layoutId={`featured-img-${item.image}`}
-                  src={item.image}
-                  alt={item.title}
-                  className={styles.featuredImage}
-                  loading="lazy"
-                  style={{ opacity: activeLightbox === item.image ? 0 : 1 }}
-                  transition={{ type: 'spring', stiffness: 340, damping: 30, mass: 0.8 }}
-                />
-              </button>
-              <div className={styles.featuredMeta}>
-                <div className={styles.featuredText}>
-                  <MarqueeText text={item.title} className={styles.featuredTitle} />
-                  <MarqueeText text={`by ${item.username}`} className={styles.featuredUsername} />
-                </div>
-                <div className={styles.featuredIcons}>
-                  <img src="/logos/github-black.svg" alt="GitHub Logo" className={styles.featuredIcon} />
-                  <img src="/logos/slack.svg" alt="Slack Logo" className={styles.featuredIcon} />
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      {liveFeatured.length === 0 ? (
+        <div className={styles.emptyState}>nothing featured yet — check back soon!</div>
+      ) : (
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={effectivePage}
+            className={styles.featuredGrid}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
+          >
+            <AnimatePresence initial={false} mode="popLayout">
+              {pageItems.map((item) => (
+                <motion.div
+                  key={item.project_id}
+                  layout="position"
+                  initial={{ opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.2, ease: 'easeInOut' } }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.5 }}
+                  className={styles.featuredCard}
+                >
+                  {item.image ? (
+                    <button
+                      type="button"
+                      className={styles.featuredImageButton}
+                      onClick={() => onImageOpen(item.image!)}
+                      aria-label={`View ${item.title} full size`}
+                    >
+                      <motion.img
+                        layoutId={`featured-img-${item.image}`}
+                        src={item.image}
+                        alt={item.title}
+                        className={styles.featuredImage}
+                        loading="lazy"
+                        style={{ opacity: activeLightbox === item.image ? 0 : 1 }}
+                        transition={{ type: 'spring', stiffness: 340, damping: 30, mass: 0.8 }}
+                      />
+                    </button>
+                  ) : (
+                    <div className={styles.featuredImageButton} style={{ cursor: 'default' }} aria-hidden>
+                      <ImagePlaceholder text="No project cover" className={styles.featuredImagePlaceholder} />
+                    </div>
+                  )}
+                  <div className={styles.featuredMeta}>
+                    <div className={styles.featuredText}>
+                      <ModalLink href={item.href} className={styles.featuredTitleLink}>
+                        <MarqueeText text={item.title} className={styles.featuredTitle} />
+                      </ModalLink>
+                      <MarqueeText text={`by ${item.username}`} className={styles.featuredUsername} />
+                    </div>
+                    {item.repo_link && (
+                      <div className={styles.featuredIcons}>
+                        <a
+                          href={item.repo_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Open ${item.title} repo on GitHub`}
+                        >
+                          <img src="/logos/github-black.svg" alt="GitHub Logo" className={styles.featuredIcon} />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        </AnimatePresence>
+      )}
+
+      {liveFeatured.length > 0 && (
+        <div className={styles.featuredFooter}>
+          <div className={styles.pagination}>
+            <button
+              type="button"
+              className={styles.pageButton}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={effectivePage === 0 || totalPages <= 1}
+              aria-label="Previous featured page"
+            >
+              <ChevronLeft className={styles.pageArrow} />
+            </button>
+            <span className={styles.pageInfo} aria-live="polite">
+              <TextMorph as="span">{(effectivePage + 1).toString()}</TextMorph>
+              <span className={styles.pageInfoSep}>/</span>
+              <TextMorph as="span">{totalPages.toString()}</TextMorph>
+            </span>
+            <button
+              type="button"
+              className={styles.pageButton}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={effectivePage >= totalPages - 1 || totalPages <= 1}
+              aria-label="Next featured page"
+            >
+              <ChevronRight className={styles.pageArrow} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className={styles.dmNotice}>
         want more? check out projects from

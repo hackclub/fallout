@@ -11,6 +11,7 @@ module MarkdownHelper
     github.com
     raw.githubusercontent.com
     blueprint.hackclub.com
+    stasis.hackclub-assets.com
   ].freeze
 
   # Tags permitted in sanitized user-generated HTML

@@ -132,24 +132,26 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     url_for(controller: params[:controller], action: :next, only_path: true, **opts)
   end
 
-  def serialize_previous_reviews(project, current_ship, review_class)
-    review_class
-      .joins(:ship)
-      .where(ships: { project_id: project.id })
-      .where.not(ship_id: current_ship.id)
-      .where.not(status: review_class.statuses[:pending])
-      .includes(:reviewer)
-      .order(updated_at: :desc)
-      .map do |review|
-        {
-          ship_id: review.ship_id,
-          status: review.status,
-          feedback: review.feedback,
-          internal_reason: review.internal_reason,
-          reviewer_display_name: review.reviewer&.display_name,
-          reviewed_at: review.updated_at.strftime("%b %d, %Y")
-        }
-      end
+  def serialize_previous_reviews(project, current_ship, *review_classes)
+    review_classes.flat_map do |review_class|
+      review_class
+        .joins(:ship)
+        .where(ships: { project_id: project.id })
+        .where.not(ship_id: current_ship.id)
+        .where.not(status: review_class.statuses[:pending])
+        .includes(:reviewer)
+        .map do |review|
+          [ review.updated_at, {
+            ship_id: review.ship_id,
+            review_type: review_class.name.underscore,
+            status: review.status,
+            feedback: review.feedback,
+            internal_reason: review.internal_reason,
+            reviewer_display_name: review.reviewer&.display_name,
+            reviewed_at: review.updated_at.strftime("%b %d, %Y")
+          } ]
+        end
+    end.sort_by { |updated_at, _| -updated_at.to_i }.map(&:last)
   end
 
   def serialize_reviewer_notes(project)
@@ -168,7 +170,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     end
   end
 
-  def serialize_review_row(review, flagged_project_ids: Set.new)
+  def serialize_review_row(review, flagged_project_ids: Set.new, previously_reviewed_project_ids: Set.new)
     ship = review.ship
     sibling = review.is_a?(TimeAuditReview) ? ship.requirements_check_review : ship.time_audit_review
     {
@@ -185,8 +187,23 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       is_claimed: review.claimed?,
       claimed_by_display_name: review.claimed? ? review.reviewer&.display_name : nil,
       sibling_approved: sibling&.approved? || false,
-      requirements_check_reviewer_display_name: review.is_a?(DesignReview) ? ship.requirements_check_review&.reviewer&.display_name : nil
+      requirements_check_reviewer_display_name: review.is_a?(DesignReview) ? ship.requirements_check_review&.reviewer&.display_name : nil,
+      previously_reviewed_by_me: previously_reviewed_project_ids.include?(ship.project_id)
     }
+  end
+
+  def precompute_previously_reviewed_project_ids
+    rc_ids = RequirementsCheckReview
+      .where(reviewer_id: current_user.id, status: %i[approved returned rejected])
+      .joins(:ship)
+      .distinct
+      .pluck("ships.project_id")
+    dr_ids = DesignReview
+      .where(reviewer_id: current_user.id, status: %i[approved returned rejected])
+      .joins(:ship)
+      .distinct
+      .pluck("ships.project_id")
+    (rc_ids + dr_ids).to_set
   end
 
   def serialize_project_context(project, ship)

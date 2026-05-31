@@ -17,6 +17,9 @@ type CtxValue = {
   trackScroll: boolean
   alwaysShow: boolean
   disabled: boolean
+  interactive: boolean
+  scheduleClose: () => void
+  cancelClose: () => void
   snapWhenOffscreen: (() => { x: number; y: number }) | false
   onSnapClick?: () => void
 }
@@ -48,6 +51,7 @@ export function Tooltip({
   trackScroll = false,
   alwaysShow = false,
   disabled = false,
+  interactive = false,
   snapWhenOffscreen = false,
   onSnapClick,
 }: {
@@ -58,11 +62,27 @@ export function Tooltip({
   trackScroll?: boolean
   alwaysShow?: boolean
   disabled?: boolean
+  interactive?: boolean
   snapWhenOffscreen?: (() => { x: number; y: number }) | false
   onSnapClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLElement>(null)
+  // Shared close timer so trigger and content can hand off the mouse without flicker
+  // when `interactive` is set (user travels into the tooltip to click a link, etc.)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }, [])
+  const scheduleClose = useCallback(() => {
+    cancelClose()
+    closeTimerRef.current = setTimeout(() => setOpen(false), 120)
+  }, [cancelClose])
+  useEffect(() => () => cancelClose(), [cancelClose])
+
   const effectiveOpen = !disabled && (alwaysShow || open)
   return (
     <Ctx.Provider
@@ -76,6 +96,9 @@ export function Tooltip({
         trackScroll,
         alwaysShow,
         disabled,
+        interactive,
+        scheduleClose,
+        cancelClose,
         snapWhenOffscreen,
         onSnapClick,
       }}
@@ -86,16 +109,38 @@ export function Tooltip({
 }
 
 export function TooltipTrigger({ children, asChild }: { children: ReactNode; asChild?: boolean }) {
-  const { setOpen, triggerRef, alwaysShow, disabled } = useCtx()
+  const { setOpen, triggerRef, alwaysShow, disabled, interactive, scheduleClose, cancelClose } = useCtx()
+
+  // Preserve the consumer's onClick when asChild — `...handlers` below would otherwise
+  // overwrite it, breaking buttons whose click opens a menu or runs an action.
+  const childOnClick =
+    asChild && React.isValidElement(children)
+      ? (children as React.ReactElement<{ onClick?: React.MouseEventHandler<HTMLElement> }>).props?.onClick
+      : undefined
+
+  const close = () => (interactive ? scheduleClose() : setOpen(false))
 
   const handlers =
     alwaysShow || disabled
       ? {}
       : {
-          onMouseEnter: () => setOpen(true),
-          onMouseLeave: () => setOpen(false),
-          onFocus: () => setOpen(true),
-          onBlur: () => setOpen(false),
+          onMouseEnter: () => {
+            cancelClose()
+            setOpen(true)
+          },
+          onMouseLeave: close,
+          onFocus: () => {
+            cancelClose()
+            setOpen(true)
+          },
+          onBlur: close,
+          // Clicks indicate the user is taking an action — hide the tooltip so it doesn't
+          // cover a menu/dialog that the click opens. Then run the consumer's onClick.
+          onClick: (e: React.MouseEvent<HTMLElement>) => {
+            cancelClose()
+            setOpen(false)
+            childOnClick?.(e)
+          },
         }
 
   if (asChild && React.isValidElement(children)) {
@@ -262,7 +307,20 @@ export function TooltipContent({
   className?: string
   forwardClickToTrigger?: boolean
 }) {
-  const { open, setOpen, triggerRef, side, autoFlip, gap, trackScroll, snapWhenOffscreen, onSnapClick } = useCtx()
+  const {
+    open,
+    setOpen,
+    triggerRef,
+    side,
+    autoFlip,
+    gap,
+    trackScroll,
+    interactive,
+    scheduleClose,
+    cancelClose,
+    snapWhenOffscreen,
+    onSnapClick,
+  } = useCtx()
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<Pos | null>(null)
   const posRef = useRef<Pos | null>(null)
@@ -386,13 +444,18 @@ export function TooltipContent({
       ref={ref}
       role="tooltip"
       className={twMerge(
-        'fixed z-50 px-3 py-2 text-sm rounded',
-        isClickable ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none',
+        'fixed z-[20000] px-3 py-2 text-sm rounded',
+        // Interactive tooltips need pointer-events-auto so the user can hover and click
+        // inside them (e.g. follow a hyperlink) without the tooltip closing first.
+        isClickable || interactive ? 'pointer-events-auto' : 'pointer-events-none',
+        isClickable ? 'cursor-pointer' : '',
         'bg-light-brown border-2 border-dark-brown text-dark-brown shadow-md',
         className,
       )}
       style={pos ? { top: pos.top, left: pos.left } : { visibility: 'hidden', top: 0, left: 0 }}
       onClick={isClickable ? handleClick : undefined}
+      onMouseEnter={interactive ? cancelClose : undefined}
+      onMouseLeave={interactive ? scheduleClose : undefined}
     >
       {pos && <Arrow side={pos.side} />}
       {children}

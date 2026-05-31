@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_23_234717) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -198,6 +198,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_234717) do
     t.index ["user_id"], name: "index_dialog_campaigns_on_user_id"
   end
 
+  create_table "featured_projects", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "discarded_at"
+    t.datetime "featured_at", null: false
+    t.bigint "featured_by_user_id", null: false
+    t.text "note"
+    t.integer "position", default: 0, null: false
+    t.bigint "project_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["discarded_at"], name: "index_featured_projects_on_discarded_at"
+    t.index ["featured_by_user_id"], name: "index_featured_projects_on_featured_by_user_id"
+    t.index ["position"], name: "index_featured_projects_on_position"
+    t.index ["project_id"], name: "index_featured_projects_on_project_id"
+    t.index ["project_id"], name: "index_featured_projects_unique_active_project", unique: true, where: "(discarded_at IS NULL)"
+  end
+
   create_table "flipper_features", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "key", null: false
@@ -333,6 +349,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_234717) do
   end
 
   create_table "journal_entries", force: :cascade do |t|
+    t.integer "burnout_duration_seconds"
     t.text "content"
     t.datetime "created_at", null: false
     t.datetime "discarded_at"
@@ -570,12 +587,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_234717) do
     t.string "name", null: false
     t.string "repo_link"
     t.string "tags", default: [], null: false, array: true
+    t.datetime "unified_thumbnail_checked_at"
+    t.string "unified_thumbnail_etag"
+    t.string "unified_thumbnail_source_url"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["discarded_at"], name: "index_projects_on_discarded_at"
     t.index ["is_unlisted"], name: "index_projects_on_is_unlisted"
     t.index ["name"], name: "index_projects_on_name_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["tags"], name: "index_projects_on_tags", using: :gin
+    t.index ["unified_thumbnail_checked_at"], name: "index_projects_on_unified_thumbnail_checked_at"
     t.index ["user_id"], name: "index_projects_on_user_id"
   end
 
@@ -609,6 +630,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_234717) do
     t.index ["status"], name: "index_requirements_check_reviews_on_status"
   end
 
+  create_table "reviewer_admin_notes", force: :cascade do |t|
+    t.bigint "author_id", null: false
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.bigint "reviewer_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["author_id"], name: "index_reviewer_admin_notes_on_author_id"
+    t.index ["reviewer_id"], name: "index_reviewer_admin_notes_on_reviewer_id"
+  end
+
   create_table "reviewer_notes", force: :cascade do |t|
     t.text "body", null: false
     t.datetime "created_at", null: false
@@ -620,6 +651,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_234717) do
     t.index ["project_id"], name: "index_reviewer_notes_on_project_id"
     t.index ["ship_id"], name: "index_reviewer_notes_on_ship_id"
     t.index ["user_id"], name: "index_reviewer_notes_on_user_id"
+  end
+
+  create_table "reviewer_unavailabilities", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.date "ends_on", null: false
+    t.string "reason"
+    t.bigint "reviewer_id", null: false
+    t.date "starts_on", null: false
+    t.datetime "updated_at", null: false
+    t.index ["reviewer_id"], name: "index_reviewer_unavailabilities_on_reviewer_id"
+  end
+
+  create_table "reviewer_week_resolutions", force: :cascade do |t|
+    t.bigint "author_id", null: false
+    t.datetime "created_at", null: false
+    t.string "reason"
+    t.bigint "reviewer_id", null: false
+    t.datetime "updated_at", null: false
+    t.date "week_start", null: false
+    t.index ["author_id"], name: "index_reviewer_week_resolutions_on_author_id"
+    t.index ["reviewer_id", "week_start"], name: "index_reviewer_week_resolutions_on_reviewer_id_and_week_start", unique: true
+    t.index ["reviewer_id"], name: "index_reviewer_week_resolutions_on_reviewer_id"
   end
 
   create_table "ships", force: :cascade do |t|
@@ -1001,6 +1054,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_234717) do
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
   add_foreign_key "dialog_campaigns", "users"
+  add_foreign_key "featured_projects", "projects"
+  add_foreign_key "featured_projects", "users", column: "featured_by_user_id"
   add_foreign_key "gold_transactions", "ships"
   add_foreign_key "gold_transactions", "users"
   add_foreign_key "gold_transactions", "users", column: "actor_id"
@@ -1043,9 +1098,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_23_234717) do
   add_foreign_key "recordings", "users"
   add_foreign_key "requirements_check_reviews", "ships"
   add_foreign_key "requirements_check_reviews", "users", column: "reviewer_id"
+  add_foreign_key "reviewer_admin_notes", "users", column: "author_id"
+  add_foreign_key "reviewer_admin_notes", "users", column: "reviewer_id"
   add_foreign_key "reviewer_notes", "projects"
   add_foreign_key "reviewer_notes", "ships"
   add_foreign_key "reviewer_notes", "users"
+  add_foreign_key "reviewer_unavailabilities", "users", column: "reviewer_id"
+  add_foreign_key "reviewer_week_resolutions", "users", column: "author_id"
+  add_foreign_key "reviewer_week_resolutions", "users", column: "reviewer_id"
   add_foreign_key "ships", "preflight_runs"
   add_foreign_key "ships", "projects"
   add_foreign_key "ships", "users", column: "reviewer_id"

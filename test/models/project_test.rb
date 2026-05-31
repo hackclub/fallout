@@ -33,7 +33,88 @@
 require "test_helper"
 
 class ProjectTest < ActiveSupport::TestCase
-  # test "the truth" do
-  #   assert true
-  # end
+  include ActiveJob::TestHelper
+
+  # The global `fixtures :all` hits a pre-existing schema drift in
+  # test/fixtures/hcb_connections.yml. Skip fixture loading and build the records we need.
+  def setup_fixtures; end
+  def teardown_fixtures; end
+
+  setup do
+    @user = TrialUser.create!(
+      email: "ptest-#{SecureRandom.hex(4)}@example.com",
+      display_name: "Project Tester",
+      avatar: "https://example.com/a.png",
+      timezone: "UTC",
+      device_token: SecureRandom.hex(16)
+    )
+  end
+
+  test "creating a project with a repo_link enqueues ComputeProjectUnifiedThumbnailJob" do
+    assert_enqueued_with(job: ComputeProjectUnifiedThumbnailJob) do
+      Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
+    end
+  end
+
+  test "creating a project without a repo_link does not enqueue the job" do
+    assert_no_enqueued_jobs only: ComputeProjectUnifiedThumbnailJob do
+      Project.create!(user: @user, name: "P")
+    end
+  end
+
+  test "changing repo_link enqueues the job" do
+    project = Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
+    clear_enqueued_jobs
+
+    assert_enqueued_with(job: ComputeProjectUnifiedThumbnailJob, args: [ project.id ]) do
+      project.update!(repo_link: "https://github.com/example/p2")
+    end
+  end
+
+  test "changing an unrelated field (name) does not enqueue the job" do
+    project = Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
+    clear_enqueued_jobs
+
+    assert_no_enqueued_jobs only: ComputeProjectUnifiedThumbnailJob do
+      project.update!(name: "Renamed")
+    end
+  end
+
+  test "clearing repo_link enqueues the job (so it can purge the stale attachment)" do
+    project = Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
+    clear_enqueued_jobs
+
+    assert_enqueued_with(job: ComputeProjectUnifiedThumbnailJob, args: [ project.id ]) do
+      project.update!(repo_link: nil)
+    end
+  end
+
+  test "discarding a project does not enqueue the job" do
+    project = Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
+    clear_enqueued_jobs
+
+    assert_no_enqueued_jobs only: ComputeProjectUnifiedThumbnailJob do
+      project.discard
+    end
+  end
+
+  test "undiscarding a project with a repo_link enqueues the job" do
+    project = Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
+    project.discard
+    clear_enqueued_jobs
+
+    assert_enqueued_with(job: ComputeProjectUnifiedThumbnailJob, args: [ project.id ]) do
+      project.undiscard
+    end
+  end
+
+  test "undiscarding a project without a repo_link does not enqueue the job" do
+    project = Project.create!(user: @user, name: "P")
+    project.discard
+    clear_enqueued_jobs
+
+    assert_no_enqueued_jobs only: ComputeProjectUnifiedThumbnailJob do
+      project.undiscard
+    end
+  end
 end

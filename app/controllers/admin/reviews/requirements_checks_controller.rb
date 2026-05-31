@@ -7,10 +7,11 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
     @pagy, @all_reviews = pagy(base.order(created_at: :desc))
     Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
     flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
+    previously_reviewed = precompute_previously_reviewed_project_ids
 
     render inertia: {
-      pending_reviews: pending_reviews.map { |r| serialize_review_row(r) },
-      all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids) },
+      pending_reviews: pending_reviews.map { |r| serialize_review_row(r, previously_reviewed_project_ids: previously_reviewed) },
+      all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids, previously_reviewed_project_ids: previously_reviewed) },
       pagy: pagy_props(@pagy),
       start_reviewing_path: next_admin_reviews_requirements_checks_path,
       **review_stats_props(RequirementsCheckReview)
@@ -38,7 +39,7 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
       new_entries: new_entries.map { |je| serialize_journal_entry(je, time_audit) },
       previous_entries: previous_entries.map { |je| serialize_journal_entry(je, time_audit) },
       sibling_statuses: serialize_sibling_statuses(ship),
-      previous_reviews: serialize_previous_reviews(project, ship, RequirementsCheckReview),
+      previous_reviews: serialize_previous_reviews(project, ship, RequirementsCheckReview, DesignReview),
       repo_tree: @review.repo_tree,
       refresh_tree_path: refresh_tree_admin_reviews_requirements_check_path(@review),
       reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
@@ -62,20 +63,17 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
   def update
     authorize @review
 
+    # Checkpoint message is optional — attempt lookup on terminal submissions and attach if found,
+    # but never block the review if no message exists.
     submitting_terminal = %w[approved returned rejected].include?(params.dig(:requirements_check_review, :status))
     checkpoint_just_stored = false
     if submitting_terminal && @review.checkpoint_message_url.blank?
       slack_id = @review.ship.project.user.slack_id
-      url, failure = resolve_checkpoint_message(slack_id, params.dig(:requirements_check_review, :checkpoint_message_url))
-      if url.nil?
-        msg = failure == :wrong_mention \
-          ? "That message doesn't mention @#{@review.ship.project.user.display_name}. Did you tag the wrong person?" \
-          : "No checkpoint message found in #fallout-checkpoint mentioning this user in the past 24 hours. Please paste the message link."
-        return redirect_back fallback_location: admin_reviews_requirements_check_path(@review),
-                             inertia: { errors: { checkpoint_message_url: [ msg ] } }
+      url, _failure = resolve_checkpoint_message(slack_id, params.dig(:requirements_check_review, :checkpoint_message_url))
+      if url
+        @review.update_columns(checkpoint_message_url: url)
+        checkpoint_just_stored = true
       end
-      @review.update_columns(checkpoint_message_url: url)
-      checkpoint_just_stored = true
     end
 
     if @review.update(review_params)

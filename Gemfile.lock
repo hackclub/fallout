@@ -174,6 +174,7 @@ GEM
     ffi (1.17.4-arm-linux-gnu)
     ffi (1.17.4-arm-linux-musl)
     ffi (1.17.4-arm64-darwin)
+    ffi (1.17.4-x64-mingw-ucrt)
     ffi (1.17.4-x86_64-linux-gnu)
     ffi (1.17.4-x86_64-linux-musl)
     flipper (1.4.2)
@@ -330,6 +331,8 @@ GEM
       racc (~> 1.4)
     nokogiri (1.19.3-arm64-darwin)
       racc (~> 1.4)
+    nokogiri (1.19.3-x64-mingw-ucrt)
+      racc (~> 1.4)
     nokogiri (1.19.3-x86_64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.19.3-x86_64-linux-musl)
@@ -350,6 +353,7 @@ GEM
     pg (1.6.3-aarch64-linux)
     pg (1.6.3-aarch64-linux-musl)
     pg (1.6.3-arm64-darwin)
+    pg (1.6.3-x64-mingw-ucrt)
     pg (1.6.3-x86_64-linux)
     pg (1.6.3-x86_64-linux-musl)
     pg_search (2.3.7)
@@ -539,6 +543,7 @@ GEM
     sqlite3 (2.9.4-arm-linux-gnu)
     sqlite3 (2.9.4-arm-linux-musl)
     sqlite3 (2.9.4-arm64-darwin)
+    sqlite3 (2.9.4-x64-mingw-ucrt)
     sqlite3 (2.9.4-x86_64-linux-gnu)
     sqlite3 (2.9.4-x86_64-linux-musl)
     sshkit (1.25.0)
@@ -570,6 +575,8 @@ GEM
       railties (>= 7.1.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
+    tzinfo-data (1.2026.2)
+      tzinfo (>= 1.0.0)
     unaccent (0.4.0)
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
@@ -608,6 +615,7 @@ PLATFORMS
   arm-linux-musl
   arm64-darwin-24
   arm64-darwin-25
+  x64-mingw-ucrt
   x86_64-linux
   x86_64-linux-gnu
   x86_64-linux-musl

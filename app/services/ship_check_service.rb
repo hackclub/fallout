@@ -183,7 +183,8 @@ module ShipCheckService
       project.description.to_s,
       project.repo_link.to_s,
       project.respond_to?(:kept_journal_entries) ? project.kept_journal_entries.size : 0,
-      project.respond_to?(:time_logged) ? project.time_logged.to_i : 0
+      project.respond_to?(:time_logged) ? project.time_logged.to_i : 0,
+      project.respond_to?(:tags) ? project.tags.sort.join(",") : ""
     ].join("|"))
     "ship_check_results:#{nwo}:#{pushed_at}:#{fields}"
   end
