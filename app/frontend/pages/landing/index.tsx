@@ -1192,6 +1192,9 @@ export default function LandingIndex() {
                     </a>
                   </div>
                 </div>
+                <div className="flex flex-col">
+                  <img src="/landing/letter.png" alt="hackclub/dns" title="hackclub/dns" className="h-40 w-full" />
+                </div>
               </div>
             </div>
           </footer>
