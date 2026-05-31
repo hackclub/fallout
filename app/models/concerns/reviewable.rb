@@ -31,6 +31,11 @@ module Reviewable
       )
     }
 
+    # Stamp completed_at once when the review first reaches a terminal status so
+    # time-series charts can group by finalization date rather than updated_at
+    # (updated_at drifts on heartbeat/annotation edits after the review is closed).
+    before_save :set_completed_at, if: :status_changed?
+
     # Update Ship's cached status in the SAME transaction (not after_commit) to prevent drift
     after_save :recompute_ship_status!, if: :saved_change_to_status?
 
@@ -176,6 +181,11 @@ module Reviewable
     return if new_record?
     return unless TERMINAL_STATUSES.include?(status_was)
     errors.add(:status, "cannot transition from #{status_was}")
+  end
+
+  def set_completed_at
+    return if completed_at.present?
+    self.completed_at = Time.current if TERMINAL_STATUSES.include?(status)
   end
 
   def recompute_ship_status!

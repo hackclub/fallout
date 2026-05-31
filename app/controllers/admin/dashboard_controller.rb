@@ -46,7 +46,7 @@ class Admin::DashboardController < Admin::ApplicationController
     base_scopes = klasses.to_h { |k| [ k, k.where(status: terminal_statuses).where.not(reviewer_id: nil) ] }
 
     all_promises = base_scopes.transform_values { |s| s.group(:reviewer_id).async_count }
-    week_promises = base_scopes.transform_values { |s| s.where(s.klass.arel_table[:updated_at].gteq(week_ago)).group(:reviewer_id).async_count }
+    week_promises = base_scopes.transform_values { |s| s.where.not(completed_at: nil).where(s.klass.arel_table[:completed_at].gteq(week_ago)).group(:reviewer_id).async_count }
 
     all_time = Hash.new(0)
     week = Hash.new(0)
@@ -92,7 +92,7 @@ class Admin::DashboardController < Admin::ApplicationController
     reviews.each do |ta|
       rec_annotations = ta.annotations&.dig("recordings") || {}
       fallback_reviewer_id = ta.reviewer_id
-      in_week = ta.updated_at >= week_ago
+      in_week = ta.completed_at.present? && ta.completed_at >= week_ago
 
       ta.ship.journal_entries.reject(&:discarded?).each do |entry|
         entry.recordings.each do |rec|
@@ -212,18 +212,18 @@ class Admin::DashboardController < Admin::ApplicationController
     reviewers = User.where("roles && ARRAY['requirements_checker', 'pass2_reviewer']::varchar[]")
 
     terminal = %w[approved returned rejected]
-    week_group = Arel.sql("TO_CHAR(DATE_TRUNC('week', updated_at), 'YYYY-MM-DD')")
+    week_group = Arel.sql("TO_CHAR(DATE_TRUNC('week', completed_at), 'YYYY-MM-DD')")
 
     rc_rows = RequirementsCheckReview
-      .where(status: terminal).where.not(reviewer_id: nil).where("updated_at >= ?", start_week)
+      .where(status: terminal).where.not(reviewer_id: nil).where("completed_at >= ?", start_week)
       .group(:reviewer_id).group(week_group).count
 
     dr_rows = DesignReview
-      .where(status: terminal).where.not(reviewer_id: nil).where("updated_at >= ?", start_week)
+      .where(status: terminal).where.not(reviewer_id: nil).where("completed_at >= ?", start_week)
       .group(:reviewer_id).group(week_group).count
 
     ta_rows = TimeAuditReview
-      .where(status: :approved).where.not(reviewer_id: nil).where("updated_at >= ?", start_week)
+      .where(status: :approved).where.not(reviewer_id: nil).where("completed_at >= ?", start_week)
       .group(:reviewer_id).group(week_group).sum(:approved_public_seconds)
 
     rc_by = Hash.new { |h, k| h[k] = Hash.new(0) }

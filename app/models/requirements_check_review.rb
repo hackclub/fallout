@@ -5,6 +5,7 @@
 #  id                     :bigint           not null, primary key
 #  checkpoint_message_url :string
 #  claim_expires_at       :datetime
+#  completed_at           :datetime
 #  feedback               :text
 #  internal_reason        :text
 #  lock_version           :integer          default(0), not null
@@ -17,10 +18,11 @@
 #
 # Indexes
 #
-#  idx_on_status_claim_expires_at_8572608249        (status,claim_expires_at)
-#  index_requirements_check_reviews_on_reviewer_id  (reviewer_id)
-#  index_requirements_check_reviews_on_ship_id      (ship_id) UNIQUE
-#  index_requirements_check_reviews_on_status       (status)
+#  idx_on_status_claim_expires_at_8572608249         (status,claim_expires_at)
+#  index_requirements_check_reviews_on_completed_at  (completed_at)
+#  index_requirements_check_reviews_on_reviewer_id   (reviewer_id)
+#  index_requirements_check_reviews_on_ship_id       (ship_id) UNIQUE
+#  index_requirements_check_reviews_on_status        (status)
 #
 # Foreign Keys
 #

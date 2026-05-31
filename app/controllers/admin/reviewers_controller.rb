@@ -17,22 +17,22 @@ class Admin::ReviewersController < Admin::ApplicationController
       w += 7
     end
 
-    week_group = Arel.sql("TO_CHAR(DATE_TRUNC('week', updated_at), 'YYYY-MM-DD')")
+    week_group = Arel.sql("TO_CHAR(DATE_TRUNC('week', completed_at), 'YYYY-MM-DD')")
     terminal = %w[approved returned rejected]
 
     rc_rows = RequirementsCheckReview
       .where(status: terminal, reviewer_id: @reviewer.id)
-      .where("updated_at >= ?", start_week)
+      .where("completed_at >= ?", start_week)
       .group(week_group).count
 
     dr_rows = DesignReview
       .where(status: terminal, reviewer_id: @reviewer.id)
-      .where("updated_at >= ?", start_week)
+      .where("completed_at >= ?", start_week)
       .group(week_group).count
 
     ta_rows = TimeAuditReview
       .where(status: :approved, reviewer_id: @reviewer.id)
-      .where("updated_at >= ?", start_week)
+      .where("completed_at >= ?", start_week)
       .group(week_group).sum(:approved_public_seconds)
 
     all_time_reviews = [ TimeAuditReview, DesignReview, BuildReview, RequirementsCheckReview ]

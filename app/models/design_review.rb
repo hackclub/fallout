@@ -6,6 +6,7 @@
 #  annotations            :jsonb
 #  checkpoint_message_url :string
 #  claim_expires_at       :datetime
+#  completed_at           :datetime
 #  feedback               :text
 #  hours_adjustment       :integer
 #  internal_reason        :text
@@ -19,6 +20,7 @@
 #
 # Indexes
 #
+#  index_design_reviews_on_completed_at                 (completed_at)
 #  index_design_reviews_on_reviewer_id                  (reviewer_id)
 #  index_design_reviews_on_ship_id                      (ship_id) UNIQUE
 #  index_design_reviews_on_status                       (status)

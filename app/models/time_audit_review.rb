@@ -31,10 +31,6 @@
 class TimeAuditReview < ApplicationRecord
   include Reviewable
 
-  # Stamp completed_at once when the review first reaches a terminal status so
-  # time-series charts can group by finalization date rather than updated_at
-  # (updated_at drifts on annotation edits after the review is closed).
-  before_save :set_completed_at, if: :status_changed?
   before_save :add_manual_seconds_to_approved, if: -> { status_changed? && approved? }
 
   def self.review_id_prefix
@@ -54,8 +50,4 @@ class TimeAuditReview < ApplicationRecord
     self.approved_public_seconds = approved_public_seconds.to_i + ship.project.manual_seconds.to_i
   end
 
-  def set_completed_at
-    return if completed_at.present? # only set once
-    self.completed_at = Time.current if self.class::TERMINAL_STATUSES.include?(status)
-  end
 end
