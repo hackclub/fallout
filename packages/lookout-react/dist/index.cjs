@@ -851,6 +851,11 @@ function useSilentAudioKeepAlive(enabled) {
   }, [enabled]);
 }
 
+// src/hooks/computeBestTracked.ts
+function computeBestTrackedSeconds(inputs) {
+  return Math.max(inputs.sessionTrackedSeconds, inputs.uploaderTrackedSeconds);
+}
+
 // src/hooks/useLookout.ts
 function useLookout() {
   const { config, client } = useLookoutContext();
@@ -862,13 +867,10 @@ function useLookout() {
   const cameraCapture = useCameraCapture();
   const capture = captureMode === "camera" ? cameraCapture : screenCapture;
   const uploader = useUploader();
-  const intervalSeconds = Math.floor(config.capture.intervalMs / 1e3);
-  const localEstimate = uploader.uploads.completed >= 2 ? (uploader.uploads.completed - 1) * intervalSeconds : 0;
-  const bestTrackedSeconds = Math.max(
-    session.trackedSeconds,
-    uploader.trackedSeconds,
-    localEstimate
-  );
+  const bestTrackedSeconds = computeBestTrackedSeconds({
+    sessionTrackedSeconds: session.trackedSeconds,
+    uploaderTrackedSeconds: uploader.trackedSeconds
+  });
   const displaySeconds = useSessionTimer(
     bestTrackedSeconds,
     capture.isSharing && (session.status === "active" || session.status === "pending")
