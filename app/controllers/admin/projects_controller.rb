@@ -225,6 +225,8 @@ class Admin::ProjectsController < Admin::ApplicationController
   end
 
   def recording_playback_url(recording)
+    return unless current_user.admin?
+
     recordable = recording.recordable
     return unless recordable.is_a?(LapseTimelapse) || recordable.is_a?(LookoutTimelapse)
 
