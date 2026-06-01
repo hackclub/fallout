@@ -173,7 +173,7 @@ class Admin::ProjectsController < Admin::ApplicationController
       created_at: je.created_at.strftime("%b %d, %Y"),
       ship_id: je.ship_id,
       total_duration: recs.sum { |r| recording_duration(r) },
-      recordings: recs.map { |r| serialize_recording_summary(r, rec_annotations) }
+      recordings: recs.map { |r| serialize_recording_summary(r, rec_annotations, include_playback_url: current_user.admin?) }
     }
   end
 
@@ -208,7 +208,7 @@ class Admin::ProjectsController < Admin::ApplicationController
     end.round
   end
 
-  def serialize_recording_summary(recording, rec_annotations = {})
+  def serialize_recording_summary(recording, rec_annotations = {}, include_playback_url: false)
     duration = recording_duration(recording)
     rec_data = rec_annotations[recording.id.to_s] || {}
     segments = rec_data["segments"] || []
@@ -219,7 +219,15 @@ class Admin::ProjectsController < Admin::ApplicationController
       name: recording.recordable.try(:name) || recording.recordable.try(:title) || "Recording",
       duration: duration,
       removed_seconds: removed,
-      description: rec_data["description"]
+      description: rec_data["description"],
+      playback_url: include_playback_url ? recording_playback_url(recording) : nil
     }
+  end
+
+  def recording_playback_url(recording)
+    recordable = recording.recordable
+    return unless recordable.is_a?(LapseTimelapse) || recordable.is_a?(LookoutTimelapse)
+
+    recordable.playback_url.presence
   end
 end

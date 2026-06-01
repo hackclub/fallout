@@ -106,6 +106,7 @@ interface JournalEntry {
     duration: number
     removed_seconds: number
     description: string | null
+    playback_url: string | null
   }[]
 }
 
@@ -281,6 +282,7 @@ export default function AdminProjectsShow({
   const [featureDialogOpen, setFeatureDialogOpen] = useState(false)
   const [featureNote, setFeatureNote] = useState('')
   const [featuring, setFeaturing] = useState(false)
+  const [selectedRecording, setSelectedRecording] = useState<JournalEntry['recordings'][number] | null>(null)
 
   function toggleFeatured() {
     if (liveProject.featured_project_id) {
@@ -491,7 +493,15 @@ export default function AdminProjectsShow({
                   {entry.recordings.length > 0 && (
                     <div className="grid grid-cols-3 gap-1.5">
                       {entry.recordings.map((rec) => (
-                        <div key={rec.id} className="text-xs rounded border border-border p-2 space-y-1">
+                        <button
+                          key={rec.id}
+                          type="button"
+                          disabled={!isAdmin || !rec.playback_url}
+                          onClick={() => {
+                            if (isAdmin && rec.playback_url) setSelectedRecording(rec)
+                          }}
+                          className="text-xs rounded border border-border p-2 space-y-1 text-left disabled:cursor-default disabled:opacity-100 enabled:cursor-pointer enabled:hover:bg-muted/40"
+                        >
                           <div className="flex items-center gap-1.5">
                             <Badge
                               className={`text-[10px] shrink-0 ${recordingTypeBadgeColor(rec.type)}`}
@@ -507,7 +517,7 @@ export default function AdminProjectsShow({
                             )}
                           </div>
                           {rec.description && <p className="text-muted-foreground leading-snug">{rec.description}</p>}
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -574,6 +584,31 @@ export default function AdminProjectsShow({
           </Deferred>
         </div>
       )}
+
+      <AlertDialog
+        open={selectedRecording !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedRecording(null)
+        }}
+      >
+        <AlertDialogContent className="max-w-4xl! p-4">
+          <AlertDialogHeader className="items-start text-left">
+            <AlertDialogTitle>{selectedRecording?.name || 'Recording'}</AlertDialogTitle>
+          </AlertDialogHeader>
+          {selectedRecording?.playback_url && (
+            <video
+              key={selectedRecording.id}
+              src={selectedRecording.playback_url}
+              controls
+              autoPlay
+              className="w-full max-h-[75vh] rounded-md bg-black"
+            />
+          )}
+          <AlertDialogFooter className="border-t-0 bg-transparent p-0 pt-2">
+            <AlertDialogCancel>Close</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={featureDialogOpen} onOpenChange={(o) => !featuring && setFeatureDialogOpen(o)}>
         <AlertDialogContent>
