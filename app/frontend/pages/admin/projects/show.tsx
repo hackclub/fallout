@@ -500,7 +500,7 @@ export default function AdminProjectsShow({
                           onClick={() => {
                             if (isAdmin && rec.playback_url) setSelectedRecording(rec)
                           }}
-                          className="text-xs rounded border border-border p-2 space-y-1 text-left disabled:cursor-default disabled:opacity-100 enabled:cursor-pointer enabled:hover:bg-muted/40"
+                          className="w-full bg-transparent text-xs rounded border border-border p-2 space-y-1 text-left disabled:cursor-default disabled:opacity-100 enabled:cursor-pointer enabled:hover:bg-muted/40"
                         >
                           <div className="flex items-center gap-1.5">
                             <Badge
