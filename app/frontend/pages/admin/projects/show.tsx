@@ -591,7 +591,7 @@ export default function AdminProjectsShow({
           if (!open) setSelectedRecording(null)
         }}
       >
-        <AlertDialogContent className="max-w-4xl! p-4">
+        <AlertDialogContent className="!max-w-4xl p-4">
           <AlertDialogHeader className="items-start text-left">
             <AlertDialogTitle>{selectedRecording?.name || 'Recording'}</AlertDialogTitle>
           </AlertDialogHeader>
