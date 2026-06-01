@@ -496,7 +496,7 @@ export default function AdminProjectsShow({
                         <button
                           key={rec.id}
                           type="button"
-                          disabled={!isAdmin || !rec.playback_url}
+                          disabled={!rec.playback_url}
                           onClick={() => setSelectedRecording(rec)}
                           className="w-full bg-transparent text-xs rounded border border-border p-2 space-y-1 text-left disabled:cursor-default disabled:opacity-100 enabled:cursor-pointer enabled:hover:bg-muted/40"
                         >
