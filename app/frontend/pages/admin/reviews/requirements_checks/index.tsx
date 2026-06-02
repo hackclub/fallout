@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Link, usePage } from '@inertiajs/react'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
@@ -27,6 +27,11 @@ export default function RequirementsChecksIndex({
 }) {
   const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
   const isAdmin = admin_permissions?.is_admin ?? false
+  const [sortByHours, setSortByHours] = useState(false)
+
+  const sortedPending = sortByHours
+    ? [...pending_reviews].sort((a, b) => (b.approved_public_hours ?? -1) - (a.approved_public_hours ?? -1))
+    : pending_reviews
 
   return (
     <div className="space-y-8">
@@ -44,15 +49,20 @@ export default function RequirementsChecksIndex({
               </Badge>
             )}
           </h2>
-          {pending_reviews.length > 0 && (
-            <Button asChild size="sm">
-              <Link href={start_reviewing_path}>Start Reviewing</Link>
+          <div className="flex items-center gap-2">
+            <Button variant={sortByHours ? 'default' : 'outline'} size="sm" onClick={() => setSortByHours((v) => !v)}>
+              {sortByHours ? 'Sort: Hours' : 'Sort: Time Waiting'}
             </Button>
-          )}
+            {pending_reviews.length > 0 && (
+              <Button asChild size="sm">
+                <Link href={start_reviewing_path}>Start Reviewing</Link>
+              </Button>
+            )}
+          </div>
         </div>
         <DataTable
           columns={buildPendingColumns(BASE_PATH, 'Time Audit done')}
-          data={pending_reviews}
+          data={sortedPending}
           noun="pending reviews"
           rowClassName={(row) => {
             const parts: string[] = []

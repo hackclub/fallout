@@ -980,7 +980,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_28_131000) do
     t.boolean "excluded_from_reviewer_suggestions", default: false, null: false
     t.string "first_name"
     t.integer "gold_balance", default: 0, null: false
-    t.integer "hacker_value", default: 0, null: false
     t.boolean "has_hca_address", default: false, null: false
     t.string "hca_id"
     t.text "hca_token"
@@ -999,6 +998,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_28_131000) do
     t.integer "streak_freezes", default: 1, null: false
     t.boolean "streak_in_app_notifications", default: true, null: false
     t.boolean "streak_slack_notifications", default: true, null: false
+    t.string "summit_rsvp"
     t.string "timezone", null: false
     t.string "type"
     t.datetime "updated_at", null: false

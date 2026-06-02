@@ -391,13 +391,24 @@ if Rails.env.development?
       created_at: dr_ts, updated_at: dr_ts }
   end
 
-  # 3 pending design reviews (no reviewer assigned yet)
+  # 3 pending design reviews (no reviewer assigned yet), with varied TA-approved hours so sort works
   pending_ship_ids = ship_ids.reject { |id| dr_rows.any? { |r| r[:ship_id] == id } }.first(3)
   pending_dr_rows = pending_ship_ids.map { |sid|
     { ship_id: sid, reviewer_id: nil, status: DesignReview.statuses[:pending],
       created_at: Time.current, updated_at: Time.current }
   }
   DesignReview.insert_all!(dr_rows + pending_dr_rows)
+
+  pending_ta_hours = [ 8, 22, 15 ]
+  pending_ta_rows = pending_ship_ids.each_with_index.map { |sid, i|
+    seconds = pending_ta_hours[i] * 3600
+    { ship_id: sid, reviewer_id: reviewers[0].id,
+      status: TimeAuditReview.statuses[:approved],
+      approved_public_seconds: seconds,
+      completed_at: Time.current,
+      created_at: Time.current, updated_at: Time.current }
+  }
+  TimeAuditReview.insert_all!(pending_ta_rows)
 
   total = specs.size
   puts "Seeded #{total} RC reviews and #{dr_rows.size + pending_dr_rows.size} design reviews (#{pending_dr_rows.size} pending) across #{reviewer_data.size} reviewers (#{reviewer_data.map { |r| r[:display_name] }.join(', ')})"

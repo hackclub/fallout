@@ -188,7 +188,8 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       claimed_by_display_name: review.claimed? ? review.reviewer&.display_name : nil,
       sibling_approved: sibling&.approved? || false,
       requirements_check_reviewer_display_name: review.is_a?(DesignReview) ? ship.requirements_check_review&.reviewer&.display_name : nil,
-      previously_reviewed_by_me: previously_reviewed_project_ids.include?(ship.project_id)
+      previously_reviewed_by_me: previously_reviewed_project_ids.include?(ship.project_id),
+      approved_public_hours: ship.time_audit_review&.approved? ? (ship.time_audit_review.approved_public_seconds.to_f / 3600.0).round(2) : nil
     }
   end
 
