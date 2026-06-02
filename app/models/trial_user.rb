@@ -1,4 +1,4 @@
-﻿# == Schema Information
+# == Schema Information
 #
 # Table name: users
 #
@@ -15,7 +15,6 @@
 #  excluded_from_reviewer_suggestions :boolean          default(FALSE), not null
 #  first_name                         :string
 #  gold_balance                       :integer          default(0), not null
-#  hacker_value                       :integer          default(0), not null
 #  has_hca_address                    :boolean          default(FALSE), not null
 #  hca_token                          :text
 #  hcb_email                          :string
@@ -32,7 +31,6 @@
 #  streak_freezes                     :integer          default(1), not null
 #  streak_in_app_notifications        :boolean          default(TRUE), not null
 #  streak_slack_notifications         :boolean          default(TRUE), not null
-#  summit_rsvp                        :string
 #  timezone                           :string           not null
 #  type                               :string
 #  verification_status                :string
