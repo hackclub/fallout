@@ -11,9 +11,10 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
     flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
     Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
     previously_reviewed = precompute_previously_reviewed_project_ids
+    lifetime_hours = precompute_user_lifetime_hours(pending_reviews)
 
     render inertia: {
-      pending_reviews: pending_reviews.map { |r| serialize_review_row(r, previously_reviewed_project_ids: previously_reviewed) },
+      pending_reviews: pending_reviews.map { |r| serialize_review_row(r, previously_reviewed_project_ids: previously_reviewed, user_lifetime_hours: lifetime_hours) },
       all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids, previously_reviewed_project_ids: previously_reviewed) },
       pagy: pagy_props(@pagy),
       start_reviewing_path: next_admin_reviews_design_reviews_path,
@@ -51,7 +52,7 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_design_review_path(@review),
       swap_type_path: swap_type_admin_reviews_design_review_path(@review),
-      next_path: next_admin_reviews_design_reviews_path,
+      next_path: review_next_path,
       index_path: admin_reviews_design_reviews_path
     }
   end

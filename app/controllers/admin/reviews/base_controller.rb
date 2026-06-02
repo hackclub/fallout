@@ -26,7 +26,8 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   def next
     skip_authorization # Collection action — no record to authorize
     skip_ids = parse_skip_ids
-    review = review_model.next_eligible(current_user, skip_ids:)
+    sort = parse_sort
+    review = review_model.next_eligible(current_user, skip_ids:, sort:)
 
     if review
       redirect_to review_show_path(review, skip: skip_ids.any? ? skip_ids.join(",") : nil)
@@ -85,6 +86,13 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
 
   def parse_skip_ids
     (params[:skip] || "").split(",").filter_map { |id| id.to_i if id.present? }
+  end
+
+  def parse_sort
+    # Persist explicit preference in session so it survives PATCH/redirect cycles
+    # where params[:sort] is absent (form submission doesn't re-send query params).
+    session[:review_sort] = params[:sort] if params[:sort].in?(%w[hours waiting])
+    session[:review_sort] == "hours" ? :hours : :waiting
   end
 
   # Flagged projects are visible in the All table but excluded from the pending queue
@@ -170,7 +178,18 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     end
   end
 
-  def serialize_review_row(review, flagged_project_ids: Set.new, previously_reviewed_project_ids: Set.new)
+  def precompute_user_lifetime_hours(reviews)
+    user_ids = reviews.map { |r| r.ship.project.user_id }.uniq
+    return {} if user_ids.empty?
+    seconds_by_user = Ship.where.not(approved_public_seconds: nil)
+      .joins(:project)
+      .where(projects: { user_id: user_ids })
+      .group("projects.user_id")
+      .sum(:approved_public_seconds)
+    seconds_by_user.transform_values { |s| s > 0 ? (s / 3600.0).round(1) : nil }
+  end
+
+  def serialize_review_row(review, flagged_project_ids: Set.new, previously_reviewed_project_ids: Set.new, user_lifetime_hours: {})
     ship = review.ship
     sibling = review.is_a?(TimeAuditReview) ? ship.requirements_check_review : ship.time_audit_review
     {
@@ -189,7 +208,7 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
       sibling_approved: sibling&.approved? || false,
       requirements_check_reviewer_display_name: review.is_a?(DesignReview) ? ship.requirements_check_review&.reviewer&.display_name : nil,
       previously_reviewed_by_me: previously_reviewed_project_ids.include?(ship.project_id),
-      approved_public_hours: ship.time_audit_review&.approved? ? (ship.time_audit_review.approved_public_seconds.to_f / 3600.0).round(2) : nil
+      approved_public_hours: user_lifetime_hours[ship.project.user_id]
     }
   end
 

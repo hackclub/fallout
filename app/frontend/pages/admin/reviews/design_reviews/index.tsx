@@ -36,6 +36,15 @@ export default function DesignReviewsIndex({
   const isAdmin = admin_permissions?.is_admin ?? false
   const [sortByHours, setSortByHours] = useState(false)
 
+  const hoursColumn = {
+    accessorKey: 'approved_public_hours',
+    header: 'Hours',
+    cell: ({ row }: { row: { original: ReviewRow } }) =>
+      row.original.approved_public_hours != null
+        ? `${row.original.approved_public_hours}h`
+        : <span className="text-muted-foreground">—</span>,
+  }
+
   const sortedPending = sortByHours
     ? [...pending_reviews].sort((a, b) => (b.approved_public_hours ?? -1) - (a.approved_public_hours ?? -1))
     : pending_reviews
@@ -62,13 +71,13 @@ export default function DesignReviewsIndex({
             </Button>
             {pending_reviews.length > 0 && (
               <Button asChild size="sm">
-                <Link href={start_reviewing_path}>Start Reviewing</Link>
+                <Link href={`${start_reviewing_path}?sort=${sortByHours ? 'hours' : 'waiting'}`}>Start Reviewing</Link>
               </Button>
             )}
           </div>
         </div>
         <DataTable
-          columns={buildPendingColumns(BASE_PATH, undefined, [reqCheckColumn])}
+          columns={buildPendingColumns(BASE_PATH, undefined, sortByHours ? [reqCheckColumn, hoursColumn] : [reqCheckColumn])}
           data={sortedPending}
           noun="pending reviews"
           rowClassName={(row) => (row.previously_reviewed_by_me ? 'bg-blue-50 dark:bg-blue-950/20' : undefined)}

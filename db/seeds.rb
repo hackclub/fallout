@@ -260,6 +260,119 @@ if Rails.env.development?
 
     puts "Gave #{hours_target.display_name} (##{hours_target.id}) #{hours} approved hours via project ##{hours_project.id}"
   end
+
+  # Give demo users varying lifetime approved hours across 1-2 projects + a pending DR each.
+  # format: display_name => { projects: [{name:, hours:, tags:}], pending_hours: }
+  # pending_hours = TA hours for the new pending DR ship (on the last listed project)
+  seed_rc_user = User.find_by(email: "seed_alice@example.com")
+
+  demo_dr_data = {
+    "Tongyu Zhou" => {
+      projects: [ { name: "Wireless Sensor Node", hours: 12, tags: %w[iot esp32] } ],
+      pending_hours: 12
+    },
+    "Cyao Lin" => {
+      projects: [
+        { name: "Cyao's PCB Badge",     hours: 20, tags: %w[hardware kicad] },
+        { name: "Cyao's OLED Watch",    hours: 18, tags: %w[hardware wearable] }
+      ],
+      pending_hours: 18
+    },
+    "Antush Patel" => {
+      projects: [
+        { name: "Antush's Sensor Array",   hours: 5, tags: %w[iot sensors] },
+        { name: "Antush's Display Module", hours: 3, tags: %w[hardware display] }
+      ],
+      pending_hours: 3
+    },
+    "Mira Suzuki" => {
+      projects: [
+        { name: "Mira's Wearable Sensor", hours: 15, tags: %w[hardware wearable] },
+        { name: "Mira's Solar Tracker",   hours: 10, tags: %w[hardware solar] }
+      ],
+      pending_hours: 10
+    },
+    "Joon Park" => {
+      projects: [
+        { name: "Joon's Mechanical Keyboard", hours: 28, tags: %w[keyboard hardware] },
+        { name: "Joon's LED Controller",      hours: 16, tags: %w[hardware rgb] }
+      ],
+      pending_hours: 16
+    },
+    "Sade Okafor" => {
+      projects: [
+        { name: "Sade's First PCB",  hours: 4, tags: %w[hardware kicad] },
+        { name: "Sade's Audio Amp",  hours: 2, tags: %w[hardware audio] }
+      ],
+      pending_hours: 2
+    },
+    "Felix Romero" => {
+      projects: [
+        { name: "Felix's Motor Driver",     hours: 12, tags: %w[hardware motors] },
+        { name: "Felix's Enclosure Design", hours: 7,  tags: %w[hardware 3d-printing] }
+      ],
+      pending_hours: 7
+    }
+  }
+
+  demo_dr_data.each do |display_name, data|
+    demo_user = demo_user_scope.find_by(display_name: display_name)
+    next unless demo_user
+
+    # Wipe previous pending-DR seed ships for this user to keep re-runs clean
+    old_ids = Ship.joins(:project).where(projects: { user_id: demo_user.id }, justification: "seed pending DR").pluck(:id)
+    if old_ids.any?
+      DesignReview.where(ship_id: old_ids).delete_all
+      RequirementsCheckReview.where(ship_id: old_ids).delete_all
+      TimeAuditReview.where(ship_id: old_ids).delete_all
+      Ship.where(id: old_ids).delete_all
+    end
+
+    last_proj = nil
+    data[:projects].each do |proj_data|
+      proj = Project.find_or_create_by!(name: proj_data[:name], user: demo_user) do |p|
+        p.description = "Seeded project — #{proj_data[:name]}"
+        p.repo_link = "https://github.com/fallout-demo/#{proj_data[:name].parameterize}"
+        p.tags = proj_data[:tags]
+        p.is_unlisted = false
+      end
+
+      approved_ship = Ship.find_or_create_by!(project: proj, justification: "seed lifetime hours") do |s|
+        s.ship_type = :design
+        s.status = :approved
+        s.approved_public_seconds = proj_data[:hours] * 3600
+      end
+      approved_ship.update!(status: :approved, approved_public_seconds: proj_data[:hours] * 3600)
+
+      last_proj = proj
+    end
+
+    # Pending DR on the last project
+    new_ship_id = Ship.insert_all!(
+      [ { project_id: last_proj.id, ship_type: 0, status: 1, justification: "seed pending DR",
+          created_at: Time.current, updated_at: Time.current } ],
+      returning: :id
+    ).first["id"]
+
+    pending_h = data[:pending_hours]
+    RequirementsCheckReview.insert_all!([ {
+      ship_id: new_ship_id, reviewer_id: seed_rc_user&.id,
+      status: RequirementsCheckReview.statuses[:approved], feedback: "Requirements verified.",
+      completed_at: Time.current, created_at: Time.current, updated_at: Time.current
+    } ])
+    TimeAuditReview.insert_all!([ {
+      ship_id: new_ship_id, reviewer_id: seed_rc_user&.id,
+      status: TimeAuditReview.statuses[:approved],
+      approved_public_seconds: pending_h * 3600,
+      completed_at: Time.current, created_at: Time.current, updated_at: Time.current
+    } ])
+    DesignReview.insert_all!([ {
+      ship_id: new_ship_id, reviewer_id: nil,
+      status: DesignReview.statuses[:pending],
+      completed_at: nil, created_at: Time.current, updated_at: Time.current
+    } ])
+  end
+  puts "Seeded pending DR ships for demo users with varied lifetime hours"
 end
 
 # Dev-only: RC reviewer profiles sample data
@@ -343,6 +456,7 @@ if Rails.env.development?
     seed_ship_ids = Ship.where(project_id: seed_project_ids).pluck(:id)
     DesignReview.where(ship_id: seed_ship_ids).delete_all
     RequirementsCheckReview.where(ship_id: seed_ship_ids).delete_all
+    TimeAuditReview.where(ship_id: seed_ship_ids).delete_all
     Ship.where(id: seed_ship_ids).delete_all
     Project.where(id: seed_project_ids).delete_all
   end
@@ -438,45 +552,52 @@ if Rails.env.development?
   project  = tanishq && Project.find_by(name: "Test Project", user: tanishq)
 
   if project
-    seed_rc = User.find_by(email: "seed_alice@example.com")
+    seed_rc  = User.find_by(email: "seed_alice@example.com")
+    seed_bob = User.find_by(email: "seed_bob@example.com")
 
-    # [ship_id_or_nil, rc_status, rc_feedback, dr_status, dr_reviewer_email, dr_feedback]
-    # nil ship_id → create a new ship; existing id → add DR to it
+    # Wipe previous seed DR test ships so re-runs don't accumulate duplicates
+    old_ship_ids = Ship.where(project: project, justification: "seed DR test").pluck(:id)
+    if old_ship_ids.any?
+      DesignReview.where(ship_id: old_ship_ids).delete_all
+      RequirementsCheckReview.where(ship_id: old_ship_ids).delete_all
+      TimeAuditReview.where(ship_id: old_ship_ids).delete_all
+      Ship.where(id: old_ship_ids).delete_all
+    end
+
+    # Each entry: rc_feedback, ta_hours, dr_status, dr_reviewer, dr_feedback
     test_cases = [
-      { ship_id: 7, dr_status: :pending, dr_reviewer: nil },
-      { ship_id: nil, rc_status: :approved, rc_feedback: "All requirements met. Justification is clear and hours are well documented.", dr_status: :pending, dr_reviewer: nil },
-      { ship_id: nil, rc_status: :approved, rc_feedback: "Hours verified. Project scope is appropriate and engineering process is documented.", dr_status: :approved, dr_reviewer: "seed_bob@example.com", feedback: "Great work! The design is clean and well thought out. Approved." },
-      { ship_id: nil, rc_status: :approved, rc_feedback: "Requirements check passed. Good justification and sufficient hours logged.", dr_status: :returned, dr_reviewer: "seed_carol@example.com", feedback: "Please add more detail to the process section and include screenshots of the final UI before resubmitting." }
+      { rc_feedback: "All requirements met. Hours well documented.",                                             ta_hours: 24, dr_status: :pending,  dr_reviewer: nil,       feedback: nil },
+      { rc_feedback: "Hours verified. Project scope is appropriate.",                                            ta_hours: 15, dr_status: :pending,  dr_reviewer: nil,       feedback: nil },
+      { rc_feedback: "Requirements check passed. Good justification.",                                           ta_hours: 9,  dr_status: :approved, dr_reviewer: seed_bob,  feedback: "Great work! Clean design. Approved." },
+      { rc_feedback: "Requirements check passed. Good justification and sufficient hours logged.",               ta_hours: 6,  dr_status: :returned, dr_reviewer: seed_rc,   feedback: "Please add more detail to the process section before resubmitting." }
     ]
 
     test_cases.each do |tc|
-      ship = if tc[:ship_id]
-        Ship.find(tc[:ship_id])
-      else
-        # status :approved skips the create_initial_reviews! callback
-        s_id = Ship.insert_all!(
-          [ { project_id: project.id, ship_type: 0, status: 1, justification: "seed DR test",
-             created_at: Time.current, updated_at: Time.current } ],
-          returning: :id
-        ).first["id"]
-        # Approved RC review — insert_all! skips recompute_ship_status! callback
-        RequirementsCheckReview.insert_all!([ {
-          ship_id: s_id, reviewer_id: seed_rc&.id,
-          status: RequirementsCheckReview.statuses[:approved],
-          feedback: tc[:rc_feedback],
-          created_at: Time.current, updated_at: Time.current
-        } ])
-        Ship.find(s_id)
-      end
+      s_id = Ship.insert_all!(
+        [ { project_id: project.id, ship_type: 0, status: 1, justification: "seed DR test",
+            created_at: Time.current, updated_at: Time.current } ],
+        returning: :id
+      ).first["id"]
 
-      next if DesignReview.exists?(ship: ship)
+      RequirementsCheckReview.insert_all!([ {
+        ship_id: s_id, reviewer_id: seed_rc&.id,
+        status: RequirementsCheckReview.statuses[:approved],
+        feedback: tc[:rc_feedback],
+        completed_at: Time.current, created_at: Time.current, updated_at: Time.current
+      } ])
 
-      reviewer_id = tc[:dr_reviewer] ? User.find_by(email: tc[:dr_reviewer])&.id : nil
-      # insert_all! bypasses recompute_ship_status! callback
+      TimeAuditReview.insert_all!([ {
+        ship_id: s_id, reviewer_id: seed_rc&.id,
+        status: TimeAuditReview.statuses[:approved],
+        approved_public_seconds: tc[:ta_hours] * 3600,
+        completed_at: Time.current, created_at: Time.current, updated_at: Time.current
+      } ])
+
       DesignReview.insert_all!([ {
-        ship_id: ship.id, reviewer_id: reviewer_id,
-        status:   DesignReview.statuses[tc[:dr_status]],
+        ship_id: s_id, reviewer_id: tc[:dr_reviewer]&.id,
+        status: DesignReview.statuses[tc[:dr_status]],
         feedback: tc[:feedback],
+        completed_at: tc[:dr_status] == :pending ? nil : Time.current,
         created_at: Time.current, updated_at: Time.current
       } ])
     end

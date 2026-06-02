@@ -156,19 +156,28 @@ module Reviewable
     end
 
     # Find the next review available for this user, respecting skip list.
-    # Prioritises the user's own claim first, then oldest ship (matches the
-    # pending queue table ordering — ship age is the true "how long the
-    # student has been waiting" signal, since DR/BR rows are created later
-    # than the ship.
-    def next_eligible(user, skip_ids: [])
+    # sort: :waiting (default) — oldest ship first; :hours — most TA-approved hours first.
+    # Prioritises the user's own claim first in either mode.
+    def next_eligible(user, skip_ids: [], sort: :waiting)
       scope = available_for(user).joins(:ship)
       scope = scope.where.not(id: skip_ids) if skip_ids.present?
-      scope.order(
-        Arel::Nodes::Case.new
-          .when(arel_table[:reviewer_id].eq(user.id)).then(0)
-          .else(1),
-        "ships.created_at ASC"
-      ).first
+      own_claim_first = Arel::Nodes::Case.new
+        .when(arel_table[:reviewer_id].eq(user.id)).then(0)
+        .else(1)
+      if sort == :hours
+        scope.joins("INNER JOIN projects proj_sort ON proj_sort.id = ships.project_id").order(
+          own_claim_first,
+          Arel.sql(<<~SQL.squish)
+            (SELECT COALESCE(SUM(s2.approved_public_seconds), 0)
+             FROM ships s2
+             INNER JOIN projects p2 ON p2.id = s2.project_id
+             WHERE p2.user_id = proj_sort.user_id
+             AND s2.approved_public_seconds IS NOT NULL) DESC
+          SQL
+        ).first
+      else
+        scope.order(own_claim_first, "ships.created_at ASC").first
+      end
     end
   end
 
