@@ -193,7 +193,7 @@ Zines are added near *ship* time, not at project creation, so discovery is trigg
 - `ProjectsController#refresh_cover` — the owner-triggered "Check for my zine" button on the project page (verified owners only via `ProjectPolicy#refresh_cover?`; `force: true`, `allow_representative: false`; Rack::Attack throttled `refresh_cover/user`). The frontend polls `#cover_status`, which reports `working`/`found`/`none` by comparing `unified_thumbnail_checked_at` to the POST time.
 - `ShipPreflightJob` — after preflight's checks finish, if `HasZinePage` passed it reuses the already-built `SharedContext` to find the zine URL (no second GitHub fetch) and enqueues with that `source_url` (`allow_representative: false`).
 - `AttachShipUnifiedScreenshotJob` after a ship's `frozen_screenshot` is populated (keeps the representative-image fallback).
-- `Project` after_commit **only when `repo_link` is cleared** — to purge the now-orphaned cover. It deliberately does NOT scan on repo add/change (a freshly linked repo has no zine yet).
+- `Project` after_commit when `repo_link` changes (cleared or swapped) — to purge the now-stale cover. It deliberately does NOT scan on repo add/change (a freshly linked repo has no zine yet).
 - [`RefreshStaleUnifiedThumbnailsJob`](../app/jobs/refresh_stale_unified_thumbnails_job.rb) — recurring hourly, but **only projects that already have a `unified_thumbnail` attached** (a cheap etag refresh to catch zine *updates*), with `unified_thumbnail_checked_at IS NULL OR < 24h ago`, jittered across a 30-minute window, capped at `PER_RUN_LIMIT = 200` per run.
 
 Inside the job, the freshness model is **never purge without positive proof**:
