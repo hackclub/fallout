@@ -49,5 +49,4 @@ class TimeAuditReview < ApplicationRecord
     return if ship.previous_approved_ship.present?
     self.approved_public_seconds = approved_public_seconds.to_i + ship.project.manual_seconds.to_i
   end
-
 end

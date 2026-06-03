@@ -33,9 +33,11 @@ export default function RequirementsChecksIndex({
     accessorKey: 'approved_public_hours',
     header: 'Hours',
     cell: ({ row }: { row: { original: ReviewRow } }) =>
-      row.original.approved_public_hours != null
-        ? `${row.original.approved_public_hours}h`
-        : <span className="text-muted-foreground">—</span>,
+      row.original.approved_public_hours != null ? (
+        `${row.original.approved_public_hours}h`
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
   }
 
   const sortedPending = sortByHours

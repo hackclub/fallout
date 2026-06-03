@@ -136,7 +136,9 @@ function ReviewerProfileCard({
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">{profile.display_name}</p>
               <div className="flex items-center gap-1.5">
-                <p className="text-xs text-muted-foreground">{profile.rc_reviews} RC · {profile.total_reviews} all-time</p>
+                <p className="text-xs text-muted-foreground">
+                  {profile.rc_reviews} RC · {profile.total_reviews} all-time
+                </p>
                 {hasLowWeek && (
                   <span title="Has weeks below 15 reviews" className="text-yellow-500">
                     ⚠
@@ -341,30 +343,26 @@ export default function RequirementsDesignDashboard() {
         ) : (
           <div className="flex flex-wrap gap-3">
             {non_reviewer_channel_members.map((member) => (
-              <Link
-                key={member.id}
-                href={`/admin/users/${member.id}`}
-                className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
-              >
-                {member.avatar ? (
-                  <img src={member.avatar} className="size-6 rounded-full shrink-0" alt="" />
-                ) : (
-                  <div className="size-6 rounded-full bg-muted shrink-0" />
-                )}
-                <span>{member.display_name}</span>
+              <div key={member.id} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+                <Link href={`/admin/users/${member.id}`} className="flex items-center gap-2 flex-1 hover:underline">
+                  {member.avatar ? (
+                    <img src={member.avatar} className="size-6 rounded-full shrink-0" alt="" />
+                  ) : (
+                    <div className="size-6 rounded-full bg-muted shrink-0" />
+                  )}
+                  <span>{member.display_name}</span>
+                </Link>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
+                  onClick={() =>
                     router.patch(`/admin/users/${member.id}/toggle_reviewer_suggestion`, {}, { preserveScroll: true })
-                  }}
+                  }
                   title="Exclude from suggestions"
-                  className="text-muted-foreground hover:text-destructive ml-1"
+                  className="text-muted-foreground hover:text-destructive"
                 >
                   <X className="size-3" />
                 </button>
-              </Link>
+              </div>
             ))}
           </div>
         )}

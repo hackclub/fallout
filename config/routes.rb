@@ -462,9 +462,6 @@ Rails.application.routes.draw do
 
   get "up" => "rails/health#show", as: :rails_health_check
 
-  if Rails.env.development?
-    get "dev/login/:user_id" => "dev_sessions#create", as: :dev_login
-  end
 
   root "landing#index"
 

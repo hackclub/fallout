@@ -40,9 +40,11 @@ export default function DesignReviewsIndex({
     accessorKey: 'approved_public_hours',
     header: 'Hours',
     cell: ({ row }: { row: { original: ReviewRow } }) =>
-      row.original.approved_public_hours != null
-        ? `${row.original.approved_public_hours}h`
-        : <span className="text-muted-foreground">—</span>,
+      row.original.approved_public_hours != null ? (
+        `${row.original.approved_public_hours}h`
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
   }
 
   const sortedPending = sortByHours
@@ -77,7 +79,11 @@ export default function DesignReviewsIndex({
           </div>
         </div>
         <DataTable
-          columns={buildPendingColumns(BASE_PATH, undefined, sortByHours ? [reqCheckColumn, hoursColumn] : [reqCheckColumn])}
+          columns={buildPendingColumns(
+            BASE_PATH,
+            undefined,
+            sortByHours ? [reqCheckColumn, hoursColumn] : [reqCheckColumn],
+          )}
           data={sortedPending}
           noun="pending reviews"
           rowClassName={(row) => (row.previously_reviewed_by_me ? 'bg-blue-50 dark:bg-blue-950/20' : undefined)}
