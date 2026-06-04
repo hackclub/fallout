@@ -50,8 +50,9 @@ class ProjectTest < ActiveSupport::TestCase
     )
   end
 
-  test "creating a project with a repo_link enqueues ComputeProjectUnifiedThumbnailJob" do
-    assert_enqueued_with(job: ComputeProjectUnifiedThumbnailJob) do
+  test "creating a project with a repo_link does not enqueue ComputeProjectUnifiedThumbnailJob" do
+    # A freshly linked repo has no zine yet — discovery happens on demand, at preflight, and at ship.
+    assert_no_enqueued_jobs only: ComputeProjectUnifiedThumbnailJob do
       Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
     end
   end
@@ -62,13 +63,21 @@ class ProjectTest < ActiveSupport::TestCase
     end
   end
 
-  test "changing repo_link enqueues the job" do
+  test "changing repo_link to a different repo clears the stale cover synchronously without scanning" do
     project = Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
+    seed_cover(project, source_url: "https://raw.githubusercontent.com/example/p/main/zine.png", etag: 'W/"a"')
+    assert project.unified_thumbnail.attached?
     clear_enqueued_jobs
 
-    assert_enqueued_with(job: ComputeProjectUnifiedThumbnailJob, args: [ project.id ]) do
+    # Old cover must go immediately, but a different repo doesn't mean a zine exists there yet — no blind scan.
+    assert_no_enqueued_jobs only: ComputeProjectUnifiedThumbnailJob do
       project.update!(repo_link: "https://github.com/example/p2")
     end
+
+    project.reload
+    assert_not project.unified_thumbnail.attached?, "stale cover should be purged when the repo changes"
+    assert_nil project.unified_thumbnail_source_url
+    assert_nil project.unified_thumbnail_etag
   end
 
   test "changing an unrelated field (name) does not enqueue the job" do
@@ -80,13 +89,20 @@ class ProjectTest < ActiveSupport::TestCase
     end
   end
 
-  test "clearing repo_link enqueues the job (so it can purge the stale attachment)" do
+  test "clearing repo_link purges the stale cover synchronously without scanning" do
     project = Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
+    seed_cover(project, source_url: "https://raw.githubusercontent.com/example/p/main/zine.png", etag: 'W/"a"')
+    assert project.unified_thumbnail.attached?
     clear_enqueued_jobs
 
-    assert_enqueued_with(job: ComputeProjectUnifiedThumbnailJob, args: [ project.id ]) do
+    assert_no_enqueued_jobs only: ComputeProjectUnifiedThumbnailJob do
       project.update!(repo_link: nil)
     end
+
+    project.reload
+    assert_not project.unified_thumbnail.attached?, "stale cover should be purged when the repo is cleared"
+    assert_nil project.unified_thumbnail_source_url
+    assert_nil project.unified_thumbnail_etag
   end
 
   test "discarding a project does not enqueue the job" do
@@ -98,12 +114,12 @@ class ProjectTest < ActiveSupport::TestCase
     end
   end
 
-  test "undiscarding a project with a repo_link enqueues the job" do
+  test "undiscarding a project with a repo_link does not enqueue the job" do
     project = Project.create!(user: @user, name: "P", repo_link: "https://github.com/example/p")
     project.discard
     clear_enqueued_jobs
 
-    assert_enqueued_with(job: ComputeProjectUnifiedThumbnailJob, args: [ project.id ]) do
+    assert_no_enqueued_jobs only: ComputeProjectUnifiedThumbnailJob do
       project.undiscard
     end
   end
@@ -116,5 +132,20 @@ class ProjectTest < ActiveSupport::TestCase
     assert_no_enqueued_jobs only: ComputeProjectUnifiedThumbnailJob do
       project.undiscard
     end
+  end
+
+  private
+
+  # Minimal valid 1x1 JPEG — enough for ActiveStorage to attach and compute a checksum.
+  JPEG_BYTES = "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xFF\xD9".b.freeze
+
+  def seed_cover(project, source_url:, etag:)
+    project.unified_thumbnail.attach(io: StringIO.new(JPEG_BYTES.dup), filename: "old.jpg", content_type: "image/jpeg")
+    project.update_columns(
+      unified_thumbnail_source_url: source_url,
+      unified_thumbnail_etag: etag,
+      unified_thumbnail_checked_at: 1.day.ago
+    )
+    project.reload
   end
 end

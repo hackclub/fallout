@@ -16,14 +16,18 @@ module ShipChecks
   #       finished build on a desk, etc.) so the row still has a usable
   #       screenshot.
   module UnifiedScreenshotFinder
-    def self.find_url(project)
-      Rails.cache.fetch([ "unified_screenshot_finder", project.id, project.updated_at.to_i ], expires_in: 6.hours) do
-        ctx = SharedContext.new(project)
-
+    def self.find_url(project, ctx: nil, allow_representative: true, force: false)
+      ctx ||= SharedContext.new(project)
+      # allow_representative is part of the key so a zine-only result never collides with a
+      # representative-fallback result. skip_nil: true means a "no zine" outcome isn't cached,
+      # so a later-added zine is found on the next check instead of being masked for 6h.
+      key = [ "unified_screenshot_finder", project.id, project.updated_at.to_i, allow_representative ]
+      Rails.cache.delete(key) if force
+      Rails.cache.fetch(key, expires_in: 6.hours, skip_nil: true) do
         find_zine_by_filename_in_tree(ctx) ||
           find_zine_in_tree_via_llm(ctx) ||
           find_zine_in_readme_via_llm(ctx) ||
-          find_representative_in_readme_via_llm(ctx)
+          (allow_representative ? find_representative_in_readme_via_llm(ctx) : nil)
       end
     rescue StandardError => e
       Rails.logger.error("UnifiedScreenshotFinder failed for project ##{project.id}: #{e.class}: #{e.message}")

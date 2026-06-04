@@ -212,6 +212,7 @@ export default function ProjectsShow({
     manage_collaborators: boolean
     create_journal_entry: boolean
     create_journal_entry_locked_for_trial: boolean
+    refresh_cover: boolean
   }
   initial_tab?: 'timeline' | 'journal'
   highlight_journal_entry_id?: number | null
@@ -230,6 +231,9 @@ export default function ProjectsShow({
   const actionMenuRef = useClickOutside<HTMLDivElement>(() => setActionMenuOpen(false))
   const [journalMenuEntryId, setJournalMenuEntryId] = useState<number | null>(null)
   const [thumbnailFailed, setThumbnailFailed] = useState(false)
+  const [coverState, setCoverState] = useState<'idle' | 'working' | 'none' | 'timeout'>('idle')
+  const coverPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const coverDeadlineRef = useRef<number>(0)
 
   const [switchEntry, setSwitchEntry] = useState<JournalEntryCard | null>(null)
   const [switchProjectId, setSwitchProjectId] = useState<number | ''>('')
@@ -282,6 +286,67 @@ export default function ProjectsShow({
     }
 
     router.reload({ only: detailProps })
+  }
+
+  function stopCoverPolling() {
+    if (coverPollRef.current) {
+      clearInterval(coverPollRef.current)
+      coverPollRef.current = null
+    }
+  }
+
+  // Stop polling if the page/modal unmounts mid-check.
+  useEffect(() => {
+    return () => {
+      if (coverPollRef.current) clearInterval(coverPollRef.current)
+    }
+  }, [])
+
+  async function pollCoverStatus(since: string) {
+    if (Date.now() > coverDeadlineRef.current) {
+      stopCoverPolling()
+      setCoverState('timeout')
+      return
+    }
+    try {
+      const res = await fetch(`/projects/${project.id}/cover_status?since=${encodeURIComponent(since)}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.state === 'working') return
+      stopCoverPolling()
+      if (data.state === 'found') {
+        setCoverState('idle')
+        reloadProjectDetails()
+      } else {
+        setCoverState('none')
+      }
+    } catch {
+      // transient — retry on the next tick
+    }
+  }
+
+  async function checkForZine() {
+    if (coverState === 'working') return
+    stopCoverPolling()
+    setCoverState('working')
+    try {
+      const res = await fetch(`/projects/${project.id}/refresh_cover`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '',
+        },
+      })
+      if (!res.ok) {
+        setCoverState('timeout')
+        return
+      }
+      const { since } = await res.json()
+      coverDeadlineRef.current = Date.now() + 25000
+      coverPollRef.current = setInterval(() => pollCoverStatus(since), 1500)
+    } catch {
+      setCoverState('timeout')
+    }
   }
 
   function handleProjectSaved() {
@@ -606,36 +671,102 @@ export default function ProjectsShow({
                 Burnout
               </span>
             )}
-            {!project.unified_thumbnail_url && (
-              <span className="flex items-center gap-1">
-                No zine
-                <Tooltip side="top" gap={6} interactive>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="What's a project zine?"
-                      className="cursor-help text-brown hover:text-dark-brown"
-                    >
-                      <InformationCircleIcon className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-xs leading-snug">
-                      <span className="font-semibold">Your project?</span> Add a{' '}
-                      <a
-                        href="/docs/requirements/fallout-zine"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline hover:text-brown"
+            {!project.unified_thumbnail_url &&
+              // The "check" action only makes sense when there's a repo to scan — gate it on a repo
+              // link. Without one, fall through to a passive note that explains the prerequisite.
+              (can.refresh_cover && project.repo_link ? (
+                <span className="flex items-center gap-1">
+                  {coverState === 'working' ? (
+                    <span className="flex items-center gap-1 text-brown">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Looking for your zine…
+                    </span>
+                  ) : (
+                    <>
+                      {coverState === 'none' && <span className="text-brown">No zine found.</span>}
+                      {coverState === 'timeout' && <span className="text-brown">Still working…</span>}
+                      <button
+                        type="button"
+                        onClick={checkForZine}
+                        className="underline text-brown hover:text-dark-brown cursor-pointer"
                       >
-                        zine
-                      </a>{' '}
-                      and it'll show here.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </span>
-            )}
+                        {coverState === 'idle' ? 'Check for my zine' : 'Try again'}
+                      </button>
+                      <Tooltip side="top" gap={6} interactive>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="What's a project zine?"
+                            className="cursor-help text-brown hover:text-dark-brown"
+                          >
+                            <InformationCircleIcon className="w-4 h-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-xs leading-snug">
+                            Add a{' '}
+                            <a
+                              href="/docs/requirements/fallout-zine"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline hover:text-brown"
+                            >
+                              zine
+                            </a>{' '}
+                            to your linked repo, then check for it here — we'll use it as your cover.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </>
+                  )}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  No zine
+                  <Tooltip side="top" gap={6} interactive>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="What's a project zine?"
+                        className="cursor-help text-brown hover:text-dark-brown"
+                      >
+                        <InformationCircleIcon className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs leading-snug">
+                        {can.refresh_cover ? (
+                          <>
+                            Link a repository with a{' '}
+                            <a
+                              href="/docs/requirements/fallout-zine"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline hover:text-brown"
+                            >
+                              zine
+                            </a>{' '}
+                            to your project and it'll show here as your cover.
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-semibold">Your project?</span> Add a repo link with a{' '}
+                            <a
+                              href="/docs/requirements/fallout-zine"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline hover:text-brown"
+                            >
+                              zine
+                            </a>{' '}
+                            and it'll show here.
+                          </>
+                        )}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </span>
+              ))}
           </div>
 
           {can.manage_collaborators && (

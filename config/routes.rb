@@ -527,6 +527,8 @@ Rails.application.routes.draw do
   resources :projects do
     get "onboarding", on: :collection # Project onboarding modal accessed from path page
     get :export_journal, on: :member
+    post :refresh_cover, on: :member # Owner-triggered zine cover re-check (then polled via cover_status)
+    get :cover_status, on: :member # Polled by the frontend for cover refresh state
     resources :journal_entries, only: [ :new, :create ]
     resources :collaboration_invites, only: [ :create, :destroy ], module: :projects # Send and revoke project collaboration invites
     get :ship, controller: "projects/ships", action: :preflight # /projects/:id/ship — multi-step submission page

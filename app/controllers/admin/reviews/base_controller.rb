@@ -111,17 +111,6 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     redirect_to review_next_path(skip: skip_ids.join(",")), notice: notice
   end
 
-  # Stamp the submitter as reviewer when finalizing a review. The claim system
-  # normally sets reviewer_id, but ExpireStaleReviewClaimsJob can clear it
-  # between page load and submit, and the policy permits admins to update
-  # without an active claim. Without this, terminal reviews can land with
-  # reviewer_id=NULL, losing attribution. Only fills when blank so we preserve
-  # the original claimer when one exists.
-  def stamp_reviewer_for_terminal!(submitted_status)
-    return unless %w[approved returned rejected].include?(submitted_status.to_s)
-    @review.reviewer_id ||= current_user.id
-  end
-
   # Admin submitting a decision on a flagged review clears the flag (admin override)
   def clear_flag_if_admin_override!
     return unless current_user.admin?
