@@ -81,6 +81,7 @@
 #                       update_streak_day_admin_user PATCH  /admin/users/:id/update_streak_day(.:format)                                                  admin/users#update_streak_day
 #                     restore_streak_goal_admin_user PATCH  /admin/users/:id/restore_streak_goal(.:format)                                                admin/users#restore_streak_goal
 #                              update_ban_admin_user PATCH  /admin/users/:id/update_ban(.:format)                                                         admin/users#update_ban
+#              toggle_reviewer_suggestion_admin_user PATCH  /admin/users/:id/toggle_reviewer_suggestion(.:format)                                         admin/users#toggle_reviewer_suggestion
 #                              admin_activity_checks POST   /admin/activity_checks(.:format)                                                              admin/activity_checks#create
 #                           new_admin_activity_check GET    /admin/activity_checks/new(.:format)                                                          admin/activity_checks#new
 #                          refresh_admin_hours_stats POST   /admin/hours_stats/refresh(.:format)                                                          admin/hours_stats#refresh
