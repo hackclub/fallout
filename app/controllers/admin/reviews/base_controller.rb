@@ -396,7 +396,10 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
 
   def build_review_stats(model, include)
     now = Time.current
-    completion_col = model == TimeAuditReview ? :completed_at : :updated_at
+    # completed_at is the stamped approval/finalization time (set once on terminal
+    # transition by Reviewable#set_completed_at) and, unlike updated_at, does not
+    # drift on post-approval heartbeat/annotation edits. All four tables index it.
+    completion_col = :completed_at
     current_window = (now - STATS_WINDOW)..now
     prior_window = (now - 2 * STATS_WINDOW)..(now - STATS_WINDOW)
 
