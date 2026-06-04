@@ -69,8 +69,14 @@ class SoupCampaignChannel < ApplicationCable::Channel
   end
 
   def flush_fields(fields)
-    permitted = %w[name body footer unsubscribe_label image_url]
+    permitted = %w[name body footer unsubscribe_label image_url notification_preview]
     updates = fields.slice(*permitted)
+    if fields.key?("target_user_ids")
+      preview_campaign = @campaign.dup
+      preview_campaign.target_user_ids_text = fields["target_user_ids"]
+      updates["target_query"] = preview_campaign.target_query
+      updates["target_user_ids"] = preview_campaign.target_user_ids
+    end
     @campaign.update_columns(updates) if updates.any?
   end
 

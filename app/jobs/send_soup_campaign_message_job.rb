@@ -24,12 +24,13 @@ class SendSoupCampaignMessageJob < ApplicationJob
       token: recipient.unsubscribe_token,
       host: ENV.fetch("APP_HOST", "fallout.hackclub.com")
     )
+    personalization = personalization_for(recipient)
 
     client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
     client.chat_postMessage(
       channel: recipient.slack_id,
-      text: campaign.notification_preview.presence || interpolate(campaign.body, recipient), # Fallback text for notifications/push previews
-      blocks: build_blocks(campaign, unsubscribe_url, recipient).to_json
+      text: interpolate(campaign.notification_preview.presence || campaign.body, personalization), # Fallback text for notifications/push previews
+      blocks: build_blocks(campaign, unsubscribe_url, personalization).to_json
     )
 
     recipient.update!(status: :sent, sent_at: Time.current)
@@ -46,15 +47,13 @@ class SendSoupCampaignMessageJob < ApplicationJob
 
   private
 
-  def build_blocks(campaign, unsubscribe_url, recipient)
+  def build_blocks(campaign, unsubscribe_url, personalization)
     blocks = []
 
-    # Body — interpolate {name} with recipient's display name
-    blocks << { type: "section", text: { type: "mrkdwn", text: interpolate(campaign.body, recipient) } }
+    blocks << { type: "section", text: { type: "mrkdwn", text: interpolate(campaign.body, personalization) } }
 
-    # Footer (optional)
     if campaign.footer.present?
-      blocks << { type: "section", text: { type: "mrkdwn", text: interpolate(campaign.footer, recipient) } }
+      blocks << { type: "section", text: { type: "mrkdwn", text: interpolate(campaign.footer, personalization) } }
     end
 
     # Image (optional)
@@ -76,9 +75,23 @@ class SendSoupCampaignMessageJob < ApplicationJob
     blocks
   end
 
-  # Replaces {name} with the recipient's display name (falls back to "there" if unknown)
-  def interpolate(text, recipient)
-    first_name = recipient.display_name&.split&.first || "there"
-    text.gsub("{name}", first_name)
+  def personalization_for(recipient)
+    user = User.verified.kept.find_by(slack_id: recipient.slack_id)
+
+    {
+      name: recipient.display_name&.split&.first || "there",
+      total_time_logged_seconds: format_logged_hours(user&.total_time_logged_seconds)
+    }
+  end
+
+  def interpolate(text, personalization)
+    text
+      .gsub("{name}", personalization[:name])
+      .gsub("{total_time_logged_seconds}", personalization[:total_time_logged_seconds].to_s)
+  end
+
+  def format_logged_hours(total_time_logged_seconds)
+    hours = (total_time_logged_seconds.to_i / 3600.0).round(1)
+    hours.to_i == hours ? hours.to_i : hours
   end
 end

@@ -2,7 +2,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
   before_action :require_admin! # Soup campaigns are admin-only
 
   skip_after_action :verify_authorized, only: %i[index] # index uses policy_scope; create uses skip_authorization since it redirects immediately
-  skip_after_action :verify_policy_scoped, only: %i[show new create update destroy send_campaign test_send cancel toggle_unsubscribe] # non-index actions use authorize
+  skip_after_action :verify_policy_scoped, only: %i[show new create update destroy audience_preview send_campaign test_send cancel toggle_unsubscribe] # non-index actions use authorize
 
   def index
     campaigns = policy_scope(SoupCampaign).recent.includes(:created_by)
@@ -17,14 +17,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     authorize campaign
 
     if campaign.draft?
-      # Show projected audience (who would receive the campaign) before sending
-      projected_scope = User.verified.kept.where.not(slack_id: nil).order(:display_name)
-      pagy, projected_users = pagy(projected_scope, limit: 50, page: params[:rp], page_param: :rp)
-      recipients = projected_users.map do |u|
-        { id: u.id, slack_id: u.slack_id, display_name: u.display_name, status: "projected",
-          sent_at: nil, error_message: nil }
-      end
-      recipients_pagy = pagy_props(pagy)
+      recipients, recipients_pagy = paginate_projected_recipients(campaign.projected_recipients)
     else
       pagy, recipient_records = pagy(
         campaign.soup_campaign_recipients.order(created_at: :asc),
@@ -39,7 +32,8 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       recipients:,
       recipients_pagy:,
       stats: campaign.recipient_stats,
-      progress: campaign.progress_percent
+      progress: campaign.progress_percent,
+      audience_query_help: audience_query_help
     }
   end
 
@@ -74,6 +68,12 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       render inertia: "admin/soup_campaigns/edit", props: {
         campaign: serialize_campaign(campaign),
         yjs_state: campaign.yjs_state.present? ? Base64.strict_encode64(campaign.yjs_state) : nil,
+        audience_query_help: audience_query_help,
+        current_user_presence: {
+          id: current_user.id,
+          display_name: current_user.display_name,
+          avatar: current_user.avatar
+        },
         errors: campaign.errors.as_json
       }
     end
@@ -86,6 +86,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     render inertia: "admin/soup_campaigns/edit", props: {
       campaign: serialize_campaign(campaign),
       yjs_state: campaign.yjs_state.present? ? Base64.strict_encode64(campaign.yjs_state) : nil,
+      audience_query_help: audience_query_help,
       current_user_presence: {
         id: current_user.id,
         display_name: current_user.display_name,
@@ -111,8 +112,35 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       return
     end
 
+    preview_campaign = campaign.dup
+    preview_campaign.target_user_ids_text = campaign.target_query
+    if preview_campaign.errors.any?
+      redirect_to admin_soup_campaign_path(campaign), alert: preview_campaign.errors[:target_user_ids_text].first
+      return
+    end
+
     SendSoupCampaignJob.perform_later(campaign.id)
     redirect_to admin_soup_campaign_path(campaign), notice: "Campaign is now sending!"
+  end
+
+  def audience_preview
+    campaign = SoupCampaign.find(params[:id])
+    authorize campaign, :audience_preview?
+
+    preview_campaign = campaign.dup
+    preview_campaign.target_user_ids_text = params[:target_user_ids_text]
+
+    if preview_campaign.errors.any?
+      render json: { error: preview_campaign.errors[:target_user_ids_text].first }, status: :unprocessable_entity
+      return
+    end
+
+    recipients, recipients_pagy = paginate_projected_recipients(preview_campaign.projected_recipients)
+    render json: {
+      recipients: recipients,
+      recipients_pagy: recipients_pagy,
+      targeted: preview_campaign.targeted?
+    }
   end
 
   def test_send
@@ -124,8 +152,11 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
 
     # Use a real recipient token if this person is already a recipient, otherwise a no-op test token
     recipient = campaign.soup_campaign_recipients.find_by(slack_id: slack_id)
-    display_name = recipient&.display_name ||
-                   User.verified.kept.find_by(slack_id: slack_id)&.display_name
+    user = User.verified.kept.find_by(slack_id: slack_id)
+    personalization = {
+      name: recipient&.display_name&.split&.first || user&.display_name&.split&.first || "there",
+      total_time_logged_seconds: format_logged_hours(user&.total_time_logged_seconds)
+    }
     unsubscribe_token = recipient&.unsubscribe_token || "test-token"
     unsubscribe_url = soup_campaign_unsubscribe_url(
       token: unsubscribe_token,
@@ -135,8 +166,8 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
     client.chat_postMessage(
       channel: slack_id,
-      text: "[TEST] #{campaign.notification_preview.presence || campaign.body.gsub("{name}", (display_name&.split&.first || "there"))}",
-      blocks: build_test_blocks(campaign, unsubscribe_url, display_name).to_json
+      text: "[TEST] #{interpolate_campaign_text(campaign.notification_preview.presence || campaign.body, personalization)}",
+      blocks: build_test_blocks(campaign, unsubscribe_url, personalization).to_json
     )
 
     render json: { ok: true }
@@ -174,18 +205,18 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
   private
 
   def campaign_params
-    params.expect(soup_campaign: [ :name, :body, :footer, :unsubscribe_label, :image_url, :notification_preview ])
+    params.expect(
+      soup_campaign: [ :name, :body, :footer, :target_user_ids_text, :unsubscribe_label, :image_url, :notification_preview ]
+    )
   end
 
-  def build_test_blocks(campaign, unsubscribe_url, display_name = nil)
-    first_name = display_name&.split&.first || "there"
-
+  def build_test_blocks(campaign, unsubscribe_url, personalization)
     blocks = []
 
-    blocks << { type: "section", text: { type: "mrkdwn", text: "[TEST] #{campaign.body.gsub("{name}", first_name)}" } }
+    blocks << { type: "section", text: { type: "mrkdwn", text: "[TEST] #{interpolate_campaign_text(campaign.body, personalization)}" } }
 
     if campaign.footer.present?
-      blocks << { type: "section", text: { type: "mrkdwn", text: campaign.footer.gsub("{name}", first_name) } }
+      blocks << { type: "section", text: { type: "mrkdwn", text: interpolate_campaign_text(campaign.footer, personalization) } }
     end
 
     if campaign.image_url.present?
@@ -204,12 +235,24 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     blocks
   end
 
+  def interpolate_campaign_text(text, personalization)
+    text
+      .gsub("{name}", personalization[:name])
+      .gsub("{total_time_logged_seconds}", personalization[:total_time_logged_seconds].to_s)
+  end
+
+  def format_logged_hours(total_time_logged_seconds)
+    hours = (total_time_logged_seconds.to_i / 3600.0).round(1)
+    hours.to_i == hours ? hours.to_i : hours
+  end
+
   def serialize_campaign(campaign)
     {
       id: campaign.id,
       name: campaign.name,
       body: campaign.body,
       footer: campaign.footer,
+      target_user_ids_text: campaign.target_user_ids_text,
       unsubscribe_label: campaign.unsubscribe_label,
       image_url: campaign.image_url,
       notification_preview: campaign.notification_preview,
@@ -227,6 +270,15 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     }
   end
 
+  def audience_query_help
+    [
+      "ids: 1, 2, 3",
+      "qualified: true",
+      "has_ships: false",
+      "total_time_logged_seconds >= 72000"
+    ]
+  end
+
   def serialize_recipient(recipient)
     {
       id: recipient.id,
@@ -236,5 +288,38 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       sent_at: recipient.sent_at&.iso8601,
       error_message: recipient.error_message
     }
+  end
+
+  def paginate_projected_recipients(projected_recipients)
+    limit = 50
+    count = projected_recipients.count
+    pages = [ (count.to_f / limit).ceil, 1 ].max
+    page = params.fetch(:rp, 1).to_i
+    page = 1 if page < 1
+    page = pages if page > pages
+    offset = (page - 1) * limit
+
+    recipients = projected_recipients.slice(offset, limit).to_a.each_with_index.map do |recipient, index|
+      {
+        id: offset + index + 1,
+        slack_id: recipient[:slack_id],
+        display_name: recipient[:display_name],
+        status: "projected",
+        sent_at: nil,
+        error_message: nil
+      }
+    end
+
+    [
+      recipients,
+      {
+        count: count,
+        page: page,
+        limit: limit,
+        pages: pages,
+        next: page < pages ? page + 1 : nil,
+        prev: page > 1 ? page - 1 : nil
+      }
+    ]
   end
 end

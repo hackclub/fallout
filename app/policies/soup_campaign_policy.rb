@@ -7,6 +7,7 @@ class SoupCampaignPolicy < ApplicationPolicy
   def update? = admin? && record.draft?
   def edit? = update?
   def destroy? = admin? && record.draft?
+  def audience_preview? = admin? && record.draft?
   def send_campaign? = admin? && record.draft?
   def test_send? = admin?
   def cancel? = admin? && record.sending?

@@ -30,6 +30,7 @@ interface Campaign {
   name: string
   body: string
   footer: string
+  target_user_ids_text: string
   unsubscribe_label: string
   image_url: string
   notification_preview: string
@@ -54,6 +55,7 @@ interface Props {
   campaign: Campaign
   current_user_presence: CurrentUserPresence
   yjs_state: string | null
+  audience_query_help?: string[]
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -61,8 +63,17 @@ interface Props {
 const SOUP_AVATAR = 'https://avatars.slack-edge.com/2026-03-03/10620134255189_994e10cd91f0fc88ad9c_512.jpg'
 const DEFAULT_UNSUBSCRIBE_LABEL = 'Important program related announcement | Unsubscribe'
 const PREVIEW_NAME = 'Alex'
+const PREVIEW_TOTAL_TIME_LOGGED_HOURS = '20'
 const AUTOSAVE_DEBOUNCE_MS = 800
-const FIELDS = ['name', 'body', 'footer', 'unsubscribe_label', 'image_url', 'notification_preview'] as const
+const FIELDS = [
+  'name',
+  'body',
+  'footer',
+  'target_user_ids',
+  'unsubscribe_label',
+  'image_url',
+  'notification_preview',
+] as const
 type Field = (typeof FIELDS)[number]
 
 // ── Slack preview renderer ────────────────────────────────────────────────────
@@ -127,6 +138,12 @@ function inlineSlack(text: string): string {
     )
     .replace(/&lt;(https?:\/\/[^|&]+)\|([^&]+)&gt;/g, '<a href="$1" style="color:#1264a3;">$2</a>')
     .replace(/&lt;(https?:\/\/[^&]+)&gt;/g, '<a href="$1" style="color:#1264a3;">$1</a>')
+}
+
+function interpolatePreview(text: string): string {
+  return text
+    .replace(/\{name\}/g, PREVIEW_NAME)
+    .replace(/\{total_time_logged_seconds\}/g, PREVIEW_TOTAL_TIME_LOGGED_HOURS)
 }
 
 // ── Presence avatars ──────────────────────────────────────────────────────────
@@ -370,7 +387,7 @@ function SlackPreview({ fields }: { fields: Record<Field, string> }) {
           {body.trim() ? (
             <div
               className="text-[#d1d2d3] leading-relaxed [&_strong]:text-white [&_em]:italic [&_code]:bg-[#2c2d30] [&_code]:px-1 [&_code]:rounded [&_code]:font-mono [&_code]:text-xs [&_a]:text-[#1264a3] [&_a:hover]:underline mb-2"
-              dangerouslySetInnerHTML={{ __html: renderSlackMarkdown(body.replace(/\{name\}/g, PREVIEW_NAME)) }}
+              dangerouslySetInnerHTML={{ __html: renderSlackMarkdown(interpolatePreview(body)) }}
             />
           ) : (
             <p className="text-[#ababad] italic mb-2">Your message will appear here…</p>
@@ -378,7 +395,7 @@ function SlackPreview({ fields }: { fields: Record<Field, string> }) {
           {footer.trim() && (
             <div
               className="text-[#d1d2d3] leading-relaxed [&_a]:text-[#1264a3] mb-2"
-              dangerouslySetInnerHTML={{ __html: renderSlackMarkdown(footer.replace(/\{name\}/g, PREVIEW_NAME)) }}
+              dangerouslySetInnerHTML={{ __html: renderSlackMarkdown(interpolatePreview(footer)) }}
             />
           )}
           {image_url.trim() && (
@@ -406,7 +423,12 @@ function SlackPreview({ fields }: { fields: Record<Field, string> }) {
 
 // ── Main collaborative editor ─────────────────────────────────────────────────
 
-export default function SoupCampaignCollaborativeEditor({ campaign, current_user_presence, yjs_state }: Props) {
+export default function SoupCampaignCollaborativeEditor({
+  campaign,
+  current_user_presence,
+  yjs_state,
+  audience_query_help = [],
+}: Props) {
   const ydocRef = useRef<Y.Doc | null>(null)
   const awarenessRef = useRef<Awareness | null>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createConsumer>['subscriptions']['create']> | null>(null)
@@ -419,12 +441,15 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [peers, setPeers] = useState<PresenceUser[]>([])
   const [activeField, setActiveField] = useState<Field | null>(null)
+  const [audiencePreview, setAudiencePreview] = useState<{ count: number; targeted: boolean } | null>(null)
+  const [audiencePreviewError, setAudiencePreviewError] = useState('')
 
   // Live preview state driven by Yjs
   const [previewFields, setPreviewFields] = useState<Record<Field, string>>({
     name: campaign.name,
     body: campaign.body,
     footer: campaign.footer ?? '',
+    target_user_ids: campaign.target_user_ids_text ?? '',
     unsubscribe_label: campaign.unsubscribe_label,
     image_url: campaign.image_url ?? '',
     notification_preview: campaign.notification_preview ?? '',
@@ -448,6 +473,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
           doc.getText('name').insert(0, campaign.name)
           doc.getText('body').insert(0, campaign.body)
           doc.getText('footer').insert(0, campaign.footer ?? '')
+          doc.getText('target_user_ids').insert(0, campaign.target_user_ids_text ?? '')
           doc.getText('unsubscribe_label').insert(0, campaign.unsubscribe_label)
           doc.getText('image_url').insert(0, campaign.image_url ?? '')
           doc.getText('notification_preview').insert(0, campaign.notification_preview ?? '')
@@ -457,6 +483,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
         doc.getText('name').insert(0, campaign.name)
         doc.getText('body').insert(0, campaign.body)
         doc.getText('footer').insert(0, campaign.footer ?? '')
+        doc.getText('target_user_ids').insert(0, campaign.target_user_ids_text ?? '')
         doc.getText('unsubscribe_label').insert(0, campaign.unsubscribe_label)
         doc.getText('image_url').insert(0, campaign.image_url ?? '')
         doc.getText('notification_preview').insert(0, campaign.notification_preview ?? '')
@@ -467,6 +494,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
       doc.getText('name').insert(0, campaign.name)
       doc.getText('body').insert(0, campaign.body)
       doc.getText('footer').insert(0, campaign.footer ?? '')
+      doc.getText('target_user_ids').insert(0, campaign.target_user_ids_text ?? '')
       doc.getText('unsubscribe_label').insert(0, campaign.unsubscribe_label)
       doc.getText('image_url').insert(0, campaign.image_url ?? '')
       doc.getText('notification_preview').insert(0, campaign.notification_preview ?? '')
@@ -500,6 +528,33 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
     })
     return () => handlers.forEach(([yText, handler]) => yText.unobserve(handler))
   }, [ydoc])
+
+  useEffect(() => {
+    const query = previewFields.target_user_ids.trim()
+    const controller = new AbortController()
+    const timeout = setTimeout(() => {
+      fetch(`/admin/soup_campaigns/${campaign.id}/audience_preview?target_user_ids_text=${encodeURIComponent(query)}`, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      })
+        .then(async (response) => {
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error ?? 'Failed to load audience preview')
+          setAudiencePreview({ count: data.recipients_pagy.count, targeted: data.targeted })
+          setAudiencePreviewError('')
+        })
+        .catch((error: Error) => {
+          if (error.name === 'AbortError') return
+          setAudiencePreview(null)
+          setAudiencePreviewError(error.message)
+        })
+    }, 250)
+
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [campaign.id, previewFields.target_user_ids])
 
   // ── Autosave ────────────────────────────────────────────────────────────────
 
@@ -773,6 +828,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
                   ['_text_', 'italic'],
                   ['`code`', 'code'],
                   ['{name}', 'first name'],
+                  ['{total_time_logged_seconds}', 'logged hours'],
                 ].map(([sym, desc]) => (
                   <span key={sym}>
                     <code className="bg-muted px-1 py-0.5 rounded font-mono text-[10px]">{sym}</code>{' '}
@@ -807,6 +863,35 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
               onFocus={() => handleFieldFocus('footer')}
               onBlur={handleFieldBlur}
             />
+          </section>
+
+          <section>
+            <label className="text-sm font-semibold tracking-tight mb-1 block">Audience targeting</label>
+            <p className="text-xs text-muted-foreground mb-3">
+              Leave blank to send to the full Soup audience. Use one safe filter per line to target specific Fallout
+              users.
+            </p>
+            <CollabEditor
+              yText={ydoc.getText('target_user_ids')}
+              awareness={awareness}
+              placeholderText={'qualified: true\nhas_ships: false\ntotal_time_logged_seconds >= 72000'}
+              minHeight="6rem"
+              mono
+              onFocus={() => handleFieldFocus('target_user_ids')}
+              onBlur={handleFieldBlur}
+            />
+            {audience_query_help.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {audience_query_help.map((example) => (
+                  <code
+                    key={example}
+                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground"
+                  >
+                    {example}
+                  </code>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Image */}
@@ -865,10 +950,24 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Live preview</p>
               <p className="text-xs text-muted-foreground">
-                <code className="bg-muted px-1 py-0.5 rounded font-mono">{'{name}'}</code> → {PREVIEW_NAME}
+                <code className="bg-muted px-1 py-0.5 rounded font-mono">{'{name}'}</code> → {PREVIEW_NAME} ·{' '}
+                <code className="bg-muted px-1 py-0.5 rounded font-mono">{'{total_time_logged_seconds}'}</code> →{' '}
+                {PREVIEW_TOTAL_TIME_LOGGED_HOURS}
               </p>
             </div>
             <SlackPreview fields={previewFields} />
+            <div className="rounded-lg border bg-background p-3 text-sm">
+              <p className="font-medium">Audience preview</p>
+              {audiencePreviewError ? (
+                <p className="mt-1 text-xs text-destructive">{audiencePreviewError}</p>
+              ) : audiencePreview ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {audiencePreview.count} {audiencePreview.targeted ? 'targeted users' : 'full-audience recipients'}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">Loading audience preview…</p>
+              )}
+            </div>
             {activeField && (
               <p className="text-xs text-muted-foreground text-center">
                 Editing <span className="font-medium">{activeField.replace('_', ' ')}</span>
