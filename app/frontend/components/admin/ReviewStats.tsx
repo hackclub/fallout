@@ -75,30 +75,22 @@ function renderCard(key: ReviewStatKey, stats?: ReviewStats) {
     case 'turnaround': {
       const t = stats?.turnaround
       return (
-        <StatCard key={key} label="P90 Turnaround (7d)" description="90th-percentile wait time for reviewed projects">
+        <StatCard key={key} label="P90 Turnaround (7d)" description="90th-pct wait, includes pending backlog">
           <TooltipProvider>
             <span>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="cursor-default">{fmtDays(t?.ship_days ?? null)}</span>
                 </TooltipTrigger>
-                <TooltipContent>This ship</TooltipContent>
+                <TooltipContent>
+                  <div>90% of reviews wait less than this, from ship submission.</div>
+                  <div>Still-pending reviews count by their current wait, so a backlog shows up here.</div>
+                  {t?.cycle_days != null && <div className="mt-1">From cycle start: {t.cycle_days.toFixed(1)}d</div>}
+                </TooltipContent>
               </Tooltip>
               {t && (
                 <span className="ml-1 align-middle">
                   <DeltaChevron delta={t.ship_delta} better="down" unit="d" />
-                </span>
-              )}
-              <span className="text-muted-foreground"> / </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="cursor-default text-muted-foreground">{fmtDays(t?.cycle_days ?? null)}</span>
-                </TooltipTrigger>
-                <TooltipContent>This cycle</TooltipContent>
-              </Tooltip>
-              {t && (
-                <span className="ml-1 align-middle">
-                  <DeltaChevron delta={t.cycle_delta} better="down" unit="d" />
                 </span>
               )}
               {t && (

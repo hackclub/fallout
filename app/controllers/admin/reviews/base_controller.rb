@@ -421,35 +421,48 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   end
 
   def stat_turnaround(model, completion_col, current_window, prior_window)
-    current = turnaround_for_window(model, completion_col, current_window)
-    prior = turnaround_for_window(model, completion_col, prior_window)
+    # as_of = the window's trailing edge: pending reviews are counted by their wait
+    # as of that instant, so current vs prior compare like-for-like snapshots.
+    current = turnaround_for_window(model, completion_col, current_window, current_window.end)
+    prior = turnaround_for_window(model, completion_col, prior_window, prior_window.end)
     ship_delta = (current[:ship_days] && prior[:ship_days]) ? (current[:ship_days] - prior[:ship_days]).round(1) : nil
     cycle_delta = (current[:cycle_days] && prior[:cycle_days]) ? (current[:cycle_days] - prior[:cycle_days]).round(1) : nil
     current.merge(ship_delta: ship_delta, cycle_delta: cycle_delta)
   end
 
   # Returns { ship_days:, cycle_days:, count: } where ship_days/cycle_days are the
-  # P90 (90th percentile) turnaround, not the mean — the mean is dragged down by
-  # the bulk of fast reviews and hides the long-tail waits we actually care about.
-  # Pluck (completion_at, ship_id) instead of loading full review rows — review
-  # tables carry a jsonb annotations column we don't need here. Ships are loaded
-  # once by id and run through Ship.preload_cycle_started_at to hit the shared cache.
+  # P90 (90th percentile) wait, not the mean — the mean is dragged down by the bulk
+  # of fast reviews and hides the long tail we care about. Reviews still WAITING at
+  # `as_of` are included, counted by their wait up to that instant, so a growing
+  # backlog pushes the number up instead of staying invisible until the slow reviews
+  # finally complete. P90 makes this safe: fresh pending reviews land at the bottom
+  # of the distribution and can't drag it down — only genuinely old ones move it.
   #
-  # Status filter uses the positive set (decided enum values) so Postgres can hit
-  # the status index directly instead of NOT-IN'ing pending+cancelled.
-  def turnaround_for_window(model, completion_col, window)
+  # Pluck (timestamp, ship_id) instead of loading full review rows — review tables
+  # carry a jsonb annotations column we don't need here. Ships are loaded once by id
+  # and run through Ship.preload_cycle_started_at to hit the shared cache.
+  def turnaround_for_window(model, completion_col, window, as_of)
     decided = [ model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected] ]
-    pairs = model.where(completion_col => window)
+    rows = model.where(completion_col => window)
       .where(status: decided)
       .pluck(completion_col, :ship_id)
-    return { ship_days: nil, cycle_days: nil, count: 0 } if pairs.empty?
 
-    ships_by_id = Ship.where(id: pairs.map(&:last).uniq).index_by(&:id)
+    # Reviews not yet decided at `as_of` (still pending then), measured up to `as_of`.
+    # Excludes cancelled — those are system-driven supersessions, not real waits.
+    col = model.arel_table[completion_col]
+    model.where.not(status: model.statuses[:cancelled])
+      .where(model.arel_table[:created_at].lteq(as_of))
+      .where(col.eq(nil).or(col.gt(as_of)))
+      .pluck(:ship_id)
+      .each { |ship_id| rows << [ as_of, ship_id ] }
+    return { ship_days: nil, cycle_days: nil, count: 0 } if rows.empty?
+
+    ships_by_id = Ship.where(id: rows.map(&:last).uniq).index_by(&:id)
     Ship.preload_cycle_started_at(ships_by_id.values)
 
     ship_secs = []
     cycle_secs = []
-    pairs.each do |completed, ship_id|
+    rows.each do |completed, ship_id|
       ship = ships_by_id[ship_id]
       next unless ship && completed
       ship_secs << completed - ship.created_at
@@ -496,8 +509,10 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   end
 
   def stat_reship_ratio(model, completion_col, current_window, prior_window)
-    current = reship_ratio_for_window(model, completion_col, current_window)
-    prior = reship_ratio_for_window(model, completion_col, prior_window)
+    # as_of = the window's trailing edge: still-pending reviews are snapshotted there
+    # so current vs prior compare like-for-like (see #reship_ratio_for_window).
+    current = reship_ratio_for_window(model, completion_col, current_window, current_window.end)
+    prior = reship_ratio_for_window(model, completion_col, prior_window, prior_window.end)
     delta = (current[:percent] && prior[:percent]) ? (current[:percent] - prior[:percent]).round(1) : nil
     current.merge(delta: delta)
   end
@@ -506,19 +521,28 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   # Approved siblings are excluded — a follow-on after a clean approval is a new
   # cycle, not a "redo" of a failed attempt.
   #
+  # Reviews still pending at `as_of` are included: reship is knowable at submission,
+  # so the waiting backlog counts toward the ratio rather than waiting on review.
+  #
   # Two simple counts (total + reships-with-EXISTS) rather than one COUNT FILTER —
   # keeps the AR-pluck path straightforward and avoids the same Arel.sql-aggregate
   # pitfall that silently zeroed the approval ratio.
-  def reship_ratio_for_window(model, completion_col, window)
+  def reship_ratio_for_window(model, completion_col, window, as_of)
     decided = [ model.statuses[:approved], model.statuses[:returned], model.statuses[:rejected] ]
-    scope = model.joins(:ship)
+    col = model.arel_table[completion_col]
+    decided_scope = model.joins(:ship)
       .where(model.table_name => { completion_col => window })
       .where(status: decided)
+    # Not yet decided at `as_of`; excludes cancelled (system-driven supersessions).
+    pending_scope = model.joins(:ship)
+      .where.not(status: model.statuses[:cancelled])
+      .where(model.arel_table[:created_at].lteq(as_of))
+      .where(col.eq(nil).or(col.gt(as_of)))
 
-    total = scope.count
+    total = decided_scope.count + pending_scope.count
     return { percent: nil, count: 0 } if total.zero?
 
-    reships = scope.where(<<~SQL.squish, returned: Ship.statuses[:returned], rejected: Ship.statuses[:rejected]).count
+    reship_exists = <<~SQL.squish
       EXISTS (
         SELECT 1 FROM ships s2
         WHERE s2.project_id = ships.project_id
@@ -526,6 +550,8 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
           AND s2.status IN (:returned, :rejected)
       )
     SQL
+    binds = { returned: Ship.statuses[:returned], rejected: Ship.statuses[:rejected] }
+    reships = decided_scope.where(reship_exists, binds).count + pending_scope.where(reship_exists, binds).count
 
     { percent: ((reships.to_f / total) * 100).round(1), count: total }
   end
