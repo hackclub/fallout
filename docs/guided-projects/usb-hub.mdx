@@ -1,4 +1,4 @@
-﻿| title | USB Hub |
+| title | USB Hub |
 | description | Guided Project by @Rudy |
 | --- | --- |
 
@@ -360,7 +360,7 @@ So for each downstream USB-C port, place a **56 kΩ resistor** on the CC1 and 
 
 If you’ve followed all these steps, your schematic should now look clean and complete, with all power, data, and control signals properly connected.
 
-![img](/docs-assets/guided-projects/usb-hub/img-20260214142839.webp)
+![img](/docs-assets/guided-projects/usb-hub/zen_FFMfDI7HfY.webp)
 
 We’re almost done! The last little piece to add is **capacitors**, specifically **decoupling capacitors**.
 
@@ -376,7 +376,7 @@ Basically, each decoupling capacitor will have **one end connected to the power 
 
 A little schematic etiquette tip: **power flags should point up** and **ground flags should point down**. To keep things tidy, place your decoupling capacitors following this convention, power end toward the +5 V flag and ground end toward the GND flag. This makes the schematic easier to read and visually consistent.
 
-![img](/docs-assets/guided-projects/usb-hub/img-20260214143138.webp)
+![img](/docs-assets/guided-projects/usb-hub/zen_At1Ew0Cgyv_1.webp)
 
 For the IC’s internal supply pins, **VDD33** (3.3 V) and **VDD18** (1.8 V), we’ll add **two capacitors each**: a **1 µF** and a **100 nF**. Both act as decoupling capacitors, but the smaller **100 nF capacitor reacts faster** to sudden voltage spikes, making it great for filtering high-frequency noise.
 
@@ -386,7 +386,7 @@ We’ll do the same thing for the **VDD5** pin: a 1 µF and a 100 nF capacit
 
 Here’s roughly what your completed schematic should look like at the end: all power rails, ground connections, data lines, pull-up/pull-down resistors, and decoupling capacitors in place, with clean left-to-right flow from the upstream port through the IC to the downstream ports. Everything should be neatly labeled and easy to read, ready for the PCB stage.
 
-![img](/docs-assets/guided-projects/usb-hub/img-20260214143300.webp)
+![img](/docs-assets/guided-projects/usb-hub/zen_nKM5G6KMHf.webp)
 
 And just like that, **schematics complete!** :D
 
@@ -422,7 +422,7 @@ Good layout starts with intention. Take a moment and think about what you actual
 
 This is your project. Give it some personality. Maybe it’s a fun shape. Maybe it’s something you can turn into a keychain. Maybe it’s completely ridiculous in the best possible way. I’m turning mine into a small keychain shaped board, but you’re absolutely encouraged to design something wild.
 
-If you want to go further and experiment with more advanced outlines, like silhouettes or detailed drawings, you can import custom shapes using DXF files. You can get surprisingly creative with PCB outlines.
+If you want to go further and experiment with more advanced outlines, like silhouettes or detailed drawings, check out this little side guide on creating custom board shapes. You can get surprisingly creative with PCB outlines.
 
 #### Custom Board Outlines
 

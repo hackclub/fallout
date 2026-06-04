@@ -502,7 +502,7 @@ if Rails.env.development?
     reviewer = active_reviewers.sample(random: rng)
     { ship_id: ship_ids[i], reviewer_id: reviewer.id,
       status: dr_statuses.sample(random: rng),
-      created_at: dr_ts, updated_at: dr_ts }
+      completed_at: dr_ts, created_at: dr_ts, updated_at: dr_ts }
   end
 
   # 3 pending design reviews (no reviewer assigned yet), with varied TA-approved hours so sort works

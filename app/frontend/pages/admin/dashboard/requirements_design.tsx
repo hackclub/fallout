@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { usePage, Link, router } from '@inertiajs/react'
 import AdminLayout from '@/layouts/AdminLayout'
@@ -193,6 +193,8 @@ function ReviewerProfileCard({
 
 export default function RequirementsDesignDashboard() {
   const { leaderboard, totals, reviewer_profiles, non_reviewer_channel_members } = usePage<Props>().props
+  const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
+  const isAdmin = admin_permissions?.is_admin ?? false
 
   const [dmStates, setDmStates] = useState<Record<number, Date | null>>(() => {
     const result: Record<number, Date | null> = {}
@@ -352,16 +354,19 @@ export default function RequirementsDesignDashboard() {
                   )}
                   <span>{member.display_name}</span>
                 </Link>
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.patch(`/admin/users/${member.id}/toggle_reviewer_suggestion`, {}, { preserveScroll: true })
-                  }
-                  title="Exclude from suggestions"
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <X className="size-3" />
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.patch(`/admin/users/${member.id}/toggle_reviewer_suggestion`, {}, { preserveScroll: true })
+                    }
+                    title="Exclude from suggestions"
+                    aria-label="Exclude from suggestions"
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
