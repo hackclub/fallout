@@ -179,6 +179,8 @@ Shared by all 4 review types. Provides:
 
 Each review's `Policy#update?` requires `record.pending? && (admin? || active_claimer?)`. `active_claimer?` checks `record.claimed_by?(user)` — i.e., not just `reviewer_id` match, but a non-expired claim. **Updates without an active claim fail authorization** — heartbeat is what keeps the claim alive.
 
+**Reviewer attribution invariant**: any review reaching `approved/returned/rejected` must carry a non-NULL `reviewer_id`. The claim system normally sets it on page load, but `ExpireStaleReviewClaimsJob` can clear it between page load and submit (and admins can submit without an active claim). To guarantee attribution, controllers set `@review.finalizing_user = current_user` before `#update`; `Reviewable#stamp_finalizing_reviewer` (before_update) backfills `reviewer_id` only when blank, preserving the original claimer when one exists. Cancellations are intentionally excluded — `cancel_pending_reviews!` is system-driven and has no reviewer.
+
 ### Heartbeat & Skip Flow
 
 - `POST /admin/reviews/:type/:id/heartbeat` — extends claim by 5min if `claimed_by?(current_user)`. Returns JSON `{ok, expires_at}` or 409 `claim_lost`.

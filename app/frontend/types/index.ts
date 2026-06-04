@@ -392,6 +392,7 @@ export interface ReviewRow {
   sibling_approved: boolean
   requirements_check_reviewer_display_name: string | null
   previously_reviewed_by_me: boolean
+  approved_public_hours: number | null
 }
 
 export interface TimeAuditReviewDetail {

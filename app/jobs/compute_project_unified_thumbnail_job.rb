@@ -13,9 +13,12 @@ class ComputeProjectUnifiedThumbnailJob < ApplicationJob
   # Serialize per project so concurrent triggers (ship approval + repo_link edit) don't
   # race on the same attachment. Duration is the abandon-the-lock timeout — generous
   # because libvips PDF rasterization plus HTTP timeouts can take ~30s in the worst case.
-  limits_concurrency to: 1, key: ->(project_id) { "unified_thumbnail:#{project_id}" }, duration: 5.minutes
+  limits_concurrency to: 1, key: ->(project_id, *) { "unified_thumbnail:#{project_id}" }, duration: 5.minutes
 
-  def perform(project_id)
+  # source_url: when a caller already discovered the zine URL (e.g. preflight reusing its
+  # repo tree), pass it to skip the finder entirely. force/allow_representative are forwarded
+  # to the finder when we do have to look it up.
+  def perform(project_id, source_url: nil, force: false, allow_representative: true)
     return if Rails.cache.read(PAUSE_CACHE_KEY)
 
     project = Project.find_by(id: project_id)
@@ -32,7 +35,7 @@ class ComputeProjectUnifiedThumbnailJob < ApplicationJob
       return
     end
 
-    source_url = ShipChecks::UnifiedScreenshotFinder.find_url(project)
+    source_url ||= ShipChecks::UnifiedScreenshotFinder.find_url(project, force: force, allow_representative: allow_representative)
 
     if source_url.present?
       refresh_from_source(project, source_url)

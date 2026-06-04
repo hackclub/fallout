@@ -119,9 +119,50 @@ Most symbols won't label every pin with its function (SDA, SCL, MOSI, etc.) They
 
 **Now, for this tutorial, I will create the base Tamagotchi. Spice your own Tamagotchi up more than this one! Add some flavor!**
 
-I then connect GND to GND, 5V to +5V, 3V3 to and BAT to + as shown below:
+I then connect GND to GND, 5V to +5V, +3V3 to 3V3, and BAT to +BATT as shown below:
 
 ![Power connections](https://files.catbox.moe/kgmyi6.png)
+
+## What is 5V? What is GND? What is 3V3?
+
+> #### What "ground" actually means here
+>
+> Ground is the **reference point** for the entire circuit.
+> Think of it as the **zero level** that everything else is measured against.
+>
+> - Voltage is always measured **relative to ground**.
+> - Current flows **from power, through components, back to ground**.
+> - Without ground, the circuit has **no return path**, so nothing works.
+>
+> Ground isn't "negative energy"; it's simply the **other side of the loop**.
+>
+> [Check this for more information!](https://www.build-electronic-circuits.com/what-is-ground/)
+>
+> Additionally, here's some ground!
+>
+> ![grass](https://cdn.hackclub.com/019d1727-e9bb-75dc-87a9-4cf6c6538862/image.png)
+>
+> #### What voltage is, and why it matters
+>
+> Voltage is the **electrical pressure** that pushes electrons through the circuit.
+>
+> - Higher voltage = stronger push
+> - Lower voltage = weaker push
+>
+> Voltage matters because every component is designed to operate within a certain range.
+>
+> [Check this for more information!](https://battlebornbatteries.com/what-are-volts/?srsltid=AfmBOoq2a-NWzu9QzU4y2rCSIqEydhqyE-QsEUiqbilRdl8T43YO8uKB)
+>
+> ![low-voltage](https://cdn.hackclub.com/019d1727-ec23-73ad-9ac5-0373f6347d5d/image.png)
+>
+> #### 5V vs 3V3, why two rails?
+>
+> The XIAO exposes two voltage rails: **5V** and **3V3**.
+>
+> - **5V** is powered by USB-C. When running on battery, the LiPo only outputs ~3.7V, not enough to supply this pin, so it gets no power.
+> - **3V3** is a stable 3.3V generated on-board, available whether you're on USB or battery.
+>
+> Most components, the OLED, sensors, logic pins, are rated for **3.3V**, so connect them to 3V3. Too much voltage means too much current, which damages components.
 
 **Why didn't I connect the top pads?**
 
@@ -367,6 +408,12 @@ You may also notice that similar to the buttons, the pin numbers are wrong accor
 ![Footprints](https://files.seeedstudio.com/wiki/XIAO_WiFi/back-label-6.png)
 
 Fix the pin numbers to match. Keep in mind that the footprint is mirrored, so if it helps, temporarily move it to the back layer so it is orientated the same way as the diagram.
+
+Here are some useful diagrams!
+
+![](https://cdn.hackclub.com/019e9092-784f-741c-8e92-4dabde84ffb6/image.png)
+
+![](https://cdn.hackclub.com/019e9092-573a-7d08-a428-c32b4c5da3f0/image.png)
 
 Here is the final result:
 

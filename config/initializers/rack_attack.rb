@@ -73,6 +73,14 @@ class Rack::Attack
     end
   end
 
+  # Zine cover refresh — owner-only + policy-gated, but throttled because each request triggers
+  # a GitHub API scan. User-scoped (falls back to IP).
+  throttle("refresh_cover/user", limit: 6, period: 1.minute) do |req|
+    if req.path.match?(%r{\A/projects/\d+/refresh_cover\z}) && req.post?
+      req.env["warden"]&.user&.id&.to_s || req.ip
+    end
+  end
+
   # Block suspicious requests
   blocklist("block suspicious requests") do |req|
     # Block requests with suspicious user agents

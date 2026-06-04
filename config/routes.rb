@@ -81,6 +81,7 @@
 #                       update_streak_day_admin_user PATCH  /admin/users/:id/update_streak_day(.:format)                                                  admin/users#update_streak_day
 #                     restore_streak_goal_admin_user PATCH  /admin/users/:id/restore_streak_goal(.:format)                                                admin/users#restore_streak_goal
 #                              update_ban_admin_user PATCH  /admin/users/:id/update_ban(.:format)                                                         admin/users#update_ban
+#              toggle_reviewer_suggestion_admin_user PATCH  /admin/users/:id/toggle_reviewer_suggestion(.:format)                                         admin/users#toggle_reviewer_suggestion
 #                              admin_activity_checks POST   /admin/activity_checks(.:format)                                                              admin/activity_checks#create
 #                           new_admin_activity_check GET    /admin/activity_checks/new(.:format)                                                          admin/activity_checks#new
 #                          refresh_admin_hours_stats POST   /admin/hours_stats/refresh(.:format)                                                          admin/hours_stats#refresh
@@ -405,6 +406,7 @@ Rails.application.routes.draw do
           patch :update_streak_day # Admin streak day status override
           patch :restore_streak_goal # Admin streak goal restore (fills blank/missed days with frozen)
           patch :update_ban # Admin ban/unban — admin-only
+          patch :toggle_reviewer_suggestion # Exclude/include from "Not Yet a Reviewer" list
         end
       end
       resources :activity_checks, only: [ :new, :create ]
@@ -460,6 +462,7 @@ Rails.application.routes.draw do
   end
 
   get "up" => "rails/health#show", as: :rails_health_check
+
 
   root "landing#index"
 
@@ -524,6 +527,8 @@ Rails.application.routes.draw do
   resources :projects do
     get "onboarding", on: :collection # Project onboarding modal accessed from path page
     get :export_journal, on: :member
+    post :refresh_cover, on: :member # Owner-triggered zine cover re-check (then polled via cover_status)
+    get :cover_status, on: :member # Polled by the frontend for cover refresh state
     resources :journal_entries, only: [ :new, :create ]
     resources :collaboration_invites, only: [ :create, :destroy ], module: :projects # Send and revoke project collaboration invites
     get :ship, controller: "projects/ships", action: :preflight # /projects/:id/ship — multi-step submission page

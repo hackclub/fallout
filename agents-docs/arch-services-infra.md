@@ -120,12 +120,12 @@ Outbound sync for Users, Projects, ShopOrders, Ships, and the four review types 
 
 3. `AttachShipUnifiedScreenshotJob` — slow path. Finds a source URL via `ShipChecks::UnifiedScreenshotFinder` (four-stage strategy below), caches it on `ship.frozen_screenshot`, processes via `ShipChecks::UnifiedScreenshotProcessor` (libvips → JPEG, progressive quality reduction until ≤5MB; supports PNG/JPG/WEBP/GIF + PDF rendered through libpoppler-glib8), then POSTs the bytes to `https://content.airtable.com/v0/{base}/{recordId}/Screenshot/uploadAttachment` via `AirtableSync.upload_attachment!`. The job retries with `wait: 15.seconds, attempts: 8` if the parallel upload job hasn't yet created the Airtable record (no airtable_id in `AirtableSync`). After a successful attachment, writes a sentinel `AirtableSync` row keyed `"Ship#<id>/unified/screenshot"` so retries skip — `uploadAttachment` *appends* to the field array, so a repeat would duplicate the screenshot. SVG sources are still skipped (would require librsvg).
 
-`UnifiedScreenshotFinder` strategy, in priority order:
+`UnifiedScreenshotFinder.find_url(project, ctx: nil, allow_representative: true, force: false)` strategy, in priority order. Callers can pass an already-built `SharedContext` via `ctx:` to avoid re-fetching the repo tree / re-running vision descriptions (preflight does this); `allow_representative: false` restricts to real zines (skips stage 4); `force: true` busts the cache. Results are cached 6h keyed by `[project.id, updated_at, allow_representative]` with `skip_nil: true`, so a "no zine" outcome is **not** cached and a later-added zine is found on the next check.
 
 1. **Filename regex over the repo tree** — `zine|poster|flyer|magazine|page` + image/PDF extension. Fast, no LLM.
 2. **LLM filter over the repo tree** — list every image/PDF file in the tree (regardless of name) and ask the LLM which is the zine. Catches zines named "submission.pdf", "{project}.png", etc. Cheap text-only call over filenames.
 3. **LLM search of README images** — reuses the descriptions already memoized for `HasZinePage`, asks the LLM if any image is a zine.
-4. **Fallback when no zine exists** — LLM picks the best representative project image from the README (entire assembly, finished build on a desk, etc.) so the YSWS row still gets a usable screenshot.
+4. **Fallback when no zine exists (only when `allow_representative: true`)** — LLM picks the best representative project image from the README (entire assembly, finished build on a desk, etc.) so the YSWS row still gets a usable screenshot. The on-demand cover button and preflight piggyback pass `allow_representative: false`, so this fallback is ship-approval-only.
 
 No HCB API code is touched — Fallout only pushes data into the YSWS table; downstream YSWS automation handles any actual money flow.
 

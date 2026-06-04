@@ -2,7 +2,7 @@ class ProjectsController < ApplicationController
   allow_unauthenticated_access only: %i[show] # Listed project details are public from Explore and the public API.
   allow_trial_access only: %i[index show new create edit update destroy onboarding export_journal] # Trial users can manage their single project and export their journal
   skip_onboarding_redirect only: %i[show] # Public project details must stay viewable before account onboarding.
-  before_action :set_project, only: %i[show edit update destroy export_journal]
+  before_action :set_project, only: %i[show edit update destroy export_journal refresh_cover cover_status]
   before_action :set_project_unfurl_meta, only: :show
 
   def onboarding
@@ -87,6 +87,7 @@ class ProjectsController < ApplicationController
         share: project_policy.share?, # Gates the "Copy share link" overflow menu item — true only for listed, non-discarded projects
         ship: project_policy.ship?,
         manage_collaborators: collab_enabled && project_policy.manage_collaborators?,
+        refresh_cover: project_policy.refresh_cover?, # Gates the owner-only "Check for my zine" cover action
         # JournalEntriesController only allows trial access on :preview — exclude trial users so they fall through to the locked button below.
         create_journal_entry: !current_user&.trial? && JournalEntryPolicy.new(current_user, @project.journal_entries.build(user: current_user)).create?,
         # Trial owner or trial collaborator who would gain create access on verifying — drives the "locked" feather button with a verify prompt.
@@ -210,11 +211,46 @@ class ProjectsController < ApplicationController
               disposition: "attachment"
   end
 
+  def refresh_cover
+    authorize @project, :refresh_cover?
+    since = Time.current
+    # force: bust the 6h finder cache so a freshly added zine is picked up now.
+    # allow_representative: false — the button only sets a cover when a real zine is found.
+    ComputeProjectUnifiedThumbnailJob.perform_later(@project.id, force: true, allow_representative: false)
+    # iso8601(6): keep microsecond precision so cover_status can't read a concurrent job's same-second
+    # checked_at write as "already finished" and resolve before this forced scan runs.
+    render json: { since: since.iso8601(6) }
+  end
+
+  def cover_status
+    authorize @project, :refresh_cover?
+    checked_at = @project.unified_thumbnail_checked_at
+    since = begin
+      Time.iso8601(params[:since].to_s)
+    rescue ArgumentError, TypeError
+      nil
+    end
+    # The job always advances unified_thumbnail_checked_at, so checked_at moving past the POST
+    # time means the scan finished — attached? then tells us whether a zine was found.
+    state =
+      if since && (checked_at.nil? || checked_at <= since)
+        "working"
+      elsif @project.unified_thumbnail.attached?
+        "found"
+      else
+        "none"
+      end
+    render json: {
+      state: state,
+      unified_thumbnail_url: state == "found" ? url_for(@project.unified_thumbnail) : nil
+    }
+  end
+
   private
 
   def set_project
     scope = Project.kept
-    scope = scope.includes(:user, unified_thumbnail_attachment: :blob) if action_name == "show"
+    scope = scope.includes(:user, unified_thumbnail_attachment: :blob) if %w[show cover_status].include?(action_name)
     @project = scope.find(params[:id])
   end
 

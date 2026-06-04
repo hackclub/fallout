@@ -61,7 +61,11 @@ module ShipChecks
       # local network is an SSRF signal, not a configuration we forgive.
       return nil if ips.size != addrs.size
 
-      ips.first.to_s
+      # Prefer IPv4 when the host resolves to both families. We pin a single IP for SSRF safety
+      # (Net::HTTP#ipaddr=), which disables Happy-Eyeballs fallback — so on networks with broken or
+      # partial IPv6 routing, an IPv6-first pick would fail to connect even though IPv4 works. Every
+      # address is already validated above, so preferring IPv4 doesn't change the security posture.
+      (ips.find(&:ipv4?) || ips.first).to_s
     end
 
     def self.safe_ipaddr(raw)

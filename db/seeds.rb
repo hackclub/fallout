@@ -57,7 +57,7 @@ if Rails.env.development?
   # Identified by the exact display names the tests hardcode — narrow enough that real users
   # (HCA-authenticated, type=nil) can never match. destroy_all cascades through dependent: :destroy
   # on projects, journal entries, ships, koi_transactions, etc.
-  fixture_users = User.where(type: "TrialUser", display_name: [ "Unified Tester", "Project Tester" ])
+  fixture_users = User.where(type: "TrialUser", display_name: [ "Unified Tester", "Project Tester", "Refresh Tester" ])
   purged_count = fixture_users.count
   if purged_count.positive?
     # FeaturedProject's FK to projects is non-cascading by design (we want hard project deletes
@@ -67,199 +67,350 @@ if Rails.env.development?
     puts "Purged #{purged_count} legacy test-fixture users (cascaded to their projects)"
   end
 
-  # --- Demo dataset --------------------------------------------------------
-  # Heal legacy broken avatars left behind by system specs, then create a
-  # curated set of full users + diverse projects + journal entries so the
-  # bulletin board / explore feed / admin dashboards have realistic content.
-  # Idempotent: re-running only fills gaps. Pictures come from picsum.photos
-  # (deterministic seed → stable image across runs).
-  require "open-uri"
+  # --- Realistic demo dataset ----------------------------------------------
+  # Curated full users + real open-source hardware projects (genuine repo links and
+  # real cover photos pulled from each repo's README) + hand-written multi-entry build
+  # journals, so the bulletin board / explore feed / admin dashboards show authentic
+  # content. Covers download through UnifiedScreenshotProcessor (SSRF-safe, IPv4-
+  # preferring, transcoded to JPEG) — the same path the live cover pipeline uses.
+  # Idempotent: existing demo projects are left untouched; delete a demo user to rebuild it.
+  demo = [
+    { first: "Maya", last: "Lindqvist", hours: 34,
+      name: "Lily58 Split Keyboard",
+      description: "A 58-key column-staggered split keyboard built to end my wrist pain. Hand-soldered SMD diodes, QMK firmware with a custom layer-based keymap, and a 3D-printed tenting case.",
+      repo_link: "https://github.com/kata0510/Lily58",
+      tags: %w[keyboard ergonomics qmk],
+      cover: "https://user-images.githubusercontent.com/6285554/84393842-13960900-ac37-11ea-811e-65db2948ca73.jpg",
+      journal: [
+        "Finally committing to a split keyboard — my wrists have had enough. Ordered the Lily58 PCBs from JLCPCB and a set of Kailh Choc browns. Now the long wait for shipping.",
+        "PCBs arrived! Spent tonight soldering the diodes — 58 of them, all SMD. My hands are cramping but the joints look clean under the loupe. Tweezers plus a flux pen is the only way to stay sane.",
+        "Pro Micro flashed with QMK and the left half is alive. Three columns were dead — turned out I'd bridged two diode pads. Reflowed them and we're back to 100%.",
+        "Wrote my first custom keymap with a symbol layer and arrows on the thumb cluster. Took an evening to stop fat-fingering it, but my typing speed is already creeping back up.",
+        "Printed a tenting case in TPU and glued on rubber feet. It's done — typed this whole entry on it. The split angle is a revelation. Writing up a parts list for anyone else considering the jump."
+      ] },
+    { first: "Diego", last: "Herrera", hours: 41,
+      name: "Sofle Keyboard",
+      description: "A split keyboard with rotary encoders and per-half OLED displays. Hot-swap sockets, RGB underglow, and an acrylic case stack. KiCad sources and a QMK keymap.",
+      repo_link: "https://github.com/josefadamcik/SofleKeyboard",
+      tags: %w[keyboard split-keyboard kicad],
+      cover: "https://raw.githubusercontent.com/josefadamcik/SofleKeyboard/HEAD/Images/IMG_20191104_202757.jpg",
+      journal: [
+        "Starting a Sofle — it's like a Lily58 but with rotary encoders and OLED screens, which sold me instantly. Pulled the KiCad files and sent them off to PCBWay.",
+        "Hot-swap sockets soldered. I went with Kailh hotswap so I can change switches later without desoldering — past me always regrets soldering switches directly.",
+        "OLED displays wired up and showing a WPM counter. Watching my words-per-minute tick up in real time is weirdly motivating. The encoder is mapped to volume for now.",
+        "Underglow RGB is in. Spent way too long picking an animation in QMK — settled on a slow rainbow I'll probably turn off in a week. Worth it.",
+        "Final assembly: acrylic case stack, brass standoffs, o-ring dampened switches. The typing sound is chef's kiss. Calling this one shipped."
+      ] },
+    { first: "Priya", last: "Nair", hours: 28,
+      name: "Skeletyl 36-Key",
+      description: "A low-profile, column-staggered 36-key split keyboard from the Bastard Keyboards family. Matte PETG unibody case, Elite-C controllers, per-key RGB, home-row mods.",
+      repo_link: "https://github.com/bastardkb/skeletyl",
+      tags: %w[keyboard 3d-printing split-keyboard],
+      cover: "https://raw.githubusercontent.com/bastardkb/skeletyl/HEAD/pics/unibody.jpg",
+      journal: [
+        "My next board should be tiny. The Skeletyl's 36-key layout looks intimidating but everyone says you adapt fast. Printing the unibody case in matte black PETG.",
+        "Case came off the printer with minimal stringing after I dropped the temp 5°C. Test-fit the PCB and the standoffs line up perfectly — Bastard Keyboards did their tolerance homework.",
+        "Soldered the Elite-C and the per-key RGB. One corner LED is stuck blue — chasing down whether it's the LED or a cold joint on the data line tomorrow.",
+        "Found it: cold joint on the DIN pad of the dead LED. Reflowed and the whole chain lights up now. 90% of keyboard bugs really are just solder joints.",
+        "36 keys felt impossible for two days and now I can't imagine going back. Home-row mods changed my life. Build log and keymap are up in the repo."
+      ] },
+    { first: "Wei", last: "Chen", hours: 22,
+      name: "DIY SpaceMouse",
+      description: "An open-source 3D navigation device for CAD, built from hall-effect sensors and magnets for under $30. Startup calibration for drift, axes mapped to pan/orbit/zoom in Fusion 360.",
+      repo_link: "https://github.com/sb-ocr/diy-spacemouse",
+      tags: %w[hardware cad input-device],
+      cover: "https://raw.githubusercontent.com/sb-ocr/diy-spacemouse/HEAD/Images/Spacemouse_Thumbnail@2x.png",
+      journal: [
+        "I live in Fusion 360 and a real SpaceMouse is $150+. Found an open-source DIY version using hall-effect sensors and magnets — BOM under $30. Ordering the sensors.",
+        "Printed the gimbal and the base. The magnet mounts are press-fit and snug. Waiting on the controller before I can read the sensors.",
+        "Raw hall-effect readings are printing over serial. The values drift with temperature, so I added a startup calibration that zeroes them. Movement detection works in every direction!",
+        "Mapped the axes to pan/orbit/zoom in Fusion. Tuning the deadzone and sensitivity curves took a few tries — too sensitive and the model flies off screen.",
+        "Glued the knob on and it feels great in the hand. Modeling a bracket *with* the SpaceMouse felt meta. Wrote up the calibration steps since that tripped me up the most."
+      ] },
+    { first: "Jonas", last: "Bauer", hours: 31,
+      name: "daytripper Tripwire",
+      description: "A laser tripwire that hides every window the instant someone walks up behind my desk. Pulsed laser + photodiode receiver talking to a USB dongle over 2.4GHz, with 3D-printed enclosures.",
+      repo_link: "https://github.com/dekuNukem/daytripper",
+      tags: %w[hardware automation wireless],
+      cover: "https://raw.githubusercontent.com/dekuNukem/daytripper/HEAD/resources/photos/face_note.jpg",
+      journal: [
+        "Building daytripper: a laser tripwire that hides all my windows the instant someone walks up behind me. Equal parts useful and ridiculous. Ordered the laser module and receiver PCB.",
+        "Transmitter and receiver assembled. Aligning the laser across my doorway is fiddly — a 1mm tilt and the photodiode misses entirely. Added a pot to tune the threshold.",
+        "Receiver talks to a USB dongle over 2.4GHz. Wrote the host script that fires a global hotkey when the beam breaks. First test: walked through, all windows minimized. It works!",
+        "Battery life was terrible — the transmitter ran hot all day. Switched the laser to pulsed mode synced with the receiver's sampling window and cut current draw by ~80%.",
+        "3D-printed enclosures for both ends and mounted them with the brackets. Demoed it to my roommate and watched their face when my screen vanished. Shipping it."
+      ] },
+    { first: "Amara", last: "Okeke", hours: 26,
+      name: "duckyPad Macropad",
+      description: "A 15-key mechanical macropad that runs scripts, with an OLED for profile names and per-key RGB. STM32-based, per-app profile switching, macros defined in a plain text file.",
+      repo_link: "https://github.com/dekuNukem/duckyPad",
+      tags: %w[hardware macropad stm32],
+      cover: "https://raw.githubusercontent.com/dekuNukem/duckyPad/HEAD/resources/pics/caps.jpg",
+      journal: [
+        "My workflow has too many shortcuts to remember, so I'm building a duckyPad — a 15-key mechanical macropad that runs scripts. STM32 with an OLED for profile names.",
+        "Soldered the switches and the OLED. The STM32 enumerated as a composite USB device on the first try, which never happens. Flashed the firmware and the demo profile lit up.",
+        "Wrote my first duckyScript macros — one opens my dev environment, another runs my git commit-and-push routine. Per-app profile switching detects the focused window and swaps the keymap.",
+        "Added RGB feedback so each key glows its profile color. The config-file format took an hour to learn, but now adding a macro is just editing a text file on the flash drive.",
+        "Laser-cut an acrylic case and added rubber feet. It lives under my monitor and I genuinely use it every day. Documented my favorite macros in the README."
+      ] },
+    { first: "Sofia", last: "Russo", hours: 19,
+      name: "E-Paper Weather Station",
+      description: "A low-power weather display: an ESP32 driving a 2.9\" e-paper panel, pulling forecasts from OpenWeatherMap. Deep-sleeps between updates to run for months on three AAs.",
+      repo_link: "https://github.com/G6EJD/ESP32-e-Paper-Weather-Display",
+      tags: %w[iot esp32 e-paper],
+      cover: "https://raw.githubusercontent.com/G6EJD/ESP32-e-Paper-Weather-Display/HEAD/Waveshare_1_54.jpg",
+      journal: [
+        "Building a low-power weather display: ESP32 driving a 2.9\" e-paper panel, forecasts from the OpenWeatherMap API. Goal is something that runs for months on a battery.",
+        "Got the e-paper refreshing with a hello-world. These panels are slow (~2s full refresh) but the paper-like contrast is so worth it for a glanceable display.",
+        "Parsing the weather JSON on an ESP32 with limited RAM meant switching to a streaming parser. Now showing temp, an icon, and a three-day forecast row. Layout took a lot of pixel-pushing.",
+        "Implemented deep sleep between updates — wakes every 30 minutes, fetches, redraws, sleeps. Multimeter says ~40µA asleep. Should run all winter on 3 AAs.",
+        "Built a little wood frame and stood it on my desk. The e-paper makes it look like a printed card that magically updates. Pushed the firmware and a wiring diagram."
+      ] },
+    { first: "Kenji", last: "Watanabe", hours: 24,
+      name: "RGB LED Matrix Board",
+      description: "A 64x32 HUB75 RGB matrix desk display driven by a Raspberry Pi. Cycles a clock, weather, next calendar event, and dithered Spotify album art behind a diffused acrylic front.",
+      repo_link: "https://github.com/hzeller/rpi-rgb-led-matrix",
+      tags: %w[led raspberry-pi display],
+      cover: "https://raw.githubusercontent.com/hzeller/rpi-rgb-led-matrix/HEAD/img/user-action-shot.jpg",
+      journal: [
+        "Picked up a 64x32 HUB75 RGB matrix to make a desk info board, driving it from a Raspberry Pi with hzeller's library. The ribbon-cable pinout is a maze — triple-checking before power-on.",
+        "It's alive and blindingly bright! Dialed brightness to 50%. Refresh flicker was visible on camera until I enabled hardware PWM on a dedicated GPIO.",
+        "Wrote a Python service that cycles clock, weather, and my next calendar event. Scrolling text needed double-buffering to stop tearing — buttery smooth now.",
+        "Added a now-playing panel that pulls album art from the Spotify API and dithers it to the matrix's color depth. Tiny pixel album covers are unreasonably charming.",
+        "Built a diffused acrylic front and a 3D-printed frame to soften the pixels, then mounted it on the wall. Wrote up the wiring and the systemd setup."
+      ] },
+    { first: "Leila", last: "Hassan", hours: 47,
+      name: "NanoVNA Analyzer",
+      description: "A pocket vector network analyzer for antenna and filter tuning up to 900MHz. STM32 + Si5351, reflow-soldered QFNs, open/short/load calibration, and a 3D-printed portable case.",
+      repo_link: "https://github.com/ttrftech/NanoVNA",
+      tags: %w[rf test-equipment stm32],
+      cover: "https://raw.githubusercontent.com/ttrftech/NanoVNA/HEAD/doc/nanovna-pcb-photo.jpg",
+      journal: [
+        "Antenna tuning by guesswork is over — building a NanoVNA, a pocket vector network analyzer. Measures impedance and SWR to 900MHz. The STM32 + Si5351 BOM is shockingly cheap.",
+        "Reflow went well except two QFN pins bridged on the mixer IC. Cleaned them with wick and flux under the microscope. Continuity checks all pass now.",
+        "Firmware flashed and the touchscreen calibrates. Did the open/short/load cal on the test ports — the Smith chart traces are actually tracking. I can't believe this works.",
+        "Measured my handmade 2m antenna and found resonance was 8MHz too high. Trimmed the elements off the SWR plot and got it dead-on. This tool already paid for itself.",
+        "Printed a case with a battery compartment so it's truly portable. Characterized a stack of filters at the bench. Notes and calibration tips are in the repo."
+      ] },
+    { first: "Tomas", last: "Novak", hours: 58,
+      name: "Voron 2.4 Printer",
+      description: "A self-sourced Voron 2.4: a 300mm CoreXY 3D printer with a flying gantry and quad independent Z. Klipper on an Octopus board, input shaping, pressure advance — and it prints its own upgrades.",
+      repo_link: "https://github.com/VoronDesign/Voron-2",
+      tags: %w[3d-printing corexy hardware],
+      cover: "http://vorondesign.com/images/voron2.4.jpg",
+      journal: [
+        "The big one: building a Voron 2.4 from a self-sourced kit. 300mm CoreXY with a flying gantry. Spent the whole weekend just reading the manual and sorting M3 hardware into bins.",
+        "Frame is squared and the linear rails are mounted. Getting the gantry square took three attempts and a dial indicator — 'measure twice' is an understatement here.",
+        "Wired the Octopus board and flashed Klipper. The flying gantry uses four independent Z motors for quad gantry leveling — watching them auto-level the gantry is mesmerizing.",
+        "First-layer fights took two evenings of pressure-advance and Z-offset tuning. After a fresh PID tune and an input-shaper run, the test cube came out within 0.05mm and the ringing is gone.",
+        "Printed its first real part: a desk parts tray, in its own filament. A printer that prints its own upgrades. Full build log, mods, and my Klipper config are up."
+      ] }
+  ]
 
-  PICSUM_AVATAR = ->(seed) { "https://picsum.photos/seed/fallout-user-#{seed}/200/200" }
-  PICSUM_THUMB  = ->(seed) { "https://picsum.photos/seed/fallout-proj-#{seed}/800/1000" }
-  PICSUM_JOURNAL = ->(seed) { "https://picsum.photos/seed/fallout-journal-#{seed}/900/600" }
+  demo_emails = demo.map { |d| "#{d[:first].downcase}.#{d[:last].downcase}@fallout.demo" }
 
-  # 1. Fix obviously-broken avatars on existing test/trial users so the UI
-  #    stops rendering broken-image icons. update_column skips validations and
-  #    callbacks — these are display-only fixes.
-  broken_avatar_users = User.where(avatar: [ "https://example.com/a.png", nil, "" ])
-  broken_count = broken_avatar_users.count
-  broken_avatar_users.find_each do |u|
-    u.update_column(:avatar, PICSUM_AVATAR.call(u.id))
+  # Clear prior demo identities (the old picsum-cover projects) that aren't in the new set.
+  # FeaturedProject's FK to projects is non-cascading by design — clear referencing rows
+  # first so the user → project destroy cascade can proceed.
+  stale_demo = User.where("email LIKE ?", "%@fallout.demo").where.not(email: demo_emails)
+  if stale_demo.exists?
+    FeaturedProject.where(project_id: Project.where(user_id: stale_demo.select(:id))).delete_all
+    purged = stale_demo.count
+    stale_demo.destroy_all
+    puts "Cleared #{purged} stale demo users (cascaded to their projects)"
   end
-  puts "Healed #{broken_count} broken user avatars" if broken_count.positive?
 
-  # 2. Curated demo users — full (non-trial) so they show on the explore feed
-  #    and can own featured projects without the trial-account guards.
-  demo_people = [
-    { display: "Alex Tran",     first: "Alex",   last: "Tran" },
-    { display: "Tongyu Zhou",   first: "Tongyu", last: "Zhou" },
-    { display: "Cyao Lin",      first: "Cyao",   last: "Lin" },
-    { display: "Antush Patel",  first: "Antush", last: "Patel" },
-    { display: "Mira Suzuki",   first: "Mira",   last: "Suzuki" },
-    { display: "Joon Park",     first: "Joon",   last: "Park" },
-    { display: "Sade Okafor",   first: "Sade",   last: "Okafor" },
-    { display: "Felix Romero",  first: "Felix",  last: "Romero" }
-  ]
-
-  demo_projects = [
-    { name: "Biblically Accurate Keyboard",
-      description: "A 36-key split keyboard inspired by the wild geometry of biblical seraphim. ZMK firmware, hand-wired matrix, 3D-printed case.",
-      repo_link: "https://github.com/fallout-demo/biblical-keyboard",
-      tags: %w[hardware keyboard 3d-printing] },
-    { name: "Mini Maimai",
-      description: "Pocket-sized rhythm cabinet that emulates Sega's maimai. 8 capacitive touch buttons, OLED display, USB-C charging.",
-      repo_link: "https://github.com/fallout-demo/mini-maimai",
-      tags: %w[hardware arcade rhythm-game] },
-    { name: "Icepi Zero",
-      description: "Raspberry Pi Zero stuffed inside a translucent Game Boy Pocket shell. Runs RetroArch and a custom launcher in Pygame.",
-      repo_link: "https://github.com/fallout-demo/icepi-zero",
-      tags: %w[hardware emulation handheld] },
-    { name: "Split Wave",
-      description: "Open-source ergonomic split keyboard with a tented case and per-key RGB underglow. KiCad designs included.",
-      repo_link: "https://github.com/fallout-demo/split-wave",
-      tags: %w[keyboard ergonomics kicad] },
-    { name: "RainPi Weather Station",
-      description: "ESP32-driven weather rig with BME280 + tipping bucket rain gauge, piping live data into a self-hosted Grafana board.",
-      repo_link: "https://github.com/fallout-demo/rainpi",
-      tags: %w[iot esp32 grafana] },
-    { name: "Glow Pen",
-      description: "Smart-pen prototype with a capacitive ink sensor and an addressable LED ferrule. Pairs over BLE to a sketch app.",
-      repo_link: "https://github.com/fallout-demo/glow-pen",
-      tags: %w[hardware ble wearable] },
-    { name: "Loopback Drum Pad",
-      description: "Hand-machined aluminum drum pads driving a CME-pitched groovebox over MIDI. Built around a Teensy 4.1.",
-      repo_link: "https://github.com/fallout-demo/loopback-pad",
-      tags: %w[music midi teensy] },
-    { name: "Tiny Telescope",
-      description: "DIY equatorial tracking mount with a stepper-driven RA axis. STM32 controller, hand-cut aluminum, 3D-printed gears.",
-      repo_link: "https://github.com/fallout-demo/tiny-telescope",
-      tags: %w[astronomy hardware stm32] }
-  ]
-
-  journal_templates = [
-    "Kicked off the project today — sketched the rough enclosure on paper and ordered the first batch of parts.",
-    "Got the bare-bones firmware compiling. Pushed an initial commit; mostly just I/O setup and a debug LED blink.",
-    "Spent the afternoon on the wiring harness. Rerouted everything under the main PCB so the lid finally closes.",
-    "Friday demo went well — useful feedback from the cohort. Going to refactor the input handling before the next iteration.",
-    "Soldering session #3. Burns: 0. Solder joints: 84. Probably the best ratio yet.",
-    "Took the prototype to a coffee shop and let people try it. Big win on the haptics — biggest complaint is the screen brightness.",
-    "Long debugging session. Turns out the bus was floating because I forgot a pull-up. Adding it to the BOM so future-me doesn't forget."
-  ]
-
-  demo_emails = demo_people.map { |p| "#{p[:display].parameterize}@fallout.demo" }
-
-  demo_people.zip(demo_projects).each_with_index do |(person, proj), index|
-    next unless person && proj
-
-    slug = person[:display].parameterize
-    email = "#{slug}@fallout.demo"
+  demo.each_with_index do |d, index|
+    email = "#{d[:first].downcase}.#{d[:last].downcase}@fallout.demo"
+    slug = "#{d[:first]}-#{d[:last]}".parameterize
 
     # Curated full users (type=nil). slack_id/hca_id are required for non-trial accounts.
     user = User.find_or_initialize_by(email: email)
     if user.new_record?
       user.assign_attributes(
         type: nil,
-        display_name: person[:display],
-        first_name: person[:first],
-        last_name: person[:last],
-        avatar: PICSUM_AVATAR.call(slug),
+        display_name: "#{d[:first]} #{d[:last]}",
+        first_name: d[:first],
+        last_name: d[:last],
+        avatar: "https://api.dicebear.com/9.x/lorelei/svg?seed=#{slug}",
         timezone: "America/New_York",
-        slack_id: "UDEMO#{(1000 + index)}",
+        slack_id: "UDEMO#{1000 + index}",
         hca_id: "demo-hca-#{slug}",
         onboarded: true,
         is_adult: true,
         roles: %w[user]
       )
       user.save!
-    elsif user.avatar.blank? || begin
-      host = URI.parse(user.avatar).host&.downcase
-      host == "example.com" || host&.end_with?(".example.com")
-    rescue URI::InvalidURIError
-      false
-    end
-      user.update!(avatar: PICSUM_AVATAR.call(slug))
     end
 
-    project = Project.find_or_initialize_by(name: proj[:name], user: user)
-    if project.new_record?
-      project.assign_attributes(
-        description: proj[:description],
-        repo_link: proj[:repo_link],
-        tags: proj[:tags],
-        is_unlisted: false
-      )
-      project.save!
-    end
+    project = Project.find_or_initialize_by(name: d[:name], user: user)
+    next unless project.new_record? # already seeded — don't re-download or duplicate journals
 
-    # Attach a deterministic picsum cover so the bulletin board featured grid
-    # and explore feed have real images instead of empty placeholders.
-    unless project.unified_thumbnail.attached?
-      url = PICSUM_THUMB.call(proj[:name].parameterize)
-      begin
-        downloaded = URI.parse(url).open(read_timeout: 10)
-        project.unified_thumbnail.attach(
-          io: downloaded,
-          filename: "#{proj[:name].parameterize}.jpg",
-          content_type: "image/jpeg"
-        )
-      rescue => e
-        warn "  could not attach thumbnail for #{project.name}: #{e.class}: #{e.message}"
+    project.assign_attributes(
+      description: d[:description],
+      repo_link: d[:repo_link],
+      tags: d[:tags],
+      manual_seconds: d[:hours] * 3600, # gives the project realistic logged hours on cards/explore
+      is_unlisted: false
+    )
+    project.save!
+
+    # Real cover photo from the repo, fetched + transcoded through the live cover pipeline.
+    cover_jpeg = nil
+    result = ShipChecks::UnifiedScreenshotProcessor.download_with_etag(d[:cover], if_none_match: nil)
+    if result[:status] == :changed && result[:bytes].present?
+      # Resolve + guard the content type like the cover job does: a server returning an unknown or blank
+      # Content-Type would otherwise make transcode_to_jpeg's EXT_FOR_CONTENT_TYPE.fetch raise and abort db:seed.
+      effective_type = ShipChecks::UnifiedScreenshotProcessor.resolve_content_type(result[:content_type], d[:cover])
+      if ShipChecks::UnifiedScreenshotProcessor::SUPPORTED_CONTENT_TYPES.include?(effective_type)
+        cover_jpeg = ShipChecks::UnifiedScreenshotProcessor.transcode_to_jpeg(result[:bytes], effective_type)
       end
     end
+    if cover_jpeg
+      project.unified_thumbnail.attach(io: StringIO.new(cover_jpeg), filename: "#{d[:name].parameterize}.jpg", content_type: "image/jpeg")
+    else
+      warn "  could not fetch cover for #{d[:name]}: #{result[:status]} #{result[:detail]}"
+    end
 
-    # Three journal entries per project, each with one picsum image attached so
-    # the explore feed cards have inline media variety.
-    needed = 3 - project.journal_entries.count
-    needed.times do |n|
-      entry = JournalEntry.create!(
-        user: user,
-        project: project,
-        content: journal_templates[(index + n) % journal_templates.length]
-      )
-
-      begin
-        downloaded = URI.parse(PICSUM_JOURNAL.call("#{slug}-#{project.id}-#{n}")).open(read_timeout: 10)
-        entry.images.attach(
-          io: downloaded,
-          filename: "journal-#{entry.id}.jpg",
-          content_type: "image/jpeg"
-        )
-      rescue => e
-        warn "  could not attach journal image for entry ##{entry.id}: #{e.class}: #{e.message}"
-      end
+    d[:journal].each_with_index do |text, n|
+      entry = JournalEntry.create!(user: user, project: project, content: text)
+      # Attach the real project photo to the final ("it's done") entry so journal cards carry authentic media.
+      next unless n == d[:journal].length - 1 && cover_jpeg
+      entry.images.attach(io: StringIO.new(cover_jpeg), filename: "#{d[:name].parameterize}-final.jpg", content_type: "image/jpeg")
     end
   end
 
-  demo_user_scope = User.verified.where(email: demo_emails)
-  puts "Demo users: #{demo_user_scope.count}"
-  puts "Demo projects: #{Project.where(user_id: demo_user_scope.select(:id)).count}"
-  puts "Demo journal entries: #{JournalEntry.where(user_id: demo_user_scope.select(:id)).count}"
+  demo_scope = User.verified.where(email: demo_emails)
+  puts "Realistic demo: #{demo_scope.count} users, " \
+       "#{Project.where(user_id: demo_scope.select(:id)).count} projects, " \
+       "#{JournalEntry.where(user_id: demo_scope.select(:id)).count} journal entries"
 
-  # Give the first demo user a separate project with 50 approved hours so the path/hours-stats
-  # flows have data to render. Previously this targeted a TrialUser by id, but that user is
-  # purged above — anchor it to a curated demo identity instead.
-  hours_target = demo_user_scope.order(:id).first
-  if hours_target
-    hours = 50
-    seconds = hours * 3600
-
-    hours_project = Project.find_or_create_by!(name: "Seeded Hours Project", user: hours_target) do |p|
-      p.description = "Seeded project for testing approved hours"
-      p.manual_seconds = seconds
-    end
-    hours_project.update!(manual_seconds: seconds)
-
-    hours_ship = Ship.find_or_create_by!(project: hours_project) do |s|
+  # Give the first demo project an approved design Ship so the path / hours-stats dashboards have
+  # build-approved hours to render (logged hours come from manual_seconds above). Anchoring this to
+  # a real demo project avoids a throwaway placeholder cluttering the explore feed.
+  approved_target = Project.where(user_id: demo_scope.select(:id)).order(:id).first
+  if approved_target
+    Ship.find_or_create_by!(project: approved_target) do |s|
       s.ship_type = :design
-      s.status = :approved
-      s.approved_public_seconds = seconds
-      s.justification = "Seeded for testing"
+      s.status = :approved # created (not updated) as approved, so the airtable-upload after_update_commit doesn't fire
+      s.approved_public_seconds = approved_target.manual_seconds
+      s.justification = "Seeded for hours dashboards"
     end
-    hours_ship.update!(status: :approved, approved_public_seconds: seconds)
-
-    puts "Gave #{hours_target.display_name} (##{hours_target.id}) #{hours} approved hours via project ##{hours_project.id}"
+    puts "Gave '#{approved_target.name}' an approved ship (#{approved_target.manual_seconds / 3600}h)"
   end
+
+  # Give demo users varying lifetime approved hours across 1-2 projects + a pending DR each.
+  # format: display_name => { projects: [{name:, hours:, tags:}], pending_hours: }
+  # pending_hours = TA hours for the new pending DR ship (on the last listed project)
+  seed_rc_user = User.find_by(email: "seed_alice@example.com")
+
+  demo_dr_data = {
+    "Tongyu Zhou" => {
+      projects: [ { name: "Wireless Sensor Node", hours: 12, tags: %w[iot esp32] } ],
+      pending_hours: 12
+    },
+    "Cyao Lin" => {
+      projects: [
+        { name: "Cyao's PCB Badge",     hours: 20, tags: %w[hardware kicad] },
+        { name: "Cyao's OLED Watch",    hours: 18, tags: %w[hardware wearable] }
+      ],
+      pending_hours: 18
+    },
+    "Antush Patel" => {
+      projects: [
+        { name: "Antush's Sensor Array",   hours: 5, tags: %w[iot sensors] },
+        { name: "Antush's Display Module", hours: 3, tags: %w[hardware display] }
+      ],
+      pending_hours: 3
+    },
+    "Mira Suzuki" => {
+      projects: [
+        { name: "Mira's Wearable Sensor", hours: 15, tags: %w[hardware wearable] },
+        { name: "Mira's Solar Tracker",   hours: 10, tags: %w[hardware solar] }
+      ],
+      pending_hours: 10
+    },
+    "Joon Park" => {
+      projects: [
+        { name: "Joon's Mechanical Keyboard", hours: 28, tags: %w[keyboard hardware] },
+        { name: "Joon's LED Controller",      hours: 16, tags: %w[hardware rgb] }
+      ],
+      pending_hours: 16
+    },
+    "Sade Okafor" => {
+      projects: [
+        { name: "Sade's First PCB",  hours: 4, tags: %w[hardware kicad] },
+        { name: "Sade's Audio Amp",  hours: 2, tags: %w[hardware audio] }
+      ],
+      pending_hours: 2
+    },
+    "Felix Romero" => {
+      projects: [
+        { name: "Felix's Motor Driver",     hours: 12, tags: %w[hardware motors] },
+        { name: "Felix's Enclosure Design", hours: 7,  tags: %w[hardware 3d-printing] }
+      ],
+      pending_hours: 7
+    }
+  }
+
+  demo_dr_data.each do |display_name, data|
+    demo_user = demo_user_scope.find_by(display_name: display_name)
+    next unless demo_user
+
+    # Wipe previous pending-DR seed ships for this user to keep re-runs clean
+    old_ids = Ship.joins(:project).where(projects: { user_id: demo_user.id }, justification: "seed pending DR").pluck(:id)
+    if old_ids.any?
+      DesignReview.where(ship_id: old_ids).delete_all
+      RequirementsCheckReview.where(ship_id: old_ids).delete_all
+      TimeAuditReview.where(ship_id: old_ids).delete_all
+      Ship.where(id: old_ids).delete_all
+    end
+
+    last_proj = nil
+    data[:projects].each do |proj_data|
+      proj = Project.find_or_create_by!(name: proj_data[:name], user: demo_user) do |p|
+        p.description = "Seeded project — #{proj_data[:name]}"
+        p.repo_link = "https://github.com/fallout-demo/#{proj_data[:name].parameterize}"
+        p.tags = proj_data[:tags]
+        p.is_unlisted = false
+      end
+
+      approved_ship = Ship.find_or_create_by!(project: proj, justification: "seed lifetime hours") do |s|
+        s.ship_type = :design
+        s.status = :approved
+        s.approved_public_seconds = proj_data[:hours] * 3600
+      end
+      approved_ship.update!(status: :approved, approved_public_seconds: proj_data[:hours] * 3600)
+
+      last_proj = proj
+    end
+
+    # Pending DR on the last project
+    new_ship_id = Ship.insert_all!(
+      [ { project_id: last_proj.id, ship_type: 0, status: 1, justification: "seed pending DR",
+          created_at: Time.current, updated_at: Time.current } ],
+      returning: :id
+    ).first["id"]
+
+    pending_h = data[:pending_hours]
+    RequirementsCheckReview.insert_all!([ {
+      ship_id: new_ship_id, reviewer_id: seed_rc_user&.id,
+      status: RequirementsCheckReview.statuses[:approved], feedback: "Requirements verified.",
+      completed_at: Time.current, created_at: Time.current, updated_at: Time.current
+    } ])
+    TimeAuditReview.insert_all!([ {
+      ship_id: new_ship_id, reviewer_id: seed_rc_user&.id,
+      status: TimeAuditReview.statuses[:approved],
+      approved_public_seconds: pending_h * 3600,
+      completed_at: Time.current, created_at: Time.current, updated_at: Time.current
+    } ])
+    DesignReview.insert_all!([ {
+      ship_id: new_ship_id, reviewer_id: nil,
+      status: DesignReview.statuses[:pending],
+      completed_at: nil, created_at: Time.current, updated_at: Time.current
+    } ])
+  end
+  puts "Seeded pending DR ships for demo users with varied lifetime hours"
 end
 
 # Dev-only: RC reviewer profiles sample data
@@ -343,6 +494,7 @@ if Rails.env.development?
     seed_ship_ids = Ship.where(project_id: seed_project_ids).pluck(:id)
     DesignReview.where(ship_id: seed_ship_ids).delete_all
     RequirementsCheckReview.where(ship_id: seed_ship_ids).delete_all
+    TimeAuditReview.where(ship_id: seed_ship_ids).delete_all
     Ship.where(id: seed_ship_ids).delete_all
     Project.where(id: seed_project_ids).delete_all
   end
@@ -358,8 +510,10 @@ if Rails.env.development?
 
   # Bulk-insert projects → ships → reviews in three queries
   now = Time.current
+  # is_unlisted: these are admin reviewer-stats scaffolding (1000+ rows) — keep them OUT of the
+  # public explore feed (public_for_explore = kept.listed) while the reviews still feed the dashboard.
   project_rows = specs.map.with_index { |s, i|
-    { name: "Seed RC #{i}", description: "seed-rc", user_id: student.id, created_at: s[:ts], updated_at: s[:ts] }
+    { name: "Seed RC #{i}", description: "seed-rc", user_id: student.id, is_unlisted: true, created_at: s[:ts], updated_at: s[:ts] }
   }
   project_ids = Project.insert_all!(project_rows, returning: :id).map { |r| r["id"] }
 
@@ -388,16 +542,27 @@ if Rails.env.development?
     reviewer = active_reviewers.sample(random: rng)
     { ship_id: ship_ids[i], reviewer_id: reviewer.id,
       status: dr_statuses.sample(random: rng),
-      created_at: dr_ts, updated_at: dr_ts }
+      completed_at: dr_ts, created_at: dr_ts, updated_at: dr_ts }
   end
 
-  # 3 pending design reviews (no reviewer assigned yet)
+  # 3 pending design reviews (no reviewer assigned yet), with varied TA-approved hours so sort works
   pending_ship_ids = ship_ids.reject { |id| dr_rows.any? { |r| r[:ship_id] == id } }.first(3)
   pending_dr_rows = pending_ship_ids.map { |sid|
     { ship_id: sid, reviewer_id: nil, status: DesignReview.statuses[:pending],
       created_at: Time.current, updated_at: Time.current }
   }
   DesignReview.insert_all!(dr_rows + pending_dr_rows)
+
+  pending_ta_hours = [ 8, 22, 15 ]
+  pending_ta_rows = pending_ship_ids.each_with_index.map { |sid, i|
+    seconds = pending_ta_hours[i] * 3600
+    { ship_id: sid, reviewer_id: reviewers[0].id,
+      status: TimeAuditReview.statuses[:approved],
+      approved_public_seconds: seconds,
+      completed_at: Time.current,
+      created_at: Time.current, updated_at: Time.current }
+  }
+  TimeAuditReview.insert_all!(pending_ta_rows)
 
   total = specs.size
   puts "Seeded #{total} RC reviews and #{dr_rows.size + pending_dr_rows.size} design reviews (#{pending_dr_rows.size} pending) across #{reviewer_data.size} reviewers (#{reviewer_data.map { |r| r[:display_name] }.join(', ')})"
@@ -427,45 +592,52 @@ if Rails.env.development?
   project  = tanishq && Project.find_by(name: "Test Project", user: tanishq)
 
   if project
-    seed_rc = User.find_by(email: "seed_alice@example.com")
+    seed_rc  = User.find_by(email: "seed_alice@example.com")
+    seed_bob = User.find_by(email: "seed_bob@example.com")
 
-    # [ship_id_or_nil, rc_status, rc_feedback, dr_status, dr_reviewer_email, dr_feedback]
-    # nil ship_id → create a new ship; existing id → add DR to it
+    # Wipe previous seed DR test ships so re-runs don't accumulate duplicates
+    old_ship_ids = Ship.where(project: project, justification: "seed DR test").pluck(:id)
+    if old_ship_ids.any?
+      DesignReview.where(ship_id: old_ship_ids).delete_all
+      RequirementsCheckReview.where(ship_id: old_ship_ids).delete_all
+      TimeAuditReview.where(ship_id: old_ship_ids).delete_all
+      Ship.where(id: old_ship_ids).delete_all
+    end
+
+    # Each entry: rc_feedback, ta_hours, dr_status, dr_reviewer, dr_feedback
     test_cases = [
-      { ship_id: 7, dr_status: :pending, dr_reviewer: nil },
-      { ship_id: nil, rc_status: :approved, rc_feedback: "All requirements met. Justification is clear and hours are well documented.", dr_status: :pending, dr_reviewer: nil },
-      { ship_id: nil, rc_status: :approved, rc_feedback: "Hours verified. Project scope is appropriate and engineering process is documented.", dr_status: :approved, dr_reviewer: "seed_bob@example.com", feedback: "Great work! The design is clean and well thought out. Approved." },
-      { ship_id: nil, rc_status: :approved, rc_feedback: "Requirements check passed. Good justification and sufficient hours logged.", dr_status: :returned, dr_reviewer: "seed_carol@example.com", feedback: "Please add more detail to the process section and include screenshots of the final UI before resubmitting." }
+      { rc_feedback: "All requirements met. Hours well documented.",                                             ta_hours: 24, dr_status: :pending,  dr_reviewer: nil,       feedback: nil },
+      { rc_feedback: "Hours verified. Project scope is appropriate.",                                            ta_hours: 15, dr_status: :pending,  dr_reviewer: nil,       feedback: nil },
+      { rc_feedback: "Requirements check passed. Good justification.",                                           ta_hours: 9,  dr_status: :approved, dr_reviewer: seed_bob,  feedback: "Great work! Clean design. Approved." },
+      { rc_feedback: "Requirements check passed. Good justification and sufficient hours logged.",               ta_hours: 6,  dr_status: :returned, dr_reviewer: seed_rc,   feedback: "Please add more detail to the process section before resubmitting." }
     ]
 
     test_cases.each do |tc|
-      ship = if tc[:ship_id]
-        Ship.find(tc[:ship_id])
-      else
-        # status :approved skips the create_initial_reviews! callback
-        s_id = Ship.insert_all!(
-          [ { project_id: project.id, ship_type: 0, status: 1, justification: "seed DR test",
-             created_at: Time.current, updated_at: Time.current } ],
-          returning: :id
-        ).first["id"]
-        # Approved RC review — insert_all! skips recompute_ship_status! callback
-        RequirementsCheckReview.insert_all!([ {
-          ship_id: s_id, reviewer_id: seed_rc&.id,
-          status: RequirementsCheckReview.statuses[:approved],
-          feedback: tc[:rc_feedback],
-          created_at: Time.current, updated_at: Time.current
-        } ])
-        Ship.find(s_id)
-      end
+      s_id = Ship.insert_all!(
+        [ { project_id: project.id, ship_type: 0, status: 1, justification: "seed DR test",
+            created_at: Time.current, updated_at: Time.current } ],
+        returning: :id
+      ).first["id"]
 
-      next if DesignReview.exists?(ship: ship)
+      RequirementsCheckReview.insert_all!([ {
+        ship_id: s_id, reviewer_id: seed_rc&.id,
+        status: RequirementsCheckReview.statuses[:approved],
+        feedback: tc[:rc_feedback],
+        completed_at: Time.current, created_at: Time.current, updated_at: Time.current
+      } ])
 
-      reviewer_id = tc[:dr_reviewer] ? User.find_by(email: tc[:dr_reviewer])&.id : nil
-      # insert_all! bypasses recompute_ship_status! callback
+      TimeAuditReview.insert_all!([ {
+        ship_id: s_id, reviewer_id: seed_rc&.id,
+        status: TimeAuditReview.statuses[:approved],
+        approved_public_seconds: tc[:ta_hours] * 3600,
+        completed_at: Time.current, created_at: Time.current, updated_at: Time.current
+      } ])
+
       DesignReview.insert_all!([ {
-        ship_id: ship.id, reviewer_id: reviewer_id,
-        status:   DesignReview.statuses[tc[:dr_status]],
+        ship_id: s_id, reviewer_id: tc[:dr_reviewer]&.id,
+        status: DesignReview.statuses[tc[:dr_status]],
         feedback: tc[:feedback],
+        completed_at: tc[:dr_status] == :pending ? nil : Time.current,
         created_at: Time.current, updated_at: Time.current
       } ])
     end

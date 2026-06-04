@@ -31,11 +31,24 @@ module Reviewable
       )
     }
 
+    # Stamp completed_at once when the review first reaches a terminal status so
+    # time-series charts can group by finalization date rather than updated_at
+    # (updated_at drifts on heartbeat/annotation edits after the review is closed).
+    before_save :set_completed_at, if: :status_changed?
+
     # Update Ship's cached status in the SAME transaction (not after_commit) to prevent drift
     after_save :recompute_ship_status!, if: :saved_change_to_status?
 
+    # Backfill reviewer_id on terminal transitions when the claim was lost mid-session.
+    # See #stamp_finalizing_reviewer for the full rationale.
+    before_update :stamp_finalizing_reviewer
+
     # Set to true to skip recompute_ship_status! (e.g. during bulk cancellation where the caller recomputes once)
     attr_accessor :skip_ship_recompute
+
+    # Set by controllers (to current_user) before #update on terminal submissions so the
+    # before_update callback can stamp reviewer_id when the claim system left it blank.
+    attr_accessor :finalizing_user
   end
 
   # -- Claim instance methods (use update_columns to bypass callbacks) --
@@ -151,19 +164,28 @@ module Reviewable
     end
 
     # Find the next review available for this user, respecting skip list.
-    # Prioritises the user's own claim first, then oldest ship (matches the
-    # pending queue table ordering — ship age is the true "how long the
-    # student has been waiting" signal, since DR/BR rows are created later
-    # than the ship.
-    def next_eligible(user, skip_ids: [])
+    # sort: :waiting (default) — oldest ship first; :hours — most TA-approved hours first.
+    # Prioritises the user's own claim first in either mode.
+    def next_eligible(user, skip_ids: [], sort: :waiting)
       scope = available_for(user).joins(:ship)
       scope = scope.where.not(id: skip_ids) if skip_ids.present?
-      scope.order(
-        Arel::Nodes::Case.new
-          .when(arel_table[:reviewer_id].eq(user.id)).then(0)
-          .else(1),
-        "ships.created_at ASC"
-      ).first
+      own_claim_first = Arel::Nodes::Case.new
+        .when(arel_table[:reviewer_id].eq(user.id)).then(0)
+        .else(1)
+      if sort == :hours
+        scope.joins("INNER JOIN projects proj_sort ON proj_sort.id = ships.project_id").order(
+          own_claim_first,
+          Arel.sql(<<~SQL.squish)
+            (SELECT COALESCE(SUM(s2.approved_public_seconds), 0)
+             FROM ships s2
+             INNER JOIN projects p2 ON p2.id = s2.project_id
+             WHERE p2.user_id = proj_sort.user_id
+             AND s2.approved_public_seconds IS NOT NULL) DESC
+          SQL
+        ).first
+      else
+        scope.order(own_claim_first, "ships.created_at ASC").first
+      end
     end
   end
 
@@ -178,11 +200,30 @@ module Reviewable
     errors.add(:status, "cannot transition from #{status_was}")
   end
 
+  def set_completed_at
+    return if completed_at.present?
+    self.completed_at = Time.current if TERMINAL_STATUSES.include?(status)
+  end
+
   def recompute_ship_status!
     return if skip_ship_recompute
     ship.with_lock do
       ship.ensure_phase_two_review!
       ship.recompute_status!
     end
+  end
+
+  # Reviewer attribution invariant: any review reaching approved/returned/rejected must
+  # carry a non-NULL reviewer_id. Normally the claim system sets it when the reviewer opens
+  # the page, but ExpireStaleReviewClaimsJob can clear it between page load and submit,
+  # and the policy permits admins to update without an active claim — so a terminal save
+  # can otherwise land with reviewer_id=NULL. Controllers set #finalizing_user to
+  # current_user before #update; this callback fills reviewer_id from it only when blank,
+  # preserving the original claimer when one exists. Cancellations are excluded — they're
+  # system-driven (cancel_pending_reviews!) and intentionally have no reviewer.
+  def stamp_finalizing_reviewer
+    return unless will_save_change_to_status?
+    return unless %w[approved returned rejected].include?(status)
+    self.reviewer_id ||= finalizing_user&.id
   end
 end

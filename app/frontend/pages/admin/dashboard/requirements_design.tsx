@@ -1,6 +1,6 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { usePage, Link } from '@inertiajs/react'
+import { usePage, Link, router } from '@inertiajs/react'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/admin/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/admin/ui/table'
@@ -8,7 +8,7 @@ import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/admin/ui/chart'
 import { Bar, BarChart } from 'recharts'
-import { MessageCircleIcon } from 'lucide-react'
+import { MessageCircleIcon, X } from 'lucide-react'
 import { PageProps } from '@inertiajs/core'
 
 interface LeaderboardRow {
@@ -28,7 +28,11 @@ interface Totals {
 
 interface ReviewWeek {
   week: string
-  count: number
+  rc: number
+  dr: number
+  ta: number
+  ta_hours: number
+  low: boolean
 }
 
 interface ReviewerProfile {
@@ -36,6 +40,7 @@ interface ReviewerProfile {
   display_name: string
   avatar: string | null
   total_reviews: number
+  rc_reviews: number
   reviews_by_week: ReviewWeek[]
 }
 
@@ -57,7 +62,9 @@ function formatRate(value: number): string {
 }
 
 const profileChartConfig: ChartConfig = {
-  count: { label: 'Reviews', color: 'hsl(217, 91%, 60%)' },
+  rc: { label: 'RC', color: 'hsl(217, 91%, 60%)' },
+  dr: { label: 'DR', color: 'hsl(142, 71%, 45%)' },
+  ta: { label: 'Time Audit', color: 'hsl(38, 92%, 50%)' },
 }
 
 const DM_PREFIX = 'reviewer_dm:'
@@ -115,7 +122,7 @@ function ReviewerProfileCard({
   dmDate: Date | null
   onToggle: () => void
 }) {
-  const hasLowWeek = profile.reviews_by_week.some((w) => w.count > 0 && w.count < 15)
+  const hasLowWeek = profile.reviews_by_week.some((w) => w.low)
   return (
     <Link href={`/admin/reviewers/${profile.id}`} className="block hover:no-underline">
       <Card className="hover:bg-muted/50 transition-colors">
@@ -129,7 +136,9 @@ function ReviewerProfileCard({
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">{profile.display_name}</p>
               <div className="flex items-center gap-1.5">
-                <p className="text-xs text-muted-foreground">{profile.total_reviews} reviews total</p>
+                <p className="text-xs text-muted-foreground">
+                  {profile.rc_reviews} RC · {profile.total_reviews} all-time
+                </p>
                 {hasLowWeek && (
                   <span title="Has weeks below 15 reviews" className="text-yellow-500">
                     ⚠
@@ -164,10 +173,16 @@ function ReviewerProfileCard({
                       const d = new Date(v + 'T00:00:00')
                       return `Week of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                     }}
+                    formatter={(value, name, item) => {
+                      if (name === 'ta') return [`${item.payload.ta_hours} hrs`, 'Time Audit']
+                      return [value, (name as string).toUpperCase()]
+                    }}
                   />
                 }
               />
-              <Bar dataKey="count" fill="var(--color-count)" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="rc" stackId="a" fill="var(--color-rc)" />
+              <Bar dataKey="dr" stackId="a" fill="var(--color-dr)" />
+              <Bar dataKey="ta" stackId="a" radius={[2, 2, 0, 0]} fill="var(--color-ta)" />
             </BarChart>
           </ChartContainer>
         </CardContent>
@@ -178,6 +193,8 @@ function ReviewerProfileCard({
 
 export default function RequirementsDesignDashboard() {
   const { leaderboard, totals, reviewer_profiles, non_reviewer_channel_members } = usePage<Props>().props
+  const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
+  const isAdmin = admin_permissions?.is_admin ?? false
 
   const [dmStates, setDmStates] = useState<Record<number, Date | null>>(() => {
     const result: Record<number, Date | null> = {}
@@ -329,12 +346,27 @@ export default function RequirementsDesignDashboard() {
           <div className="flex flex-wrap gap-3">
             {non_reviewer_channel_members.map((member) => (
               <div key={member.id} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
-                {member.avatar ? (
-                  <img src={member.avatar} className="size-6 rounded-full shrink-0" alt="" />
-                ) : (
-                  <div className="size-6 rounded-full bg-muted shrink-0" />
+                <Link href={`/admin/users/${member.id}`} className="flex items-center gap-2 flex-1 hover:underline">
+                  {member.avatar ? (
+                    <img src={member.avatar} className="size-6 rounded-full shrink-0" alt="" />
+                  ) : (
+                    <div className="size-6 rounded-full bg-muted shrink-0" />
+                  )}
+                  <span>{member.display_name}</span>
+                </Link>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.patch(`/admin/users/${member.id}/toggle_reviewer_suggestion`, {}, { preserveScroll: true })
+                    }
+                    title="Exclude from suggestions"
+                    aria-label="Exclude from suggestions"
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="size-3" />
+                  </button>
                 )}
-                <span>{member.display_name}</span>
               </div>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link, usePage } from '@inertiajs/react'
+import { Link, router, usePage } from '@inertiajs/react'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
@@ -22,6 +22,7 @@ export default function DesignReviewsIndex({
   all_reviews,
   pagy,
   start_reviewing_path,
+  current_sort,
   stats_keys,
   stats,
 }: {
@@ -29,11 +30,24 @@ export default function DesignReviewsIndex({
   all_reviews: ReviewRow[]
   pagy: PagyProps
   start_reviewing_path: string
+  current_sort: 'hours' | 'waiting'
   stats_keys: ReviewStatKey[]
   stats?: ReviewStats
 }) {
   const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
   const isAdmin = admin_permissions?.is_admin ?? false
+  const sortByHours = current_sort === 'hours'
+
+  const hoursColumn = {
+    accessorKey: 'approved_public_hours',
+    header: 'Hours',
+    cell: ({ row }: { row: { original: ReviewRow } }) =>
+      row.original.approved_public_hours != null ? (
+        `${row.original.approved_public_hours}h`
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  }
 
   return (
     <div className="space-y-8">
@@ -51,14 +65,29 @@ export default function DesignReviewsIndex({
               </Badge>
             )}
           </h2>
-          {pending_reviews.length > 0 && (
-            <Button asChild size="sm">
-              <Link href={start_reviewing_path}>Start Reviewing</Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={sortByHours ? 'default' : 'outline'}
+              size="sm"
+              onClick={() =>
+                router.get(BASE_PATH, { sort: sortByHours ? 'waiting' : 'hours' }, { preserveScroll: true, replace: true })
+              }
+            >
+              {sortByHours ? 'Sort: Hours' : 'Sort: Time Waiting'}
             </Button>
-          )}
+            {pending_reviews.length > 0 && (
+              <Button asChild size="sm">
+                <Link href={`${start_reviewing_path}?sort=${sortByHours ? 'hours' : 'waiting'}`}>Start Reviewing</Link>
+              </Button>
+            )}
+          </div>
         </div>
         <DataTable
-          columns={buildPendingColumns(BASE_PATH, undefined, [reqCheckColumn])}
+          columns={buildPendingColumns(
+            BASE_PATH,
+            undefined,
+            sortByHours ? [reqCheckColumn, hoursColumn] : [reqCheckColumn],
+          )}
           data={pending_reviews}
           noun="pending reviews"
           rowClassName={(row) => (row.previously_reviewed_by_me ? 'bg-blue-50 dark:bg-blue-950/20' : undefined)}

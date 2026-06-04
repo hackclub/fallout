@@ -27,6 +27,10 @@ class UserPolicy < ApplicationPolicy
     admin?
   end
 
+  def toggle_reviewer_suggestion?
+    admin?
+  end
+
   def destroy?
     admin? && record != user
   end

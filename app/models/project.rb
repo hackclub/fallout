@@ -44,7 +44,7 @@ class Project < ApplicationRecord
   # Dirty-only public stats refresh; payload intentionally omits project IDs.
   after_commit :broadcast_bulletin_explore_update
   after_commit :enqueue_meilisearch_reindex
-  after_commit :enqueue_unified_thumbnail_compute_if_repo_changed
+  after_commit :reconcile_unified_thumbnail_on_repo_change
 
   pg_search_scope :search, against: [ :name, :description ], using: { tsearch: { prefix: true } }
 
@@ -341,19 +341,41 @@ class Project < ApplicationRecord
     MeilisearchReindexJob.perform_later(self.class.name, id)
   end
 
-  def enqueue_unified_thumbnail_compute_if_repo_changed
+  def reconcile_unified_thumbnail_on_repo_change
     return if destroyed?
-    # Enqueue when there's actually work to do:
-    # - created with a repo_link → fetch + attach
-    # - repo_link changed (in either direction) → fetch+re-attach, OR clear+purge if now blank
-    # - undiscarded with a repo_link → re-verify the cached attachment
-    should_enqueue =
-      (previously_new_record? && repo_link.present?) ||
-      saved_change_to_repo_link? ||
-      (saved_change_to_discarded_at? && discarded_at.nil? && repo_link.present?)
-    return unless should_enqueue
+    # Nothing cached to reconcile on create (and a freshly linked repo has no zine yet). saved_change_to_repo_link?
+    # is true for a new record, so this guard keeps creation from doing a pointless thumbnail-metadata write.
+    return if previously_new_record?
+    return unless saved_change_to_repo_link?
 
-    ComputeProjectUnifiedThumbnailJob.perform_later(id)
+    # The cached cover was derived from the PREVIOUS repo (cleared or swapped). It — and its
+    # source_url/etag — must not represent the project anymore. Clear synchronously so the immediate
+    # post-save Inertia reload sees it gone, RefreshStaleUnifiedThumbnailsJob stops re-fetching the
+    # old repo's file, and ComputeProjectUnifiedThumbnailJob's finder-nil probe can't resurrect it
+    # (the old repo still serves the file, so a stale source_url would falsely read as "unchanged").
+    # We deliberately do NOT scan the new repo here — a freshly linked repo has no zine yet (zines
+    # arrive near ship time); discovery stays on demand (refresh_cover), at preflight, and at ship approval.
+    clear_unified_thumbnail!
+  end
+
+  def clear_unified_thumbnail!
+    # Remove the attachment row synchronously (the post-save reload must see attached? == false) but delete
+    # the blob's stored file in a job, so a slow/erroring object store can't add latency to — or raise inside —
+    # this after_commit on the user's repo_link save. detach deletes the attachment without callbacks: a plain
+    # destroy would fire belongs_to(touch: true) → re-enter this after_commit → infinite recursion. purge_later
+    # alone wouldn't work either — it removes the attachment row in the job, so the reload would still see it.
+    if unified_thumbnail.attached?
+      blob = unified_thumbnail.blob
+      unified_thumbnail.detach
+      blob&.purge_later
+    end
+    # update_columns: skip the after_commit chain so this metadata write doesn't re-trigger
+    # Meilisearch reindex / bulletin broadcasts / re-enter this callback.
+    update_columns(
+      unified_thumbnail_source_url: nil,
+      unified_thumbnail_etag: nil,
+      unified_thumbnail_checked_at: Time.current
+    )
   end
 
   def broadcast_bulletin_explore_update

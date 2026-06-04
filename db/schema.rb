@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_28_131000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -99,6 +99,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
   create_table "build_reviews", force: :cascade do |t|
     t.jsonb "annotations"
     t.datetime "claim_expires_at"
+    t.datetime "completed_at"
     t.datetime "created_at", null: false
     t.text "feedback"
     t.integer "gold_adjustment"
@@ -109,6 +110,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
     t.bigint "ship_id", null: false
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
+    t.index ["completed_at"], name: "index_build_reviews_on_completed_at"
     t.index ["reviewer_id"], name: "index_build_reviews_on_reviewer_id"
     t.index ["ship_id"], name: "index_build_reviews_on_ship_id", unique: true
     t.index ["status", "claim_expires_at"], name: "index_build_reviews_on_status_and_claim_expires_at"
@@ -172,6 +174,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
     t.jsonb "annotations"
     t.string "checkpoint_message_url"
     t.datetime "claim_expires_at"
+    t.datetime "completed_at"
     t.datetime "created_at", null: false
     t.text "feedback"
     t.integer "hours_adjustment"
@@ -182,6 +185,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
     t.bigint "ship_id", null: false
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
+    t.index ["completed_at"], name: "index_design_reviews_on_completed_at"
     t.index ["reviewer_id"], name: "index_design_reviews_on_reviewer_id"
     t.index ["ship_id"], name: "index_design_reviews_on_ship_id", unique: true
     t.index ["status", "claim_expires_at"], name: "index_design_reviews_on_status_and_claim_expires_at"
@@ -615,6 +619,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
   create_table "requirements_check_reviews", force: :cascade do |t|
     t.string "checkpoint_message_url"
     t.datetime "claim_expires_at"
+    t.datetime "completed_at"
     t.datetime "created_at", null: false
     t.text "feedback"
     t.text "internal_reason"
@@ -624,6 +629,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
     t.bigint "ship_id", null: false
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
+    t.index ["completed_at"], name: "index_requirements_check_reviews_on_completed_at"
     t.index ["reviewer_id"], name: "index_requirements_check_reviews_on_reviewer_id"
     t.index ["ship_id"], name: "index_requirements_check_reviews_on_ship_id", unique: true
     t.index ["status", "claim_expires_at"], name: "idx_on_status_claim_expires_at_8572608249"
@@ -971,6 +977,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_27_053922) do
     t.datetime "discarded_at"
     t.string "display_name", null: false
     t.string "email", null: false
+    t.boolean "excluded_from_reviewer_suggestions", default: false, null: false
     t.string "first_name"
     t.integer "gold_balance", default: 0, null: false
     t.boolean "has_hca_address", default: false, null: false

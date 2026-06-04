@@ -15,7 +15,7 @@ class ShipPreflightJob < ApplicationJob
     Rails.cache.write(cache_key, { status: "running", checks: initial_checks }, expires_in: 5.minutes)
 
     # Always run all checks — internal results are stored for admin review
-    results = ShipCheckService.run_all(project, run_all_checks: true) do |result|
+    results, ctx = ShipCheckService.run_all(project, run_all_checks: true, return_context: true) do |result|
       cached = Rails.cache.read(cache_key)
       next unless cached
       idx = cached[:checks].index { |c| c[:key].to_s == result.key.to_s }
@@ -47,5 +47,22 @@ class ShipPreflightJob < ApplicationJob
       status: status.to_s,
       checks: final_results
     }, expires_in: 5.minutes)
+
+    enqueue_cover_refresh(project, results, ctx)
+  end
+
+  private
+
+  # Piggyback on the repo data preflight already fetched: if the zine check passed, reuse the
+  # shared context to find the zine URL (no second GitHub fetch / no re-running vision LLM) and
+  # refresh the project cover. allow_representative: false keeps this strictly zine-driven.
+  def enqueue_cover_refresh(project, results, ctx)
+    zine = results.find { |r| r.key.to_s == "has_zine_page" }
+    return unless zine&.passed?
+
+    source_url = ShipChecks::UnifiedScreenshotFinder.find_url(project, ctx: ctx, allow_representative: false)
+    ComputeProjectUnifiedThumbnailJob.perform_later(project.id, source_url: source_url) if source_url.present?
+  rescue StandardError => e
+    Rails.logger.warn("ShipPreflightJob cover refresh failed for project ##{project.id}: #{e.message}")
   end
 end

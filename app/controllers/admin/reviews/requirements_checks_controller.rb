@@ -3,17 +3,21 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
     base = policy_scope(RequirementsCheckReview)
       .includes(ship: [ :project, :time_audit_review, project: :user ], reviewer: [])
 
+    sort = parse_sort
     pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).order(created_at: :asc).load
     @pagy, @all_reviews = pagy(base.order(created_at: :desc))
     Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
     flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
     previously_reviewed = precompute_previously_reviewed_project_ids
+    lifetime_hours = precompute_user_lifetime_hours(pending_reviews)
+    pending_reviews = pending_reviews.sort_by { |review| -(lifetime_hours[review.ship.project.user_id] || -1) } if sort == :hours
 
     render inertia: {
-      pending_reviews: pending_reviews.map { |r| serialize_review_row(r, previously_reviewed_project_ids: previously_reviewed) },
+      pending_reviews: pending_reviews.map { |r| serialize_review_row(r, previously_reviewed_project_ids: previously_reviewed, user_lifetime_hours: lifetime_hours) },
       all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids, previously_reviewed_project_ids: previously_reviewed) },
       pagy: pagy_props(@pagy),
       start_reviewing_path: next_admin_reviews_requirements_checks_path,
+      current_sort: sort,
       **review_stats_props(RequirementsCheckReview)
     }
   end
@@ -48,7 +52,7 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
       can: { update: policy(@review).update? },
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_requirements_check_path(@review),
-      next_path: next_admin_reviews_requirements_checks_path,
+      next_path: review_next_path,
       index_path: admin_reviews_requirements_checks_path
     }
   end
@@ -76,6 +80,7 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
       end
     end
 
+    @review.finalizing_user = current_user # Reviewable#stamp_finalizing_reviewer backfills reviewer_id on terminal save when claim was cleared mid-session
     if @review.update(review_params)
       if @review.approved? || @review.returned? || @review.rejected?
         if checkpoint_just_stored

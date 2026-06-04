@@ -197,6 +197,13 @@ class Admin::UsersController < Admin::ApplicationController
     end
   end
 
+  def toggle_reviewer_suggestion
+    @user = User.find(params[:id])
+    authorize @user
+    @user.update!(excluded_from_reviewer_suggestions: !@user.excluded_from_reviewer_suggestions)
+    redirect_back_or_to admin_root_path
+  end
+
   def restore_streak_goal
     @user = User.find(params[:id])
     authorize @user
