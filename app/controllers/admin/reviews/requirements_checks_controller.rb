@@ -80,6 +80,7 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
       end
     end
 
+    @review.finalizing_user = current_user # Reviewable#stamp_finalizing_reviewer backfills reviewer_id on terminal save when claim was cleared mid-session
     if @review.update(review_params)
       if @review.approved? || @review.returned? || @review.rejected?
         if checkpoint_just_stored

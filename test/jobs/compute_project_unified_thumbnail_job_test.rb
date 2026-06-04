@@ -16,7 +16,7 @@ class ComputeProjectUnifiedThumbnailJobTest < ActiveJob::TestCase
       device_token: SecureRandom.hex(16)
     )
     @project = Project.create!(user: @user, name: "Test Project", repo_link: "https://github.com/example/test")
-    # The create callback enqueues a job; we run the job synchronously with our stubs in tests.
+    # Create no longer enqueues a thumbnail job; we invoke the job directly with our stubs below.
     clear_enqueued_jobs
     # Minimal valid JPEG (1x1) — enough to satisfy bytes-blank? checks and let
     # ActiveStorage compute a checksum on attach.
@@ -309,7 +309,8 @@ class ComputeProjectUnifiedThumbnailJobTest < ActiveJob::TestCase
 
   def stub_finder(url)
     calls = @finder_calls
-    with_stubbed(ShipChecks::UnifiedScreenshotFinder, :find_url) do |project|
+    # find_url now takes ctx:/allow_representative:/force: keywords — accept and ignore them.
+    with_stubbed(ShipChecks::UnifiedScreenshotFinder, :find_url) do |project, **|
       calls << project
       url
     end

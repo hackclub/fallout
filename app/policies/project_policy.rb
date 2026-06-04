@@ -61,6 +61,13 @@ class ProjectPolicy < ApplicationPolicy
     !user.trial? && owner? # Only verified project owners can submit for review
   end
 
+  def refresh_cover?
+    return false if record.discarded?
+    return false unless user.present?
+
+    !user.trial? && owner? # Cover refresh hits the GitHub API — verified owners only (mirrors ship?)
+  end
+
   def manage_collaborators?
     return false unless user.present? && !user.trial? && collaborators_enabled?
 

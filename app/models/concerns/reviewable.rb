@@ -39,8 +39,16 @@ module Reviewable
     # Update Ship's cached status in the SAME transaction (not after_commit) to prevent drift
     after_save :recompute_ship_status!, if: :saved_change_to_status?
 
+    # Backfill reviewer_id on terminal transitions when the claim was lost mid-session.
+    # See #stamp_finalizing_reviewer for the full rationale.
+    before_update :stamp_finalizing_reviewer
+
     # Set to true to skip recompute_ship_status! (e.g. during bulk cancellation where the caller recomputes once)
     attr_accessor :skip_ship_recompute
+
+    # Set by controllers (to current_user) before #update on terminal submissions so the
+    # before_update callback can stamp reviewer_id when the claim system left it blank.
+    attr_accessor :finalizing_user
   end
 
   # -- Claim instance methods (use update_columns to bypass callbacks) --
@@ -203,5 +211,19 @@ module Reviewable
       ship.ensure_phase_two_review!
       ship.recompute_status!
     end
+  end
+
+  # Reviewer attribution invariant: any review reaching approved/returned/rejected must
+  # carry a non-NULL reviewer_id. Normally the claim system sets it when the reviewer opens
+  # the page, but ExpireStaleReviewClaimsJob can clear it between page load and submit,
+  # and the policy permits admins to update without an active claim — so a terminal save
+  # can otherwise land with reviewer_id=NULL. Controllers set #finalizing_user to
+  # current_user before #update; this callback fills reviewer_id from it only when blank,
+  # preserving the original claimer when one exists. Cancellations are excluded — they're
+  # system-driven (cancel_pending_reviews!) and intentionally have no reviewer.
+  def stamp_finalizing_reviewer
+    return unless will_save_change_to_status?
+    return unless %w[approved returned rejected].include?(status)
+    self.reviewer_id ||= finalizing_user&.id
   end
 end

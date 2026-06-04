@@ -70,7 +70,7 @@ module ShipCheckService
   # Runs all checks, pipelined: checks start as soon as their deps resolve.
   # Yields each CheckResult as it completes (for real-time cache updates).
   # Results are cached by repo state + project fields; pass force: true to bypass.
-  def run_all(project, run_all_checks: false, force: false, &on_complete)
+  def run_all(project, run_all_checks: false, force: false, return_context: false, &on_complete)
     ctx = ShipChecks::SharedContext.new(project)
 
     # Resolve repo_meta first (needed for cache key)
@@ -81,7 +81,7 @@ module ShipCheckService
       cached = load_cached_results(ctx, project)
       if cached
         cached.each { |r| on_complete&.call(r) }
-        return cached
+        return return_context ? [ cached, ctx ] : cached
       end
     end
 
@@ -129,7 +129,7 @@ module ShipCheckService
     sorted = results.sort_by { |r| order.index(r.key) || order.size }
 
     store_cached_results(ctx, project, sorted)
-    sorted
+    return_context ? [ sorted, ctx ] : sorted
   end
 
   # Only user-visible, blocking failures prevent submission (warn/skipped are non-blocking)
