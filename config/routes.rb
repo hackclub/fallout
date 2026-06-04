@@ -426,6 +426,7 @@ Rails.application.routes.draw do
       end
       resources :soup_campaigns, only: [ :index, :show, :new, :create, :update, :edit, :destroy ] do
         member do
+          get :audience_preview
           post :send_campaign
           post :test_send
           post :cancel

@@ -38,6 +38,7 @@ interface Campaign {
   name: string
   body: string
   footer: string
+  target_user_ids_text: string
   unsubscribe_label: string
   image_url: string | null
   status: 'draft' | 'sending' | 'sent' | 'cancelled'
@@ -63,6 +64,7 @@ interface Props {
   recipients_pagy: PagyProps
   stats: Campaign['stats']
   progress: number
+  audience_query_help?: string[]
 }
 
 const STATUS_BADGE: Record<
@@ -85,6 +87,11 @@ const RECIPIENT_STATUS_ICON: Record<Recipient['status'], ReactNode> = {
 }
 
 const SOUP_AVATAR = 'https://avatars.slack-edge.com/2026-03-03/10620134255189_994e10cd91f0fc88ad9c_512.jpg'
+const PREVIEW_TOTAL_TIME_LOGGED_HOURS = '20'
+
+function interpolatePreview(text: string): string {
+  return text.replace(/\{name\}/g, 'Alex').replace(/\{total_time_logged_seconds\}/g, PREVIEW_TOTAL_TIME_LOGGED_HOURS)
+}
 
 function renderSlackMarkdown(text: string): string {
   return text
@@ -137,14 +144,14 @@ function MessagePreview({
           {/* Body */}
           <div
             className="text-[#d1d2d3] leading-relaxed [&_strong]:text-white [&_a]:text-[#1264a3] [&_a:hover]:underline mb-2"
-            dangerouslySetInnerHTML={{ __html: renderSlackMarkdown(body.replace(/\{name\}/g, 'Alex')) }}
+            dangerouslySetInnerHTML={{ __html: renderSlackMarkdown(interpolatePreview(body)) }}
           />
 
           {/* Footer section block */}
           {footer.trim() && (
             <div
               className="text-[#d1d2d3] leading-relaxed [&_strong]:text-white [&_a]:text-[#1264a3] [&_a:hover]:underline mb-2"
-              dangerouslySetInnerHTML={{ __html: renderSlackMarkdown(footer.replace(/\{name\}/g, 'Alex')) }}
+              dangerouslySetInnerHTML={{ __html: renderSlackMarkdown(interpolatePreview(footer)) }}
             />
           )}
 
@@ -268,6 +275,7 @@ export default function SoupCampaignsShow({
   const [recipients, setRecipients] = useState<Recipient[]>(initialRecipients)
   const [togglingId, setTogglingId] = useState<number | null>(null)
   const isDraft = campaign.status === 'draft'
+  const isTargeted = campaign.target_user_ids_text.trim().length > 0
   // Poll for progress updates when campaign is sending
   const poll = useCallback(() => {
     router.reload({ only: ['campaign', 'stats', 'progress', 'recipients'] })
@@ -424,9 +432,10 @@ export default function SoupCampaignsShow({
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Send to all recipients?</AlertDialogTitle>
+                    <AlertDialogTitle>Send campaign?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will DM all Fallout users and members of #fallout as Soup. This cannot be undone.
+                      This will DM {recipients_pagy.count} {isTargeted ? 'targeted Fallout users' : 'recipients'} as
+                      Soup. This cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -524,7 +533,7 @@ export default function SoupCampaignsShow({
                 Recipients
                 {isDraft && (
                   <Badge variant="outline" className="text-[10px] h-4 px-1.5 font-normal">
-                    projected
+                    {isTargeted ? 'targeted' : 'projected'}
                   </Badge>
                 )}
               </CardTitle>
@@ -586,6 +595,10 @@ export default function SoupCampaignsShow({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status</span>
                 <Badge variant={variant}>{label}</Badge>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Audience</span>
+                <span className="text-right">{isTargeted ? 'Targeted users' : 'Full Soup audience'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created by</span>
