@@ -3,18 +3,21 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
     base = policy_scope(RequirementsCheckReview)
       .includes(ship: [ :project, :time_audit_review, project: :user ], reviewer: [])
 
+    sort = parse_sort
     pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).order(created_at: :asc).load
     @pagy, @all_reviews = pagy(base.order(created_at: :desc))
     Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
     flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
     previously_reviewed = precompute_previously_reviewed_project_ids
     lifetime_hours = precompute_user_lifetime_hours(pending_reviews)
+    pending_reviews = pending_reviews.sort_by { |review| -(lifetime_hours[review.ship.project.user_id] || -1) } if sort == :hours
 
     render inertia: {
       pending_reviews: pending_reviews.map { |r| serialize_review_row(r, previously_reviewed_project_ids: previously_reviewed, user_lifetime_hours: lifetime_hours) },
       all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids, previously_reviewed_project_ids: previously_reviewed) },
       pagy: pagy_props(@pagy),
       start_reviewing_path: next_admin_reviews_requirements_checks_path,
+      current_sort: sort,
       **review_stats_props(RequirementsCheckReview)
     }
   end

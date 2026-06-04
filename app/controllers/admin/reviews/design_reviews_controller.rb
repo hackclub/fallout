@@ -3,6 +3,7 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
     base = policy_scope(DesignReview)
       .includes(ship: [ :project, :time_audit_review, project: :user, requirements_check_review: :reviewer ], reviewer: [])
 
+    sort = parse_sort
     # Order by ship.created_at so the longest-waiting ship floats to the top —
     # the DR row is created later (after TA approval), so DR.created_at doesn't
     # reflect how long the student has actually been waiting.
@@ -12,12 +13,14 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
     Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)
     previously_reviewed = precompute_previously_reviewed_project_ids
     lifetime_hours = precompute_user_lifetime_hours(pending_reviews)
+    pending_reviews = pending_reviews.sort_by { |review| -(lifetime_hours[review.ship.project.user_id] || -1) } if sort == :hours
 
     render inertia: {
       pending_reviews: pending_reviews.map { |r| serialize_review_row(r, previously_reviewed_project_ids: previously_reviewed, user_lifetime_hours: lifetime_hours) },
       all_reviews: @all_reviews.map { |r| serialize_review_row(r, flagged_project_ids: flagged_ids, previously_reviewed_project_ids: previously_reviewed) },
       pagy: pagy_props(@pagy),
       start_reviewing_path: next_admin_reviews_design_reviews_path,
+      current_sort: sort,
       **review_stats_props(DesignReview)
     }
   end

@@ -1,5 +1,5 @@
-import { type ReactNode, useState } from 'react'
-import { Link, usePage } from '@inertiajs/react'
+import type { ReactNode } from 'react'
+import { Link, router, usePage } from '@inertiajs/react'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
@@ -15,6 +15,7 @@ export default function RequirementsChecksIndex({
   all_reviews,
   pagy,
   start_reviewing_path,
+  current_sort,
   stats_keys,
   stats,
 }: {
@@ -22,12 +23,13 @@ export default function RequirementsChecksIndex({
   all_reviews: ReviewRow[]
   pagy: PagyProps
   start_reviewing_path: string
+  current_sort: 'hours' | 'waiting'
   stats_keys: ReviewStatKey[]
   stats?: ReviewStats
 }) {
   const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
   const isAdmin = admin_permissions?.is_admin ?? false
-  const [sortByHours, setSortByHours] = useState(false)
+  const sortByHours = current_sort === 'hours'
 
   const hoursColumn = {
     accessorKey: 'approved_public_hours',
@@ -39,10 +41,6 @@ export default function RequirementsChecksIndex({
         <span className="text-muted-foreground">—</span>
       ),
   }
-
-  const sortedPending = sortByHours
-    ? [...pending_reviews].sort((a, b) => (b.approved_public_hours ?? -1) - (a.approved_public_hours ?? -1))
-    : pending_reviews
 
   return (
     <div className="space-y-8">
@@ -61,7 +59,13 @@ export default function RequirementsChecksIndex({
             )}
           </h2>
           <div className="flex items-center gap-2">
-            <Button variant={sortByHours ? 'default' : 'outline'} size="sm" onClick={() => setSortByHours((v) => !v)}>
+            <Button
+              variant={sortByHours ? 'default' : 'outline'}
+              size="sm"
+              onClick={() =>
+                router.get(BASE_PATH, { sort: sortByHours ? 'waiting' : 'hours' }, { preserveScroll: true, replace: true })
+              }
+            >
               {sortByHours ? 'Sort: Hours' : 'Sort: Time Waiting'}
             </Button>
             {pending_reviews.length > 0 && (
@@ -73,7 +77,7 @@ export default function RequirementsChecksIndex({
         </div>
         <DataTable
           columns={buildPendingColumns(BASE_PATH, 'Time Audit done', sortByHours ? [hoursColumn] : [])}
-          data={sortedPending}
+          data={pending_reviews}
           noun="pending reviews"
           rowClassName={(row) => {
             const parts: string[] = []

@@ -91,8 +91,12 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   def parse_sort
     # Persist explicit preference in session so it survives PATCH/redirect cycles
     # where params[:sort] is absent (form submission doesn't re-send query params).
-    session[:review_sort] = params[:sort] if params[:sort].in?(%w[hours waiting])
-    session[:review_sort] == "hours" ? :hours : :waiting
+    session[review_sort_session_key] = params[:sort] if params[:sort].in?(%w[hours waiting])
+    session[review_sort_session_key] == "hours" ? :hours : :waiting
+  end
+
+  def review_sort_session_key
+    "review_sort:#{params[:controller]}"
   end
 
   # Flagged projects are visible in the All table but excluded from the pending queue

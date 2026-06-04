@@ -84,3 +84,23 @@
 #  updated_at                         :datetime         not null
 #  hca_id                             :string
 #  slack_id                           :string
+
+one:
+  avatar: MyString
+  slack_id: MyString
+  display_name: MyString
+  email: user1@example.com
+  timezone: MyString
+  hca_id: hca_id_1
+  roles: ['admin']
+  is_banned: false
+
+two:
+  avatar: MyString
+  slack_id: MyString
+  display_name: MyString
+  email: user2@example.com
+  timezone: MyString
+  hca_id: hca_id_2
+  roles: ['user']
+  is_banned: false
