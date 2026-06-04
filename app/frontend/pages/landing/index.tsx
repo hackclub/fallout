@@ -664,7 +664,7 @@ export default function LandingIndex() {
               <span className="text-2xl xs:text-3xl text-brown">My parents are worried!</span>
               <div className="gap-4 sm:gap-10 text-beige flex flex-col sm:flex-row items-center justify-center w-full">
                 <a
-                  href="https://hack.club/renran"
+                  href="https://hack.club/fallout-parent-call"
                   className="inline-block bg-brown w-full max-w-70 py-4 text-2xl rounded-sm hover:bg-dark-brown transition-all"
                 >
                   Book a call with us
