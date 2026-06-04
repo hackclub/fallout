@@ -34,8 +34,8 @@ export function WaitingLabel({
 }) {
   const ship = formatWaitDuration(waitingSince)
   const cycle = cycleStartedAt ? formatWaitDuration(cycleStartedAt) : null
-  // Red once the cycle wait (ship wait when no cycle start) reaches the SLA (breach).
-  const breached = slaDays != null && waitDays(cycleStartedAt ?? waitingSince) >= slaDays
+  // Red once THIS ship's wait reaches the SLA (breach). Cycle wait is informational only.
+  const breached = slaDays != null && waitDays(waitingSince) >= slaDays
   return (
     <TooltipProvider>
       <span className={breached ? 'text-red-700 dark:text-red-400' : undefined}>
