@@ -164,10 +164,6 @@ class JournalEntriesController < ApplicationController
     authorize JournalEntry.new(user: current_user, project: new_project), :create? # Re-check project access for the destination project
 
     source_project = @journal_entry.project
-    if source_project.ships.approved.exists? || new_project.ships.approved.exists?
-      return render_switch_project_error("Cannot move a journal entry from or to an approved project.")
-    end
-
     if @journal_entry.update(project: new_project)
       if modal_json_request?
         head :no_content

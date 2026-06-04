@@ -421,14 +421,7 @@ class ProjectsController < ApplicationController
       scope = scope.includes(:collaborator_users)
     end
 
-    unshipped_ids = Project.kept
-      .where(id: scope)
-      .where.not(id: Ship.approved.select(:project_id))
-      .pluck(:id)
-      .to_set
-
     scope.select { |project|
-      next false unless unshipped_ids.include?(project.id)
       JournalEntryPolicy.new(current_user, project.journal_entries.build(user: current_user)).create?
     }.map { |project| { id: project.id, name: project.name } }
   end

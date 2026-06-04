@@ -211,8 +211,10 @@ class Project < ApplicationRecord
   # this project's TA-blessed approved_public_seconds. Proportional split (rather than
   # journal-level approval) is used because approved_public_seconds is stored per ship,
   # not per journal — TA adjustments are still respected since the ratio is taken against
-  # the raw project total. Sums across users always equal the project's approved total
-  # (no double-counting), and a project with zero raw logged time contributes zero.
+  # the total time on journal entries claimed by approved ships only. New unshipped
+  # journals and project-level manual_seconds must not change already-approved hours.
+  # Sums across users always equal the project's approved total exactly, and a project
+  # with zero approved-cycle logged time contributes zero.
   def user_approved_seconds(user)
     self.class.batch_user_approved_seconds([ id ], user)[id].to_i
   end
@@ -243,7 +245,9 @@ class Project < ApplicationRecord
 
   # Returns { project_id => approved_seconds_attributed_to_user }. Uses the proportional
   # rule documented on user_approved_seconds: approved_public_seconds_P × user_share_P /
-  # total_logged_P. Falls back to zero when total_logged_P is zero to avoid divide-by-zero.
+  # approved_cycle_logged_P, where the denominator only includes journal entries claimed
+  # by approved ships on that project. Falls back to zero when approved_cycle_logged_P is
+  # zero to avoid divide-by-zero.
   def self.batch_user_approved_seconds(project_ids, user)
     return {} if project_ids.empty? || user.nil?
 
@@ -255,8 +259,7 @@ class Project < ApplicationRecord
     return {} if approved_by_project.empty?
 
     candidate_ids = approved_by_project.keys
-    total_by_project = batch_time_logged(candidate_ids)
-    user_by_project = batch_user_logged_seconds(candidate_ids, user)
+    total_by_project, user_by_project = batch_approved_cycle_attribution(candidate_ids, user)
 
     candidate_ids.each_with_object({}) do |pid, h|
       approved = approved_by_project[pid].to_i
@@ -268,8 +271,9 @@ class Project < ApplicationRecord
 
   # Admin-only variant of batch_user_approved_seconds that uses the *internal* approved
   # total per project — approved_public_seconds + DR.hours_adjustment + BR.hours_adjustment.
-  # Same proportional split as the public version, so per-user sums equal each project's
-  # internal-approved total. Used by the admin hours-stats dashboard's "build_approved" mode.
+  # Same approved-cycle proportional split as the public version, so per-user sums equal
+  # each project's internal-approved total. Used by the admin hours-stats dashboard's
+  # "build_approved" mode.
   def self.batch_user_internal_approved_seconds(project_ids, user)
     return {} if project_ids.empty? || user.nil?
 
@@ -282,8 +286,7 @@ class Project < ApplicationRecord
     return {} if internal_by_project.empty?
 
     candidate_ids = internal_by_project.keys
-    total_by_project = batch_time_logged(candidate_ids)
-    user_by_project = batch_user_logged_seconds(candidate_ids, user)
+    total_by_project, user_by_project = batch_approved_cycle_attribution(candidate_ids, user)
 
     candidate_ids.each_with_object({}) do |pid, h|
       internal = internal_by_project[pid].to_i
@@ -327,6 +330,30 @@ class Project < ApplicationRecord
       ActiveRecord::Base.sanitize_sql([ sql, ids: project_ids ])
     )
     result.to_h { |pid, total| [ pid.to_i, total.to_i ] }
+  end
+
+  def self.batch_approved_cycle_attribution(project_ids, user)
+    return [ {}, {} ] if project_ids.empty? || user.nil?
+
+    project_by_je = JournalEntry.kept
+      .joins(:ship)
+      .where(project_id: project_ids, ships: { status: Ship.statuses[:approved] })
+      .pluck(:id, :project_id)
+      .to_h
+
+    return [ {}, {} ] if project_by_je.empty?
+
+    total_by_project = Hash.new(0)
+    JournalEntry.batch_time_logged(project_by_je.keys).each do |je_id, secs|
+      total_by_project[project_by_je[je_id]] += secs
+    end
+
+    user_by_project = Hash.new(0)
+    JournalEntry.batch_user_attributed_seconds(project_by_je.keys, user).each do |je_id, secs|
+      user_by_project[project_by_je[je_id]] += secs
+    end
+
+    [ total_by_project, user_by_project ]
   end
 
   private

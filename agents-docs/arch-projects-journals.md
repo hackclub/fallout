@@ -55,7 +55,7 @@ Ship (audit-trailed)
 **Key methods:**
 - `time_logged` — aggregates duration from LapseTimelapse, LookoutTimelapse, and YouTubeVideo (stretch-multiplied) recordings across all kept journal entries on the project, plus admin-set `manual_seconds`.
 - `user_logged_seconds(user)` / `Project.batch_user_logged_seconds(ids, user)` — the user's attributed share of the project's hours. Each kept journal entry's seconds are divided among its attribution set (author ∪ kept journal collaborators); the user's share of `manual_seconds` is then added (split by project member_count). Used by My Projects cards, project detail header, and rolled up into `User#total_time_logged_seconds`.
-- `user_approved_seconds(user)` / `Project.batch_user_approved_seconds(ids, user)` — proportional split of approved TA seconds: `approved_public_seconds_P × user_share_P / total_logged_P`. Per-user sums equal the project's approved total exactly (no double-count).
+- `user_approved_seconds(user)` / `Project.batch_user_approved_seconds(ids, user)` — proportional split of approved TA seconds: `approved_public_seconds_P × user_share_P / approved_cycle_logged_P`. The denominator only includes journal entries claimed by approved ships on that project; newer unshipped journals and `manual_seconds` do not affect already-approved hours. Per-user sums equal the project's approved total exactly (no double-count).
 - `owner_or_collaborator?(user)` — checks ownership OR collaboration
 - `discard` (override) — **cascades in transaction**: soft-deletes collaborators, invites, and journal entries
 
@@ -77,6 +77,7 @@ Ship (audit-trailed)
 - `create?`: project owner always (preserves trial behavior); collaborators only if verified + flag enabled
 - `show?`: admin OR journal author OR project owner (always) OR project collaborator (flag-gated). Project owner access is intentionally NOT flag-gated — owners always see entries on their own projects.
 - `update?`/`destroy?`: admin OR (entry author AND (project owner OR project collaborator with flag enabled)). The AND is important — the author must also have access to the project.
+- `switch_project?`: same access as `update?`, but only for unshipped entries (`ship_id` must be nil). Approved projects are still valid move targets for unshipped entries.
 - **Scope**: returns entries the user authored, entries on projects they own, and entries on projects they collaborate on (flag-gated)
 
 **Creation flow (`app/controllers/journal_entries_controller.rb#create`):**
