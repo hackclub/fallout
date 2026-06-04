@@ -17,6 +17,7 @@ export default function BuildReviewsIndex({
   start_reviewing_path,
   stats_keys,
   stats,
+  sla_days,
 }: {
   pending_reviews: ReviewRow[]
   all_reviews: ReviewRow[]
@@ -24,6 +25,7 @@ export default function BuildReviewsIndex({
   start_reviewing_path: string
   stats_keys: ReviewStatKey[]
   stats?: ReviewStats
+  sla_days?: number
 }) {
   const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
   const isAdmin = admin_permissions?.is_admin ?? false
@@ -32,7 +34,7 @@ export default function BuildReviewsIndex({
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight mb-4">Build Reviews</h1>
-        <ReviewStatsHeader stats_keys={stats_keys} stats={stats} />
+        <ReviewStatsHeader stats_keys={stats_keys} stats={stats} sla_days={sla_days} />
       </div>
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -50,7 +52,11 @@ export default function BuildReviewsIndex({
             </Button>
           )}
         </div>
-        <DataTable columns={buildPendingColumns(BASE_PATH)} data={pending_reviews} noun="pending reviews" />
+        <DataTable
+          columns={buildPendingColumns(BASE_PATH, undefined, [], sla_days)}
+          data={pending_reviews}
+          noun="pending reviews"
+        />
       </div>
 
       <div>

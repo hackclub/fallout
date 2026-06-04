@@ -18,6 +18,7 @@ export default function RequirementsChecksIndex({
   current_sort,
   stats_keys,
   stats,
+  sla_days,
 }: {
   pending_reviews: ReviewRow[]
   all_reviews: ReviewRow[]
@@ -26,6 +27,7 @@ export default function RequirementsChecksIndex({
   current_sort: 'hours' | 'waiting'
   stats_keys: ReviewStatKey[]
   stats?: ReviewStats
+  sla_days?: number
 }) {
   const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
   const isAdmin = admin_permissions?.is_admin ?? false
@@ -46,7 +48,7 @@ export default function RequirementsChecksIndex({
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight mb-4">Requirements Checks</h1>
-        <ReviewStatsHeader stats_keys={stats_keys} stats={stats} />
+        <ReviewStatsHeader stats_keys={stats_keys} stats={stats} sla_days={sla_days} />
       </div>
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -63,7 +65,11 @@ export default function RequirementsChecksIndex({
               variant={sortByHours ? 'default' : 'outline'}
               size="sm"
               onClick={() =>
-                router.get(BASE_PATH, { sort: sortByHours ? 'waiting' : 'hours' }, { preserveScroll: true, replace: true })
+                router.get(
+                  BASE_PATH,
+                  { sort: sortByHours ? 'waiting' : 'hours' },
+                  { preserveScroll: true, replace: true },
+                )
               }
             >
               {sortByHours ? 'Sort: Hours' : 'Sort: Time Waiting'}
@@ -76,7 +82,7 @@ export default function RequirementsChecksIndex({
           </div>
         </div>
         <DataTable
-          columns={buildPendingColumns(BASE_PATH, 'Time Audit done', sortByHours ? [hoursColumn] : [])}
+          columns={buildPendingColumns(BASE_PATH, 'Time Audit done', sortByHours ? [hoursColumn] : [], sla_days)}
           data={pending_reviews}
           noun="pending reviews"
           rowClassName={(row) => {

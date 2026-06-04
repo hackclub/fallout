@@ -17,6 +17,7 @@ export default function TimeAuditsIndex({
   start_reviewing_path,
   stats_keys,
   stats,
+  sla_days,
 }: {
   pending_reviews: ReviewRow[]
   all_reviews: ReviewRow[]
@@ -24,6 +25,7 @@ export default function TimeAuditsIndex({
   start_reviewing_path: string
   stats_keys: ReviewStatKey[]
   stats?: ReviewStats
+  sla_days?: number
 }) {
   const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
   const isAdmin = admin_permissions?.is_admin ?? false
@@ -32,7 +34,7 @@ export default function TimeAuditsIndex({
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight mb-4">Time Audits</h1>
-        <ReviewStatsHeader stats_keys={stats_keys} stats={stats} />
+        <ReviewStatsHeader stats_keys={stats_keys} stats={stats} sla_days={sla_days} />
       </div>
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -51,7 +53,7 @@ export default function TimeAuditsIndex({
           )}
         </div>
         <DataTable
-          columns={buildPendingColumns(BASE_PATH, 'Requirements Check done')}
+          columns={buildPendingColumns(BASE_PATH, 'Requirements Check done', [], sla_days)}
           data={pending_reviews}
           noun="pending reviews"
           rowClassName={(row) => (row.sibling_approved ? 'bg-yellow-50 dark:bg-yellow-950/20' : undefined)}
