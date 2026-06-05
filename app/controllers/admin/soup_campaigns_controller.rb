@@ -249,6 +249,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     text
       .gsub("{name}", personalization[:name])
       .gsub("{total_time_logged_seconds}", personalization[:total_time_logged_seconds].to_s)
+      .gsub(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/, '<\2|\1>')
   end
 
   def format_logged_hours(total_time_logged_seconds)

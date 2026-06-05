@@ -38,6 +38,7 @@ function renderSlackMarkdown(text: string): string {
     .replace(/_([^_\n]+)_/g, '<em>$1</em>')
     .replace(/~([^~\n]+)~/g, '<del>$1</del>')
     .replace(/`([^`\n]+)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-xs font-mono">$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-[#1264a3] underline">$1</a>')
     .replace(/&lt;(https?:\/\/[^|&]+)\|([^&]+)&gt;/g, '<a href="$1" class="text-[#1264a3] underline">$2</a>')
     .replace(/&lt;(https?:\/\/[^&]+)&gt;/g, '<a href="$1" class="text-[#1264a3] underline">$1</a>')
     .replace(/&lt;#[A-Z0-9]+\|([^&]+)&gt;/g, '<span class="text-[#1264a3] font-medium">#$1</span>')

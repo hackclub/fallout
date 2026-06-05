@@ -136,6 +136,7 @@ function inlineSlack(text: string): string {
       /`([^`]+)`/g,
       '<code style="background:#2c2d30;padding:0 3px;border-radius:3px;font-family:monospace;font-size:0.8em;">$1</code>',
     )
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#1264a3;">$1</a>')
     .replace(/&lt;(https?:\/\/[^|&]+)\|([^&]+)&gt;/g, '<a href="$1" style="color:#1264a3;">$2</a>')
     .replace(/&lt;(https?:\/\/[^&]+)&gt;/g, '<a href="$1" style="color:#1264a3;">$1</a>')
 }
