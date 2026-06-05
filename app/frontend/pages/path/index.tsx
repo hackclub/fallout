@@ -10,7 +10,6 @@ import SignUpCta from '@/components/path/SignUpCta'
 import BgmPlayer from '@/components/path/BgmPlayer'
 import Header from '@/components/path/Header'
 import SubmissionCountdown from '@/components/path/SubmissionCountdown'
-import AnnouncementsBar from '@/components/announcements/AnnouncementsBar'
 import FlashMessages from '@/components/FlashMessages'
 import { notify } from '@/lib/notifications'
 import { useLiveReload } from '@/lib/useLiveReload'
@@ -470,7 +469,6 @@ export default function PathIndex() {
         style={{ pointerEvents: pathIntro.hudVisible ? 'auto' : 'none' }}
       >
         <Header koiBalance={user.koi} goldBalance={user.gold} avatar={user.avatar} displayName={user.display_name} />
-        <AnnouncementsBar />
       </motion.div>
 
       <motion.div

@@ -6,5 +6,6 @@ export interface Announcement {
   message: string
   href?: string
   external?: boolean
+  modal?: boolean
   dismissible?: boolean
 }

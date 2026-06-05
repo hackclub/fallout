@@ -1,4 +1,5 @@
 import { motion, type Variants } from 'motion/react'
+import { ModalLink } from '@inertiaui/modal-react'
 import type { Announcement, AnnouncementKind } from './types'
 import { dismissAnnouncement } from './storage'
 
@@ -6,15 +7,13 @@ type Props = {
   announcement: Announcement
   index: number
   stacked: boolean
-  isOnly: boolean
 }
 
 const STYLES: Record<AnnouncementKind, string> = {
   critical:
-    'bg-brown text-beige py-2 px-3 lg:px-6 text-sm sm:text-lg shadow-[0_3px_0_rgba(97,69,58,0.35)] underline decoration-1 underline-offset-2 hover:bg-light-brown hover:text-dark-brown',
-  info: 'bg-light-brown text-dark-brown py-2 px-3 lg:px-5 text-sm sm:text-base shadow-[0_2px_0_rgba(97,69,58,0.3)] hover:bg-yellow',
-  promo:
-    'bg-yellow text-dark-brown py-1.5 px-3 lg:px-5 text-xs sm:text-sm shadow-[0_2px_0_rgba(97,69,58,0.25)] hover:bg-light-brown',
+    'bg-brown text-beige py-1.5 px-3 text-xs sm:text-sm shadow-[0_3px_0_rgba(97,69,58,0.35)] underline decoration-1 underline-offset-2 hover:bg-light-brown hover:text-dark-brown',
+  info: 'bg-light-brown text-dark-brown py-1.5 px-3 text-xs sm:text-sm shadow-[0_2px_0_rgba(97,69,58,0.3)] hover:bg-yellow',
+  promo: 'bg-yellow text-dark-brown py-1 px-3 text-xs shadow-[0_2px_0_rgba(97,69,58,0.25)] hover:bg-light-brown',
 }
 
 const TACK_COLOR: Record<AnnouncementKind, string> = {
@@ -37,12 +36,12 @@ const cardVariants: Variants = {
   exit: { opacity: 0, y: -8, scale: 0.96, transition: { duration: 0.18 } },
 }
 
-export default function AnnouncementCard({ announcement, index, stacked, isOnly }: Props) {
+export default function AnnouncementCard({ announcement, index, stacked }: Props) {
   const tilt = tiltFor(index, stacked)
   const isCritical = announcement.kind === 'critical'
 
   const baseClass =
-    'relative pointer-events-auto block border border-dark-brown rounded-xs transition-colors text-center font-medium overflow-hidden'
+    'relative pointer-events-auto block border border-dark-brown rounded-xs transition-colors text-left font-medium overflow-hidden'
   const styleClass = STYLES[announcement.kind]
   const paddingShift = isCritical ? 'pl-4' : '' // Make room for the coral accent stripe.
 
@@ -55,8 +54,8 @@ export default function AnnouncementCard({ announcement, index, stacked, isOnly 
           className={`absolute -top-1.5 left-1/2 -translate-x-1/2 size-2.5 rounded-full ring-1 ring-dark-brown/40 shadow-[0_1px_0_rgba(97,69,58,0.5)] ${TACK_COLOR[announcement.kind]}`}
         />
       )}
-      <span className="inline-flex items-center justify-center gap-2">
-        <span>{announcement.message}</span>
+      <span className="flex items-center justify-between gap-2">
+        <span className="min-w-0">{announcement.message}</span>
         {announcement.dismissible && (
           <button
             type="button"
@@ -75,7 +74,7 @@ export default function AnnouncementCard({ announcement, index, stacked, isOnly 
     </>
   )
 
-  const widthClass = isOnly ? 'mx-auto w-full xs:w-fit' : 'w-full'
+  const widthClass = 'w-full'
 
   return (
     <motion.li
@@ -89,7 +88,13 @@ export default function AnnouncementCard({ announcement, index, stacked, isOnly 
       whileHover={stacked ? { rotate: 0, y: -2 } : { y: -1 }}
       className={widthClass}
     >
-      {announcement.href ? (
+      {!announcement.href ? (
+        <div className={`${baseClass} ${styleClass} ${paddingShift}`}>{content}</div>
+      ) : announcement.modal ? (
+        <ModalLink href={announcement.href} className={`${baseClass} ${styleClass} ${paddingShift}`}>
+          {content}
+        </ModalLink>
+      ) : (
         <a
           href={announcement.href}
           target={announcement.external ? '_blank' : undefined}
@@ -98,8 +103,6 @@ export default function AnnouncementCard({ announcement, index, stacked, isOnly 
         >
           {content}
         </a>
-      ) : (
-        <div className={`${baseClass} ${styleClass} ${paddingShift}`}>{content}</div>
       )}
     </motion.li>
   )

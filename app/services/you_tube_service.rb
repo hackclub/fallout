@@ -166,9 +166,12 @@ module YouTubeService
 
   def parse_iso8601_duration(duration_string)
     return nil if duration_string.blank?
-    match = duration_string.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+    # YouTube uses a days component for videos >= 24h (e.g. a 30h video is "P1DT6H1S"),
+    # which the old PT-only regex couldn't match.
+    match = duration_string.match(/\AP(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?\z/)
     return nil unless match
-    (match[1].to_i * 3600) + (match[2].to_i * 60) + match[3].to_i
+    days, hours, minutes, seconds = match.captures.map(&:to_i)
+    (days * 86_400) + (hours * 3_600) + (minutes * 60) + seconds
   end
 
   def youtube_api_key

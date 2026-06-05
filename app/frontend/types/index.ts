@@ -42,6 +42,7 @@ export interface SharedProps {
   rsvp_path: string
   has_unread_mail: boolean
   current_streak: number
+  unsubmitted_hours: number | null
   streak_freezes: number
   identity_gate: IdentityGate | null
   show_feedback_banner: boolean

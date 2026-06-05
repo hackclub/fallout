@@ -14,6 +14,12 @@ class PathController < ApplicationController
     next 0 unless current_user && !current_user.trial?
     StreakDay.current_streak(current_user)
   }
+  inertia_share unsubmitted_hours: -> { # Drives the "logged but not submitted" nudge banner on the path page
+    next nil unless current_user && !current_user.trial? # Qualification is a full-user concept; trial users see the sign-up CTA instead
+    next nil if current_user.ships.exists? # Already submitted at least one ship — nothing to nudge
+    next nil if current_logged_seconds < 20 * 3600 # Below the 20h nudge floor
+    (current_logged_seconds / 3600.0).round
+  }
 
   def index
     mail_intro_id = deliver_mail_intro || deliver_auto_open_mail
@@ -47,6 +53,11 @@ class PathController < ApplicationController
   end
 
   private
+
+  # Memoized so the unsubmitted_hours share and pending_dialog_key compute the batch hours query at most once per request.
+  def current_logged_seconds
+    @current_logged_seconds ||= current_user.total_time_logged_seconds
+  end
 
   NUDGE_INTERVAL_DAYS = 12
 
@@ -90,7 +101,7 @@ class PathController < ApplicationController
     sixty = campaigns_by_key["sixty_hours"]
     return "sixty_hours" if sixty && !sixty.seen?
 
-    if sixty.nil? && current_user.total_time_logged_seconds >= 60 * 3600
+    if sixty.nil? && current_logged_seconds >= 60 * 3600
       current_user.dialog_campaigns.create!(key: "sixty_hours")
       return "sixty_hours"
     end
