@@ -23,7 +23,7 @@ function DeltaChevron({ delta, better, unit }: { delta: number | null; better: '
   if (delta == null) return null
   if (delta === 0) {
     return (
-      <span className="inline-flex items-center text-xs text-muted-foreground" title="No change vs prior 7d">
+      <span className="inline-flex items-center text-xs text-muted-foreground" title="No change vs prior 3d">
         <Minus className="w-3 h-3" />
       </span>
     )
@@ -33,7 +33,7 @@ function DeltaChevron({ delta, better, unit }: { delta: number | null; better: '
   const Icon = up ? ChevronUp : ChevronDown
   const color = good ? 'text-green-700' : 'text-red-700'
   return (
-    <span className={`inline-flex items-center text-xs ${color}`} title="vs prior 7d">
+    <span className={`inline-flex items-center text-xs ${color}`} title="vs prior 3d">
       <Icon className="w-3 h-3" />
       {Math.abs(delta).toFixed(1)}
       {unit}
@@ -77,7 +77,7 @@ function renderCard(key: ReviewStatKey, stats?: ReviewStats, slaDays?: number) {
       // Red once the P90 wait reaches the queue's SLA (breach).
       const breached = slaDays != null && t?.ship_days != null && t.ship_days >= slaDays
       return (
-        <StatCard key={key} label="P90 Turnaround (7d)" description="90th-pct wait, includes pending backlog">
+        <StatCard key={key} label="P90 Turnaround (3d)" description="90th-pct wait, includes pending backlog">
           <TooltipProvider>
             <span className={breached ? 'text-red-700 dark:text-red-400' : undefined}>
               <Tooltip>
@@ -108,7 +108,7 @@ function renderCard(key: ReviewStatKey, stats?: ReviewStats, slaDays?: number) {
     case 'approval_ratio': {
       const a = stats?.approval_ratio
       return (
-        <StatCard key={key} label="Approval ratio (7d)" description="percentage of ships that get approved">
+        <StatCard key={key} label="Approval ratio (3d)" description="percentage of ships that get approved">
           <span>{fmtPct(a?.percent ?? null)}</span>
           {a && (
             <span className="text-muted-foreground text-sm font-normal ml-2">
@@ -128,7 +128,7 @@ function renderCard(key: ReviewStatKey, stats?: ReviewStats, slaDays?: number) {
       return (
         <StatCard
           key={key}
-          label="Reship ratio (7d)"
+          label="Reship ratio (3d)"
           description="ships that are re-attempts after a returned/rejected ship"
         >
           <span>{fmtPct(r?.percent ?? null)}</span>

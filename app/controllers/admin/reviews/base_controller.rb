@@ -358,10 +358,11 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   #     reship_ratio:  { percent: 20.0, count: 10, delta: -3.0 }                   # negative delta = fewer reships
   #   }
   #
-  # Windowed stats compare the last 7d against the prior 7d (days 7-14 ago).
+  # Windowed stats compare the last 3d against the prior 3d (days 3-6 ago) — a
+  # short window keeps the figure current rather than smoothing over week-old state.
   # Delta is nil when the prior window had zero qualifying reviews — leaving
   # the chevron off rather than rendering a misleading "infinite improvement".
-  STATS_WINDOW = 7.days
+  STATS_WINDOW = 3.days
   STATS_CACHE_TTL = 5.minutes
 
   # Stats arrive deferred (heavy aggregates off the critical path), but the layout
