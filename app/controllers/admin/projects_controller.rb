@@ -60,6 +60,7 @@ class Admin::ProjectsController < Admin::ApplicationController
       project: serialize_project_detail(@project),
       ships: @ships.map { |s| serialize_ship_row(s) },
       pagy_ships: pagy_props(@pagy_ships),
+      all_reviews: serialize_all_project_reviews(@project),
       journal_entries: @entries.map { |je| serialize_journal_entry(je, @ta_annotations) },
       pagy_entries: pagy_props(@pagy_entries)
     }
@@ -206,6 +207,27 @@ class Admin::ProjectsController < Admin::ApplicationController
       else 0
       end
     end.round
+  end
+
+  def serialize_all_project_reviews(project)
+    terminal = %w[approved returned rejected]
+    [ RequirementsCheckReview, DesignReview, BuildReview, TimeAuditReview ].flat_map do |klass|
+      klass
+        .joins(:ship)
+        .where(ships: { project_id: project.id }, status: terminal)
+        .includes(:reviewer)
+        .map do |review|
+          [ review.updated_at, {
+            ship_id: review.ship_id,
+            review_type: klass.name.underscore,
+            status: review.status,
+            feedback: review.feedback,
+            internal_reason: review.try(:internal_reason),
+            reviewer_display_name: review.reviewer&.display_name,
+            reviewed_at: review.updated_at.strftime("%b %d, %Y")
+          } ]
+        end
+    end.sort_by { |ts, _| -ts.to_i }.map(&:last)
   end
 
   def serialize_recording_summary(recording, rec_annotations = {}, include_playback_url: false)

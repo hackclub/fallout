@@ -8,8 +8,38 @@ class Admin::ReviewersController < Admin::ApplicationController
     @reviewer = User.find(params[:id])
     authorize @reviewer, :show?, policy_class: UserPolicy
 
-    start_week = Date.new(2026, 1, 5) # First Monday of 2026 — earliest reviewer onboarding
+    terminal = %w[approved returned rejected]
+    # COALESCE ensures reviews stamped before the completed_at column existed
+    # (or set via update_columns) still appear in the chart under updated_at.
+    week_expr = Arel.sql("TO_CHAR(DATE_TRUNC('week', COALESCE(completed_at, updated_at)), 'YYYY-MM-DD')")
+
+    rc_rows = RequirementsCheckReview
+      .where(status: terminal, reviewer_id: @reviewer.id)
+      .group(week_expr).count
+
+    dr_rows = DesignReview
+      .where(status: terminal, reviewer_id: @reviewer.id)
+      .group(week_expr).count
+
+    br_rows = BuildReview
+      .where(status: terminal, reviewer_id: @reviewer.id)
+      .group(week_expr).count
+
+    ta_rows = TimeAuditReview
+      .where(status: :approved, reviewer_id: @reviewer.id)
+      .group(week_expr).sum(:approved_public_seconds)
+
+    all_time_reviews = [ TimeAuditReview, DesignReview, BuildReview, RequirementsCheckReview ]
+      .sum { |klass| klass.where(status: terminal, reviewer_id: @reviewer.id).count }
+
+    rc_all_time = RequirementsCheckReview.where(status: terminal, reviewer_id: @reviewer.id).count
+
+    # Derive the weeks range from the reviewer's actual data so reviews before
+    # any hardcoded start date are never silently dropped.
+    all_week_keys = (rc_rows.keys + dr_rows.keys + br_rows.keys + ta_rows.keys).uniq.sort
     today_week = Date.today.beginning_of_week(:monday)
+    start_week = all_week_keys.any? ? Date.parse(all_week_keys.first).beginning_of_week(:monday) : today_week
+
     weeks = []
     w = start_week
     while w <= today_week
@@ -17,42 +47,24 @@ class Admin::ReviewersController < Admin::ApplicationController
       w += 7
     end
 
-    week_group = Arel.sql("TO_CHAR(DATE_TRUNC('week', completed_at), 'YYYY-MM-DD')")
-    terminal = %w[approved returned rejected]
-
-    rc_rows = RequirementsCheckReview
-      .where(status: terminal, reviewer_id: @reviewer.id)
-      .where("completed_at >= ?", start_week)
-      .group(week_group).count
-
-    dr_rows = DesignReview
-      .where(status: terminal, reviewer_id: @reviewer.id)
-      .where("completed_at >= ?", start_week)
-      .group(week_group).count
-
-    ta_rows = TimeAuditReview
-      .where(status: :approved, reviewer_id: @reviewer.id)
-      .where("completed_at >= ?", start_week)
-      .group(week_group).sum(:approved_public_seconds)
-
-    all_time_reviews = [ TimeAuditReview, DesignReview, BuildReview, RequirementsCheckReview ]
-      .sum { |klass| klass.where(status: terminal, reviewer_id: @reviewer.id).count }
-
     resolutions = @reviewer.reviewer_week_resolutions.index_by { |r| r.week_start.iso8601 }
 
     reviews_by_week = weeks.map do |week|
       rc = rc_rows[week].to_i
       dr = dr_rows[week].to_i
+      br = br_rows[week].to_i
       ta_hours = (ta_rows[week].to_f / 3600).round(1)
       ta = (ta_rows[week].to_f / (TA_HOURS_PER_REVIEW_EQUIVALENT * 3600)).round(2)
       resolution = resolutions[week]
+      total = rc + dr + br + ta
       {
         week: week,
         rc: rc,
         dr: dr,
+        br: br,
         ta: ta,
         ta_hours: ta_hours,
-        low: (rc + dr + ta) > 0 && (rc + dr + ta) < 15,
+        low: total > 0 && total < 15,
         resolved: resolution.present?,
         resolution_id: resolution&.id,
         resolution_reason: resolution&.reason
@@ -68,7 +80,7 @@ class Admin::ReviewersController < Admin::ApplicationController
         avatar: @reviewer.avatar,
         roles: @reviewer.roles,
         total_reviews: all_time_reviews,
-        rc_reviews: rc_rows.values.sum,
+        rc_reviews: rc_all_time,
         reviews_by_week: reviews_by_week,
         low_week_count: low_weeks
       },

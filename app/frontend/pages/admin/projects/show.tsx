@@ -23,7 +23,8 @@ import AuditLog, { AuditLogLoading } from '@/components/admin/AuditLog'
 import type { AuditLogEntry } from '@/components/admin/AuditLog'
 import { ChevronLeftIcon, ExternalLinkIcon, ClockIcon, StarIcon } from 'lucide-react'
 import { useLiveReload } from '@/lib/useLiveReload'
-import type { AdminProjectDetail, PagyProps, SiblingStatuses, SharedProps } from '@/types'
+import { ReviewStatusBadge } from '@/components/admin/ReviewStatusBadge'
+import type { AdminProjectDetail, PagyProps, SiblingStatuses, SharedProps, PreviousReview } from '@/types'
 
 function BurnoutToggle({ projectId, isBurnout }: { projectId: number; isBurnout: boolean }) {
   const [saving, setSaving] = useState(false)
@@ -251,10 +252,21 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+function reviewTypeLabel(type: string): string {
+  switch (type) {
+    case 'requirements_check_review': return 'RC'
+    case 'design_review': return 'Design'
+    case 'build_review': return 'Build'
+    case 'time_audit_review': return 'Time Audit'
+    default: return type
+  }
+}
+
 export default function AdminProjectsShow({
   project,
   ships,
   pagy_ships,
+  all_reviews,
   journal_entries,
   pagy_entries,
   audit_log,
@@ -262,6 +274,7 @@ export default function AdminProjectsShow({
   project: AdminProjectDetail
   ships: ShipRow[]
   pagy_ships: PagyProps
+  all_reviews: PreviousReview[]
   journal_entries: JournalEntry[]
   pagy_entries: PagyProps
   audit_log?: AuditLogEntry[]
@@ -460,6 +473,49 @@ export default function AdminProjectsShow({
       </div>
 
       <DataTable columns={shipColumns} data={ships} pagy={pagy_ships} noun="ships" pageParam="ships_page" />
+
+      {all_reviews.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-lg font-semibold tracking-tight">Reviews</h2>
+            <Badge variant="secondary" className="text-sm">{all_reviews.length}</Badge>
+          </div>
+          <Card className="py-0">
+            <div className="divide-y divide-border">
+              {all_reviews.map((r, i) => (
+                <div key={i} className="p-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <ReviewStatusBadge status={r.status} />
+                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+                        {reviewTypeLabel(r.review_type)}
+                      </span>
+                      <Link href={`/admin/reviews/${r.ship_id}`} className="text-[10px] text-muted-foreground hover:underline">
+                        Ship {r.ship_id}
+                      </Link>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {r.reviewer_display_name && `${r.reviewer_display_name} · `}{r.reviewed_at}
+                    </span>
+                  </div>
+                  {r.feedback && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Feedback</p>
+                      <p className="text-sm whitespace-pre-wrap">{r.feedback}</p>
+                    </div>
+                  )}
+                  {r.internal_reason && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Internal Reason</p>
+                      <p className="text-sm whitespace-pre-wrap text-muted-foreground">{r.internal_reason}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 mb-4 mt-8">
         <h2 className="text-lg font-semibold tracking-tight">Journal Entries</h2>

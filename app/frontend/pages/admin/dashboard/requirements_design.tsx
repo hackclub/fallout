@@ -8,8 +8,14 @@ import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/admin/ui/chart'
 import { Bar, BarChart } from 'recharts'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/admin/ui/sheet'
 import { MessageCircleIcon, X } from 'lucide-react'
 import { PageProps } from '@inertiajs/core'
+
+interface ReturnedProject {
+  id: number
+  name: string
+}
 
 interface LeaderboardRow {
   id: number
@@ -18,6 +24,7 @@ interface LeaderboardRow {
   approved_projects: number
   design_returned_projects: number
   return_rate: number
+  returned_dr_projects: ReturnedProject[]
 }
 
 interface Totals {
@@ -30,6 +37,7 @@ interface ReviewWeek {
   week: string
   rc: number
   dr: number
+  br: number
   ta: number
   ta_hours: number
   low: boolean
@@ -64,6 +72,7 @@ function formatRate(value: number): string {
 const profileChartConfig: ChartConfig = {
   rc: { label: 'RC', color: 'hsl(217, 91%, 60%)' },
   dr: { label: 'DR', color: 'hsl(142, 71%, 45%)' },
+  br: { label: 'BR', color: 'hsl(271, 81%, 60%)' },
   ta: { label: 'Time Audit', color: 'hsl(38, 92%, 50%)' },
 }
 
@@ -175,6 +184,9 @@ function ReviewerProfileCard({
                     }}
                     formatter={(value, name, item) => {
                       if (name === 'ta') return [`${item.payload.ta_hours} hrs`, 'Time Audit']
+                      if (name === 'rc') return [value, 'RC']
+                      if (name === 'dr') return [value, 'DR']
+                      if (name === 'br') return [value, 'BR']
                       return [value, (name as string).toUpperCase()]
                     }}
                   />
@@ -182,6 +194,7 @@ function ReviewerProfileCard({
               />
               <Bar dataKey="rc" stackId="a" fill="var(--color-rc)" />
               <Bar dataKey="dr" stackId="a" fill="var(--color-dr)" />
+              <Bar dataKey="br" stackId="a" fill="var(--color-br)" />
               <Bar dataKey="ta" stackId="a" radius={[2, 2, 0, 0]} fill="var(--color-ta)" />
             </BarChart>
           </ChartContainer>
@@ -195,6 +208,8 @@ export default function RequirementsDesignDashboard() {
   const { leaderboard, totals, reviewer_profiles, non_reviewer_channel_members } = usePage<Props>().props
   const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
   const isAdmin = admin_permissions?.is_admin ?? false
+
+  const [returnedSheet, setReturnedSheet] = useState<LeaderboardRow | null>(null)
 
   const [dmStates, setDmStates] = useState<Record<number, Date | null>>(() => {
     const result: Record<number, Date | null> = {}
@@ -302,9 +317,15 @@ export default function RequirementsDesignDashboard() {
                       {row.approved_projects}:{row.design_returned_projects}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Badge variant={row.design_returned_projects > 0 ? 'destructive' : 'secondary'}>
-                        {formatRate(row.return_rate)}
-                      </Badge>
+                      {row.design_returned_projects > 0 ? (
+                        <button type="button" onClick={() => setReturnedSheet(row)}>
+                          <Badge variant="destructive" className="cursor-pointer hover:opacity-80">
+                            {formatRate(row.return_rate)}
+                          </Badge>
+                        </button>
+                      ) : (
+                        <Badge variant="secondary">{formatRate(row.return_rate)}</Badge>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -372,6 +393,24 @@ export default function RequirementsDesignDashboard() {
           </div>
         )}
       </div>
+      <Sheet open={returnedSheet !== null} onOpenChange={(open) => { if (!open) setReturnedSheet(null) }}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Returned DR — {returnedSheet?.display_name}</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-2">
+            {returnedSheet?.returned_dr_projects.map((project) => (
+              <Link
+                key={project.id}
+                href={`/admin/projects/${project.id}`}
+                className="block rounded border px-3 py-2 text-sm hover:bg-muted"
+              >
+                {project.name}
+              </Link>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

@@ -198,39 +198,36 @@ class Admin::DashboardController < Admin::ApplicationController
   end
 
   def requirements_check_reviewer_profiles
-    start_week = Date.new(2026, 1, 5) # First Monday of 2026 — earliest reviewer onboarding
-    today_week = Date.today.beginning_of_week(:monday)
-
-    weeks = []
-    w = start_week
-    while w <= today_week
-      weeks << w.iso8601
-      w += 7
-    end
-
     # All users who can review requirements checks, including those with zero reviews
     reviewers = User.where("roles && ARRAY['requirements_checker', 'pass2_reviewer']::varchar[]")
 
     terminal = %w[approved returned rejected]
-    week_group = Arel.sql("TO_CHAR(DATE_TRUNC('week', completed_at), 'YYYY-MM-DD')")
+    # COALESCE ensures reviews without completed_at (pre-column or update_columns) still appear
+    week_expr = Arel.sql("TO_CHAR(DATE_TRUNC('week', COALESCE(completed_at, updated_at)), 'YYYY-MM-DD')")
 
     rc_rows = RequirementsCheckReview
-      .where(status: terminal).where.not(reviewer_id: nil).where("completed_at >= ?", start_week)
-      .group(:reviewer_id).group(week_group).count
+      .where(status: terminal).where.not(reviewer_id: nil)
+      .group(:reviewer_id).group(week_expr).count
 
     dr_rows = DesignReview
-      .where(status: terminal).where.not(reviewer_id: nil).where("completed_at >= ?", start_week)
-      .group(:reviewer_id).group(week_group).count
+      .where(status: terminal).where.not(reviewer_id: nil)
+      .group(:reviewer_id).group(week_expr).count
+
+    br_rows = BuildReview
+      .where(status: terminal).where.not(reviewer_id: nil)
+      .group(:reviewer_id).group(week_expr).count
 
     ta_rows = TimeAuditReview
-      .where(status: :approved).where.not(reviewer_id: nil).where("completed_at >= ?", start_week)
-      .group(:reviewer_id).group(week_group).sum(:approved_public_seconds)
+      .where(status: :approved).where.not(reviewer_id: nil)
+      .group(:reviewer_id).group(week_expr).sum(:approved_public_seconds)
 
     rc_by = Hash.new { |h, k| h[k] = Hash.new(0) }
     dr_by = Hash.new { |h, k| h[k] = Hash.new(0) }
+    br_by = Hash.new { |h, k| h[k] = Hash.new(0) }
     ta_by = Hash.new { |h, k| h[k] = Hash.new(0) }
     rc_rows.each { |(rid, w), n| rc_by[rid][w] = n }
     dr_rows.each { |(rid, w), n| dr_by[rid][w] = n }
+    br_rows.each { |(rid, w), n| br_by[rid][w] = n }
     ta_rows.each { |(rid, w), s| ta_by[rid][w] = s }
 
     # All-time totals across all review types — matches the main dashboard leaderboard
@@ -240,20 +237,39 @@ class Admin::DashboardController < Admin::ApplicationController
         .each { |reviewer_id, count| all_time_by_reviewer[reviewer_id] += count }
     end
 
+    # All-time RC counts per reviewer (not date-filtered)
+    rc_all_time = RequirementsCheckReview
+      .where(status: terminal).where.not(reviewer_id: nil)
+      .group(:reviewer_id).count
+
+    # Derive the weeks range from actual data so no reviews are silently dropped
+    all_week_keys = (rc_rows.keys.map(&:last) + dr_rows.keys.map(&:last) + br_rows.keys.map(&:last) + ta_rows.keys.map(&:last)).uniq.sort
+    today_week = Date.today.beginning_of_week(:monday)
+    start_week = all_week_keys.any? ? Date.parse(all_week_keys.first).beginning_of_week(:monday) : today_week
+
+    weeks = []
+    w = start_week
+    while w <= today_week
+      weeks << w.iso8601
+      w += 7
+    end
+
     reviewers.map do |user|
       weekly = weeks.map do |week|
         rc = rc_by[user.id][week]
         dr = dr_by[user.id][week]
+        br = br_by[user.id][week]
         ta_hours = (ta_by[user.id][week].to_f / 3600).round(1)
         ta = (ta_by[user.id][week].to_f / (Admin::ReviewersController::TA_HOURS_PER_REVIEW_EQUIVALENT * 3600)).round(2)
-        { week: week, rc: rc, dr: dr, ta: ta, ta_hours: ta_hours, low: (rc + dr + ta) > 0 && (rc + dr + ta) < 15 }
+        total = rc + dr + br + ta
+        { week: week, rc: rc, dr: dr, br: br, ta: ta, ta_hours: ta_hours, low: total > 0 && total < 15 }
       end
       {
         id: user.id,
         display_name: user.display_name,
         avatar: user.avatar,
         total_reviews: all_time_by_reviewer[user.id],
-        rc_reviews: rc_by[user.id].values.sum,
+        rc_reviews: rc_all_time[user.id].to_i,
         reviews_by_week: weekly
       }
     end.sort_by { |r| -r[:total_reviews] }
@@ -319,11 +335,20 @@ class Admin::DashboardController < Admin::ApplicationController
         Arel.sql(returned_project_count_sql)
       )
 
+    # Fetch the individual projects behind each reviewer's "Returned DR" count
+    returned_project_rows = requirements_to_design_return_scope
+      .where("design_reviews.status = ?", DesignReview.statuses[:returned])
+      .select("requirements_check_reviews.reviewer_id, projects.id AS project_id, projects.name AS project_name")
+      .distinct
+      .map { |r| [ r.reviewer_id, { id: r.project_id, name: r.project_name } ] }
+
+    returned_projects_by_reviewer = returned_project_rows.group_by(&:first).transform_values { |pairs| pairs.map(&:last) }
+
     users = User.where(id: rows.map(&:first)).index_by(&:id)
 
     rows.filter_map do |reviewer_id, approved_projects, returned_projects|
       user = users[reviewer_id]
-      next unless user && approved_projects + returned_projects >= 3
+      next unless user
 
       approved_projects = approved_projects.to_i
       returned_projects = returned_projects.to_i
@@ -335,7 +360,8 @@ class Admin::DashboardController < Admin::ApplicationController
         avatar: user.avatar,
         approved_projects: approved_projects,
         design_returned_projects: returned_projects,
-        return_rate: return_rate
+        return_rate: return_rate,
+        returned_dr_projects: returned_projects_by_reviewer[reviewer_id] || []
       }
     end.sort_by { |row| [ -row[:return_rate], -row[:design_returned_projects], -row[:approved_projects] ] }
   end
