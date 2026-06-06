@@ -104,9 +104,9 @@ const JournalEntriesList = memo(function JournalEntriesList({
   entries: (RequirementsCheckJournalEntry & { isNew: boolean })[]
 }) {
   return (
-    <div className="divide-y divide-border">
+    <div className="divide-y divide-border overflow-y-auto max-h-96">
       {entries.map((entry) => (
-        <div key={entry.id} className="p-3 space-y-2">
+        <div key={entry.id} className="p-3 space-y-2 min-w-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <img src={entry.author_avatar} alt="" className="size-4 rounded-full" />
             <span>{entry.author_display_name}</span>
