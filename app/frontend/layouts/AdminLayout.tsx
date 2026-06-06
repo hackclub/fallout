@@ -59,10 +59,6 @@ export default function AdminLayout({ children, flush }: { children: ReactNode; 
       ghost.setAttribute('aria-hidden', 'true')
       const rect = main.getBoundingClientRect()
       const cs = getComputedStyle(main)
-      // Read the actual computed background from the .admin root so dark mode
-      // colors resolve correctly — the ghost lives on <body> outside that scope.
-      const adminRoot = document.querySelector<HTMLElement>('.admin')
-      const bg = adminRoot ? getComputedStyle(adminRoot).backgroundColor : '#fff'
       ghost.style.cssText = `
         position: fixed;
         top: ${rect.top}px;
@@ -74,11 +70,14 @@ export default function AdminLayout({ children, flush }: { children: ReactNode; 
         overflow: hidden;
         pointer-events: none;
         z-index: 39;
-        background: ${bg};
+        background: var(--background);
         will-change: transform, opacity;
       `
       ghost.innerHTML = main.innerHTML
-      document.body.appendChild(ghost)
+      // Append inside .admin so all CSS variables (bg-card, text-foreground, etc.)
+      // resolve correctly in dark mode — position:fixed still anchors to the viewport.
+      const adminRoot = document.querySelector<HTMLElement>('.admin')
+      ;(adminRoot ?? document.body).appendChild(ghost)
 
       // Hide live <main> — ghost covers it until new content is ready
       main.style.transition = 'none'
