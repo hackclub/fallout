@@ -204,6 +204,25 @@ class Admin::UsersController < Admin::ApplicationController
     redirect_back_or_to admin_root_path
   end
 
+  def update_ticket_hours_override
+    @user = User.find(params[:id])
+    authorize @user
+
+    raw = params[:ticket_hours_override].to_s.strip
+    if raw.blank?
+      @user.update!(ticket_hours_override: nil)
+      redirect_to admin_user_path(@user), notice: "Ticket hours override cleared — default (60h) applies."
+    else
+      hours = raw.to_i
+      unless hours.positive? && hours <= 10_000
+        redirect_to admin_user_path(@user), alert: "Override must be a positive number."
+        return
+      end
+      @user.update!(ticket_hours_override: hours)
+      redirect_to admin_user_path(@user), notice: "Ticket hours override set to #{hours}h for #{@user.display_name}."
+    end
+  end
+
   def restore_streak_goal
     @user = User.find(params[:id])
     authorize @user
@@ -298,10 +317,11 @@ class Admin::UsersController < Admin::ApplicationController
       discarded_at: user.discarded_at&.strftime("%b %d, %Y"),
       created_at: user.created_at.strftime("%b %d, %Y")
     }
-    if current_user.admin? # PII — admin-only
+    if current_user.admin? # PII and sensitive config — admin-only
       detail[:email] = user.email
       detail[:pronouns] = user.pronouns
       detail[:bio] = user.bio
+      detail[:ticket_hours_override] = user.ticket_hours_override
     end
     detail
   end

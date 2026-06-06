@@ -367,6 +367,95 @@ function BanEditor({ user }: { user: AdminUserDetail }) {
   )
 }
 
+function TicketHoursOverrideEditor({ user }: { user: AdminUserDetail }) {
+  const current = user.ticket_hours_override ?? null
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(current != null ? String(current) : '')
+  const [processing, setProcessing] = useState(false)
+
+  function submit() {
+    setProcessing(true)
+    router.patch(
+      `/admin/users/${user.id}/update_ticket_hours_override`,
+      { ticket_hours_override: value.trim() },
+      {
+        onFinish: () => {
+          setProcessing(false)
+          setEditing(false)
+        },
+      },
+    )
+  }
+
+  const pendingHours = value.trim() === '' ? null : Number(value.trim())
+  const description =
+    pendingHours == null
+      ? `Remove the override — ${user.display_name} will need the default 60 hours.`
+      : `${user.display_name} will need ${pendingHours}h instead of the default 60h.`
+
+  return (
+    <Card>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <h3 className="text-sm font-medium mb-1">Ticket Hours Override</h3>
+            {!editing ? (
+              <p className="text-sm text-muted-foreground">
+                {current != null ? (
+                  <>
+                    <span className="font-medium text-foreground">{current}h</span> (default is 60h)
+                  </>
+                ) : (
+                  'Default (60h)'
+                )}
+              </p>
+            ) : (
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={10000}
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder="leave blank to reset to default"
+                  className="h-8 text-sm w-56"
+                />
+                <Button variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={processing}>
+                  Cancel
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" disabled={processing}>
+                      Save
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Override ticket hours for {user.display_name}?</AlertDialogTitle>
+                      <AlertDialogDescription>{description}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={submit} disabled={processing}>
+                        Confirm
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
+          </div>
+          {!editing && (
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              Edit override
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function ProjectsLoading() {
   return (
     <div>
@@ -811,6 +900,12 @@ export default function AdminUsersShow({
       {isAdmin && (
         <div className="mb-6">
           <BanEditor user={user} />
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="mb-6">
+          <TicketHoursOverrideEditor user={user} />
         </div>
       )}
 

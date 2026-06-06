@@ -31,6 +31,10 @@ class UserPolicy < ApplicationPolicy
     admin?
   end
 
+  def update_ticket_hours_override?
+    admin?
+  end
+
   def destroy?
     admin? && record != user
   end

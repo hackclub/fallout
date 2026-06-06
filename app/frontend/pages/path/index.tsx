@@ -54,6 +54,41 @@ type InitialPathEntryState = {
   readDocsNudge: boolean
 }
 
+function loadConfetti(): Promise<(opts: object) => void> {
+  return new Promise((resolve) => {
+    const w = window as Window & { confetti?: (opts: object) => void }
+    if (w.confetti) return resolve(w.confetti)
+    const script = document.createElement('script')
+    script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js'
+    script.onload = () => resolve(w.confetti!)
+    document.head.appendChild(script)
+  })
+}
+
+async function fireTicketConfetti() {
+  const confetti = await loadConfetti()
+  function fire(particleRatio: number, opts: object) {
+    confetti({ origin: { y: 0.7 }, ...opts, particleCount: Math.floor(200 * particleRatio) })
+  }
+  fire(0.25, { spread: 26, startVelocity: 55 })
+  fire(0.2, { spread: 60 })
+  fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 })
+  fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 })
+  fire(0.1, { spread: 120, startVelocity: 45 })
+  const duration = 15 * 1000
+  const animationEnd = Date.now() + duration
+  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 }
+  const interval = setInterval(() => {
+    const timeLeft = animationEnd - Date.now()
+    if (timeLeft <= 0) { clearInterval(interval); return }
+    const particleCount = 50 * (timeLeft / duration)
+    const x1 = Math.random() * (0.3 - 0.1) + 0.1
+    const x2 = Math.random() * (0.9 - 0.7) + 0.7
+    confetti({ ...defaults, particleCount, origin: { x: x1, y: Math.random() - 0.2 } })
+    confetti({ ...defaults, particleCount, origin: { x: x2, y: Math.random() - 0.2 } })
+  }, 250)
+}
+
 function buildPathIntroState(active = false, mode: PathIntroMode = 'regular') {
   return {
     active,
@@ -122,6 +157,7 @@ export default function PathIndex() {
     mail_intro_id,
     has_unread_mail,
     features,
+    flash,
     auth: { user: authUser },
     sign_in_path,
   } = usePage<PageProps & SharedProps>().props
@@ -252,6 +288,21 @@ export default function PathIndex() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [streakGoalScript, firstJournalScript, keepJournalingScript, sixtyHoursScript])
+
+  const claimedTicketScript: DialogScript = {
+    mascotSrc: '/onboarding/chinese_heidi.webp',
+    speakerName: 'Soup',
+    steps: [
+      { text: 'Congratulations on claiming your ticket!!' },
+      { text: 'See you in my base in Shenzhen...', last: true },
+    ],
+  }
+
+  useEffect(() => {
+    if (flash?.just_claimed !== 'true') return
+    fireTicketConfetti()
+    setActiveDialog(claimedTicketScript)
+  }, [])
 
   const [readDocsNudge, setReadDocsNudge] = useState(initialPathEntry.readDocsNudge)
   const [docsNudgeReady, setDocsNudgeReady] = useState(false)

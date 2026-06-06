@@ -407,6 +407,7 @@ Rails.application.routes.draw do
           patch :restore_streak_goal # Admin streak goal restore (fills blank/missed days with frozen)
           patch :update_ban # Admin ban/unban — admin-only
           patch :toggle_reviewer_suggestion # Exclude/include from "Not Yet a Reviewer" list
+          patch :update_ticket_hours_override # Admin per-user ticket hours threshold override
         end
       end
       resources :activity_checks, only: [ :new, :create ]

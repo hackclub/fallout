@@ -219,6 +219,7 @@ export interface AdminUserDetail {
   is_discarded: boolean
   discarded_at: string | null
   created_at: string
+  ticket_hours_override?: number | null
 }
 
 export interface AdminStreakDay {

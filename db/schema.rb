@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_04_180000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_06_103735) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1001,7 +1001,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_04_180000) do
     t.integer "streak_freezes", default: 1, null: false
     t.boolean "streak_in_app_notifications", default: true, null: false
     t.boolean "streak_slack_notifications", default: true, null: false
-    t.string "summit_rsvp"
+    t.integer "ticket_hours_override"
     t.string "timezone", null: false
     t.string "type"
     t.datetime "updated_at", null: false
