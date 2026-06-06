@@ -171,15 +171,6 @@ const JournalEntriesList = memo(function JournalEntriesList({
             style={{ zoom: 0.85 }}
             dangerouslySetInnerHTML={{ __html: entry.content_html }}
           />
-          {entry.images.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {entry.images.map((img, j) => (
-                <a key={j} href={img} target="_blank" rel="noopener noreferrer">
-                  <img src={img} alt="" className="rounded border border-border object-cover w-full max-h-24" />
-                </a>
-              ))}
-            </div>
-          )}
         </div>
       ))}
     </div>

@@ -17,6 +17,8 @@ class SoupCampaignChannel < ApplicationCable::Channel
   end
 
   def unsubscribed
+    return unless @campaign
+
     broadcast_presence_leave
     clear_my_presence
   end
