@@ -219,11 +219,16 @@ function CollapsibleCard({
     if (!el) return
     if (open) {
       el.style.maxHeight = el.scrollHeight + 'px'
+      const onEnd = () => {
+        el.style.maxHeight = 'none'
+      }
+      el.addEventListener('transitionend', onEnd, { once: true })
+      return () => el.removeEventListener('transitionend', onEnd)
     } else {
-      // Snap to current rendered height first (avoids jump when collapsing mid-animation)
-      el.style.maxHeight = el.scrollHeight + 'px'
-      // Force reflow so the browser registers the explicit value before animating to 0
-      el.getBoundingClientRect()
+      if (el.style.maxHeight === 'none' || el.style.maxHeight === '') {
+        el.style.maxHeight = el.scrollHeight + 'px'
+        el.getBoundingClientRect()
+      }
       el.style.maxHeight = '0px'
     }
   }, [open])
@@ -247,7 +252,7 @@ function CollapsibleCard({
       <div
         ref={bodyRef}
         style={{
-          maxHeight: open ? (bodyRef.current?.scrollHeight ?? 'none') : '0px',
+          maxHeight: open ? 'none' : '0px',
           overflow: 'hidden',
           transition: 'max-height 500ms cubic-bezier(0.19, 1, 0.22, 1)',
         }}
