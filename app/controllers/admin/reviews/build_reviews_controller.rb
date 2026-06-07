@@ -131,7 +131,8 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
       project_name: ship.project.name,
       user_display_name: ship.project.user.display_name,
       preflight_results: ship.preflight_results,
-      created_at: review.created_at.strftime("%B %d, %Y")
+      created_at: review.created_at.strftime("%B %d, %Y"),
+      undoable: %w[approved returned rejected].include?(review.status) && (review.completed_at || review.updated_at) >= UNDO_WINDOW.ago
     }
   end
 end

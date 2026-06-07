@@ -7,6 +7,7 @@ export const ADMIN_NAV_ORDER: string[] = [
   '/admin/reviews/requirements_checks',
   '/admin/reviews/design_reviews',
   '/admin/reviews/build_reviews',
+  '/admin/reviews/mine',
   '/admin/projects',
   '/admin/users',
   '/admin/hours_stats',

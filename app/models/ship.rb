@@ -342,7 +342,7 @@ class Ship < ApplicationRecord
     end
   end
 
-  def recompute_status!
+  def recompute_status!(force: false)
     new_status = derive_status
     if status != new_status
       attrs = { status: new_status }
@@ -363,7 +363,10 @@ class Ship < ApplicationRecord
       elsif approved_public_seconds.present?
         attrs[:approved_public_seconds] = nil
       end
-      update!(attrs)
+      # force: true bypasses status_transition_allowed so undo can move a ship
+      # backwards from an approved/returned/rejected state without triggering
+      # the guard that blocks re-opening a terminal ship in the normal forward flow.
+      force ? update_columns(attrs.merge(updated_at: Time.current)) : update!(attrs)
     end
     cancel_pending_reviews! if returned? || rejected?
   end

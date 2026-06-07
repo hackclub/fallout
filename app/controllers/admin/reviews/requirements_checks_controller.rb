@@ -127,7 +127,8 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
       user_display_name: ship.project.user.display_name,
       preflight_results: ship.preflight_results,
       created_at: review.created_at.strftime("%B %d, %Y"),
-      checkpoint_message_url: review.checkpoint_message_url
+      checkpoint_message_url: review.checkpoint_message_url,
+      undoable: %w[approved returned rejected].include?(review.status) && (review.completed_at || review.updated_at) >= UNDO_WINDOW.ago
     }
   end
 end

@@ -347,6 +347,9 @@ Rails.application.routes.draw do
           end
           collection { get :next }
         end
+        get  "mine",          to: "my_reviews#show",  as: :mine
+        get  "mine/:user_id", to: "my_reviews#show",  as: :user_reviews
+        post "undos",         to: "undos#create",     as: :undos
       end
 
       resources :project_flags, only: [ :index, :create, :destroy ]

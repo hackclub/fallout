@@ -12,6 +12,7 @@ import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { Separator } from '@/components/admin/ui/separator'
 import { Textarea } from '@/components/admin/ui/textarea'
+import { UndoReviewButton } from '@/components/admin/UndoReviewButton'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -120,6 +121,8 @@ function ReviewTopBar({
   projectFlagged,
   flagging,
   reviewStatus,
+  reviewId,
+  undoable,
   onSkip,
   onSubmit,
   onToggleNotes,
@@ -135,6 +138,8 @@ function ReviewTopBar({
   projectFlagged: boolean
   flagging: boolean
   reviewStatus: string
+  reviewId: number
+  undoable: boolean
   onSkip: () => void
   onSubmit: () => void
   onToggleNotes: () => void
@@ -229,17 +234,20 @@ function ReviewTopBar({
         </Button>
 
         {isTerminal ? (
-          <Badge
-            className={
-              reviewStatus === 'approved'
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                : reviewStatus === 'cancelled'
-                  ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                  : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
-            }
-          >
-            {reviewStatus}
-          </Badge>
+          <>
+            <Badge
+              className={
+                reviewStatus === 'approved'
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                  : reviewStatus === 'cancelled'
+                    ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                    : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
+              }
+            >
+              {reviewStatus}
+            </Badge>
+            {undoable && <UndoReviewButton reviewId={reviewId} reviewType="time_audit_review" />}
+          </>
         ) : (
           <>
             {projectFlagged ? (
@@ -2015,6 +2023,8 @@ export default function TimeAuditsShow({
         projectFlagged={isFlagged}
         flagging={flagging}
         reviewStatus={review.status}
+        reviewId={review.id}
+        undoable={review.undoable}
         onSkip={handleSkip}
         onSubmit={handleSubmit}
         onToggleNotes={() => setNotesOpen((v) => !v)}

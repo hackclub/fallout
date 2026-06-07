@@ -6,6 +6,7 @@ import ReviewLayout from '@/layouts/ReviewLayout'
 import HoursDisplay from '@/components/admin/HoursDisplay'
 import { WaitingLabel } from '@/components/admin/WaitingLabel'
 import { ReviewStatusBadge } from '@/components/admin/ReviewStatusBadge'
+import { UndoReviewButton } from '@/components/admin/UndoReviewButton'
 import { Badge } from '@/components/admin/ui/badge'
 import { Button } from '@/components/admin/ui/button'
 import { Separator } from '@/components/admin/ui/separator'
@@ -888,6 +889,9 @@ export default function BuildReviewsShow({
                 </Badge>
                 {review.reviewer_display_name && (
                   <p className="text-xs text-muted-foreground">by {review.reviewer_display_name}</p>
+                )}
+                {review.undoable && (
+                  <UndoReviewButton reviewId={review.id} reviewType="build_review" />
                 )}
               </div>
               {review.internal_reason && (

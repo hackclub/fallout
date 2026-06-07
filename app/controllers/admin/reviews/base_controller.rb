@@ -1,6 +1,8 @@
 class Admin::Reviews::BaseController < Admin::ApplicationController
   # No index action on base — override verify_authorized/verify_policy_scoped to avoid ActionNotFound
   skip_after_action :verify_authorized
+
+  UNDO_WINDOW = 1.hour
   skip_after_action :verify_policy_scoped
 
   before_action :set_review, only: %i[ show update heartbeat ]
