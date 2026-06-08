@@ -11,7 +11,7 @@ class Admin::Reviews::MyReviewsController < Admin::ApplicationController
 
   def show
     if params[:user_id]
-      require_admin! # Only admins can view other reviewers' history
+      raise ActionController::RoutingError, "Not Found" unless current_user.admin? || current_user.reviewer? # Admins and reviewers can browse other reviewers' history
       @user = User.find(params[:user_id])
     else
       @user = current_user

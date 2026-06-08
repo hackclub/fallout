@@ -12,7 +12,7 @@ class Admin::ReviewerWeekResolutionsController < Admin::ApplicationController
     )
     authorize resolution
     resolution.save!
-    redirect_to admin_reviewer_path(@reviewer)
+    redirect_back fallback_location: admin_reviewer_path(@reviewer) # Lets this be triggered from the reviewer page or the dashboard and return to the same spot
   end
 
   def bulk_create
@@ -28,14 +28,14 @@ class Admin::ReviewerWeekResolutionsController < Admin::ApplicationController
       resolution.save!
     end
 
-    redirect_to admin_reviewer_path(@reviewer)
+    redirect_back fallback_location: admin_reviewer_path(@reviewer) # Lets this be triggered from the reviewer page or the dashboard and return to the same spot
   end
 
   def destroy
     resolution = @reviewer.reviewer_week_resolutions.find(params[:id])
     authorize resolution
     resolution.destroy!
-    redirect_to admin_reviewer_path(@reviewer)
+    redirect_back fallback_location: admin_reviewer_path(@reviewer) # Lets this be triggered from the reviewer page or the dashboard and return to the same spot
   end
 
   private

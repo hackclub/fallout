@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from 'react'
-import { usePage, router } from '@inertiajs/react'
+import { Link, usePage, router } from '@inertiajs/react'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/admin/ui/card'
 import { Badge } from '@/components/admin/ui/badge'
@@ -306,7 +306,26 @@ function NoteItem({
 }
 
 export default function ReviewerShow() {
-  const { reviewer, notes, unavailabilities, can_manage } = usePage<Props>().props
+  const { reviewer, notes, unavailabilities, can_manage, admin_permissions } = usePage<
+    Props & {
+      admin_permissions?: {
+        is_admin: boolean
+        can_review_time_audits: boolean
+        can_review_requirements_checks: boolean
+        can_review_design_reviews: boolean
+        can_review_build_reviews: boolean
+      }
+    }
+  >().props
+  // Mirrors the backend gate on Admin::Reviews::MyReviewsController#show (admin? || reviewer?) —
+  // can_review_* are true for admins too, so this OR is equivalent to "admin or has a reviewer role"
+  const canViewReviews =
+    !!admin_permissions &&
+    (admin_permissions.is_admin ||
+      admin_permissions.can_review_time_audits ||
+      admin_permissions.can_review_requirements_checks ||
+      admin_permissions.can_review_design_reviews ||
+      admin_permissions.can_review_build_reviews)
 
   const [noteBody, setNoteBody] = useState('')
   const [unavailStart, setUnavailStart] = useState('')
@@ -372,12 +391,19 @@ export default function ReviewerShow() {
         ) : (
           <div className="size-14 rounded-full bg-muted shrink-0" />
         )}
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-semibold tracking-tight">{reviewer.display_name}</h1>
           <div className="flex gap-1.5 mt-1 flex-wrap">
             {reviewer.roles.filter((r) => ROLE_LABELS[r]).map(roleBadge)}
           </div>
         </div>
+        {canViewReviews && (
+          <Link href={`/admin/reviews/mine/${reviewer.id}`}>
+            <Button variant="outline" size="sm">
+              View reviews
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* 15/week warning */}

@@ -31,6 +31,12 @@ interface BacklogPoint {
   backlog: number
 }
 
+interface BacklogHoursPoint {
+  date: string
+  hours: number
+  total: number
+}
+
 interface RecentActivity {
   count: number
   avg_turnaround_seconds: number | null
@@ -42,6 +48,7 @@ interface Props {
     this_week: PeriodStats
   }
   backlog_chart: BacklogPoint[]
+  backlog_hours_chart: BacklogHoursPoint[]
   recent_activity: RecentActivity
 }
 
@@ -143,8 +150,16 @@ const backlogChartConfig: ChartConfig = {
   backlog: { label: 'Unreviewed ships', color: 'hsl(217, 91%, 60%)' },
 }
 
+const backlogHoursChartConfig: ChartConfig = {
+  hours: { label: 'Unreviewed hours', color: 'hsl(142, 71%, 45%)' },
+}
+
+const backlogTotalChartConfig: ChartConfig = {
+  total: { label: 'Unreviewed total', color: 'hsl(38, 92%, 50%)' },
+}
+
 export default function AdminDashboardIndex() {
-  const { stats, backlog_chart, recent_activity } = usePage<Props>().props
+  const { stats, backlog_chart, backlog_hours_chart, recent_activity } = usePage<Props>().props
 
   const toCountRows = (data: PeriodStats): RowItem[] =>
     data.reviewers.map((r) => ({ ...r, value: r.review_count, label: `${r.review_count}` }))
@@ -220,6 +235,102 @@ export default function AdminDashboardIndex() {
                     stroke="var(--color-backlog)"
                     strokeWidth={2}
                     fill="url(#backlogFill)"
+                  />
+                </AreaChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+          <Card className="t-card-lift max-w-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Unreviewed Hours</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={backlogHoursChartConfig} className="h-[250px] w-full">
+                <AreaChart data={backlog_hours_chart} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                  <defs>
+                    <linearGradient id="hoursFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--color-hours)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="var(--color-hours)" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    tickFormatter={(v: string) => {
+                      const d = new Date(v + 'T00:00:00')
+                      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(v: string) => {
+                          const d = new Date(v + 'T00:00:00')
+                          return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                        }}
+                        formatter={(v) => [`${v}h`, 'Unreviewed hours']}
+                      />
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="hours"
+                    stroke="var(--color-hours)"
+                    strokeWidth={2}
+                    fill="url(#hoursFill)"
+                  />
+                </AreaChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+          <Card className="t-card-lift max-w-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Unreviewed Total</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={backlogTotalChartConfig} className="h-[250px] w-full">
+                <AreaChart data={backlog_hours_chart} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                  <defs>
+                    <linearGradient id="totalFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--color-total)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="var(--color-total)" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    tickFormatter={(v: string) => {
+                      const d = new Date(v + 'T00:00:00')
+                      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(v: string) => {
+                          const d = new Date(v + 'T00:00:00')
+                          return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                        }}
+                        formatter={(v) => [v, 'Review units (ships + hours÷10)']}
+                      />
+                    }
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="total"
+                    stroke="var(--color-total)"
+                    strokeWidth={2}
+                    fill="url(#totalFill)"
                   />
                 </AreaChart>
               </ChartContainer>

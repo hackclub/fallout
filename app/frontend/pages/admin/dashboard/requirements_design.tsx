@@ -41,6 +41,7 @@ interface ReviewWeek {
   ta: number
   ta_hours: number
   low: boolean
+  resolved: boolean
 }
 
 interface ReviewerProfile {
@@ -77,15 +78,15 @@ const profileChartConfig: ChartConfig = {
 }
 
 const DM_PREFIX = 'reviewer_dm:'
-const DM_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
+const TRACKER_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
 
-function loadDmDate(id: number): Date | null {
+function loadTrackerDate(prefix: string, id: number): Date | null {
   try {
-    const raw = localStorage.getItem(`${DM_PREFIX}${id}`)
+    const raw = localStorage.getItem(`${prefix}${id}`)
     if (!raw) return null
     const date = new Date(raw)
-    if (Date.now() - date.getTime() > DM_EXPIRY_MS) {
-      localStorage.removeItem(`${DM_PREFIX}${id}`)
+    if (Date.now() - date.getTime() > TRACKER_EXPIRY_MS) {
+      localStorage.removeItem(`${prefix}${id}`)
       return null
     }
     return date
@@ -94,21 +95,21 @@ function loadDmDate(id: number): Date | null {
   }
 }
 
-function saveDmDate(id: number): Date {
+function saveTrackerDate(prefix: string, id: number): Date {
   const now = new Date()
   try {
-    localStorage.setItem(`${DM_PREFIX}${id}`, now.toISOString())
+    localStorage.setItem(`${prefix}${id}`, now.toISOString())
   } catch {}
   return now
 }
 
-function removeDmDate(id: number): void {
+function removeTrackerDate(prefix: string, id: number): void {
   try {
-    localStorage.removeItem(`${DM_PREFIX}${id}`)
+    localStorage.removeItem(`${prefix}${id}`)
   } catch {}
 }
 
-function formatDmDate(date: Date): string {
+function formatTrackerDate(date: Date): string {
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
@@ -122,16 +123,26 @@ function formatDmDate(date: Date): string {
   return `${diffDays}d ago`
 }
 
+function unresolvedLowWeeks(profile: ReviewerProfile): ReviewWeek[] {
+  return profile.reviews_by_week.filter((w) => w.low && !w.resolved)
+}
+
 function ReviewerProfileCard({
   profile,
   dmDate,
   onToggle,
+  resolving,
+  onResolve,
 }: {
   profile: ReviewerProfile
   dmDate: Date | null
   onToggle: () => void
+  resolving: boolean
+  onResolve: () => void
 }) {
   const hasLowWeek = profile.reviews_by_week.some((w) => w.low)
+  const unresolved = unresolvedLowWeeks(profile)
+  const isResolved = hasLowWeek && unresolved.length === 0
   return (
     <Link href={`/admin/reviewers/${profile.id}`} className="block hover:no-underline">
       <Card className="hover:bg-muted/50 transition-colors">
@@ -149,9 +160,25 @@ function ReviewerProfileCard({
                   {profile.rc_reviews} RC · {profile.total_reviews} all-time
                 </p>
                 {hasLowWeek && (
-                  <span title="Has weeks below 15 reviews" className="text-yellow-500">
-                    ⚠
-                  </span>
+                  isResolved ? (
+                    <span title="All low weeks resolved" className="text-muted-foreground">
+                      ✓
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={resolving}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        onResolve()
+                      }}
+                      title={`Resolve ${unresolved.length} low week${unresolved.length > 1 ? 's' : ''} (visible on their reviewer page)`}
+                      className="text-yellow-500 hover:text-yellow-600 disabled:opacity-50"
+                    >
+                      ⚠
+                    </button>
+                  )
                 )}
               </div>
             </div>
@@ -167,7 +194,7 @@ function ReviewerProfileCard({
               title={dmDate ? `DMed ${dmDate.toLocaleString()} — click to unmark` : 'Mark as DMed'}
             >
               <MessageCircleIcon className="size-3.5" />
-              {dmDate ? formatDmDate(dmDate) : 'DM'}
+              {dmDate ? formatTrackerDate(dmDate) : 'DM'}
             </Button>
           </div>
         </CardHeader>
@@ -214,7 +241,7 @@ export default function RequirementsDesignDashboard() {
   const [dmStates, setDmStates] = useState<Record<number, Date | null>>(() => {
     const result: Record<number, Date | null> = {}
     for (const p of reviewer_profiles) {
-      result[p.id] = loadDmDate(p.id)
+      result[p.id] = loadTrackerDate(DM_PREFIX, p.id)
     }
     return result
   })
@@ -222,17 +249,17 @@ export default function RequirementsDesignDashboard() {
   const handleToggle = (id: number) => {
     setDmStates((prev) => {
       if (prev[id]) {
-        removeDmDate(id)
+        removeTrackerDate(DM_PREFIX, id)
         return { ...prev, [id]: null }
       } else {
-        const date = saveDmDate(id)
+        const date = saveTrackerDate(DM_PREFIX, id)
         return { ...prev, [id]: date }
       }
     })
   }
 
   const handleClearAll = () => {
-    reviewer_profiles.forEach((p) => removeDmDate(p.id))
+    reviewer_profiles.forEach((p) => removeTrackerDate(DM_PREFIX, p.id))
     setDmStates((prev) => {
       const cleared: Record<number, Date | null> = { ...prev }
       for (const k of Object.keys(cleared)) {
@@ -243,6 +270,43 @@ export default function RequirementsDesignDashboard() {
   }
 
   const anyDmActive = reviewer_profiles.some((p) => dmStates[p.id] != null)
+
+  const lowWeekProfiles = reviewer_profiles.filter((p) => p.reviews_by_week.some((w) => w.low))
+  const anyUnresolvedLowWeek = lowWeekProfiles.some((p) => unresolvedLowWeeks(p).length > 0)
+
+  const [resolvingId, setResolvingId] = useState<number | null>(null)
+
+  // Posts to the same week_resolutions/bulk endpoint the reviewer page uses — redirect_back
+  // returns here with refreshed reviewer_profiles so the ✓ reflects immediately, and the
+  // resolution shows up on /admin/reviewers/:id too since they read the same records.
+  function resolveProfile(profile: ReviewerProfile, onFinish?: () => void) {
+    const unresolved = unresolvedLowWeeks(profile)
+    if (unresolved.length === 0) {
+      onFinish?.()
+      return
+    }
+    setResolvingId(profile.id)
+    router.post(
+      `/admin/reviewers/${profile.id}/week_resolutions/bulk`,
+      { week_starts: unresolved.map((w) => w.week) },
+      {
+        preserveScroll: true,
+        onFinish: () => {
+          setResolvingId(null)
+          onFinish?.()
+        },
+      },
+    )
+  }
+
+  const handleResolveAll = () => {
+    const queue = lowWeekProfiles.filter((p) => unresolvedLowWeeks(p).length > 0)
+    const next = () => {
+      const profile = queue.shift()
+      if (profile) resolveProfile(profile, next)
+    }
+    next()
+  }
 
   return (
     <div className="space-y-6">
@@ -338,11 +402,18 @@ export default function RequirementsDesignDashboard() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold tracking-tight">Reviewer Profiles</h2>
-          {anyDmActive && (
-            <Button variant="outline" size="sm" onClick={handleClearAll}>
-              Clear all DMs
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {anyUnresolvedLowWeek && (
+              <Button variant="outline" size="sm" onClick={handleResolveAll} disabled={resolvingId != null}>
+                {resolvingId != null ? 'Resolving…' : 'Resolve all low-week warnings'}
+              </Button>
+            )}
+            {anyDmActive && (
+              <Button variant="outline" size="sm" onClick={handleClearAll}>
+                Clear all DMs
+              </Button>
+            )}
+          </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {reviewer_profiles.map((profile) => (
@@ -351,6 +422,8 @@ export default function RequirementsDesignDashboard() {
               profile={profile}
               dmDate={dmStates[profile.id] ?? null}
               onToggle={() => handleToggle(profile.id)}
+              resolving={resolvingId === profile.id}
+              onResolve={() => resolveProfile(profile)}
             />
           ))}
         </div>

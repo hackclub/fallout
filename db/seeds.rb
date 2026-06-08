@@ -257,14 +257,18 @@ if Rails.env.development?
 
     # Real cover photo from the repo, fetched + transcoded through the live cover pipeline.
     cover_jpeg = nil
-    result = ShipChecks::UnifiedScreenshotProcessor.download_with_etag(d[:cover], if_none_match: nil)
-    if result[:status] == :changed && result[:bytes].present?
-      # Resolve + guard the content type like the cover job does: a server returning an unknown or blank
-      # Content-Type would otherwise make transcode_to_jpeg's EXT_FOR_CONTENT_TYPE.fetch raise and abort db:seed.
-      effective_type = ShipChecks::UnifiedScreenshotProcessor.resolve_content_type(result[:content_type], d[:cover])
-      if ShipChecks::UnifiedScreenshotProcessor::SUPPORTED_CONTENT_TYPES.include?(effective_type)
-        cover_jpeg = ShipChecks::UnifiedScreenshotProcessor.transcode_to_jpeg(result[:bytes], effective_type)
+    begin
+      result = ShipChecks::UnifiedScreenshotProcessor.download_with_etag(d[:cover], if_none_match: nil)
+      if result[:status] == :changed && result[:bytes].present?
+        # Resolve + guard the content type like the cover job does: a server returning an unknown or blank
+        # Content-Type would otherwise make transcode_to_jpeg's EXT_FOR_CONTENT_TYPE.fetch raise and abort db:seed.
+        effective_type = ShipChecks::UnifiedScreenshotProcessor.resolve_content_type(result[:content_type], d[:cover])
+        if ShipChecks::UnifiedScreenshotProcessor::SUPPORTED_CONTENT_TYPES.include?(effective_type)
+          cover_jpeg = ShipChecks::UnifiedScreenshotProcessor.transcode_to_jpeg(result[:bytes], effective_type)
+        end
       end
+    rescue => e
+      warn "  cover processing failed for #{d[:name]}: #{e.message}"
     end
     if cover_jpeg
       project.unified_thumbnail.attach(io: StringIO.new(cover_jpeg), filename: "#{d[:name].parameterize}.jpg", content_type: "image/jpeg")
@@ -354,7 +358,7 @@ if Rails.env.development?
   }
 
   demo_dr_data.each do |display_name, data|
-    demo_user = demo_user_scope.find_by(display_name: display_name)
+    demo_user = demo_scope.find_by(display_name: display_name)
     next unless demo_user
 
     # Wipe previous pending-DR seed ships for this user to keep re-runs clean
@@ -495,6 +499,7 @@ if Rails.env.development?
     DesignReview.where(ship_id: seed_ship_ids).delete_all
     RequirementsCheckReview.where(ship_id: seed_ship_ids).delete_all
     TimeAuditReview.where(ship_id: seed_ship_ids).delete_all
+    KoiTransaction.where(ship_id: seed_ship_ids).delete_all
     Ship.where(id: seed_ship_ids).delete_all
     Project.where(id: seed_project_ids).delete_all
   end
@@ -549,7 +554,7 @@ if Rails.env.development?
   pending_ship_ids = ship_ids.reject { |id| dr_rows.any? { |r| r[:ship_id] == id } }.first(3)
   pending_dr_rows = pending_ship_ids.map { |sid|
     { ship_id: sid, reviewer_id: nil, status: DesignReview.statuses[:pending],
-      created_at: Time.current, updated_at: Time.current }
+      completed_at: nil, created_at: Time.current, updated_at: Time.current }
   }
   DesignReview.insert_all!(dr_rows + pending_dr_rows)
 
@@ -652,4 +657,111 @@ if Rails.env.development?
   else
     puts "Tanishq / Test Project not found — skipping DR test seed"
   end
+end
+
+# Dev-only: Unreviewed Hours / Unreviewed Total chart sample data.
+# Creates ships with YouTubeVideo recordings so backlog_hours_by_day's recording-duration
+# SQL has data to aggregate. Ships are spread across weeks from the chart's start date.
+if Rails.env.development?
+  ta_reviewer_for_hours = User.find_by(email: "seed_alice@example.com")
+
+  unless User.exists?(email: "seed_hours_student@example.com")
+    User.insert_all!([ {
+      display_name: "Hours Seed Student",
+      email:        "seed_hours_student@example.com",
+      roles:        [],
+      avatar:       "https://api.dicebear.com/9.x/identicon/svg?seed=seed_hours_student",
+      timezone:     "UTC",
+      created_at:   Time.current,
+      updated_at:   Time.current
+    } ])
+  end
+  hb_user = User.find_by!(email: "seed_hours_student@example.com")
+
+  hb_proj = Project.find_or_create_by!(name: "Hours Backlog Seed Project", user: hb_user) do |p|
+    p.description = "seed-hours-backlog"
+    p.repo_link   = "https://github.com/fallout-demo/seed-hours"
+    p.is_unlisted = true
+  end
+
+  # Wipe previous runs so re-seeding is clean
+  old_ship_ids = Ship.where(project: hb_proj, justification: "seed hours backlog").pluck(:id)
+  if old_ship_ids.any?
+    je_ids_to_clean = JournalEntry.where(ship_id: old_ship_ids).pluck(:id)
+    if je_ids_to_clean.any?
+      yt_ids_to_clean = Recording.where(journal_entry_id: je_ids_to_clean, recordable_type: "YouTubeVideo").pluck(:recordable_id)
+      Recording.where(journal_entry_id: je_ids_to_clean).delete_all
+      YouTubeVideo.where(id: yt_ids_to_clean).delete_all
+      JournalEntry.where(id: je_ids_to_clean).delete_all
+    end
+    TimeAuditReview.where(ship_id: old_ship_ids).delete_all
+    Ship.where(id: old_ship_ids).delete_all
+  end
+
+  # [week_offset, hours, ta_approved] — uneven review cadence creates a visible growing backlog
+  hb_chart_start = Date.new(2026, 4, 7)
+  hb_specs = [
+    [ 0, 12, true  ], [ 0, 10, true  ], [ 0,  8, false ], [ 0, 10, false ],
+    [ 1, 15, true  ], [ 1, 12, true  ], [ 1, 10, true  ], [ 1,  8, false ], [ 1, 12, false ],
+    [ 2,  8, true  ], [ 2,  8, true  ], [ 2, 10, false ], [ 2, 12, false ], [ 2,  8, false ], [ 2, 10, false ],
+    [ 3, 12, true  ], [ 3, 10, true  ], [ 3, 10, false ], [ 3, 12, false ], [ 3,  8, false ],
+    [ 4, 15, true  ], [ 4, 12, true  ], [ 4, 10, true  ], [ 4, 10, true  ], [ 4, 10, false ], [ 4, 12, false ], [ 4,  8, false ],
+    [ 5,  8, true  ], [ 5, 10, true  ], [ 5,  8, true  ], [ 5,  8, true  ], [ 5,  8, false ],
+    [ 6, 12, true  ], [ 6, 10, true  ], [ 6, 10, true  ], [ 6,  8, false ], [ 6, 10, false ], [ 6,  8, false ],
+    [ 7, 15, true  ], [ 7, 12, true  ], [ 7, 12, true  ], [ 7,  8, false ], [ 7,  8, false ],
+    [ 8, 10, true  ], [ 8,  8, false ], [ 8, 10, false ], [ 8,  8, false ]
+  ]
+
+  rng_hb = Random.new(77)
+  now_hb  = Time.current
+
+  # YouTubeVideos — one per ship; duration drives the hours chart
+  yt_rows_hb = hb_specs.each_with_index.map { |(_, hours, _), i|
+    { video_id: "seed_hb_#{i.to_s.rjust(3, '0')}", title: "Seed Build Log #{i}",
+      duration_seconds: hours * 3600, stretch_multiplier: 1,
+      created_at: now_hb, updated_at: now_hb }
+  }
+  yt_ids_hb = YouTubeVideo.insert_all!(yt_rows_hb, returning: :id).map { |r| r["id"] }
+
+  # Ships — spread within each week by a random 0–4 day offset
+  ship_ts_hb = hb_specs.map { |(week, _, _)|
+    (hb_chart_start + (week * 7 + rng_hb.rand(0..4)).days).to_time
+  }
+  ship_rows_hb = hb_specs.each_with_index.map { |_, i|
+    { project_id: hb_proj.id, ship_type: 0, status: 1, justification: "seed hours backlog",
+      created_at: ship_ts_hb[i], updated_at: ship_ts_hb[i] }
+  }
+  ship_ids_hb = Ship.insert_all!(ship_rows_hb, returning: :id).map { |r| r["id"] }
+
+  # JournalEntries
+  je_rows_hb = hb_specs.each_with_index.map { |_, i|
+    { project_id: hb_proj.id, ship_id: ship_ids_hb[i], user_id: hb_user.id,
+      content: "Seed hours backlog entry #{i}",
+      created_at: ship_ts_hb[i], updated_at: ship_ts_hb[i] }
+  }
+  je_ids_hb = JournalEntry.insert_all!(je_rows_hb, returning: :id).map { |r| r["id"] }
+
+  # Recordings linking each journal entry to its YouTube video
+  rec_rows_hb = hb_specs.each_with_index.map { |_, i|
+    { journal_entry_id: je_ids_hb[i], recordable_id: yt_ids_hb[i], recordable_type: "YouTubeVideo",
+      user_id: hb_user.id, created_at: ship_ts_hb[i], updated_at: ship_ts_hb[i] }
+  }
+  Recording.insert_all!(rec_rows_hb)
+
+  # TimeAuditReviews for ships marked as TA-approved
+  ta_rows_hb = hb_specs.each_with_index.filter_map { |(week, hours, approved), i|
+    next unless approved
+    ta_ts = (hb_chart_start + (week * 7 + rng_hb.rand(1..5)).days).to_time
+    { ship_id: ship_ids_hb[i], reviewer_id: ta_reviewer_for_hours&.id,
+      status:   TimeAuditReview.statuses[:approved],
+      approved_public_seconds: hours * 3600,
+      completed_at: ta_ts, created_at: ta_ts, updated_at: ta_ts }
+  }
+  TimeAuditReview.insert_all!(ta_rows_hb) if ta_rows_hb.any?
+
+  submitted_h_total = hb_specs.sum { |(_, h, _)| h }
+  approved_h_total  = hb_specs.sum { |(_, h, ok)| ok ? h : 0 }
+  puts "Seeded #{hb_specs.size} ships for hours backlog chart " \
+       "(#{submitted_h_total}h submitted, #{approved_h_total}h TA-approved, " \
+       "#{submitted_h_total - approved_h_total}h unreviewed)"
 end
