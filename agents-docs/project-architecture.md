@@ -14,14 +14,14 @@ Fallout is a grant/hackathon program for students. The user journey:
 2. **Create a project** — describe what you're building
 3. **Log work** — create journal entries with markdown, images, and timelapse recordings (Lapse, Lookout, YouTube)
 4. **Submit for review** — ship the project for reviewer approval, get hours credited
-5. **Earn rewards** — each journal entry awards a random critter (gacha). Koi (and parallel gold) currency are ledger-backed; earning sources today are streak goal completion + admin adjustments. Spending: shop items, project grants (koi → USD via HCB).
+5. **Earn rewards** — each journal entry awards a random critter (gacha). Koi (and parallel gold) currency are ledger-backed; earning sources are ship review approval (`ship_review`, the primary award) + `built_irl_conversion` + streak goal completion + admin adjustments. Spending: shop items, project grants (koi → USD via HCB).
 6. **Progress on the path** — a 3D perspective ground plane where each journal entry advances you one node
 
 ## Stack
 
-**Backend:** Ruby 3.4.4, Rails 8.1.2, PostgreSQL, Solid Queue, Solid Cache, Pundit, Flipper, PaperTrail
-**Frontend:** React 19 + TypeScript, Tailwind 4.1.18, Vite 7.3.1, Inertia Rails
-**Infra:** Kamal (Docker), Puma, Redis, Cloudflare R2 (Active Storage), Sentry, Skylight
+**Backend:** Ruby 3.4.4, Rails 8.1.3, PostgreSQL, Solid Queue, Solid Cache, Pundit, Flipper, PaperTrail, Meilisearch
+**Frontend:** React 19 + TypeScript, Tailwind 4.1.18, Vite 8.0.12, Inertia Rails
+**Infra:** Kamal (Docker), Puma, Redis, Cloudflare R2 (Active Storage), Sentry, Logtail, RailsPerformance
 
 ## Where Do I Look When...
 
@@ -42,12 +42,17 @@ Fallout is a grant/hackathon program for students. The user journey:
 | **Auth & Users** | [auth-architecture.md](auth-architecture.md) | `concerns/authentication.rb`, `auth_controller.rb`, `trial_sessions_controller.rb`, `user.rb`, `trial_user.rb`, `hca_service.rb` |
 | **Projects & Journals** | [arch-projects-journals.md](arch-projects-journals.md) | `project.rb`, `journal_entry.rb`, `recording.rb`, `ship.rb`, `collaborator.rb`, `collaboration_invite.rb` |
 | **The Path & Gamification** | [arch-path-gamification.md](arch-path-gamification.md) | `path_controller.rb`, `critter.rb`, `clearing_controller.rb`, `pages/path/index.tsx` |
+| **Bulletin Board** | [arch-bulletin-board.md](arch-bulletin-board.md) | `bulletin_board_controller.rb`, `bulletin_event.rb` |
+| **Explore Feed** | [arch-explore.md](arch-explore.md) | `api/v1/explore_controller.rb`, `public_for_explore` scopes on `project.rb`/`journal_entry.rb` |
 | **Frontend** | [arch-frontend.md](arch-frontend.md) | `entrypoints/inertia.ts`, `layouts/`, `components/`, `pages/`, `styles/application.css` |
 | **Services & Infra** | [arch-services-infra.md](arch-services-infra.md) | `app/services/`, `app/jobs/`, `config/initializers/`, `config/recurring.yml` |
 | **Cross-Cutting Patterns** | [arch-data-patterns.md](arch-data-patterns.md) | `application_policy.rb`, `application_controller.rb`, `concerns/discardable.rb` |
 
 ## Existing Deep-Dives
 
+- [Ship Pipeline & Koi/Gold Economy](arch-ship-and-koi.md) — Preflight, identity gate, multi-stage review (TA/RC/DR/BR), claim/heartbeat, re-ship, koi/gold awarding, built-irl conversion, edge cases
+- [Project Grants & HCB Ledger](arch-hcb-ledger.md) — Two-table ledger (orders + topups), settle service, card lifecycle, closure refunds, divergence detection, admin UI scoping
+- [HCB API v4 docs](hcb-api-docs.md) — OAuth flow, token lifecycle, scopes, card grants, transactions, organizations
 - [Lookout API docs](lookout-api-docs.md) — Full endpoint reference for the video recording service
 - [Inertia Modal fork](inertia-modal-fork.md) — Custom `duration` prop, in-modal navigation, setup
 - [Path 3D rendering](test-page-architecture.md) — CSS perspective math, billboard system, canvas grass

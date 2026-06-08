@@ -1,26 +1,30 @@
 # 3D Perspective Ground Plane
 
-File: app/frontend/components/dashboard/Path.tsx
+File: app/frontend/components/path/Path.tsx
+
+Rendered by the path page: `app/frontend/pages/path/index.tsx`. (This doc is named "test-page" for historical reasons — the feature is now the live Path page.)
 
 ## Architecture Overview
 
 **Hybrid rendering**: Billboards are DOM elements with direct style manipulation (bypassing React re-renders). Grass is rendered on two `<canvas>` elements with manual perspective projection. React renders once on mount; all scroll updates happen imperatively via refs and `requestAnimationFrame`.
 
-## Constants (line 3–28)
+## Constants (top of file)
 
 ```ts
 HORIZON_PCT = 0          // vanishing point at top of screen
 PERSPECTIVE = 800        // camera distance in px
-MAX_WIDTH = 1152         // billboard ground plane bottom edge (6xl)
+MAX_WIDTH = 1024         // billboard ground plane bottom edge (5xl)
+RIGHT_MARGIN = 100       // px reserved on the right for sidebar content (shifts center left)
 GROUND_ANGLE = 60        // plane tilt in degrees (θ)
 LANES = 3                // billboard columns
-BILLBOARD_COUNT = 60     // total billboards generated
-BILLBOARD_H = 300        // billboard container height in px
+BILLBOARD_CULL_H = 600   // estimated max billboard height, used as culling buffer
 BILLBOARD_Y_OFFSET = 60  // vertical offset for billboard content (px, via 2D translateY)
 BILLBOARD_SPACING = 400  // px between billboard rows on ground plane
-INFLECTION_PCT = 20      // screen % from top where billboard bottoms visually peak
+INFLECTION_PCT = 20      // screen % from top where sky ends and ground begins (vanishing-point peak)
+TOP_PCT = 50             // % from top of ground area where billboard bottoms peak
+BOTTOM_PCT = 30          // % from bottom of ground area where closest billboard appears
 SCROLL_SPEED = 1.5       // native scroll multiplier (higher = less page height, faster travel)
-DEBUG = false            // toggle debug visuals (grid, horizon line, ground plane border)
+SCROLL_TO_BOTTOM_PCT = 40 // clicked node's bottom lands this % from screen bottom
 
 GRASS_DENSITY = 7        // blades per 1000px of ground depth
 GRASS_X_MIN = -150       // % of ground plane width (left bound for random x)
@@ -33,8 +37,14 @@ GRASS_SCALE_RANGE = 0.1  // scale varies ± this from base (so 0.4 to 0.6)
 GRASS_BASE_ROTATION = 0  // base lean in degrees (rotateZ)
 GRASS_ROTATION_RANGE = 15 // rotation varies ± this from base (so -15° to +15°)
 GRASS_IMAGES = ['/grass/1.svg' ... '/grass/11.svg']  // 11 SVG grass sprites
-BILLBOARD_IMAGES = ['/path/1.png', '/path/2.png', '/path/3.png']
 ```
+
+Billboards are not images: each billboard renders one of the React `nodes` passed in
+as a prop (e.g. `PathNode`). The number of billboards equals `nodes.length` (no fixed
+`BILLBOARD_COUNT`). There is also a separate "bulletin board" decoration system (`boards`)
+that renders `/path/board.svg` `ModalLink`s interspersed along the path.
+
+There is no `DEBUG` constant or debug-visual system in the current code.
 
 ### Precomputed trig constants (module level)
 
@@ -48,32 +58,36 @@ PERSPECTIVE_OFFSET_PX = round(800 × 0.577)   // = 462
 ## DOM Structure
 
 ```
-<> (fragment)
+<ScrollToNodeContext.Provider> / <PathCenterContext.Provider>
 ├── spacer div  (height: calc(100vh + maxScroll px), creates native scroll height)
 └── viewport    (fixed, inset: 0, overflow: hidden)
     ├── sky           (top: 0, height: INFLECTION_PCT%, var(--color-light-blue))
-    ├── ground        (top: INFLECTION_PCT%, bottom: 0, solid #acc094)
-    ├── [DEBUG] horizon line (top: INFLECTION_PCT%, 2px, white 30% opacity, zIndex: 1)
+    ├── clouds band   (top: 0, height: INFLECTION_PCT%, overflow hidden — /clouds/*.webp)
+    ├── onboarding grass overlay (absolute, inset: 0, ONBOARDING_GRASS_SPRITES, opacity-gated)
     ├── back grass canvas   (absolute, inset: 0, pointerEvents: none, visibility gated)
-    ├── 3D scene BACK (billboards past inflection — behind cover)
-    │   └── perspective container (perspective: 800px, visibility gated)
-    │       └── billboard ground plane (rotateX 60deg, preserve-3d, maxWidth: MAX_WIDTH)
+    ├── 3D scene BACK (motion.div — billboards past inflection — behind cover)
+    │   └── perspective container (perspective: 800px, perspectiveOrigin centerPct, visibility gated)
+    │       └── billboard ground plane (rotateX 60deg, preserve-3d, width MAX_WIDTH, centered via left/marginLeft)
+    │           ├── bulletin boards (display/visibility controlled imperatively)
     │           └── ALL billboards (display/visibility controlled imperatively)
     ├── hill cover    (top: inflectionScreenY, bottom: 0, var(--color-light-green))
     ├── front grass canvas  (absolute, inset: 0, pointerEvents: none, visibility gated)
-    ├── 3D scene FRONT (billboards before inflection — in front of cover)
-    │   └── perspective container (perspective: 800px, pointerEvents: none, visibility gated)
-    │       ├── [DEBUG] hotpink grid (CSS background, 100px cells, 5000px tall)
-    │       └── ALL billboards (display/visibility controlled imperatively)
-    └── instructions overlay ("Try scrolling", zIndex: 9999)
+    └── 3D scene FRONT (motion.div — billboards before inflection — in front of cover)
+        └── perspective container (perspective: 800px, perspectiveOrigin centerPct, visibility gated)
+            ├── bulletin boards (display/visibility controlled imperatively)
+            └── ALL billboards (display/visibility controlled imperatively)
 ```
 
 DOM order controls stacking — no z-index needed. The order is:
-back grass → back billboards → hill cover → front grass → front billboards.
+sky/clouds → back grass → back billboards → hill cover → front grass → front billboards.
+
+There is no static `ground` div, no `instructions` overlay, and no DEBUG grid/horizon
+line in the current code. The 3D scenes are `motion.div`s whose opacity is driven by the
+optional `introTransition` prop (intro/onboarding entry animation).
 
 **Grass ground planes removed**: Grass no longer uses DOM elements or `preserve-3d` containers. Two `<canvas>` elements replace them entirely, eliminating ~200 DOM nodes and their compositor overhead.
 
-**Visibility gating**: The 4 dynamic elements (2 canvases + 2 billboard perspective containers) use `visibility: ready ? 'visible' : 'hidden'`. Static elements (sky, ground, cover) are always visible. This prevents rendering incomplete state while keeping FCP fast.
+**Visibility gating**: The 4 dynamic elements (2 canvases + 2 billboard perspective containers) use `visibility: ready ? 'visible' : 'hidden'`. Static elements (sky, clouds, cover) are always visible. This prevents rendering incomplete state while keeping FCP fast.
 
 ---
 
@@ -105,7 +119,7 @@ Two canvases maintain the stacking order:
 
 Billboards outside the visible range get `display: none` (removed from layout entirely). Three cull conditions:
 
-1. **Scrolled past** (below viewport): `rawY < -BILLBOARD_H`
+1. **Scrolled past** (below viewport): `rawY < -BILLBOARD_CULL_H`
 2. **Too far away** (perspective scale < 0.03): extremely small on screen
 3. **Range tracking**: `prevLow`/`prevHigh` indices track the previously visible range, so only boundary elements toggle `display`, not the entire array
 
@@ -117,7 +131,7 @@ Since billboards are linearly spaced (`y = i * BILLBOARD_SPACING + 200`), the lo
 const lowIdx = Math.max(
   0,
   Math.ceil(
-    (-BILLBOARD_H - scrollOffset - firstBillboardY) / BILLBOARD_SPACING,
+    (-BILLBOARD_CULL_H - scrollOffset - firstBillboardY) / BILLBOARD_SPACING,
   ),
 );
 ```
@@ -182,15 +196,16 @@ After rotateX(60°), the basis vectors in world space:
 ## Layer 1: Perspective Container
 
 ```jsx
-<div style={{
+<motion.div style={{
   position: 'absolute', inset: 0,
   perspective: '800px',
-  perspectiveOrigin: '50% calc(0% + 462px)',
+  perspectiveOrigin: `${centerPct}% calc(0% + 462px)`,
 }}>
 ```
 
 - `perspective: 800px` — camera is 800px in front of the screen plane
-- `perspectiveOrigin` — the vanishing point on screen
+- `perspectiveOrigin` — the vanishing point on screen. The X is `centerPct`, not 50% —
+  `RIGHT_MARGIN` shifts the visual center left to leave room for sidebar content.
 
 ### Vanishing point correction
 
@@ -214,10 +229,11 @@ perspectiveOrigin Y = 0% + 462px = 462px from top
 ```jsx
 <div style={{
   position: 'absolute',
-  top: '-10000%',           // extremely tall
-  bottom: 0,                // anchored to viewport bottom
-  maxWidth: 1152,           // controls bottom edge width
-  margin: '0 auto',        // centered
+  top: '-10000%',                 // extremely tall
+  bottom: 0,                      // anchored to viewport bottom
+  left: `${centerPct}%`,          // centered on the perspective center, not viewport center
+  marginLeft: -MAX_WIDTH / 2,     // pull back by half-width to center the plane
+  width: MAX_WIDTH,               // 1024, controls bottom edge width
   transformOrigin: 'bottom center',
   transformStyle: 'preserve-3d',
   transform: 'rotateX(60deg)',
@@ -249,25 +265,27 @@ Each billboard is rendered once by React, then styled imperatively via refs:
     position: "absolute",
     left: `${(b.lane * 100) / LANES}%`,
     width: `${100 / LANES}%`,
-    height: BILLBOARD_H,
+    height: "auto",
     transformOrigin: "bottom center",
   }}
 >
   <div
     style={{
       width: "100%",
-      height: "100%",
       transform: `translateY(${BILLBOARD_Y_OFFSET}px)`,
+      cursor: "pointer",
     }}
+    onClick={() => scrollToNode(billboards.length - 1 - i)}
   >
-    <img
-      src={b.src}
-      fetchPriority="high"
-      style={{ objectFit: "contain", objectPosition: "bottom center" }}
-    />
+    {nodes[billboards.length - 1 - i]}
   </div>
 </div>
 ```
+
+Billboards render the React `nodes` passed in (most recent node at the front/closest;
+billboard index `i` maps to `nodes[billboards.length - 1 - i]`), not `<img>` elements.
+Clicking a billboard calls `scrollToNode`. In the back scene, nodes are cloned with
+`interactive: false`.
 
 Styles set imperatively each frame (via `element.style`):
 
@@ -282,8 +300,6 @@ billboard face the viewer (stand upright on the ground surface).
 **`translateZ(-curveZ)`** pushes the billboard into the ground plane's surface,
 creating the planet curvature effect.
 
-**`fetchPriority="high"`** on `<img>` elements improves LCP by prioritizing billboard image loading.
-
 **Inner `<div>` with `translateY(BILLBOARD_Y_OFFSET)`**: a 2D vertical offset for
 billboard content. Does NOT affect 3D positioning, inflection logic, or curvature.
 
@@ -292,9 +308,10 @@ billboard content. Does NOT affect 3D positioning, inflection logic, or curvatur
 - `effectiveY = Math.max(0, b.y + scrollOffset)` — current distance from viewer
 - `curveZ = effectiveY² × invTwoR` — parabolic curvature (precomputed `invTwoR = 1/(2R)`)
 - `pastInflection = effectiveY >= inflectionGroundY` — determines which scene shows it
-- Snake pattern: lanes cycle [1, 2, 1, 0] (middle, right, middle, left)
-- Images cycle: 1.png, 2.png, 3.png
-- Each row 400px apart, first row at 200px
+- Snake pattern: lanes follow `LANE_PATTERN = [1, 2, 1, 0]` (middle, right, middle, left),
+  indexed by `(count - 1 - i)` so the pattern is anchored at the star/most-recent end
+- Each billboard renders a React node; index `i` → `nodes[billboards.length - 1 - i]`
+- Each row 400px apart (`BILLBOARD_SPACING`), first row at 200px
 
 ---
 
@@ -331,8 +348,11 @@ const perspScale = P / (P - worldZ);
 const screenY = O + (worldY - O) * perspScale;
 
 const pivotX = (g.x / 100) * W + GRASS_W / 2;
-const screenX = W / 2 + (pivotX - W / 2) * perspScale;
+const screenX = centerX + (pivotX - centerX) * perspScale;
 ```
+
+`centerX = (W - RIGHT_MARGIN) / 2` — grass projects toward the same shifted center as
+the billboards, not the raw viewport center.
 
 This replicates the same formulas as the CSS 3D pipeline (`rotateX(60deg)` + `translateZ(-curveZ)` + perspective projection).
 
@@ -376,17 +396,19 @@ Grass SVGs are preloaded as `Image` objects in the `useEffect`. A separate `Prom
 
 Uses **mulberry32** seeded PRNG (seed=42) for deterministic randomness.
 
-Each grass blade gets 6 random values (in order):
+`generateGrass(minY, maxY)` is called with ground bounds derived from the billboard
+range and the computed `topGroundY`/`bottomGroundY`/`inflectionGroundY` (not a fixed
+0..maxY). `range = maxY - minY`. Each grass blade gets 6 random values (in order):
 
 1. `x` — horizontal position: `GRASS_X_MIN + rng() * (GRASS_X_MAX - GRASS_X_MIN)`
-2. `y` — depth position: `rng() * maxY`
+2. `y` — depth position: `minY + rng() * range`
 3. `src` — random image from 11 SVGs
 4. `scale` — `GRASS_BASE_SCALE + (rng() - 0.5) * 2 * GRASS_SCALE_RANGE`
 5. `rotation` — `GRASS_BASE_ROTATION + (rng() - 0.5) * 2 * GRASS_ROTATION_RANGE`
 6. `flipX` — `rng() > 0.5 ? -1 : 1`
 
-Density-based count: `Math.round(GRASS_DENSITY * maxY / 1000)`
-With `maxY = 60 * 400 + 200 = 24200`, this gives `Math.round(7 * 24200 / 1000) = 169` blades.
+Density-based count: `Math.round(GRASS_DENSITY * range / 1000)` — scales with the depth
+span of the path, so the blade count grows with the number of nodes.
 
 Array is sorted `b.y - a.y` (descending) at generation time for loop optimization.
 
@@ -452,22 +474,28 @@ Where `O = PERSPECTIVE_OFFSET_PX` (≈462) and `P = PERSPECTIVE` (800).
 
 ## The Inflection Point & Nested Bisection
 
-### What INFLECTION_PCT controls
+### What INFLECTION_PCT / TOP_PCT / BOTTOM_PCT control
 
-`INFLECTION_PCT = 20` means: "billboard bottoms should reach their highest screen
-position at exactly 20% from the top of the viewport."
+`INFLECTION_PCT = 20` is the target screen Y for the **peak** (highest point billboard
+bottoms reach), i.e. where the sky ends and the ground begins: 20% from the top. The
+peak's screen position becomes `inflectionScreenY`, which positions the hill cover.
 
-The code derives four values from this single constant:
+`TOP_PCT` and `BOTTOM_PCT` then carve out scroll bounds within the ground area below the
+peak: `topScreenY` is `TOP_PCT%` down from the peak into the ground area, and
+`bottomScreenY` is `BOTTOM_PCT%` up from the bottom of the viewport.
 
-### 1. screenYAt(d, R) — projection function
+The `useMemo` (keyed on `windowSize.h`) derives `planetRadius`, `inflectionScreenY`,
+`inflectionGroundY`, `topGroundY`, and `bottomGroundY`.
+
+### 1. screenYAt(d, R, H) — projection function (module-level)
 
 Projects a billboard bottom at ground distance `d` with radius `R` to screen Y:
 
 ```ts
 const cZ = (d * d) / (2 * R);
-const yw = H - d * cosA + cZ * sinA;
-const zw = -d * sinA - cZ * cosA;
-return O + ((yw - O) * P) / (P - zw);
+const yw = H - d * COS_A + cZ * SIN_A;
+const zw = -d * SIN_A - cZ * COS_A;
+return PERSPECTIVE_OFFSET_PX + ((yw - PERSPECTIVE_OFFSET_PX) * PERSPECTIVE) / (PERSPECTIVE - zw);
 ```
 
 ### 2. findPeakD(R) — inner bisection
@@ -475,24 +503,27 @@ return O + ((yw - O) * P) / (P - zw);
 For a given radius R, finds the ground distance `d` where `d(screenY)/dd = 0`
 (the visual peak — minimum screenY value).
 
-Uses central difference: `deriv ≈ (screenY(d+0.5) - screenY(d-0.5)) / 1.0`
+Uses central difference with `eps = 0.5`: `deriv ≈ (screenY(d+eps) - screenY(d-eps)) / (2·eps)`
 
-Bisection logic (d ranges from 0 to 50,000):
+Bisection logic (d ranges from 0 to 50,000, 60 iterations):
 
 - `deriv < 0` → screenY still decreasing (going up) → peak is further → `dLo = mid`
 - `deriv ≥ 0` → screenY increasing (going down) → past peak → `dHi = mid`
 
 ### 3. Outer bisection on R
 
-Finds the planet radius R such that the peak's screenY equals the target.
+Finds the planet radius R (range 100 to 1,000,000) such that the peak's screenY equals
+`targetSY = INFLECTION_PCT% × H`.
 
 - **Large R** (gentle curve) → peak is far away → projects high on screen
 - **Small R** (tight curve) → peak is close → projects low on screen
 
-### 4. middleGroundY bisection
+### 4. findGroundD(targetScreenY, R, H, peakD) — module-level bisection
 
-Finds the ground-plane distance that projects to the **visual middle of the ground
-area** on screen: `middleScreenY = (inflectionScreenY + viewportHeight) / 2`.
+Inverse of `screenYAt`: finds the ground-plane distance (in `0..peakD`) that projects to
+a given screen Y. Used to compute `topGroundY` (from `topScreenY`) and `bottomGroundY`
+(from `bottomScreenY`), and also by `scrollTopForNode` to scroll a clicked node to
+`SCROLL_TO_BOTTOM_PCT`.
 
 ### Output
 
@@ -500,7 +531,8 @@ area** on screen: `middleScreenY = (inflectionScreenY + viewportHeight) / 2`.
 planetRadius; // curvature radius (used in curveZ = d² × invTwoR)
 inflectionGroundY; // ground-plane distance where peak occurs (splits visibility)
 inflectionScreenY; // screen pixel Y of the peak (positions hill cover)
-middleGroundY; // ground-plane distance projecting to visual center (scroll bounds)
+topGroundY; // ground distance projecting to topScreenY (scroll bounds)
+bottomGroundY; // ground distance projecting to bottomScreenY (scroll bounds)
 ```
 
 ---
@@ -551,9 +583,9 @@ The spacer creates scroll height. The fixed viewport floats over it. `window.scr
 
 ```ts
 const firstBillboardY = billboards[0].y; // 200
-const lastBillboardY = billboards[billboards.length - 1].y; // 23800
-const maxScroll = (lastBillboardY - firstBillboardY) / SCROLL_SPEED;
-const scrollOffset = scrollY * SCROLL_SPEED + middleGroundY - lastBillboardY;
+const lastBillboardY = billboards[billboards.length - 1].y; // depends on node count
+const maxScroll = (lastBillboardY - firstBillboardY + bottomGroundY - topGroundY) / SCROLL_SPEED;
+const scrollOffset = scrollRef.current * SCROLL_SPEED + topGroundY - lastBillboardY;
 ```
 
 ### Scroll event handling
@@ -576,6 +608,11 @@ window.addEventListener("scroll", handleScroll, { passive: true });
 Uses `passive: true`. `scrollY` stored in ref (not state) — no React re-renders.
 `ticking` flag prevents multiple rAF callbacks per frame.
 
+The real handler also checks `scrollLockRef`: after the intro entry animation, scroll is
+locked to its target for ~2s and forced back if the browser tries to move it (guards
+against browser scroll restoration). `history.scrollRestoration = 'manual'` is set at
+module scope for the same reason.
+
 ### Scroll direction
 
 **Scrolling DOWN** increases `scrollY` → increases `scrollOffset` → increases
@@ -589,7 +626,7 @@ Uses `passive: true`. `scrollY` stored in ref (not state) — no React re-render
 
 `useEffect` calls `setReady(true)` immediately after the first `update()` call.
 The 4 dynamic elements (2 canvases + 2 billboard scenes) use `visibility: ready ? 'visible' : 'hidden'`.
-Static elements (sky, ground, cover) are always visible, keeping FCP fast.
+Static elements (sky, clouds, cover) are always visible, keeping FCP fast.
 
 ### Non-blocking Google Fonts
 
@@ -603,16 +640,19 @@ Static elements (sky, ground, cover) are always visible, keeping FCP fast.
 
 ### Image loading
 
-- Billboard `<img>` elements use `fetchPriority="high"` for LCP
 - Grass SVGs are preloaded as `Image` objects with async `decode()` — page doesn't wait for decode to display
+- Billboard content is whatever React `nodes` are passed in (no `<img fetchPriority>` in this component)
 
 ---
 
-## Debug Visuals (gated by `DEBUG` constant)
+## Intro / Onboarding Entry Transition
 
-- **Horizon line**: 2px white line at `INFLECTION_PCT%` from top
-- **Hotpink grid**: CSS `linear-gradient` background (100px cells) on a 5000px div
-  inside the front billboard ground plane. Scrolls with content via ref.
-- **Ground plane border**: `1px solid rgba(255,255,255,0.1)` + semi-transparent background on the front billboard ground plane only.
-
-Set `DEBUG = true` in the constants to enable. No runtime toggle.
+The optional `introTransition` prop drives an entry animation. When `active`, the scene
+starts scrolled to `maxScroll` (the star/far end) and animates scroll toward the target
+node over `PATH_ENTRY_SCROLL_DURATION_MS` using `easeOutCubic`, syncing billboard
+positions each frame via `updateBillboardsRef`. The two 3D scenes are `motion.div`s whose
+opacity fades in (`PATH_ENTRY_NODE_DURATION_MS`) gated on `nodesVisible`. In `onboarding`
+mode, a static `ONBOARDING_GRASS_SPRITES` overlay covers the scene until it is ready, and
+the live grass canvases fade in via `liveGroundFadeStyle`. `prefersReducedMotion()` skips
+the board-pop spring animations. There is no DEBUG constant or debug-visual system in the
+current code.

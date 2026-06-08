@@ -30,7 +30,7 @@ JournalEntry (soft-deletable)
  ├── belongs_to User (author) + Project
  ├── has_many Recordings (destroyed on discard — unlinks, doesn't delete media)
  ├── has_many Collaborators (polymorphic — credited contributors)
- ├── has_one Critter (gamification reward)
+ ├── has_many Critters (gamification rewards, nullified on discard)
  └── has_many_attached images (Active Storage, max 20, 10MB, PNG/JPEG/GIF/WebP)
 
 Recording (join table, delegated_type)
@@ -61,10 +61,15 @@ Ship (audit-trailed)
 - `discard` (override) — **cascades in transaction**: soft-deletes collaborators, invites, and journal entries
 
 **Policy (`app/policies/project_policy.rb`):**
-- `show?`: admin OR owner OR collaborator (flag-gated) OR listed (public)
-- `create?`: trial users limited to 1 project
-- `update?`/`destroy?`: admin OR owner
-- `manage_collaborators?`: admin OR owner, flag-gated, verified-only
+- `show?`: staff OR owner OR collaborator (flag-gated) OR listed (public). Discarded projects are admin-only.
+- `create?`: trial users limited to 1 project (`user.projects.kept`)
+- `update?`/`destroy?`: owner only (admins edit via `/admin` or Airtable, not this policy). `destroy?` also blocked once any ship exists (audit integrity).
+- `ship?`: verified, non-trial owner; blocked while a `pending` or `awaiting_identity` ship exists.
+- `refresh_cover?`: verified, non-trial owner (mirrors `ship?` — hits the GitHub API).
+- `export_journal?`: admin OR owner.
+- `update_manual_seconds?` / `toggle_burnout?`: admin only.
+- `manage_collaborators?`: owner only, flag-gated, verified-only (admins do not manage collaborators via this policy).
+- **Scope**: staff see all; everyone else sees kept+listed projects, their own projects, and (flag-gated) projects they collaborate on.
 
 ## Journal Entries — `app/models/journal_entry.rb`
 
@@ -87,9 +92,9 @@ Ship (audit-trailed)
 3. For each selected timelapse: find/create the timelapse model, call `refetch_data!`, create Recording link
 4. For each YouTube video: find existing YouTubeVideo, create Recording link
 5. For each Lookout token: validate ownership in `user.pending_lookout_tokens`, create LookoutTimelapse, create Recording, remove from pending
-6. Add journal entry collaborators (validated against project participants)
-7. Award critter if `current_user.can_earn_critter?` (not trial)
-8. Redirect to critter reveal (`/spin/:id`) or project page
+6. Add journal entry collaborators (flag-gated; validated against project participants, verified+kept users only, minus the creator)
+7. Award a critter to the creator if `can_earn_critter?` (not trial), then `award_critters_to_collaborators` does the same for each journal collaborator. Record streak activity and invalidate the streak-warning cache.
+8. Redirect to critter reveal (`/spin/:id`) or back to the project / path page (`return_to` param)
 
 **Deferred props**: Lapse timelapses and Lookout sessions are loaded as Inertia deferred props (spinners while loading).
 
@@ -139,28 +144,35 @@ Polymorphic join: can belong to Project OR JournalEntry.
 
 Soft-deletable. Cascade-deleted when parent project is discarded.
 
-### CollaborationInvite — `app/models/collaboration_invite.rb`
+### Two-tier invite flow
 
-**Status**: `pending` → `accepted` | `declined` | `revoked`
+Invites are sent **by email** and only become a real `CollaborationInvite` once an account claims them. The two models:
 
-**Validations:**
-- Invitee must be verified
-- Invitee cannot be project owner
-- No duplicate pending invites for same project+invitee
-- Invitee cannot already be a collaborator
+**PendingCollaborationInvite — `app/models/pending_collaboration_invite.rb`** (email-keyed, token-linked)
+- Columns: `invitee_email`, `token` (unique, urlsafe_base64, auto-generated), `status` enum `pending` → `claimed` | `revoked`, optional `collaboration_invite_id` (set on claim). Soft-deletable.
+- Validations: valid email format, no duplicate pending invite per project+email, email cannot be the project owner's.
+- `claim!(user)` — in a transaction, creates the real `CollaborationInvite`, sends the invite mail, marks itself `claimed`. Idempotent (returns the existing invite if already claimed).
+- `claim_all_for_email!(email, user)` — claims every matching pending invite for a newly verified user (skips invalid ones).
 
-**Accept flow**: creates a Collaborator record. Invitee can then create journal entries on the project and be credited as collaborator on entries.
+**CollaborationInvite — `app/models/collaboration_invite.rb`** (user-keyed, the acceptance surface)
+- **Status**: `pending` → `accepted` | `declined` | `revoked`
+- **Validations:** invitee must be verified, cannot be project owner, no duplicate pending invite per project+invitee, cannot already be a collaborator.
+- **Accept flow**: creates a Collaborator record. Invitee can then create journal entries on the project and be credited as collaborator on entries.
 
-**Routes (split across two controllers):**
-- `Projects::CollaborationInvitesController` (nested under projects):
-  - `POST /projects/:id/collaboration_invites` — send invite (owner finds user by email)
-  - `DELETE /projects/:id/collaboration_invites/:id` — revoke
-- `CollaborationInvitesController` (top-level, for invitee actions):
+**Send path**: `POST /projects/:id/collaboration_invites` (`Projects::CollaborationInvitesController#create`) takes an `email`, not a user id. It builds a `PendingCollaborationInvite` and enqueues `ProcessCollaborationInviteJob`. Responses are deliberately uniform ("Invite sent!") regardless of whether the email maps to a verified user, a duplicate, a self-invite, or nothing — to prevent email enumeration (the claim/mail branching runs in the background so response timing doesn't leak either).
+
+**Routes (split across three controllers):**
+- `Projects::CollaborationInvitesController` (nested under projects, owner actions, flag-gated):
+  - `POST /projects/:id/collaboration_invites` — send invite by email (`manage_collaborators?`)
+  - `DELETE /projects/:id/collaboration_invites/:id` — revoke (`revoke?`); also revokes the linked pending invite
+- `CollaborationInvitesController` (top-level, invitee actions on a claimed invite, flag-gated):
   - `GET /collaboration_invites/:id` — show invite
   - `POST /collaboration_invites/:id/accept` — accept
   - `POST /collaboration_invites/:id/decline` — decline
+- `PendingCollaborationInvitesController` (universal email link):
+  - `GET /i/:token` (`pending_invite`) — `allow_unauthenticated_access` + `allow_trial_access`; renders state-specific UI (`unauthenticated` / `trial` / `wrong_user` / `revoked`) or, for a matching verified user, calls `claim!` and redirects to the real invite.
 
-**Why split**: The nested controller handles owner actions scoped to a project. The top-level controller handles invitee actions where the invitee navigates to the invite directly (e.g., from a notification link).
+**Why split**: the nested controller handles owner actions scoped to a project; the top-level controller handles invitee actions on an already-claimed invite; the pending controller handles the public email link that works in any auth state (and bridges trial → verified users via `session[:return_to]`).
 
 ## LookoutSessionsController — `app/controllers/lookout_sessions_controller.rb`
 
@@ -182,6 +194,7 @@ Creates and manages recording sessions:
 - **`pages/projects/form.tsx`** — create/edit with Inertia `useForm`
 - **`pages/journal_entries/new.tsx`** — book-style dual-pane: left = markdown editor + image upload, right = tabbed media browser (Lapse/YouTube/Lookout)
 - **`pages/collaboration_invites/show.tsx`** — accept/decline invite
+- **`pages/pending_collaboration_invites/show.tsx`** — email-link landing page (sign-in / verification prompts, revoked / wrong-user states)
 
 ## Journal Export
 

@@ -45,6 +45,7 @@ Screen/camera recording sessions with signed URLs. See [lookout-api-docs.md](loo
   - `get_session(token)` — public, returns session data with signed URLs
   - `get_video_url(token)` / `get_thumbnail_url(token)` — fresh signed URLs (1hr expiry)
   - `batch_sessions(tokens)` — max 100 tokens per request
+  - `download_video(token)` — follows the video URL (handles up to 3 redirects) into a `Tempfile` for server-side processing
 - **Feature flag**: `:"03_18_collapse"` (shared as `lookout` to frontend)
 - **NPM packages**: still named `@collapse/*` pending upstream rename
 - **Env**: `LOOKOUT_URL`, `LOOKOUT_API_KEY`
@@ -53,13 +54,14 @@ Screen/camera recording sessions with signed URLs. See [lookout-api-docs.md](loo
 
 Video metadata fetching and caching.
 
-- **API**: YouTube Data API v3 (`/youtube/v3/videos`, snippet + contentDetails)
+- **API**: YouTube Data API v3 (`/youtube/v3/videos`, `snippet,contentDetails,liveStreamingDetails`), with an oEmbed fallback (`youtube.com/oembed`) when the Data API key is missing or returns nothing
 - **Methods**:
   - `find_or_fetch(url)` — returns cached `YouTubeVideo` record or fetches new
-  - `extract_video_id(url)` — parses URLs, **rejects Shorts**
-  - `thumbnail_url(url, quality:)` — generates i.ytimg.com URL
+  - `extract_video_id(url)` — parses URLs (incl. `live/`), **rejects Shorts**
+  - `thumbnail_url(url, quality:)` / `thumbnail_url_from_id(video_id, quality:)` — generates i.ytimg.com URL
 - **Anti-abuse**: Videos ≤60s that aren't live streams rejected as Shorts
-- **Env**: `YOUTUBE_API_KEY`
+- **Live streams**: `was_live` derived from `liveBroadcastContent` + `liveStreamingDetails`; recently-ended streams fall back to `actualEndTime - actualStartTime` for duration and are re-fetched after 1 day via `YouTubeVideoRefetchJob`
+- **Env**: `YOUTUBE_API_KEY` (falls back to `GOOGLE_CLOUD_API_KEY`)
 
 ### Hackatime — `app/services/hackatime_service.rb`
 
@@ -75,7 +77,7 @@ User messaging and channel management via bot token.
 
 - **Jobs**: `SlackMsgJob` (sends DMs/channel posts), `SlackChannelInviteJob` (invites to channels)
 - **Welcome channels**: `User::SLACK_WELCOME_CHANNELS` constant (invited on trial→full promotion)
-- **Error handling**: gracefully ignores `AlreadyInChannel`, warns on `UserIsRestricted`
+- **Error handling**: invites gracefully ignore `AlreadyInChannel`, warn on `UserIsRestricted`/`CantInvite`. `SlackMsgJob` serializes sends via `limits_concurrency to: 1` + a 1.1s sleep (Slack ~1 msg/sec workspace limit) and retries `TooManyRequestsError`/`TimeoutError` with backoff.
 - **Used by**: `AuthController#create` (post-HCA verification welcome), `User#refresh_profile_from_slack`
 - **Env**: `SLACK_BOT_TOKEN`
 
@@ -87,15 +89,18 @@ User messaging and channel management via bot token.
 - **Supported URLs:**
   - `https://fallout.hackclub.com/projects/:id`
   - `https://fallout.hackclub.com/bulletin_board?project=:id`
-- **Response:** calls `chat.unfurl` with the same native `card` block structure used in review thread messages (title/subtitle/body/actions/hero image/icon)
+- **Response:** calls `chat.unfurl` with the same native `card` block structure used in review thread messages — built via the shared `SlackProjectCardService.build_card_block` (title/subtitle/body/actions/hero image/icon). Only resolves projects visible via `Project.public_for_explore`.
 
 ### MailDeliveryService — `app/services/mail_delivery_service.rb`
 
 Creates in-app MailMessage notifications. Not an external integration — purely internal, but lives in `services/` because it's a stateless service object.
 
-**Methods:**
+**Methods** (class methods, one per notification type):
 - `ship_status_changed(ship)` — creates targeted notification on approval/return/rejection with feedback. Links to project page.
 - `collaboration_invite_sent(invite)` — creates non-dismissable notification for invitee. Links to invite show page. `dismissable: false` forces accept/decline.
+- `blueprint_transfer(user, project_names)` — notifies on Blueprint transfer.
+- Streak family: `streak_milestone`, `streak_reminder`, `streak_broken`, `streak_goal_broken`, `streak_goal_completed`, `streak_freeze_used` — driven by the streak jobs (see Background Jobs).
+- Broadcast/announcement helpers (`mail_intro`, `professors_announcement`) — one-off campaign messages, some with `pinned`/`filters`/`expires_at`.
 
 ### Airtable — `app/models/airtable_sync.rb`
 
@@ -110,7 +115,7 @@ Outbound sync for Users, Projects, ShopOrders, Ships, and the four review types 
 
 **Unified reviews table**: All four `Reviewable` subclasses sync to one Airtable table (`tblH5ENbMHrWR6hyd`, sync `J3D2bzea`). Shared sync config (table id, sync id, batch flags, ship preload, base field mappings) lives in `Reviewable.class_methods`. Each subclass declares a 2-letter `review_id_prefix` (`TA`/`RC`/`DR`/`BR`) and an `extra_review_field_mappings` override. Rows in Airtable are disambiguated by a prefixed "Review ID" column (e.g. `TA12`, `BR12`). Each class still gets its own `AirtableSync` row in the local table (different `record_identifier`); Airtable upserts merge them server-side via the shared sync source.
 
-**Ships table** (`tblz2umphZqnDoQDZ`, sync `PLi0fLU8`): one row per `Ship`, includes the three hour flavors (`Logged Hours`, `Approved Hours`, `Internal Hours` — see [arch-ship-and-koi.md](arch-ship-and-koi.md) §7), `Koi Awarded` (sum of `KoiTransaction` where `reason='ship_review'`), per-pipeline review statuses, and the user-facing fields (justification/feedback/links). Logged hours uses `Ship.batch_time_logged` (single SQL aggregate over recordings) to avoid N+1 across the sync run.
+**Ships table** (`tbl1LJG0FKSV61wcW`, sync `5BFGD4ac`): one row per `Ship`, includes the three hour flavors (`Logged Hours`, `Approved Hours`, `Internal Hours` — see [arch-ship-and-koi.md](arch-ship-and-koi.md) §7), `Koi Awarded` (sum of `KoiTransaction` where `reason='ship_review'`), per-pipeline review statuses, and the user-facing fields (justification/feedback/links). Logged hours uses `Ship.batch_time_logged` (single SQL aggregate over recordings) to avoid N+1 across the sync run.
 
 **One-shot YSWS Unified Submissions upload** (`tbl1CXrjDLqtYp84y`): per-approval push, separate from the cron mirror. Two parallel jobs fire on approval (and from the backfill rake):
 
@@ -133,28 +138,45 @@ Backfill: `bin/rake airtable:backfill_unified_ships` — dry-run by default, `AP
 
 ## Background Jobs — Solid Queue
 
-**Config** (`config/queue.yml`): 4 worker pools:
+**Config** (`config/queue.yml`): 3 worker pools (process count is `JOB_CONCURRENCY`, default 2):
 
 | Pool | Queues | Threads | Purpose |
 |---|---|---|---|
-| 1 | `realtime`, `default` | 4 | User-facing: Slack messages, channel invites |
-| 2 | `background`, `ahoy`, `uptime` | 6 | Async: Airtable sync, analytics, health checks |
-| 3 | `active_storage` | 2 | File processing |
-| 4 | `*` (wildcard) | 1 | Catch-all |
+| 1 | `realtime`, `default` | 2 | User-facing: Slack messages, channel invites |
+| 2 | `background`, `ahoy`, `meilisearch`, `active_storage`, `solid_queue_recurring`, `uptime` | 4 | Async: Airtable sync, analytics, search reindex, file processing, recurring tasks, health checks |
+| 3 | `heavy` | 4 | Long-running work |
 
-**Recurring jobs** (`config/recurring.yml`):
+There is no wildcard (`*`) catch-all pool — jobs must target one of the queues above.
+
+**Recurring jobs** (`config/recurring.yml`, production only):
 
 | Job | Schedule | Queue |
 |---|---|---|
-| `clear_solid_queue_finished_jobs` | Hourly (minute 12) | — |
+| `clear_solid_queue_finished_jobs` (command) | Hourly (minute 12) | — |
 | `UptimePingJob` | Every minute | `uptime` |
 | `AirtableSyncJob` | Every 5 minutes | `background` |
+| `ExpireStaleReviewClaimsJob` | Every 10 minutes | `background` |
+| `HcbTokenRefreshJob` | Hourly | `background` |
+| `HcbGrantCardSyncJob` | Every 15 minutes | `background` |
+| `HcbDonationSyncJob` | Every 5 minutes | `background` |
+| `StreakReconciliationJob` | Every 30 minutes | `background` |
+| `StreakNotificationJob` | Hourly (minute 30) | `background` |
+| `StreakLeaderboardJob` | Daily 5pm | `background` |
+| `ProjectInactivityJob` | Daily 9am | `background` |
+| `UserBanCheckJob` | Every 30 minutes | `background` |
+| `HcaIdentityRefreshJob` | Every 10 minutes | `background` |
+| `YouTubeVideoBackfillJob` | Daily 11pm | `background` |
+| `hours_stats_refresh` (command) | Daily 5am | — |
+| `RefreshStaleUnifiedThumbnailsJob` | Hourly | `background` |
 
-**Job inventory:**
+**Job inventory** (selected; full list in `app/jobs/`):
 - `SlackMsgJob` — send Slack message (default queue)
 - `SlackChannelInviteJob` — invite user to Slack channels (default queue)
 - `AirtableSyncJob` → `AirtableSyncClassJob` — orchestrate per-model Airtable sync (background queue)
+- `ShipUnifiedAirtableUploadJob` / `AttachShipUnifiedScreenshotJob` — YSWS unified-submission upload pair (see Airtable section)
 - `UptimePingJob` — health check ping to monitoring service (uptime queue)
+- `HcaIdentityRefreshJob` — refreshes HCA identity, clears invalid tokens
+- Streak jobs (`StreakReconciliationJob`, `StreakNotificationJob`, `StreakLeaderboardJob`) drive the MailDeliveryService streak notifications
 
 Admin dashboard: MissionControl::Jobs at `/jobs` (admin-only constraint).
 
@@ -186,9 +208,9 @@ No Action Mailbox processors are implemented (inbound email is not used).
 
 | Service | Purpose | Config |
 |---|---|---|
-| **Sentry** | Error tracking (Ruby + React) | `config/initializers/sentry.rb`, `ErrorReporter` wrapper module |
-| **Skylight** | Rails APM | `config/skylight.yml` |
-| **Ahoy** | Analytics (visits, events) | `config/initializers/ahoy.rb`, geolocation via Hack Club geocoder |
+| **Sentry** | Error tracking + tracing (Ruby + React) | `config/initializers/sentry.rb` (traces/profiles 20% in prod), `ErrorReporter` wrapper (`app/lib/error_reporter.rb`) |
+| **RailsPerformance** | Rails APM dashboard | `/admin/performance` (admin-only, mounted only when `REDIS_URL` is set) |
+| **Ahoy** | Analytics (visits, events) | `config/initializers/ahoy.rb`, `geocode = true`, jobs on `background` queue, CF-Connecting-IP, disabled in dev |
 | **Flipper UI** | Feature flag dashboard | `/flipper` (admin-only) |
 | **MissionControl::Jobs** | Solid Queue dashboard | `/jobs` (admin-only) |
 
@@ -198,14 +220,19 @@ Sentry frontend: browserTracing (20% sample), replayOnError, canvas replay.
 
 ### Rack::Attack — `config/initializers/rack_attack.rb`
 
+All IP-keyed throttles use Cloudflare's `CF-Connecting-IP` (the `CFConnectingIp` prepend) rather than `req.ip`, so a spoofed `X-Forwarded-For` can't bypass them. There is no global all-routes throttle.
+
 | Throttle | Limit | Scope |
 |---|---|---|
-| Global | 300/5min | per IP |
-| Auth start | 10/min | per IP |
-| HCA callback | 20/min | per IP |
-| Sign out | 10/min | per IP |
-| RSVP | 5/min | per IP |
-| YouTube lookup | 10/min | per IP |
+| Auth start (`/auth/hca/start`) | 10/min | per IP |
+| HCA callback (`/auth/hca/callback`) | 20/min | per IP |
+| Sign out (`/auth/signout`) | 10/min | per IP |
+| RSVP (`/rsvp`) | 5/min | per IP |
+| YouTube lookup (`/you_tube_videos/lookup`) | 10/min | per IP |
+| Trial session (`/trial_session`) | 10/3min per IP, 5/hr per hashed email | per IP + email |
+| API v1 (`/api/v1/*`) | 120/min per hashed key, 60/min per IP | per key + IP |
+| Collaboration invites | 20/hr | per user (IP fallback) |
+| Zine cover refresh (`/projects/:id/refresh_cover`) | 6/min | per user (IP fallback) |
 
 **Blocklist**: Fail2Ban for `/etc/passwd`, `wp-admin`, `wp-login` patterns — 5 attempts in 10 minutes → 1 hour ban.
 
@@ -215,11 +242,13 @@ Sentry frontend: browserTracing (20% sample), replayOnError, canvas replay.
 
 ## Public API
 
-`/api/v1/` — bearer token auth via `Authorization` header (constant-time comparison against `EXTERNAL_API_KEY`).
+`/api/v1/` — bearer token auth via `Authorization` header (constant-time comparison against `EXTERNAL_API_KEY`, in `Api::V1::BaseController` which inherits `ActionController::API`).
 
 **Endpoints:**
 - `GET /api/v1/projects` — paginated, searchable project list
 - `GET /api/v1/projects/:id` — single project detail
+- `GET /api/v1/users` / `GET /api/v1/users/:id` — user list / detail
+- `GET /api/v1/explore/projects` / `GET /api/v1/explore/journals` — explore feeds
 
 ## Deployment — Kamal
 

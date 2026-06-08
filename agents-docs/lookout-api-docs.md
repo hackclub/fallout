@@ -73,7 +73,7 @@ State transitions use optimistic locking — concurrent state changes return `40
 ## Public Endpoints
 
 ### Get Session Status
-`GET /api/sessions/:token` → `{ status, trackedSeconds, screenshotCount, startedAt, totalActiveSeconds, createdAt, thumbnailUrl, videoUrl, videoWebmUrl, metadata }`
+`GET /api/sessions/:token` → `{ status, name, trackedSeconds, screenshotCount, startedAt, totalActiveSeconds, createdAt, thumbnailUrl, videoUrl, videoWebmUrl, metadata }`
 
 ### Get Presigned Upload URL
 `GET /api/sessions/:token/upload-url` → `{ uploadUrl, r2Key, screenshotId, minuteBucket, nextExpectedAt }`
@@ -100,7 +100,7 @@ State transitions use optimistic locking — concurrent state changes return `40
 `GET /api/sessions/:token/thumbnail` → `{ thumbnailUrl }` (1hr signed URL)
 
 ### Batch Get Sessions
-`POST /api/sessions/batch` body: `{ tokens: [...] }` → `{ sessions: [{ token, status, trackedSeconds, screenshotCount, startedAt, createdAt, totalActiveSeconds, thumbnailUrl, videoUrl, videoWebmUrl, metadata }] }`
+`POST /api/sessions/batch` body: `{ tokens: [...] }` → `{ sessions: [{ token, name, status, trackedSeconds, screenshotCount, startedAt, createdAt, totalActiveSeconds, thumbnailUrl, videoUrl, videoWebmUrl, metadata }] }`
 
 ---
 

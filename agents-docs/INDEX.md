@@ -25,7 +25,3 @@ This index points to the per-subsystem docs. Start with [Project Architecture](p
 - [Inertia Modal fork](inertia-modal-fork.md) — Custom duration prop, in-modal navigation, modified files
 - [Path 3D rendering](test-page-architecture.md) — CSS perspective math, billboard system, canvas grass, curvature
 - [Path performance](test-page-performance.md) — Optimization strategies (implemented and remaining)
-
-## Legacy (Superseded)
-
-- [Trial users](trial-users.md) — Superseded by [auth-architecture.md](auth-architecture.md)

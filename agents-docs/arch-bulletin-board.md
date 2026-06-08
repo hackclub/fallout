@@ -114,7 +114,7 @@ Frontend subscriptions (via [`useLiveReload`](app/frontend/lib/useLiveReload.ts)
 | Page | Stream | `only:` props |
 |---|---|---|
 | `pages/bulletin_board/index.tsx` | `bulletin_events` | `['events']` |
-| `pages/bulletin_board/events/show.tsx` | `bulletin_events` | (full reload) |
+| `pages/bulletin_board/events/show.tsx` | `bulletin_events` | `['event']` (plus an `onMessage` that closes the detail view if the event is destroyed) |
 | `pages/admin/bulletin_events/index.tsx` | `bulletin_events` | `['events']` |
 
 `useLiveReload` is modal-aware: inside an InertiaUI Modal overlay it calls `modal.reload()` and snapshots `modal.props` into local state to drive a re-render (the modal fork's prop-propagation chain is unreliable for some subtrees). Outside a modal it falls back to `router.reload({ only })`. See the comment block at the top of `useLiveReload.ts` for details.

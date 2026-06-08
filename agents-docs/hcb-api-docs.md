@@ -1217,7 +1217,8 @@ Create check deposit.
 ## Fallout Integration Notes
 
 For Fallout's use case (org-level, issue grants + read balances/transactions):
-- **Scopes needed:** `read` + restricted scopes `organizations:read`, `card_grants:write`
-- **Key endpoints:** org details w/ balance, transactions list, card grant CRUD
-- **Token refresh:** Must refresh before 2-hour expiry — job runs hourly
-- **Single connection:** One HCB account for the whole program, stored in dedicated model (not User)
+- **Scope requested:** `HcbService.authorize_url` requests only `read` (`app/services/hcb_service.rb`). The restricted scopes `organizations:read` / `card_grants:write` documented above are part of HCB's spec but are NOT requested by our authorize flow — the connection relies on whatever the OAuth app is granted server-side.
+- **Key endpoints we call:** `GET/POST organizations/:org/card_grants`, `GET/POST card_grants/:id` (+ `topup`, `withdraw`, `activate`, `transactions`), `GET organizations/:org/transactions`. The hardcoded org is `HcbService::ORGANIZATION_ID` (`org_vgu6Nl`).
+- **Token refresh:** `HcbTokenRefreshJob` runs hourly (`config/recurring.yml`); refreshes when the token expires within 30 minutes (`HcbConnection#token_expiring_soon?`).
+- **ENV vars:** `HCB_CLIENT_ID`, `HCB_CLIENT_SECRET`, `HCB_OAUTH_HOST` (default `https://hcb.hackclub.com`). Writes are gated behind `HCB_ALLOW_WRITES` outside production (`HcbService#writes_allowed?`).
+- **Single connection:** One HCB account for the whole program, stored in the dedicated `HcbConnection` model (not User), enforced to a single row.

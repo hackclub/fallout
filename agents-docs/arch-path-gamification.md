@@ -1,6 +1,6 @@
 ---
 name: Path & Gamification Architecture
-description: The Path progression system, critter gacha rewards, koi economy (placeholder), clearing gallery, and admin review workflow
+description: The Path progression system, critter gacha rewards, koi/gold economy, clearing gallery, and admin review workflow
 type: project
 originSessionId: bb8ce051-7e1a-4ccd-bd96-7b3a575d339a
 ---
@@ -13,18 +13,24 @@ The Path is the primary user-facing experience — a 3D perspective ground plane
 Single `index` action at `/path`. Trial users can access (`allow_trial_access`).
 
 **Props passed to frontend:**
-- `display_name`, `email`, `koi` (always 0), `avatar`
+- `user` — nested object: `id`, `display_name`, `koi`, `gold`, `avatar` (no email/PII)
 - `has_projects` — whether user owns or collaborates on any project
-- `journal_entry_count` — number of kept journal entries
-- `critter_variants` — array of variant strings per journal entry (creation order)
+- `journal_entry_count` — number of kept journal entries (owned + collaborated)
+- `critter_variants` — array of variant strings per journal entry (creation order), nil where no critter was awarded
+- `pending_dialog` — key of the next campaign dialog overlay to show (`sixty_hours`, `streak_goal_completed`, `first_journal`, `streak_goal_nudge`), or nil
+- `mail_intro_id` — id of a mail to auto-open on load, or nil
 
-### Progression Logic (frontend)
+Also exposes `has_unread_mail`, `current_streak`, and `unsubmitted_hours` via path-scoped `inertia_share`.
 
-**`activeIndex`** = `has_projects ? journal_entry_count + 1 : 0`
+### Progression Logic (frontend, `app/frontend/pages/path/index.tsx`)
 
-60 billboard nodes on the path:
-- **Index 0** (star node): `active` → links to `/projects/onboarding`; `completed` → notification
-- **Index 1+** (journal nodes): `active` → links to `/journal_entries/new`; `completed` → shows critter image overlay
+**`activePathNodeIndex`** = `has_projects ? Math.min(journal_entry_count + 1, pathNodeCount - 1) : 0`
+
+**`pathNodeCount`** = `Math.max(50, 50 + journal_entry_count)` — minimum 50 nodes, grows so there's always at least one locked node ahead. (PathNode itself derives its own `activeIndex = has_projects ? journal_entry_count + 1 : 0` for state.)
+
+Nodes on the path:
+- **Index 0** (star node): `active` → `<Link>` to `/projects/onboarding`; `completed` → notification
+- **Index 1+** (journal nodes): `active` → `ModalLink` to `/journal_entries/new` (trial users / docs-nudge get a notification instead); `completed` → shows critter image overlay
 - States: `locked` (future), `active` (next to complete), `completed` (past)
 
 ### 3D Rendering
@@ -44,30 +50,39 @@ Key architecture:
 
 | Component | Purpose |
 |---|---|
-| `Path.tsx` | 3D scene — billboards, grass, scroll, curvature math (524 lines) |
-| `PathNode.tsx` | Individual node — state logic, tooltip, ModalLink for detail |
-| `Header.tsx` | Top HUD — avatar, display name, koi balance, sign-out dropdown |
+| `Path.tsx` | 3D scene — billboards, grass, scroll, curvature math (~1030 lines); takes `nodes` + `introTransition` props |
+| `PathNode.tsx` | Individual node — state logic, tooltip, Link/ModalLink for active node |
+| `Header.tsx` | Top HUD — avatar, display name, koi + gold balance, sign-out dropdown |
 | `Leaderboard.tsx` | Placeholder — "Coming Soon" |
 | `BgmPlayer.tsx` | Background music toggle |
 | `SignUpCta.tsx` | Trial user upgrade prompt |
+| `PathDialogOverlay.tsx` | Campaign dialog/cutscene overlay (mascot, stepped text, choices) driven by `pending_dialog` |
+| `SubmissionCountdown.tsx` | Countdown HUD to submission deadline |
 
 ## Critters — `app/models/critter.rb`
 
 Gacha rewards earned from creating journal entries.
 
-**18 variants**: `b2b-sales, bloo, bush, chocolate, elk, grass, gren-frog, jellycat, orange, riptide, rosey, skeelton, sungod, the-goat, the-red, trashcan, worm, yelo`
+**Variants are derived at boot from the image files in `public/critters/*.webp`** — not a hardcoded list. `Critter::ALL_VARIANTS` is the sorted list of basenames; `SHINY_VARIANTS` are those prefixed `shiny-`; `VARIANTS` is the non-shiny remainder. Adding/removing a `.webp` changes the pool. `validates :variant, inclusion: { in: ALL_VARIANTS }`.
+
+**Shiny rolls**: `Critter.roll_variant` picks a `SHINY_VARIANTS.sample` with probability `SHINY_CHANCE` (0.05), otherwise `VARIANTS.sample`. `critter.shiny?` checks the prefix.
 
 **Fields:**
-- `variant` — random from `VARIANTS.sample`
+- `variant` — set via `Critter.roll_variant`
 - `spun` — boolean, default false (whether reveal animation played)
 - `user_id`, `journal_entry_id`
 
-**Award flow** (`JournalEntriesController#maybe_award_critter`):
-1. Check `current_user.can_earn_critter?` (returns `!trial?`)
-2. Create Critter with random variant
-3. Redirect to `/spin/:critter_id` for reveal animation
+**Helpers**: `image_path` → `/critters/<variant>.webp`; `audio_path` → per-variant `/sfx/spin/<variant>.mp3` falling back to `default.mp3`; `mark_spun!`.
 
-**Policy**: show/update restricted to owner only.
+**Live updates**: includes `Broadcastable`; `broadcasts_updates_to { "path_user_#{user_id}" }` so the owner's path page re-hydrates `critter_variants` on change.
+
+**Award flow** (`JournalEntriesController#maybe_award_critter`):
+1. Check `user.can_earn_critter?` (returns `!trial?`)
+2. `user.critters.create!(variant: Critter.roll_variant, journal_entry:)`
+3. Also awards critters to journal-entry collaborators (`award_critters_to_collaborators`)
+4. On create, the controller redirects to `critter_path(critter)` (`/spin/:id`) for reveal; otherwise back to the path or project
+
+**Policy** (`CritterPolicy`): show/update restricted to owner only; scope resolves to the user's own critters.
 
 ### Critter Reveal — `app/controllers/critters_controller.rb`
 
@@ -77,7 +92,7 @@ Gacha rewards earned from creating journal entries.
 
 ### The Clearing — `app/controllers/clearing_controller.rb`
 
-Gallery view at `/clearing` showing all user's critters in a scenic environment.
+Gallery view at `/clearing` showing all the user's critters (`policy_scope(Critter)`, newest first) in a scenic environment.
 - Blue-noise distributed placement algorithm
 - Links to individual `/spin/:id` for each critter
 - "Back" link returns to `/path`
@@ -86,9 +101,9 @@ Gallery view at `/clearing` showing all user's critters in a scenic environment.
 
 Implemented as a ledger. See [arch-ship-and-koi.md](arch-ship-and-koi.md) for the full model. Quick reference:
 
-- `KoiTransaction` (readonly, `REASONS = ship_review | admin_adjustment | streak_goal`) and parallel `GoldTransaction` (admin_adjustment only).
-- `User#koi` = `koi_transactions.sum(:amount)` MINUS koi-currency shop_orders (non-rejected) MINUS project_grant_orders (non-rejected). Trials hardcoded to 0.
-- All three reasons are wired: `streak_goal` (StreakService), `admin_adjustment` (Admin::KoiTransactionsController), `ship_review` (Ship's after_update_commit → ShipKoiAwarder service). See arch-ship-and-koi.md §10 for the awarding formula and the layered safeguards (DB partial unique index, model invariant, reconciliation rake task).
+- `KoiTransaction` (readonly, `REASONS = ship_review | built_irl_conversion | admin_adjustment | streak_goal`; `SHIP_REASONS = ship_review | built_irl_conversion` require a `ship_id`) and parallel `GoldTransaction` (`REASONS = ship_review | built_irl_conversion | admin_adjustment`).
+- `User#koi` = `koi_transactions.sum(:amount)` MINUS koi-currency shop_orders (non-rejected) MINUS project_grant_orders (kept, non-rejected). Trials hardcoded to 0. `User#gold` returns the `gold_balance` integer column directly (trials 0) — see arch-ship-and-koi.md for how gold reconciles against `GoldTransaction`.
+- Reasons are wired: `streak_goal` (StreakService), `admin_adjustment` (Admin::KoiTransactionsController), `ship_review` / `built_irl_conversion` (Ship's after_update_commit → awarder service). See arch-ship-and-koi.md §10 for the awarding formula and the layered safeguards (DB partial unique index, model invariant, reconciliation rake task).
 - Spending paths: `ShopOrder` (frozen_price, currency koi/gold/hours), `ProjectGrantOrder` (koi → USD via HcbGrantSetting for HCB project funding cards). Both use frozen amounts and exclude `rejected` from the deduction (so `fulfilled→rejected` refunds).
 
 ## Admin Review Workflow
@@ -129,7 +144,7 @@ In-app notification system (not email — confusingly named "mail").
 
 ### The Clearing Dev Mode
 
-`ClearingController` supports a `?simulate` param in development that renders all 18 critter variants as mock data — useful for testing the gallery layout without creating real journal entries.
+`ClearingController` supports a `?simulate` param in development that renders all `Critter::ALL_VARIANTS` as mock data — useful for testing the gallery layout without creating real journal entries.
 
 ## Notifications Detail — `app/models/mail_interaction.rb`
 

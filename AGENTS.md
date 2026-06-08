@@ -14,7 +14,7 @@ Detailed architecture docs live in [agents-docs/](agents-docs/INDEX.md). Before 
 
 # Stack
 
-Ruby 3.4.4, Rails 8.1.2, React 19, Tailwind 4.1.18 via inertia-rails. Only suggest changes applicable to these versions. Prefer CLI-generated boilerplate over manual file creation — you can always modify generated output.
+Ruby 3.4.4, Rails 8.1.3, React 19, Tailwind 4.1.18 via inertia-rails. Only suggest changes applicable to these versions. Prefer CLI-generated boilerplate over manual file creation — you can always modify generated output.
 
 In-house services: HCA is our unified authentication system. Hackatime is the time tracking system, where Lapse is the timelapse tool for Hackatime. HCB is our "bank" (real US dollars).
 
@@ -36,7 +36,7 @@ Two user types exist: **full users** (authenticated through HCA, cross-device ac
 
 Staff users have one or more roles stored in a PostgreSQL array column: `time_auditor`, `requirements_checker`, `pass2_reviewer`, `admin`, or `hcb`. Each reviewer role grants access only to its specific review queue(s) — use `user.can_review?(queue)` to check. Admins have access to everything except real money movement, which is reserved for the `hcb` role: only users with `user.hcb?` true can issue or top up HCB project funding card grants. Regular admins can read grant orders, edit `HcbGrantSetting`, adjust admin notes, and move orders to pending/on_hold/rejected — but cannot transition an order to `fulfilled` (which triggers an HCB topup) or mark a pending topup as completed during reconciliation.
 
-**PII (email, slack_id, etc.) must only be exposed to admins.** Non-admin reviewers see display names and avatars but never email addresses or other identifying information. When serializing user data for the admin frontend, always check `current_user.admin?` before including PII fields. The `/admin/users` pages are already admin-only via `require_admin!`.
+**PII (email, full name, etc.) must only be exposed to admins.** Non-admin reviewers see display names and avatars but never email addresses or other identifying information. When serializing user data for the admin frontend, always check `current_user.admin?` before including PII fields. The `/admin/users` pages are already admin-only via `require_admin!`.
 
 ## Fail-Closed Defaults
 

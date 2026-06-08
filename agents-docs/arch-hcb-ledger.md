@@ -48,12 +48,12 @@ A pending order withholds koi but doesn't commit money. A fulfilled→rejected t
 
 ## 2. Settle Service
 
-[`ProjectFundingTopupService`](../app/services/project_funding_topup_service.rb) is the **only** code path that moves money. Called from `OrdersController` on fulfillment.
+[`ProjectFundingTopupService`](../app/services/project_funding_topup_service.rb) is the **only** code path that moves money. Its entry point is `settle!(user, triggering_order:)`, run async via [`ProjectFundingTopupJob`](../app/jobs/project_funding_topup_job.rb), which `Admin::ProjectGrants::OrdersController` enqueues (`ProjectFundingTopupJob.perform_later`) on `update` (newly-fulfilled) and `batch_fulfill`.
 
 ### Flow
 1. **`preflight!`** — fail fast (HCB unconfigured, no connection, expired token) **before** writing any pending row, so transient auth issues don't leave phantom reconciliation work.
 2. **Inside a txn + advisory lock** on `pft:#{user.id}`:
-   - `delta < 0` → `ProjectGrantWarning.record!(:over_transferred_user)` + Sentry. No money move.
+   - `delta < 0` → `ProjectGrantWarning.record!(:over_transferred_user)` + Sentry. No money move. **⚠️ Known bug:** `"over_transferred_user"` is **not** in `ProjectGrantWarning::KINDS`, which is validated via `inclusion`, so `record!`'s `save!` raises `RecordInvalid`. The over-transferred branch (transferred > expected — the dangerous direction) therefore crashes the settle txn instead of logging a warning. Fix is to add the kind to `KINDS` (+ a `KIND_DESCRIPTIONS` entry); not yet done as of this writing.
    - `delta == 0` → no-op.
    - `delta > 0` → `ensure_active_card!`; `ratchet_send_amount!` against live HCB state; insert **pending** topup row; commit txn.
 3. **Outside the txn**, call HCB (`topup_card_grant` or `card.issue!` on first-time). On success, flip pending → completed.
@@ -127,19 +127,19 @@ HCB returns two structurally distinct payloads on the transactions endpoint, and
 - **`card_charge`** (purchases) — pending means the merchant has captured an authorization but the bank hasn't fully posted. May still resolve to declined/reversed. We count pending as spent for spending totals and closure-refund math, but acknowledge it can flip.
 - **`transfer`** (org↔card movement: topups, withdrawals, initial grant) — pending means the money has **already moved**, awaiting HCB staff confirmation. Treat the same as settled when reasoning about money flow. Fallout's local ledger is the source of truth for transfers anyway, so this distinction mostly matters when reading the HCB UI / API directly.
 
-Both row types live in `HcbTransaction` keyed off `transaction_type` (`purchase | transfer | other`). The `purchases` scope filters to `card_charge` only.
+Both row types live in `HcbTransaction` keyed off `transaction_type` (`purchase | transfer | other`, inferred by `infer_transaction_type` from HCB's `card_charge`/`transfer` payload keys). The `purchases` scope filters to `transaction_type: "purchase"` only.
 
 ---
 
 ## 4.5. Donation Top-Ups (User-Funded)
 
-A second money-in path: students donate their own real dollars to the Fallout HCB org via `https://hcb.hackclub.com/donations/start/fallout`, and the equivalent amount is auto-loaded onto their active grant card. These do **not** consume the user's koi-funded entitlement.
+A second money-in path: students donate their own real dollars to the Fallout HCB org via `#{HcbService.host}/donations/start/fallout`, and the equivalent amount is auto-loaded onto their active grant card. These do **not** consume the user's koi-funded entitlement. The whole user-facing surface is gated behind the `hcb_top_ups` Flipper flag (see `HcbDonationRequestPolicy` — independent of `:grant_fulfillment` so ops can kill-switch top-ups without disabling grants).
 
 ### Flow
 1. Authenticated full user with an active issued HCB card visits `/top_ups/new`, enters a dollar amount, clicks Donate.
-2. [`TopUpsController#create`](../app/controllers/top_ups_controller.rb) creates an [`HcbDonationRequest`](../app/models/hcb_donation_request.rb) with a unique 12-char `[A-Z2-9]` token + `amount_cents`. The interstitial `top_ups/redirect.tsx` page bounces the user out to HCB with the token in the donation `message` field.
+2. [`TopUpsController#create`](../app/controllers/top_ups_controller.rb) creates an [`HcbDonationRequest`](../app/models/hcb_donation_request.rb) with a unique 12-char token (alphabet `[A-HJKMNP-Z2-9]` — excludes 0/O/1/I/L for legibility; `TOKEN_CHAR_CLASS` / `TOKEN_LENGTH`) + `amount_cents`. The interstitial `top_ups/redirect.tsx` page bounces the user out to HCB with the token in the donation `message` field.
 3. User pays on HCB.
-4. [`HcbDonationSyncJob`](../app/jobs/hcb_donation_sync_job.rb) (every 5 min) walks the org revenue transactions, extracts the token from `donation.message` via `Top[- ]up of HCB grant ([A-Z2-9]{12})\.?`, finds the matching `HcbDonationRequest`, and (when `!donation[:refunded]`) books a `ProjectFundingTopup` and tops up the card.
+4. [`HcbDonationSyncJob`](../app/jobs/hcb_donation_sync_job.rb) (every 5 min) walks the org revenue transactions, extracts the token from `donation.message` via `Top[- ]up of HCB grant (#{TOKEN_CHAR_CLASS}{12})\.?`, finds the matching `HcbDonationRequest`, and (when `!donation[:refunded]`) books a `ProjectFundingTopup` and tops up the card.
 
 ### Booking gate is just `!refunded`
 We book on both `in_transit: true` and `deposited: true`. Stripe payouts take 1–2 business days; making users wait that long would defeat the purpose. The card may go overdrawn if HCB later reverses the donation before deposit — `donation_refunded_after_match` surfaces that for admin reconciliation.
@@ -172,6 +172,7 @@ If a user's card was canceled between the donation submit and our match, the don
 ### Warning kinds
 - `ledger_divergence` — HCB's `amount_cents` ≠ Fallout's per-card ledger net.
 - `negative_transferred` — user has more out-adjustments than in-topups (always a data-entry mistake).
+- `over_transferred_user` — settle found transferred > expected. **⚠️ Referenced by the settle service but missing from `KINDS`, so recording it currently raises** (see §2 flow note).
 - `pending_topup_stuck` — pending row older than 30 minutes; settle won't retry until reconciled.
 - `dangling_card` — local card has no `hcb_id` and is older than 5 minutes (partial first-issue failure).
 - `ratchet_capped` — settle tried to send more than the ledger allows; safety triggered.
@@ -196,7 +197,7 @@ The "$ Issued" summary tile and the per-user adjustment preview both compare an 
 
 **All summary aggregations must be scoped to `status: "active"` cards.** The fix is applied in:
 - [`Admin::ProjectGrants::OrdersController#index`](../app/controllers/admin/project_grants/orders_controller.rb) — global `issued_actual_cents` / `issued_expected_cents` stats tile
-- [`Admin::ProjectGrants::AdjustmentsController#preview`](../app/controllers/admin/project_grants/adjustments_controller.rb) — per-user preview pair
+- [`Admin::ProjectGrants::AdjustmentsController#ledger`](../app/controllers/admin/project_grants/adjustments_controller.rb) — JSON sidecar for the new-adjustment form's per-user "current → projected" preview pair (`actual_cents` / `expected_cents`)
 - [`Admin::UsersController#show`](../app/controllers/admin/users_controller.rb) renders cards individually; the **frontend** ([`admin/users/show.tsx`](../app/frontend/pages/admin/users/show.tsx)) suppresses the red drift highlight on closed-card rows since `amount_cents` (historical) is non-comparable to ledger_net (post-refund).
 
 The per-card row still **shows** both values — an admin needs to see them — it just doesn't flag them as drift.
@@ -205,9 +206,9 @@ The per-card row still **shows** both values — an admin needs to see them — 
 
 ## 7. Access Control (recap)
 
-Per [AGENTS.md](../AGENTS.md):
-- **Money movement is restricted to `user.hcb?`** — only that role can transition an order to `fulfilled` (which triggers settle) or mark a pending topup `completed` during reconciliation.
-- Regular admins can read grant orders, edit `HcbGrantSetting`, adjust admin notes, and move orders between `pending | on_hold | rejected` — but **not** `fulfilled`.
+Per [AGENTS.md](../AGENTS.md) and the actual policies:
+- **Every money-adjacent write is restricted to `user.hcb?`.** The current policies are stricter than the AGENTS.md prose: in `ProjectGrantOrderPolicy`, `update?`/`fulfill?`/`batch_fulfill?`/`reconcile_pending_topup?`/`mark_topup_completed?`/`refund?` are **all** `hcb?`. So the hcb role is required not just to fulfill, but also to edit the admin note or move an order to `pending | on_hold | rejected`. `HcbGrantSettingPolicy#update?` and `ProjectFundingTopupPolicy#new?`/`create?` (manual adjustments) are likewise `hcb?`.
+- **Regular admins (non-hcb) are view-only** for every money surface — they can read orders, settings, and warnings (`show?`/`index?` are `admin?`), but cannot change order state, edit settings, book adjustments, reconcile, or resolve warnings (`ProjectGrantWarningPolicy#resolve? = hcb?`).
 - HCB-related code changes require **explicit written approval**. No tests or console code against HCB without explicit approval.
 - All financial models are immutable post-resolution: orders cannot be hard-destroyed, completed/failed topups are `readonly?`, settings are singleton and cannot be destroyed. PaperTrail audits all three.
 
@@ -239,6 +240,7 @@ Per [AGENTS.md](../AGENTS.md):
 | Settings (rates, defaults) | [app/models/hcb_grant_setting.rb](../app/models/hcb_grant_setting.rb) |
 | Warning surface | [app/models/project_grant_warning.rb](../app/models/project_grant_warning.rb) |
 | Settle service | [app/services/project_funding_topup_service.rb](../app/services/project_funding_topup_service.rb) |
+| Settle job (enqueues settle!) | [app/jobs/project_funding_topup_job.rb](../app/jobs/project_funding_topup_job.rb) |
 | HCB API client | [app/services/hcb_service.rb](../app/services/hcb_service.rb) |
 | Sync job (cards + closure refund) | [app/jobs/hcb_grant_card_sync_job.rb](../app/jobs/hcb_grant_card_sync_job.rb) |
 | OAuth refresh job | [app/jobs/hcb_token_refresh_job.rb](../app/jobs/hcb_token_refresh_job.rb) |

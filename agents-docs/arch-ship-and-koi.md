@@ -15,9 +15,9 @@ Ships and the dual-currency system are tightly coupled: a **design** ship (DR) a
 
 Entry point: `GET /projects/:id/ship` → `Projects::ShipsController#preflight`.
 
-The frontend (`pages/projects/ships/preflight.tsx`, ~470 lines) walks 4 steps:
-1. **Guidelines** — link to `/docs/requirements/submitting-design`, "I've read & am ready" double-confirm gate.
-2. **Checklist** — 5 hardcoded yes/no items (digital design complete, README, integrated build, originality, A5 zine page). All must be checked.
+The frontend (`pages/projects/ships/preflight.tsx`) walks 4 steps:
+1. **Guidelines** — link to `/docs/requirements/submitting-build` (built-irl projects) or `/docs/requirements/submitting-design`, "I've read & am ready" double-confirm gate. The build/design split keys off `project.built_irl` (passed as a prop from `#preflight`).
+2. **Checklist** — hardcoded yes/no items, type-conditional: `DESIGN_CHECKLIST_ITEMS` (5 items) for design projects, `BUILD_CHECKLIST_ITEMS` (6 items) for built-irl projects (digital design / IRL build / README / integration / originality / A5 zine page). All must be checked.
 3. **Scan** — `POST /projects/:id/ships/preflight/run` kicks `ShipPreflightJob`. Frontend polls `GET /projects/:id/ships/preflight/status?run_id=…` every 1.5s, then 5s after 10s. Submit button enables only when no `failed` checks remain (warnings allowed).
 4. **Submitted** — terminal state. If `awaiting_identity`, copy tells user to finish HCA verification + address; otherwise generic "reviewers will check."
 
@@ -27,13 +27,13 @@ The frontend (`pages/projects/ships/preflight.tsx`, ~470 lines) walks 4 steps:
 
 Two visibility tiers:
 - **USER_CHECK_MODULES** (16): description, repo link, journal entry exists, repo public, README exists, BOM exists, PCB files, CAD files, firmware, BOM has links, zine page, README images/headings/quality, repo organization, images show hardware.
-- **INTERNAL_CHECK_MODULES** (3): AI-generated image, image originality, code plagiarism.
+- **INTERNAL_CHECK_MODULES** (4): AI-generated image, image originality, code plagiarism, duplicate project.
 
 Internal checks are skipped (marked `skipped`) if any user check fails — saves LLM/API spend.
 
 Pipelined parallel execution: `MAX_THREADS = 4`, dependency-resolved fetcher order (`repo_meta → repo_tree → readme_content → bom_content → image_descriptions`). Modules launch as soon as their declared `deps` are resolved.
 
-Results cached by `(repo full_name, pushed_at, MD5(description|repo_link|entry_count|time_logged))` for 12h to avoid repeated GitHub/LLM calls when scanning unchanged state. Use `force: true` to bypass.
+Results cached by `(repo full_name, HEAD commit SHA, MD5(description|repo_link|entry_count|time_logged|tags))` for 12h to avoid repeated GitHub/LLM calls when scanning unchanged state. Any push busts the cache via the SHA; `cache_key` returns nil (cache skipped) when the SHA can't be resolved so stale results aren't served across pushes. Use `force: true` to bypass.
 
 `CheckResult` is a `Data.define(...)` with `passed?/failed?/blocking?/user?/internal?`. Only **user-visible** failures block submission; warnings are non-blocking.
 
@@ -41,11 +41,17 @@ Results cached by `(repo full_name, pushed_at, MD5(description|repo_link|entry_c
 
 ```ruby
 initial_status = current_user.fully_identity_gated? ? :pending : :awaiting_identity
+# The project's user-declared built_irl flag picks the Phase 2 queue at ship time.
+ship_type = @project.built_irl? ? :build : :design
 ship = @project.ships.build(
-  preflight_run:, frozen_demo_link:, frozen_repo_link:,
+  preflight_run:, ship_type:,
+  frozen_demo_link: @project.demo_video_link.presence || @project.demo_link,
+  frozen_repo_link: @project.repo_link,
   preflight_results: snapshot, status: initial_status
 )
 ```
+
+`ship_type` is **chosen at submission from `@project.built_irl?`** (a user-declared boolean column on the project): built-irl → `:build` (BR/gold), otherwise → `:design` (DR/koi). `frozen_demo_link` prefers the student-submitted `demo_video_link`, falling back to `demo_link`.
 
 `fully_identity_gated?` = `ysws_verified? && has_hca_address?` (i.e., HCA verification status is `"verified"` AND the cached `has_hca_address` flag is true).
 
@@ -61,7 +67,7 @@ ship = @project.ships.build(
 |---|---|
 | `status` | enum: `pending`, `approved`, `returned`, `rejected`, `awaiting_identity` |
 | `ship_type` | enum (prefix `ship_type_`): `design` (default 0), `build` (1) — chooses Phase 2 reviewer |
-| `frozen_demo_link`, `frozen_repo_link`, `frozen_screenshot`, `frozen_hca_data` | snapshot at submission. `frozen_hca_data` is `serialize :json` + `encrypts` |
+| `frozen_demo_link`, `frozen_repo_link`, `frozen_screenshot`, `frozen_hca_data` | snapshot at submission. `frozen_hca_data` is `serialize coder: JSON` + `encrypts` |
 | `approved_public_seconds` | mirrored from `time_audit_review.approved_public_seconds` **only when the ship reaches `:approved`** (set inside `recompute_status!` in the same `update!` as the status flip; cleared on any other transition). Self-describing: `approved_public_seconds > 0` ⇒ ship is fully approved. |
 | `feedback`, `justification` | `feedback` aggregated from sibling returned-review feedback when status flips to `returned` |
 | `preflight_results`, `preflight_run_id` | snapshot of preflight checks at submit time + reference to the run |
@@ -74,6 +80,8 @@ Has-one: `time_audit_review`, `requirements_check_review`, `design_review`, `bui
 - `after_create :create_initial_reviews!, if: :pending?` — creates a `TimeAuditReview` + `RequirementsCheckReview`. Skipped when ship is `:awaiting_identity`.
 - `after_update_commit :create_initial_reviews!, if: :became_pending_from_awaiting?` — fires when an awaiting_identity ship is promoted (e.g., user finishes HCA verification).
 - `after_update_commit :notify_status_change, if: :saved_change_to_status?` — `MailDeliveryService.ship_status_changed(self)` for in-app notification on approved/returned/rejected.
+- `after_update_commit :award_ship_review_currency!, if: :saved_change_to_status?` — DR koi / BR gold + built-irl conversion on the `:approved` transition (see §10). Rescued + reported to `ErrorReporter`; never rolls back the approval.
+- `after_update_commit :enqueue_unified_airtable_upload, if: :saved_change_to_status?` — on `:approved` (skips trial users / missing `AIRTABLE_API_KEY`), enqueues `ShipUnifiedAirtableUploadJob` + `AttachShipUnifiedScreenshotJob` to push the YSWS Unified Submissions row.
 
 ### Status transitions
 
@@ -123,7 +131,7 @@ Re-ships after a prior approval start a fresh cycle — counters reset, and the 
 
 ### Phase 1 (Parallel)
 - `TimeAuditReview` (TA) — assigned to `time_auditor` role. Sets `approved_public_seconds` + `annotations: { recordings: { "<id>": { description, segments: [{type: "removed"|"deflated", start_seconds, end_seconds, deflated_percent}], stretch_multiplier } } }`.
-- `RequirementsCheckReview` (RC) — assigned to `requirements_checker` OR `pass2_reviewer`. Has `repo_tree` jsonb (populated by `FetchRepoTreeJob` after_create_commit). Has `gerber_zip_files` action that pulls a zip from GitHub and renders top/bottom PCB SVGs via Node `pcb-stackup` (output is sanitized via `Rails::Html::SafeListSanitizer` — Gerber zips are user-supplied untrusted input).
+- `RequirementsCheckReview` (RC) — assigned to `requirements_checker` OR `pass2_reviewer`. Has `repo_tree` jsonb (populated by `FetchRepoTreeJob` on `after_create_commit`). The controller exposes a `refresh_tree` member action (`POST /admin/reviews/requirements_checks/:id/refresh_tree`) to re-fetch the tree on demand.
 
 ### Phase 2 (Single, type-conditional)
 Created by `Ship#ensure_phase_two_review!` only after `phase_one_complete?` (both TA and RC approved — checked via direct DB existence query, not association cache, for concurrency).
@@ -153,11 +161,11 @@ Shared by all 4 review types. Provides:
 - Terminal status transitions blocked (same logic as Ship)
 - `lock_version` column → optimistic locking for safe concurrent edits
 
-**Claim system** (5min TTL)
+**Claim system** (`CLAIM_DURATION = 10.minutes` TTL)
 - `claim_expires_at`, `reviewer_id` columns
-- `atomic_claim!(review_id, user)` — single `UPDATE … WHERE … status=pending AND (reviewer_id IS NULL OR reviewer_id = uid OR claim_expires_at <= now)`. Returns true iff one row updated. Race-safe.
+- `atomic_claim!(review_id, user)` — single `UPDATE … WHERE … status=pending AND (reviewer_id IS NULL OR reviewer_id = uid OR claim_expires_at IS NULL OR claim_expires_at <= now)`. Returns true iff one row updated. Race-safe.
 - `release_all_claims!(user)` — wipes claim cols for any pending claims by user; preserves `reviewer_id` audit trail on terminal reviews.
-- `active_claim_for(user)`, `available_for(user)`, `next_eligible(user, skip_ids:)` — queue helpers
+- `active_claim_for(user)`, `available_for(user)`, `next_eligible(user, skip_ids:, sort:)` — queue helpers. `sort:` is `:waiting` (default, oldest ship first) or `:hours` (most TA-approved lifetime hours for the project owner first); both prioritize the user's own claim.
 - `extend_claim!`, `release_claim!` — instance helpers
 - "One claim at a time across types": `Admin::Reviews::BaseController#claim_review!` calls `release_all_claims!` for ALL `Reviewable::REVIEW_MODELS` before atomically claiming the new one.
 
@@ -183,8 +191,8 @@ Each review's `Policy#update?` requires `record.pending? && (admin? || active_cl
 
 ### Heartbeat & Skip Flow
 
-- `POST /admin/reviews/:type/:id/heartbeat` — extends claim by 5min if `claimed_by?(current_user)`. Returns JSON `{ok, expires_at}` or 409 `claim_lost`.
-- `GET /admin/reviews/:type/next?skip=1,2,3` — `next_eligible` orders by "your existing claim first, then oldest pending." Reviewers click "skip" to avoid a tricky review and add it to the URL skip list.
+- `POST /admin/reviews/:type/:id/heartbeat` — extends claim by `CLAIM_DURATION` (10min) if `claimed_by?(current_user)`. Returns JSON `{ok, expires_at}` or 409 `{error: "claim_lost"}`. The frontend `useReviewHeartbeat` hook (`app/frontend/hooks/useReviewHeartbeat.ts`) beats every **2 minutes** (`HEARTBEAT_INTERVAL_MS`) and alerts on 409 or 2 consecutive failures.
+- `GET /admin/reviews/:type/next?skip=1,2,3&sort=waiting|hours` — `next_eligible` orders by "your existing claim first, then oldest pending (or most owner-hours when `sort=hours`)." The chosen sort persists in session across PATCH/redirect cycles. Reviewers click "skip" to avoid a tricky review and add it to the URL skip list.
 - `redirect_to_next_or_index` (called after approve/return/reject) — clears `claim_expires_at` (keeps `reviewer_id` for audit), appends current id to skip list, redirects to `next`.
 - Admin viewing a review they don't own enters "supervisory mode" — no claim taken, no redirect.
 
@@ -232,12 +240,12 @@ The TA is responsible for converting raw recording duration into `approved_publi
 - For each new journal entry's recordings:
   - **Lapse / Lookout**: `duration` is already real-time seconds.
   - **YouTube**: `duration_seconds * stretch_multiplier` (default 1, but a reviewer can set e.g. 60 to treat a YT video as a 1:60 timelapse). Stretch is per-recording in TA annotations and is persisted onto the `YouTubeVideo` row via `sync_youtube_stretch_multipliers!` so that aggregation queries reflect it.
-  - Then subtract `removed` segments (full duration) and `deflated` segments (`real_range * deflated_percent / 100`).
+  - Then subtract `removed` segments (full `real_range`) and `deflated` segments (`real_range * deflated_percent / 100`), where `real_range = video_range * multiplier`. The segment `multiplier` is the YouTube `stretch_multiplier` for YT recordings, but a **hardcoded `60.0` for timelapses** — segment start/end are video-position seconds, so a 1s timelapse segment removes 60s of real work. (Gotcha: timelapse base duration is already real seconds, but timelapse *segment* trimming scales by 60. Both `serialize_journal_entry` and `recording_duration` in the reviews base controller mirror this 60.0 factor.)
 - Result clamped to ≥ 0.
 
 `Ship#total_hours` (used in admin context) re-computes from kept journal entries via raw SQL summing the per-recordable duration columns, divides by 3600.
 
-`Ship#recompute_status!` mirrors `time_audit_review.approved_public_seconds` onto `ship.approved_public_seconds` **only when the ship transitions to `:approved`** (set inside the same `update!` as the status flip, so `award_ship_review_koi!` sees the populated value). Any transition to a non-approved status clears the column. The TA's own `approved_public_seconds` stays set independently from the moment the TA reviewer approves — that's the per-review record. The ship-level column is the gated, full-pipeline value: `ships.approved_public_seconds > 0` ⇔ ship is fully approved.
+`Ship#recompute_status!` mirrors `time_audit_review.approved_public_seconds` onto `ship.approved_public_seconds` **only when the ship transitions to `:approved`** (set inside the same `update!` as the status flip, so `award_ship_review_currency!` sees the populated value). Any transition to a non-approved status clears the column. The TA's own `approved_public_seconds` stays set independently from the moment the TA reviewer approves — that's the per-review record. The ship-level column is the gated, full-pipeline value: `ships.approved_public_seconds > 0` ⇔ ship is fully approved.
 
 `Ship#approved_internal_seconds` (admin-only display) = `approved_public_seconds + design_review.hours_adjustment + build_review.hours_adjustment`. Returns an integer (always); display callers convert to hours and render `nil` when zero.
 
@@ -393,7 +401,7 @@ end
 | koi | `admin_adjustment` | `Admin::KoiTransactionsController#create` | Hard-coded reason; `actor` set to `current_user`. Admin-only via `require_admin!`. |
 | koi | `ship_review` | `ShipKoiAwarder.call(ship)` from `Ship#award_ship_review_currency!` | DR ships only. See below. |
 | koi | `built_irl_conversion` | `BuiltIrlConversionService.call(ship)` (NEGATIVE amount, koi debit side of a transfer pair) | Paired with a gold credit row by `transfer_id`. |
-| gold | `admin_adjustment` | `Admin::GoldTransactionsController#create` | Manual admin grant. |
+| gold | `admin_adjustment` | `Admin::KoiTransactionsController#create` (with `?currency=gold`) | Manual admin grant. The single koi controller switches between `KoiTransaction`/`GoldTransaction` via `current_currency` — there is no separate gold controller. |
 | gold | `ship_review` | `ShipGoldAwarder.call(ship)` from `Ship#award_ship_review_currency!` | BR ships only. |
 | gold | `built_irl_conversion` | `BuiltIrlConversionService.call(ship)` (POSITIVE amount, gold credit side of a transfer pair) | Paired with a koi debit row by `transfer_id`. |
 
@@ -430,7 +438,7 @@ other_built = ship.project.ships.approved
 # Skip conversion if there's already a prior approved BR — sweep is one-shot.
 ```
 
-`Project#built_irl?` returns `ships.approved.where(ship_type: :build).exists?` — computed on the fly. Once true, it stays true (terminal status guards prevent un-approving).
+`Project#built_irl?` is the AR-generated predicate over the **user-declared `built_irl` boolean column** (set on the project edit page). It is what drives `ship_type` at submission (`true` → build ship). It is NOT derived from approved build ships — the "first approved BR" trigger above is computed independently in the conversion service via the `other_built` existence query.
 
 **Per-member formula**:
 ```
@@ -509,7 +517,7 @@ If you change the rate (currently `7`) or the source-of-truth field (currently `
 - `/shop` index: `koi_balance: current_user.koi` (from `shop_items_controller.rb`).
 - Project grants: `koi_balance: current_user.koi` on the new/index pages.
 - Shop order new: balance shown in the chosen currency (`gold` if item is gold-priced, else koi).
-- Admin pages: `/admin/koi_transactions` (per-user filterable history), `/admin/koi_transactions/new` (manual adjustment form).
+- Admin pages: `/admin/koi_transactions` (per-user filterable history), `/admin/koi_transactions/new` (manual adjustment form). The same controller/pages serve gold via `?currency=gold` (`current_currency` swaps the model) — there is no separate gold transactions controller or page.
 - API: `/api/v1/users/me` includes `koi: user.koi`.
 
 ### Spending: Shop Orders
@@ -547,7 +555,7 @@ Both `User#koi` and `User#gold` short-circuit to `0` for trial users. `ShopOrder
 | Risk | Mitigation |
 |---|---|
 | Two reviewers grabbing the same review | `atomic_claim!` single-UPDATE WHERE guard returns true on success only |
-| Reviewer's claim expiring mid-edit | Frontend heartbeat every <5min; if returns 409, edit fails policy check (no active claim) |
+| Reviewer's claim expiring mid-edit | Frontend heartbeat every 2min (10min TTL); if returns 409, edit fails policy check (no active claim) |
 | Stale data on review save | `lock_version` optimistic locking on each Reviewable |
 | Ship status drift if review status saved but ship not recomputed | `after_save` (not after_commit) `recompute_ship_status!` runs in same transaction |
 | Phase 2 review created twice | `validates :ship_id, uniqueness: true` per-review-type; `find_or_create_by!` in `ensure_phase_two_review!` |
@@ -567,11 +575,10 @@ Both `User#koi` and `User#gold` short-circuit to `0` for trial users. `ShopOrder
 | Path | Purpose |
 |---|---|
 | `pages/admin/reviews/time_audits/{index,show}.tsx` | TA queue + review UI with timeline + segment annotation |
-| `pages/admin/reviews/requirements_checks/{index,show}.tsx` | RC queue + repo tree viewer + Gerber renderer |
+| `pages/admin/reviews/requirements_checks/{index,show}.tsx` | RC queue + repo tree viewer (refresh via `refresh_tree`) |
 | `pages/admin/reviews/design_reviews/show.tsx` | DR queue (Phase 2 design ships) |
 | `pages/admin/reviews/build_reviews/show.tsx` | BR queue (Phase 2 build ships). Shows "Approval will convert N koi → N gold" preview below the Modify Gold field when this would be the project's first approved BR and the owner has koi to convert. |
-| `pages/admin/koi_transactions/{index,new}.tsx` | Admin koi ledger + manual adjustment form |
-| `pages/admin/gold_transactions/{index,new}.tsx` | Admin gold ledger + manual adjustment form (if present — admin-only) |
+| `pages/admin/koi_transactions/{index,new}.tsx` | Admin koi **and gold** ledger + manual adjustment form — the `currency` prop (`?currency=gold`) switches the page between the two. No separate gold pages exist. |
 
 Each show page polls heartbeat and listens for 409 to surface "claim lost" UX.
 
@@ -580,7 +587,7 @@ Each show page polls heartbeat and listens for 409 to surface "claim lost" UX.
 ## 13. Open Questions / Watch Items
 
 - **No reconciliation rake task for BR gold or built-irl conversions** — only DR koi is reconciled today via `rake koi:reconcile_ship_reviews`. Acceptable while BR is brand new and no projects are built-irl in production. If gaps appear post-launch, build parallel tasks (e.g. `rake gold:reconcile_ship_reviews`, `rake gold:reconcile_built_irl_conversions`) mirroring the koi rake.
-- **`ship_type` selector at submission** — `ship_type` defaults to `design`. The submission form needs a UI selector for users to submit BR ships when ready. Until that lands, BR ships only exist via admin swap (`Ship#swap_phase_two_type!`).
+- **`ship_type` at submission** — resolved: `ship_type` is now set from the project's user-declared `built_irl` flag at submission (`@project.built_irl? ? :build : :design`), so users submit BR ships by marking the project built-irl on the edit page. Admin swap (`Ship#swap_phase_two_type!`) remains for correcting a mis-typed ship in review.
 - **No user-facing notification on built-irl conversion** — `MailDeliveryService.ship_status_changed` notifies users on ship approval but does not call out the koi → gold sweep specifically. Worth adding a dedicated message so users understand the balance shift.
 - **Project grant orders use koi only** — gold is not spendable on HCB-backed project grants. By design today; revisit if gold should also be redeemable for real USD.
 - **Awaiting-identity ships** create no reviews and are invisible to reviewers — but they DO count toward `ProjectPolicy#ship?`'s "pending submission" lock. The user can't ship a different project if they have an awaiting-identity submission on another (intentional? worth confirming).

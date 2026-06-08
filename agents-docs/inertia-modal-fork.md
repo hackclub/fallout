@@ -62,7 +62,7 @@ return content
 ```
 
 **Files modified:**
-- `ModalRoot.jsx` — `navigatedContent`, `navigationHistory`, `navigate()`, `goBack()`, `canGoBack` on Modal class; `navigateModal()` on context value; `'replace'` added to `modalPropNames`
+- `ModalRoot.jsx` — `navigatedContent`, `navigationHistory`, `navigate()`, `goBack()`, `canGoBack` on Modal class; `navigateModal()` on context value
 - `Modal.jsx` — `NavigatedModalContext` created via `createContext(null)`; parent Modal wraps `NavigatedComponent` in `<NavigatedModalContext.Provider>` passing `{ modalContext, config, close, navigate, goBack, canGoBack }`; child Modals check `useContext(NavigatedModalContext)` and render ModalContent/SlideoverContent with their own config when inside navigated content; passes `navigate`/`goBack`/`canGoBack` to children render props; merges navigated config with base config
 - `HeadlessModal.jsx` — exposes `navigate`, `goBack`, `canGoBack` in render props and imperative handle
 - `ModalRenderer.jsx` — `useModalIndex()` returns `null` instead of throwing when outside context (so ModalLink can detect if it's inside a modal)

@@ -18,7 +18,7 @@ Patterns that span the entire codebase. Understanding these is prerequisite to w
 
 **Concern**: `app/models/concerns/discardable.rb`
 
-Adds `discarded_at` timestamp column to models. Used by: User, Project, JournalEntry, Collaborator, CollaborationInvite.
+Adds `discarded_at` timestamp column to models. Used by: User, Project, JournalEntry, Collaborator, CollaborationInvite, PendingCollaborationInvite, FeaturedProject, StreakGoal, HcbDonationRequest, ProjectGrantOrder, ProjectFundingTopup.
 
 **API:**
 - `record.discard` — sets `discarded_at = Time.current`
@@ -29,7 +29,7 @@ Adds `discarded_at` timestamp column to models. Used by: User, Project, JournalE
 
 **Cascade behavior is explicit, not automatic:**
 - `Project#discard` → transaction: soft-deletes collaborators, invites, journal entries (see [arch-projects-journals.md](arch-projects-journals.md))
-- `JournalEntry#discard` → **destroys** Recording links (hard-delete the join, preserving underlying media for reuse by future journal entries)
+- `JournalEntry#discard` → transaction: restores any Lookout session tokens to `user.pending_lookout_tokens`, then **destroys** Recording links (hard-delete the join, preserving underlying media for reuse by future journal entries) via `unclaim_recordings`
 - `User` discard → soft-delete only (no cascade)
 - Trial user promotion → `TrialUser.kept.where(email:).update_all(discarded_at: Time.current)` — bulk soft-purge across all devices. This invalidates trial sessions on other devices, which is detected by `redirect_discarded_trial_user!` in the before-action chain (see [auth-architecture.md](auth-architecture.md))
 
@@ -53,8 +53,9 @@ Every action must call `authorize(resource)` or `policy_scope(collection)`. If n
 
 **Shared helpers:**
 - `admin?` — `user&.admin?`
-- `owner?` — `record.user == user`
-- `collaborators_enabled?` — `Flipper.enabled?(:collaborators, user)`
+- `staff?` — `user&.staff?`
+- `owner?` — `record.respond_to?(:user) && record.user == user`
+- `collaborators_enabled?` — `user.present? && Flipper.enabled?(:collaborators, user)` (also defined on the policy `Scope` class)
 
 ### Rails 8.1 Callback Gotcha
 
@@ -81,6 +82,8 @@ The rule exists because **a forgotten new action must default to MORE restrictio
 Never `except:` on relaxing. Never `only:` on restricting. Every access directive must have an inline comment explaining why.
 
 ### Policy Summary
+
+Non-exhaustive — `app/policies/` has grown to cover review queues, shop/orders, currency ledgers (koi/gold), bulletin/campaigns, and the HCB grant flow. The core models are summarized below; consult the specific policy class for the rest.
 
 | Model | Who can read | Who can write | Special |
 |---|---|---|---|
@@ -110,7 +113,8 @@ Never `except:` on relaxing. Never `only:` on restricting. Every access directiv
 | Flag | Controls | Checked in |
 |---|---|---|
 | `:collaborators` | Project/journal collaboration features | Policies, controllers, shared props |
-| `:"03_18_collapse"` | Lookout video recording | Journal entry form, shared as `features.lookout` |
+| `:shop` | Shop/redemption features | Controllers, shared props |
+| `:hcb_top_ups` | HCB project funding top-ups | Controllers, shared props |
 
 **Usage pattern:**
 ```ruby
@@ -119,18 +123,21 @@ def collaborators_enabled?
   user.present? && Flipper.enabled?(:collaborators, user)
 end
 
-# In controllers (shared to frontend)
+# In controllers (shared to frontend) — only shared for full (non-trial) users
 inertia_share features: -> {
+  next {} unless current_user && !current_user.trial?
   {
     collaborators: Flipper.enabled?(:collaborators, current_user),
-    lookout: Flipper.enabled?(:"03_18_collapse", current_user)
+    shop: Flipper.enabled?(:shop, current_user),
+    grant_fulfillment: true, # not flag-gated; always on for full users
+    hcb_top_ups: Flipper.enabled?(:hcb_top_ups, current_user)
   }
 }
 ```
 
 ## 4. PaperTrail Auditing
 
-**Models with `has_paper_trail`**: User, Project, JournalEntry, Ship, Collaborator, CollaborationInvite, MailMessage
+**Models with `has_paper_trail`**: User, Project, JournalEntry, Ship, Collaborator, CollaborationInvite, PendingCollaborationInvite, MailMessage, StreakDay, StreakGoal, ProjectFlag, ReviewerNote, plus the `Reviewable` concern (mixed into the review models) and the HCB models (HcbConnection, HcbDonationRequest, HcbTransaction, HcbGrantCard, HcbGrantSetting, ProjectGrantOrder, ProjectFundingTopup).
 
 Stores all changes in `versions` table. Particularly important for Ships (review workflow transparency — frozen fields + status changes + reviewer assignment all tracked) and MailMessages (notification audit trail).
 
@@ -159,7 +166,7 @@ redirect_to_onboarding!         → Force onboarding completion
 `ApplicationController` shares auth state, flash, feature flags, and paths with every page via `inertia_share`.
 
 **All shared props are visible in browser devtools.** Never include:
-- `hca_token`, `lapse_token` (server-only encrypted fields)
+- `hca_token`, `lapse_token`, `slack_token`, `device_token` (server-only encrypted fields)
 - Internal IDs that could enable enumeration
 - Any data the user shouldn't see
 
@@ -194,24 +201,33 @@ The AGENTS.md line "PII (email, slack_id, etc.) must only be exposed to admins" 
 Rails Active Record encryption enabled for sensitive fields:
 - `user.hca_token` — HCA OAuth access token
 - `user.lapse_token` — Lapse OAuth token
+- `user.slack_token` — Slack OAuth token
 - `user.device_token` — deterministic encryption (for `find_by` lookups)
 - `ship.frozen_hca_data` — user identity snapshot at submission
+- `shop_order.phone`, `shop_order.address` — shipping PII
+- `hcb_connection.access_token`, `hcb_connection.refresh_token` — HCB OAuth tokens
 
 Session cookie: standard Rails cookie encryption (`_fallout_session`, 3-month expiry).
 Trial device token: `cookies.encrypted[:trial_device_token]` (httponly, secure, strict, 1-year expiry).
 
 ## 9. Route Constraints
 
-Admin routes protected at routing layer (defense in depth on top of Pundit):
+Admin routes protected at routing layer (defense in depth on top of Pundit). Constraint classes live in `lib/constraints/` under the `Constraints` namespace: `AdminConstraint` (`user.admin?`), `StaffConstraint` (`user.staff?`, i.e. admin || reviewer), and `ReviewerConstraint` (`user.reviewer?`).
 
 ```ruby
-constraints AdminConstraint.new do   # user.admin?
-  mount Flipper::UI, MissionControl::Jobs
-  namespace :admin { resources :projects, :users }
+constraints Constraints::StaffConstraint.new do   # user.staff?
+  namespace :admin do
+    # dashboards, reviewer pages, review queues (reviews/*), project_flags,
+    # projects (index/show), users (index/show), ships (path: "reviews"),
+    # bulletin_events, featured_projects (staff-readable; mutations admin-gated in controllers)
+  end
 end
 
-constraints StaffConstraint.new do   # user.staff? (admin || reviewer)
-  namespace :admin { resources :ships }
+constraints Constraints::AdminConstraint.new do   # user.admin?
+  mount MissionControl::Jobs::Engine, at: "/jobs"
+  mount Flipper::UI.app(Flipper), at: "/flipper"
+  mount RailsPerformance::Engine, at: "/admin/performance" if ENV["REDIS_URL"].present?
+  namespace :admin { ... } # admin-only mutations: project/user overrides, grant orders, etc.
 end
 ```
 

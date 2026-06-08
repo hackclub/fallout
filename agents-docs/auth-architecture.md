@@ -12,9 +12,9 @@ Landing page → "Sign in with HCA" → HCA OAuth (external) → callback valida
 **Trial user sign-in:**
 ```
 Landing page → enter email → POST /trial_session → validate email
-→ if email belongs to verified user: redirect to HCA with login_hint (prefills email)
+→ if email belongs to verified user: X-Inertia-Location header → HCA with login_hint (prefills email)
 → else: find/create TrialUser by email+device_token → set encrypted cookie (1yr)
-→ session[:user_id] = trial_user.id → redirect to /path
+→ session[:user_id] = trial_user.id → redirect to return_to or /path
 ```
 
 **Trial → Full promotion:**
@@ -24,7 +24,8 @@ Trial user clicks "Go Verify" → HCA OAuth → callback:
 → email match? transaction: transfer projects + onboarding responses + ahoy visits
 → delete device cookie → soft-purge ALL same-email trial users (all devices)
 → fire Slack welcome message + channel invite jobs
-→ sign in as verified user → redirect to /
+→ apply pending professor enrollment + claim pending collaboration invites
+→ sign in as verified user → redirect to return_to or /
 ```
 
 **Before-action pipeline (every request):**
@@ -41,6 +42,7 @@ Each step depends on previous steps. Order is critical. Default: everything lock
 |---|---|
 | How does the before-action chain work? | `app/controllers/concerns/authentication.rb` |
 | How does HCA OAuth work? | `app/controllers/auth_controller.rb`, `app/services/hca_service.rb` |
+| Where is the OAuth CSRF state stored? | `app/controllers/concerns/oauth_state.rb` (encrypted cookie, not session) |
 | How do trial sessions work? | `app/controllers/trial_sessions_controller.rb` |
 | What data do users have? | `app/models/user.rb`, `app/models/trial_user.rb` |
 | What's shared with the frontend? | `app/controllers/application_controller.rb` (inertia_share) |
@@ -79,25 +81,31 @@ avatar              string NOT NULL
 timezone            string NOT NULL
 roles               string[] NOT NULL default=[]
 is_banned           boolean NOT NULL default=false
+ban_type            string          -- one of BAN_PRIORITY (fallout/hcb/hardware/age/hackatime)
+ban_reason          text
 onboarded           boolean NOT NULL default=false
 hca_id              string          -- nil for trial users
 slack_id            string          -- nil for trial users
 hca_token           text encrypted  -- nil for trial users
 lapse_token         text encrypted
-device_token        string          -- nil for full users
+slack_token         text encrypted
+device_token        text encrypted (deterministic) -- nil for full users; deterministic so find_by works
 discarded_at        datetime        -- soft delete timestamp
 is_adult            boolean NOT NULL default=false
 verification_status string
 has_hca_address     boolean NOT NULL default=false
+professor_enrolled_at datetime      -- nil until enrolled in the Professor/mentor program
 first_name          string          -- cached from HCA identity for batch sync use
 last_name           string          -- cached from HCA identity for batch sync use
 country             string          -- ISO2 code from HCA primary address (normalized)
 created_at/updated_at datetime
 ```
+(Other columns exist — gold_balance, streak_*, hcb_email, bio, pronouns, etc. — but are unrelated to auth.)
 
 **Indexes:**
-- `index_users_on_device_token` — for `find_by(device_token: ...)`
-- `index_users_on_discarded_at` — for Discard gem queries
+- `index_users_on_device_token` — for `find_by(device_token: ...)` (deterministic-encrypted)
+- `index_users_on_discarded_at` — for `kept`/`discarded` scope queries
+- `index_users_on_hca_id` — `UNIQUE WHERE (hca_id IS NOT NULL)` — enforces one full user per HCA ID
 - `index_users_unique_verified_email` — `UNIQUE WHERE (type IS NULL AND discarded_at IS NULL)` — enforces no two active full users share an email at the DB level
 
 **Why partial index instead of regular unique index?**
@@ -115,6 +123,7 @@ GET    /auth/hca/start           auth#new            (signin)
 GET    /auth/hca/callback        auth#create         (hca_callback)
 DELETE /auth/signout             auth#destroy        (signout)
 POST   /trial_session            trial_sessions#create (trial_session)
+POST   /rsvp                     rsvps#create        (rsvp)
 GET    /path                     path#index
 GET    /sorry                    bans#show           (sorry)
 GET    /onboarding               onboarding#show
@@ -142,19 +151,20 @@ def staff?;    admin? || reviewer?; end
 
 ### Conditional validations
 ```ruby
-validates :slack_id,  presence: true, unless: :trial?
-validates :hca_id,    presence: true, unless: :trial?
-validates :roles,     presence: true, unless: :trial?
+validates :slack_id, presence: true, unless: :trial?
+validates :hca_id,   presence: true, unless: :trial?
+validates :roles,    presence: true, unless: :trial?
+validate  :roles_must_be_valid,       unless: :trial?
 ```
-These are `nil` for trial users, so the validations must be conditional.
+These are `nil`/empty for trial users, so the validations must be conditional. `roles_must_be_valid` rejects any role not in `VALID_ROLES` (`user admin time_auditor requirements_checker pass2_reviewer hcb`).
 
 ### `User.exchange_hca_token(code, redirect_uri)` — HCA token exchange
-1. POST to HCA `/oauth/token` with code + redirect_uri → get `access_token`
-2. GET `/api/v1/me` with Bearer token → get identity hash
+1. `HcaService.exchange_code_for_token` → POST to HCA `/oauth/token` with code + redirect_uri → get `access_token`
+2. `HcaService.me(access_token)` → GET `/api/v1/me` with Bearer token → response hash; `identity = hca_response["identity"]`
 3. `identity["id"]` = `hca_id`, `identity["primary_email"]` = email
 4. `User.find_by(hca_id: hca_id)` — look up by HCA ID first
-5. If found: update `hca_token` + `email`, call `refresh_profile_from_slack`, return user
-6. If not found: `create_from_hca(identity, access_token)` then `refresh_profile_from_slack`
+5. If found: update `hca_token` + `email`, call `apply_identity_cache!(identity)` (syncs verification_status/address/name/country) + `refresh_profile_from_slack`, return user
+6. If not found: `create_from_hca(identity, access_token)` (which also calls `apply_identity_cache!`) then `refresh_profile_from_slack`
 
 Note: `find_by(hca_id: ...)` only searches base `User` class (type=nil), never TrialUser (they have nil hca_id).
 
@@ -245,6 +255,7 @@ def redirect_discarded_trial_user!
   return unless current_user&.discarded?
 
   is_trial = current_user.trial?
+  email = current_user.email
   @current_user = nil
   terminate_session
 
@@ -339,7 +350,7 @@ This is safe: `verify_policy_scoped` only runs for `index` anyway; blanket-skipp
 | `LandingController` | `index` | Redirects `user_signed_in?` to path. Without `allow_trial_access`, `authenticate_verified_user!` fires first and sends trial users to HCA sign-in instead. |
 | `BansController` | `show` | Banned trial users must see the ban notice. Without this: `redirect_banned_user!` sends them to `/sorry`, then `authenticate_verified_user!` kicks them out of `/sorry` → redirect loop. |
 | `PathController` | `index` | Trial users view their path (main experience page). |
-| `ProjectsController` | all | Trial users create/view/edit their single project. |
+| `ProjectsController` | `index show new create edit update destroy onboarding export_journal` | Trial users create/view/edit their single project and export its journal. (`show` is also `allow_unauthenticated_access` — listed project pages are public from Explore/the public API.) |
 | `JournalEntriesController` | `preview` | Trial users can preview journal markdown (but cannot create entries — unverified emails prevent abuse). |
 | `YouTubeVideosController` | `lookup` | Trial users can look up video metadata during journal creation. |
 | `MarkdownController` | `show` | Trial users can read docs. Also has `allow_unauthenticated_access` but that only skips `authenticate_user!`, not `authenticate_verified_user!`. |
@@ -355,19 +366,27 @@ This is safe: `verify_policy_scoped` only runs for `index` anyway; blanket-skipp
 
 ## HCA OAuth Flow — `auth_controller.rb`
 
+`AuthController` includes the `OauthState` concern (`app/controllers/concerns/oauth_state.rb`) for storing the CSRF state in a dedicated encrypted cookie rather than the session.
+
 ### `GET /auth/hca/start` → `auth#new`
 
 ```ruby
 def new
   state = SecureRandom.hex(24)
-  session[:state] = state
+  # Store OAuth state in a dedicated cookie (not the session) so it survives
+  # cross-site redirects and reset_session. Keep the last 4 so concurrent tabs
+  # don't overwrite each other.
+  existing = Array(cookies.encrypted[:oauth_state]).last(4)
+  set_oauth_cookie(:oauth_state, existing + [ state ])
   redirect_to HcaService.authorize_url(hca_callback_url, state, login_hint: params[:login_hint]), allow_other_host: true
 end
 ```
 
-1. Generate 48-char CSRF state token, store in session
+1. Generate 48-char CSRF state token, append it to the `oauth_state` encrypted cookie (keeps up to the last 4 states so concurrent tabs don't clobber each other; cookie expires in 10 min, `same_site: :lax`)
 2. Build HCA OAuth URL with client_id, redirect_uri, scopes, state, and optional `login_hint`
 3. Redirect to HCA (external host, hence `allow_other_host: true`)
+
+**Why a cookie instead of `session[:state]`**: the session cookie can be dropped during cross-site OAuth redirects under strict browser privacy settings, and `terminate_session`/`reset_session` would wipe it. The `oauth_state` cookie survives both. Multiple states are stored so a user with several tabs mid-flow doesn't fail CSRF.
 
 **`login_hint`**: If `params[:login_hint]` is present, appended to the HCA authorize URL. HCA uses this to prefill the email field. Set when `TrialSessionsController` detects the entered email belongs to a verified user.
 
@@ -375,9 +394,11 @@ end
 
 ```ruby
 def create
-  # 1. CSRF validation
-  if params[:state] != session[:state]
-    # log error, clear state, redirect with alert
+  # 1. CSRF validation: state must be one of the stored oauth_state cookie values
+  valid_states = Array(cookies.encrypted[:oauth_state])
+  delete_oauth_cookie(:oauth_state)
+  unless valid_states.include?(params[:state])
+    # ErrorReporter.capture_message(...), redirect_to root_path, alert: "Authentication failed due to CSRF token mismatch"
     return
   end
 
@@ -413,16 +434,31 @@ def create
       SlackChannelInviteJob.perform_later(user.slack_id, User::SLACK_WELCOME_CHANNELS)
     end
 
-    # 6. Sign in as verified user
+    # 6. Apply pending professor enrollment (intent stored in onboarding_responses,
+    #    applied here once HCA promotion grants a slack_id). Non-blocking.
+    # ...
+
+    # 7. Claim any pending collaboration invites matching this email
+    PendingCollaborationInvite.claim_all_for_email!(user.email, user)
+
+    # 8. Sign in as verified user
     terminate_session
     session[:user_id] = user.id
-    redirect_to root_path, notice: "Welcome back, #{user.display_name}!"
+    redirect_to_return_to_or(root_path, notice: "Welcome back, #{user.display_name}!")
   rescue StandardError => e
     ErrorReporter.capture_exception(e)
     redirect_to root_path, alert: "Authentication failed. Please try again."
   end
 end
 ```
+
+**CSRF validation**: `params[:state]` must match one of the values in the `oauth_state` cookie (multiple states for concurrent tabs). The cookie is deleted before the check (single-use). A mismatch is logged via `ErrorReporter.capture_message` with a "CSRF validation failed" message and redirects to `root_path` with a CSRF-mismatch alert.
+
+**Pending professor enrollment**: if the trial user signed up for a mentor during onboarding (intent stored in `onboarding_responses` under `professor_enrollment`), it's applied here once they have a `slack_id` via `ProfessorService.manual_add`. Non-blocking — a failure leaves `professor_enrolled_at` nil and the auth flow continues.
+
+**Pending collaboration invites**: `PendingCollaborationInvite.claim_all_for_email!` attaches any invites that were sent to this user's email before they had an account.
+
+**Post-auth redirect**: uses `redirect_to_return_to_or(root_path, ...)` — honors `session[:return_to]` if set (preserved across `terminate_session`), otherwise falls back to `root_path`.
 
 **Email mismatch guard**: If the trial user's email doesn't match the HCA account's email, abort. This prevents cross-contamination where a user accidentally verifies with the wrong HCA account.
 
@@ -439,7 +475,7 @@ def destroy
 end
 ```
 
-`terminate_session` calls `reset_session` (clears all session data). Does NOT delete the `trial_device_token` cookie — that persists so the user can resume their trial session if they re-enter the same email.
+`terminate_session` calls `reset_session` but preserves `session[:return_to]` across the reset (so post-auth redirects survive the OAuth flow). Does NOT delete the `trial_device_token` cookie — that persists so the user can resume their trial session if they re-enter the same email.
 
 ---
 
@@ -491,7 +527,7 @@ def create
 
   # 5. Sign in as trial user
   session[:user_id] = trial_user.id
-  redirect_to path_path, notice: "Welcome!"
+  redirect_to_return_to_or(path_path)
 end
 ```
 
@@ -514,8 +550,11 @@ end
 
 Sessions are standard Rails cookie-backed sessions:
 - `session[:user_id]` — ID of the signed-in user (full or trial)
+- `session[:return_to]` — optional post-auth redirect target; preserved across `terminate_session` and consumed by `redirect_to_return_to_or`
 - `set_current_user` → `User.find_by(id: session[:user_id])` → Rails STI returns correct subclass
-- `terminate_session` → `reset_session` (regenerates session ID and clears all session data)
+- `terminate_session` → `reset_session` (regenerates session ID and clears all session data, but re-stores `return_to`)
+
+OAuth CSRF `state` is NOT stored in the session — it lives in a dedicated encrypted `oauth_state` cookie (see `OauthState` concern) so it survives `reset_session` and cross-site redirects that can drop session cookies.
 
 There is no JWT, no server-side session store — purely cookie-based Rails sessions.
 
@@ -552,7 +591,13 @@ Development host: `https://hca.dinosaurbbq.org`
 POST to `/oauth/token` with `grant_type: "authorization_code"`. Returns parsed JSON or nil on failure.
 
 ### `me(access_token)`
-GET `/api/v1/me` with Bearer authorization. Returns the user identity hash (contains `id`, `primary_email`, `first_name`, `slack_id`, `profile_picture`, `verification_status`, `birthday`).
+GET `/api/v1/me` with Bearer authorization. Returns the parsed response hash (the identity is nested under the `"identity"` key, containing `id`, `primary_email`, `first_name`, `last_name`, `slack_id`, `profile_picture`, `verification_status`, `addresses`, `birthday`). Raises `HcaService::InvalidToken` on 401/403 so callers can clear a dead stored token; returns nil on transient network errors.
+
+### `identity(access_token)`
+Convenience wrapper: calls `me` and returns the inner `"identity"` hash (or `{}`). Used by the periodic identity refresh job.
+
+### `verify_portal_url(return_to:)` / `address_portal_url(return_to:)`
+Build HCA portal URLs (`/portal/verify`, `/portal/address`) with a `return_to` query param. Powers the identity-gate CTAs shared to the frontend.
 
 ---
 
@@ -565,50 +610,82 @@ inertia_share auth: -> {
   {
     user: current_user&.then { |u|
       {
-        id:           u.id,
-        display_name: u.display_name,
-        email:        u.email,
-        avatar:       u.avatar,
-        roles:        u.roles,
-        is_admin:     u.admin?,
-        is_staff:     u.staff?,
-        is_banned:    u.is_banned,
-        is_trial:     u.trial?,
-        is_onboarded: u.onboarded?
+        id:                             u.id,
+        display_name:                   u.display_name,
+        avatar:                         u.avatar,
+        roles:                          u.roles,
+        is_admin:                       u.admin?,
+        is_staff:                       u.staff?,
+        is_banned:                      u.is_banned,
+        ban_type:                       u.ban_type,
+        is_trial:                       u.trial?,
+        is_onboarded:                   u.onboarded?,
+        professor_enrolled:             u.professor_enrolled?,
+        professor_recently_enrolled:    u.professor_enrolled? && u.professor_enrolled_at > 24.hours.ago,
+        professor_enrollment_eligible:  u.professor_enrollment_eligible? && !u.professor_enrolled?
       }
     }
   }
 }
-inertia_share flash:              -> { flash.to_hash }
-inertia_share sign_in_path:       -> { signin_path(login_hint: current_user&.trial? ? current_user.email : nil) }
-inertia_share sign_out_path:      -> { signout_path }
-inertia_share trial_session_path: -> { trial_session_path }
-inertia_share rsvp_path:          -> { rsvp_path }
-inertia_share features:           -> { { collaborators: ..., lookout: ... } }  # per-user Flipper flags (empty {} for trial users)
-inertia_share has_unread_mail:    -> { ... }  # drives envelope badge on path page (false for trial users)
+inertia_share flash:                -> { flash.to_hash }
+inertia_share sign_in_path:         -> { signin_path(login_hint: current_user&.trial? ? current_user.email : nil) }
+inertia_share sign_out_path:        -> { signout_path }
+inertia_share trial_session_path:   -> { trial_session_path }
+inertia_share rsvp_path:            -> { rsvp_path }
+inertia_share features:             -> { ... }  # per-user Flipper flags (empty {} for trial/unauth users)
+inertia_share streak_freezes:       -> { ... }  # 0 for trial/unauth users
+inertia_share identity_gate:        -> { ... }  # nil for trial/unauth users; { state, verify_url, address_url }
+inertia_share show_feedback_banner: -> { ... }  # true only for full users with an email
 ```
+
+**Note**: `email` is intentionally NOT included in the shared `auth.user` props — it's PII. Frontend code that needs it must obtain it from an admin-only/authorized page prop.
+
+**`has_unread_mail` and `current_streak` are scoped to `PathController` only** (declared via `inertia_share` inside `PathController`, not `ApplicationController`) — they're only consumed by the path page header, so they aren't shared on every other authenticated request (saves 2 queries/page).
 
 **IMPORTANT**: `sign_in_path`, `sign_out_path`, `trial_session_path`, `rsvp_path` are **top-level** shared props, NOT nested under `auth`. Access as `shared.sign_in_path`, not `shared.auth.sign_in_path`.
 
 **`sign_in_path` is dynamic**: for trial users, it includes `login_hint: current_user.email` so HCA prefills their email field. For full users or unauthenticated visitors, no hint.
 
-**`features`**: returns empty `{}` for trial users (feature flags are full-user only). Otherwise `{ collaborators: bool, lookout: bool }` based on Flipper.
+**`features`**: returns empty `{}` for trial/unauthenticated users (feature flags are full-user only). Otherwise based on Flipper: `{ collaborators: bool, shop: bool, grant_fulfillment: true, hcb_top_ups: bool }`.
 
-**Security note**: All attributes passed to the frontend are visible in browser devtools. `hca_token` and `lapse_token` are server-only encrypted fields and are never exposed here.
+**`identity_gate`**: `nil` for trial/unauthenticated users (no HCA account to link). Otherwise `{ state: identity_gate_state, verify_url:, address_url: }` driving the AnnouncementsBar identity card.
+
+**Security note**: All attributes passed to the frontend are visible in browser devtools. `hca_token`, `lapse_token`, `slack_token`, and `email` are never exposed in shared props.
 
 ### TypeScript types (`app/frontend/types/index.ts`)
 ```ts
 interface SharedProps {
   auth: { user: User | null }         // just user, nothing else nested
-  flash: { alert?: string; notice?: string }
-  features: { collaborators?: boolean; lookout?: boolean }
+  flash: FlashData                    // Record<string, string>
+  features: Features                  // { collaborators?, shop?, grant_fulfillment: true }
   sign_in_path: string                // top-level, NOT under auth
   sign_out_path: string
   trial_session_path: string
   rsvp_path: string
-  has_unread_mail: boolean
+  has_unread_mail: boolean            // only present on the path page
+  current_streak: number              // only present on the path page
+  unsubmitted_hours: number | null
+  streak_freezes: number
+  identity_gate: IdentityGate | null
+  show_feedback_banner: boolean
   errors: Record<string, string[]>
   [key: string]: unknown
+}
+
+interface User {
+  id: number
+  display_name: string
+  avatar: string
+  roles: string[]
+  is_admin: boolean
+  is_staff: boolean
+  is_banned: boolean
+  ban_type: BanType | null
+  is_trial: boolean
+  is_onboarded: boolean
+  professor_enrolled: boolean
+  professor_recently_enrolled: boolean
+  professor_enrollment_eligible: boolean
 }
 ```
 
@@ -633,31 +710,32 @@ router.delete(shared.sign_out_path)
 Admin and staff routes are protected at the routing layer via route constraints:
 
 ```ruby
-constraints StaffConstraint.new do
+constraints Constraints::StaffConstraint.new do
   namespace :admin do
-    resources :ships  # staff can access reviews
+    # ... staff-accessible review queues
   end
 end
 
-constraints AdminConstraint.new do
-  mount MissionControl::Jobs::Engine  # admins only
+constraints Constraints::AdminConstraint.new do
+  mount MissionControl::Jobs::Engine, at: "/jobs"  # admins only
   namespace :admin do
-    resources :projects, :users
+    # ... admin-only resources (projects, users, etc.)
   end
 end
 ```
+(There is also a small admin block intentionally OUTSIDE the `StaffConstraint` for reviewer-specific routes — see `config/routes.rb`.)
 
-`StaffConstraint` and `AdminConstraint` check `user.staff?` / `user.admin?` on the request's session user. Trial users have `roles: []`, so both return `false` — they cannot reach any admin routes.
+`Constraints::StaffConstraint` and `Constraints::AdminConstraint` (`lib/constraints/`) look up `User.find_by(id: request.session[:user_id])` and check `user&.staff?` / `user&.admin?`. Trial users have `roles: []`, so both return `false` — they cannot reach any admin routes.
 
-Admin controllers inherit from `Admin::ApplicationController`, which enforces staff/admin presence as a before-action as well (defense in depth).
+Admin controllers inherit from `Admin::ApplicationController`, which enforces `require_staff!` (and `require_admin!` where needed) as a before-action too (defense in depth).
 
 ---
 
 ## Soft Delete / Discard
 
-The `Discardable` concern (from the `discard` gem) adds:
-- `discarded_at` timestamp column
-- `discard` / `undiscard` instance methods
+The in-house `Discardable` concern (`app/models/concerns/discardable.rb`, NOT the `discard` gem) adds:
+- relies on the `discarded_at` timestamp column
+- `discard` / `undiscard` / `discarded?` instance methods
 - `kept` scope (`WHERE discarded_at IS NULL`)
 - `discarded` scope (`WHERE discarded_at IS NOT NULL`)
 
@@ -675,23 +753,24 @@ Hard deleting trial users would cause `set_current_user` to silently return `nil
 ```
 1. User clicks "Sign in with HCA"
    → GET /auth/hca/start (auth#new)
-   → session[:state] = random CSRF token
+   → append random CSRF token to oauth_state encrypted cookie
    → redirect to https://auth.hackclub.com/oauth/authorize?...
 
 2. User authenticates on HCA
    → HCA redirects to GET /auth/hca/callback?code=xxx&state=yyy
 
 3. auth#create:
-   → validate state == session[:state]
+   → validate state ∈ oauth_state cookie (then delete cookie)
    → User.exchange_hca_token(code, redirect_uri)
      → POST /oauth/token → access_token
      → GET /api/v1/me → identity
      → find or create User by hca_id
-     → refresh Slack profile
+     → apply_identity_cache! + refresh Slack profile
    → (if trial user: transfer data, delete cookie)
    → soft-purge same-email trial users
+   → apply pending professor enrollment + claim pending collaboration invites
    → terminate_session; session[:user_id] = user.id
-   → redirect to / (landing) → landing redirects logged-in users to /path
+   → redirect to return_to or / (landing) → landing redirects logged-in users to /path
 ```
 
 ## Complete Sign-In Flow (Trial User)
@@ -704,7 +783,7 @@ Hard deleting trial users would cause `set_current_user` to silently return `nil
    → else: find/create TrialUser by email+device_token (rescue TOCTOU race)
    → set encrypted trial_device_token cookie (1 year)
    → session[:user_id] = trial_user.id
-   → redirect to /path
+   → redirect to return_to or /path
 ```
 
 ## Trial Promotion Flow
@@ -723,8 +802,10 @@ Hard deleting trial users would cause `set_current_user` to silently return `nil
    → cookies.delete(:trial_device_token)
    → soft-purge ALL TrialUser.kept.where(email: A)
    → SlackMsgJob + SlackChannelInviteJob (welcome message + channel invites)
+   → apply pending professor enrollment (if intent recorded + now has slack_id)
+   → PendingCollaborationInvite.claim_all_for_email!
    → terminate_session; session[:user_id] = verified_user.id
-   → redirect to /
+   → redirect to return_to or /
 4. Other devices with same email A trial session:
    → next request: redirect_discarded_trial_user! fires
    → session cleared, cookie deleted, redirect to /auth/hca/start?login_hint=email
@@ -739,5 +820,5 @@ Hard deleting trial users would cause `set_current_user` to silently return `nil
 3. **`device_token` never in params** — only read from `cookies.encrypted[]`; strong params don't include it
 4. **Promotion transfers only current device's data** — content from the verifying device transfers; other devices' trial content does not
 5. **Email is downcased before storage** — `TrialSessionsController` does `.strip.downcase`; HCA emails should already be normalized
-6. **Rate limiting on auth endpoints** — `trial_sessions#create`: 10/3min; `auth#create`: 10/3min
-7. **CSRF on HCA OAuth** — `state` parameter round-trip verified; mismatch logged to ErrorReporter and rejected
+6. **Rate limiting on auth endpoints** — primarily at the Rack::Attack layer (`config/initializers/rack_attack.rb`, Redis-backed, consistent across Puma workers): `POST /trial_session` 10/3min per IP + 5/hour per email; `GET /auth/hca/start` 10/min per IP; `GET /auth/hca/callback` 20/min per IP; `DELETE /auth/signout` 10/min per IP; `POST /rsvp` 5/min per IP. `auth#create` additionally has a Rails-native `rate_limit to: 10, within: 3.minutes`.
+7. **CSRF on HCA OAuth** — `state` stored in the `oauth_state` encrypted cookie (not the session) and round-trip verified; mismatch logged to ErrorReporter and rejected

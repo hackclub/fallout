@@ -11,7 +11,7 @@ Two surfaces share the same underlying data and logic:
 1. **In-app feed** — embedded in `/bulletin_board` (Inertia). See [arch-bulletin-board.md](arch-bulletin-board.md) for how the feed is composed into the community hub. Search hits `GET /bulletin_board/search` (JSON, debounced).
 2. **Public API** — `GET /api/v1/explore/{projects,journals}` (JSON). Documented for API consumers in [docs/developer/api.mdx](docs/developer/api.mdx); this page covers the *internals* an agent maintaining the feature needs to know.
 
-Both surfaces are **unauthenticated** (no API key required). The bulletin board controller skips Pundit verification entirely; the API controller uses `skip_before_action :authenticate_api_key!, only: %i[projects journals]` while keeping the rest of the API key-gated.
+Both surfaces are **unauthenticated** (no API key required). The bulletin board controller uses `allow_unauthenticated_access`/`allow_trial_access`/`skip_onboarding_redirect` and skips the Pundit verify callbacks (`skip_after_action :verify_authorized`/`:verify_policy_scoped, only: %i[index search event events_feed event_ics]`); the API controller uses `skip_before_action :authenticate_api_key!, only: %i[projects journals]` while keeping the rest of the API key-gated.
 
 ---
 
@@ -42,10 +42,11 @@ A journal entry is public iff its parent project is `kept` and not `is_unlisted`
 | Sort options | `active`, `newest` | `active`, `newest` |
 | Default project sort | `active` | `active` |
 | Journal sort | always `newest` (no choice) | always `newest` (no choice) |
-| Default page limit | 5 | 20 |
-| Max limit | 50 | 50 |
-| Search hard cap | 500 (Meilisearch) | 500 (Meilisearch) |
-| Cursor format | `Base64.urlsafe_encode64("<iso8601 or 'none'>|<id>")` | identical |
+| Default page limit | 5 (`EXPLORE_LIMIT`) | 20 (`DEFAULT_LIMIT`) |
+| Max limit | 50 (`EXPLORE_LIMIT_MAX`) | 50 (`MAX_LIMIT`) |
+| Search hard cap | 1000 (`MEILISEARCH_SEARCH_LIMIT`) | 1000 (`MEILISEARCH_SEARCH_LIMIT`) |
+| Cursor format (browse) | `Base64.urlsafe_encode64("<iso8601 or 'none'>|<id>")` | identical |
+| Cursor format (search) | `Base64.urlsafe_encode64("search|<offset>")` | identical |
 
 The duplication is intentional today — the two controllers serialize differently (the in-app feed renders markdown excerpts and resolves cover images more aggressively for the masonry layout; the API returns simpler payloads with absolute URLs). Don't merge them blindly; if you change pagination or search, update both and verify neither cursor format broke.
 
@@ -110,27 +111,34 @@ The three-clause OR is the explicit equivalent of `NULLS LAST` semantics in curs
 
 Single mode: `iso8601(created_at)|id`. Same id-tiebreak pattern.
 
-### Cap & "load all" for search
+### Search cursor (offset-based)
 
-When a query is present:
-- The pagination limit is upgraded to `MAX_LIMIT` (50) for that one request (no benefit to small pages when results are already ranked).
-- Cursor pagination is **not applied** — Meilisearch returns up to 500 IDs ranked by relevance, and `array_position(...)` preserves that order. Returning `next_cursor: nil` signals "no more pages" even when there are.
-- This means there's no way to paginate past the top 500 search hits. Acceptable today because relevance falls off quickly.
+Search **does** paginate, but with a different cursor than browse. When a query is present the project path:
+- Fetches up to `[offset + limit + 1, MEILISEARCH_SEARCH_LIMIT].min` ranked IDs from Meilisearch.
+- Slices `ranked_ids[offset, limit + 1]` to get the page (plus the +1 lookahead for `has_more`).
+- Loads those projects with `array_position(...)` to preserve relevance order.
+- Encodes the next cursor as `encode_project_search_cursor(offset + limit)` → `Base64("search|<offset>")`. Decode raises `ArgumentError` (→ `400 Invalid cursor`) if the prefix isn't `"search"`, the offset is missing, or it's negative.
+
+Journal search does **not** offset-paginate the search itself — it filters the scope to the Meilisearch-matched IDs, then applies the normal timestamp journal cursor over the `DISTINCT ON` latest-entry set.
+
+`MEILISEARCH_SEARCH_LIMIT` is 1000, so there's no way to paginate past the top 1000 project search hits. Acceptable today because relevance falls off quickly.
 
 ---
 
 ## Search: Meilisearch with ActiveRecord Fallback
 
-Every search path uses Meilisearch first and falls back to `ActiveRecord` `pg_search` on connection failure or API error:
+Every search path uses Meilisearch first and falls back to the model's `search` scope (pg_search) on connection failure or API error. The method is `search_project_ids` in the API controller and `search_projects_for_explore` in the bulletin board controller (the latter takes a `limit:`):
 
 ```ruby
-def search_project_ids(query)
-  project_ids         = Project.ms_search(query, filter: "is_unlisted = false", sort: ["journal_count:desc", "created_at:desc"], limit: 500).map(&:id)
-  journal_project_ids = JournalEntry.ms_search(query, sort: ["created_at:desc"], limit: 500).map(&:project_id).uniq
+def search_project_ids(query, limit:)
+  project_ids         = Project.ms_search(query, filter: "is_unlisted = false", sort: ["journal_count:desc", "created_at:desc"], limit: limit).map(&:id)
+  journal_project_ids = JournalEntry.ms_search(query, sort: ["created_at:desc"], limit: limit).map(&:project_id).uniq
   (project_ids + (journal_project_ids - project_ids)).uniq  # direct project hits first, then journal-only hits
-rescue Meilisearch::ApiError, Errno::ECONNREFUSED
-  # pg_search fallback — same shape, slower, no relevance scoring
-  ...
+rescue Meilisearch::ApiError, Meilisearch::CommunicationError, Errno::ECONNREFUSED
+  # pg_search fallback — same shape, slower, no relevance scoring; scoped to public_for_explore
+  project_matches = Project.public_for_explore.search(query).select(:id).limit(limit).map(&:id)
+  journal_matches = JournalEntry.public_for_explore.search(query).select(:project_id).limit(limit).map(&:project_id)
+  (project_matches + (journal_matches - project_matches)).uniq
 end
 ```
 
@@ -223,7 +231,7 @@ Backfill rake task: `bin/rake fallout:backfill_unified_thumbnails` (envs `BATCH_
 | Unlisted project surfaced via journal-content match | `Project.ms_search` filters `is_unlisted = false`; final SQL uses `public_for_explore` regardless |
 | Hostile markdown image in public excerpt | URL allowlist (http(s) + same-origin only) before passing to `<img src>` |
 | Cascade deletes flooding the cable | Frontend debounces `bulletin_explore` at 500ms |
-| Pundit accidentally enabled on these controllers | Explicit `skip_after_action :verify_authorized, only: %i[index search event]` (and same for `:verify_policy_scoped`); the `public_for_explore` scopes are the trust boundary |
+| Pundit accidentally enabled on these controllers | Explicit `skip_after_action :verify_authorized, only: %i[index search event events_feed event_ics]` (and same for `:verify_policy_scoped`); the `public_for_explore` scopes are the trust boundary |
 | Drift between in-app and public API | The two controllers don't share helpers — when changing pagination/sort/search, audit both |
 
 ---
@@ -234,7 +242,7 @@ Backfill rake task: `bin/rake fallout:backfill_unified_thumbnails` (envs `BATCH_
 |---|---|
 | New sort option | `BulletinBoardController#order_projects_for_explore` + `Api::V1::ExploreController#order_projects` + `EXPLORE_SORTS`/`SORTS` constants in both |
 | Change public visibility rules | `Project#public_for_explore` and/or `JournalEntry#public_for_explore` (cascades everywhere) |
-| Add a new explore category | `EXPLORE_CATEGORIES` in both controllers + new `*_explore_entries` method + serializer |
+| Add a new explore category | `EXPLORE_CATEGORIES` (bulletin board) / `CATEGORIES` (API) + new entries method/action + serializer |
 | Adjust live-update sensitivity | `Project#bulletin_explore_stats_changed?` and the parallel method on `JournalEntry` |
 | Change cursor format | Both controllers' `encode_*_cursor` / `decode_*_cursor` — clients hold cursors across requests, so format changes break in-flight pagination |
 

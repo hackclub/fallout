@@ -18,8 +18,8 @@ O(1) low cutoff computation for linearly-spaced billboards. Forward iteration wi
 - Viewport culling in grass canvas loop (`screenY - h > H` or `screenY < 0`)
 
 ### FCP/LCP Optimizations — DONE
-- Non-blocking Google Fonts via `media="print" onload="this.media='all'"` in layout
-- `fetchPriority="high"` on billboard `<img>` elements
+- Google Fonts loaded with `preconnect` to `fonts.googleapis.com`/`fonts.gstatic.com` and `display=swap` in layout (the older non-blocking `media="print" onload` swap is no longer used)
+- `fetchPriority="high"` on billboard/star `<img>` elements (in `components/path/PathNode.tsx`)
 - `useEffect` (not `useLayoutEffect`) with `ready` state — static elements (sky, ground, cover) paint immediately
 - Only 4 dynamic elements gated by `visibility: ready ? 'visible' : 'hidden'`
 - Grass image `decode()` does NOT block `setReady(true)` — important for Safari SVG decode performance
