@@ -110,9 +110,8 @@ namespace :koi do
     per-contribution (per-entry, proportional to attributed hours) split.
 
     CURRENCY=koi (default) rewrites KoiTransaction rows (design ships); CURRENCY=gold rewrites
-    GoldTransaction rows (build ships). Gold additionally fixes the denormalized
-    users.gold_balance counter by each user's net delta, since update_columns/delete bypass the
-    after_create callback that maintains it (koi is summed live from the ledger, so needs no fix).
+    GoldTransaction rows (build ships). Both currencies are summed live from their ledgers
+    (User#koi / User#gold), so rewriting rows is all that's needed — no counter to reconcile.
 
     Dry-run by default — prints every change and FLAGS any user whose resulting balance would go
     negative, touching nothing. Pass APPLY=1 to mutate rows in place (update_columns, bypassing
@@ -223,9 +222,6 @@ namespace :koi do
     ActiveRecord::Base.transaction do
       updates.each { |u| u[:row].update_columns(amount: u[:new], description: u[:desc]) } # update_columns bypasses the read-only guard
       deletes.each { |d| d[:row].delete } # delete bypasses the read-only before_destroy guard (new share is 0, which the amount validation forbids)
-      # Gold balance is a denormalized counter maintained only by GoldTransaction's after_create;
-      # update_columns/delete skip it, so reconcile it by each user's net delta here.
-      deltas.each { |uid, d| User.update_counters(uid, gold_balance: d) if d != 0 } if gold
     end
     puts "Done. Updated #{updates.size}, deleted #{deletes.size}."
   end

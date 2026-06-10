@@ -362,7 +362,7 @@ Three currencies referenced in code:
 
 `GoldTransaction` (`app/models/gold_transaction.rb`):
 - Same shape as KoiTransaction but with `REASONS = %w[ship_review built_irl_conversion admin_adjustment]` (no streak source; streak rewards are koi-only). Also has `ship_id` (with the same `SHIP_REASONS` consistency rule) and `transfer_id`.
-- **Maintains a `users.gold_balance` counter cache** via `after_create :increment_user_gold_balance`. ShopOrder credits/debits the counter on order state transitions (see [arch-data-patterns.md](arch-data-patterns.md) — this differs from koi, which is recomputed from the sum). Don't bypass `GoldTransaction.create!` if you want the balance to stay correct.
+- **No denormalized balance** — gold is recomputed live from the ledger by `User#gold`, exactly like koi (the old `users.gold_balance` counter cache and its `after_create`/ShopOrder/ProjectGrantOrder callbacks were removed). Record gold only via `GoldTransaction.create!`.
 
 ### Balance Calculation (`User#koi`, `User#gold`)
 
@@ -377,13 +377,16 @@ end
 
 def gold
   return 0 if trial?
-  gold_balance # counter cache
+  gold_transactions.sum(:amount) -
+    shop_orders.joins(:shop_item).where(shop_items: { currency: "gold" })
+               .where.not(state: :rejected).sum("frozen_price * quantity") -
+    project_grant_orders.kept.where.not(state: :rejected).sum(:frozen_gold_amount)
 end
 ```
 
 **Koi balance** = sum of ledger amounts (including negative `built_irl_conversion` debits) MINUS reservations from non-rejected koi-currency shop orders MINUS reservations from non-rejected project grant orders.
 
-**Gold balance** uses the `users.gold_balance` counter cache, maintained by `GoldTransaction#after_create` and `ShopOrder` state-transition callbacks.
+**Gold balance** is computed the same way as koi — sum of `GoldTransaction` amounts MINUS non-rejected gold-currency shop orders MINUS non-rejected project grant orders' `frozen_gold_amount`. Rejecting an order auto-refunds (it drops out of the sum); there is no counter to maintain.
 
 **Trial users always have 0** — they cannot earn or spend.
 
@@ -534,7 +537,7 @@ If you change the rate (currently `7`) or the source-of-truth field (currently `
 
 `ProjectGrantOrder` (`app/models/project_grant_order.rb`) — the koi/gold → real USD path via HCB.
 - User specifies `frozen_usd_cents`; `before_validation :snapshot_cost_from_usd` derives the total currency cost from `HcbGrantSetting.current.koi_for_usd_cents(usd_cents)` (rounded UP — user pays the ceiling), then splits it **koi-first, gold-second** (1 koi = 1 gold) into `frozen_koi_amount` / `frozen_gold_amount`. Affordability checks `koi + gold >= total`.
-- The koi portion refunds automatically on reject via `User#koi` (excludes rejected orders). The gold portion is a mutated counter cache, so `after_create :deduct_gold_balance` / `after_update :sync_gold_balance` deduct and refund it explicitly, mirroring `ShopOrder`.
+- Both portions refund automatically on reject — `User#koi` and `User#gold` are recomputed live from their ledgers and exclude rejected orders, so no deduct/refund callbacks are needed.
 - `HcbGrantSetting` stores `koi_to_cents_numerator` (default 500) / `koi_to_cents_denominator` (default 7) → 7 koi = $5 = 500 cents (so 1 koi ≈ $0.71).
 - Soft-deletable (`include Discardable`).
 - States mirror `ShopOrder`: pending, fulfilled, rejected, on_hold.

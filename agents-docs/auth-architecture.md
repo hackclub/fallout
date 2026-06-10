@@ -100,7 +100,7 @@ last_name           string          -- cached from HCA identity for batch sync u
 country             string          -- ISO2 code from HCA primary address (normalized)
 created_at/updated_at datetime
 ```
-(Other columns exist — gold_balance, streak_*, hcb_email, bio, pronouns, etc. — but are unrelated to auth.)
+(Other columns exist — streak_*, hcb_email, bio, pronouns, etc. — but are unrelated to auth.)
 
 **Indexes:**
 - `index_users_on_device_token` — for `find_by(device_token: ...)` (deterministic-encrypted)

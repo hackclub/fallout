@@ -40,9 +40,6 @@ class ShopOrder < ApplicationRecord
 
   before_validation :freeze_price, on: :create
 
-  after_create :deduct_gold_balance, if: :gold_order?
-  after_update :sync_gold_balance, if: -> { gold_order? && saved_change_to_state? }
-
   validates :frozen_price, presence: true, numericality: { greater_than: 0 }
   validates :quantity, presence: true, numericality: { greater_than: 0, only_integer: true }
   validates :address, presence: true, if: -> { shop_item&.requires_shipping? }
@@ -74,23 +71,6 @@ class ShopOrder < ApplicationRecord
   end
 
   private
-
-  def gold_order?
-    shop_item.currency == "gold"
-  end
-
-  def deduct_gold_balance
-    User.update_counters(user_id, gold_balance: -(frozen_price * quantity))
-  end
-
-  def sync_gold_balance
-    cost = frozen_price * quantity
-    if rejected?
-      User.update_counters(user_id, gold_balance: cost)         # refund when rejected
-    elsif state_before_last_save == "rejected"
-      User.update_counters(user_id, gold_balance: -cost)        # re-deduct if un-rejected
-    end
-  end
 
   def freeze_price
     self.frozen_price ||= shop_item&.price

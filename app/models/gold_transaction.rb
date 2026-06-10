@@ -47,13 +47,7 @@ class GoldTransaction < ApplicationRecord
   before_update { raise ActiveRecord::ReadonlyRecord }
   before_destroy { raise ActiveRecord::ReadonlyRecord }
 
-  after_create :increment_user_gold_balance
-
   private
-
-  def increment_user_gold_balance
-    User.update_counters(user_id, gold_balance: amount)
-  end
 
   # Enforces the structural contract `ship_id present iff reason ∈ SHIP_REASONS`.
   def ship_id_consistency

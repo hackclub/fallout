@@ -40,13 +40,6 @@ class ProjectGrantOrder < ApplicationRecord
   # and split it koi-first, gold-second (1 koi = 1 gold). All columns are NOT NULL.
   before_validation :snapshot_cost_from_usd, on: :create
 
-  # Gold is a mutated counter cache (users.gold_balance), unlike koi which is recomputed
-  # from ledgers in User#koi. So the gold portion must be deducted/refunded explicitly,
-  # mirroring ShopOrder. The koi portion needs no callback — User#koi excludes rejected
-  # orders, so rejecting auto-refunds koi.
-  after_create :deduct_gold_balance, if: :spends_gold?
-  after_update :sync_gold_balance, if: -> { spends_gold? && saved_change_to_state? }
-
   validates :frozen_usd_cents, presence: true, numericality: { greater_than: 0, only_integer: true }
   validates :frozen_koi_amount, presence: true, numericality: { greater_than_or_equal_to: 0, only_integer: true }
   validates :frozen_gold_amount, presence: true, numericality: { greater_than_or_equal_to: 0, only_integer: true }
@@ -58,9 +51,10 @@ class ProjectGrantOrder < ApplicationRecord
   # admin discover the user couldn't pay only after they're sitting in the review queue.
   validate :user_can_afford, on: :create
 
-  # NOTE on fulfilled→rejected: this transition IS allowed and refunds the user — koi via
-  # `User#koi` (which excludes rejected orders) and gold via `sync_gold_balance` below. It
-  # does NOT automatically claw money back on HCB — the admin is responsible for reconciling
+  # NOTE on fulfilled→rejected: this transition IS allowed and refunds the user — both koi and
+  # gold are recomputed live from their ledgers (`User#koi` / `User#gold` exclude rejected
+  # orders), so rejecting auto-refunds. It does NOT automatically claw money back on HCB —
+  # the admin is responsible for reconciling
   # the HCB side via the "Record adjustment" flow if needed. This decoupling is intentional:
   # real-world refunds are messy (invoicing, partial recovery) and the admin needs
   # flexibility over what goes in the ledger.
@@ -103,21 +97,5 @@ class ProjectGrantOrder < ApplicationRecord
     return if user.koi >= frozen_koi_amount && user.gold >= frozen_gold_amount
 
     errors.add(:base, "You don't have enough koi or gold for this grant")
-  end
-
-  def spends_gold?
-    frozen_gold_amount.to_i.positive?
-  end
-
-  def deduct_gold_balance
-    User.update_counters(user_id, gold_balance: -frozen_gold_amount)
-  end
-
-  def sync_gold_balance
-    if rejected?
-      User.update_counters(user_id, gold_balance: frozen_gold_amount)         # refund on reject
-    elsif state_before_last_save == "rejected"
-      User.update_counters(user_id, gold_balance: -frozen_gold_amount)        # re-deduct on un-reject
-    end
   end
 end
