@@ -171,13 +171,28 @@ export default function AdminDashboardIndex() {
       label: formatDuration(r.total_approved_seconds),
     }))
 
+  const toContributedRows = (data: PeriodStats): RowItem[] => {
+    const reviewMap = new Map(data.reviewers.map((r) => [r.id, r]))
+    const timeMap = new Map(data.time_audited.map((r) => [r.id, r]))
+    const allIds = new Set([...reviewMap.keys(), ...timeMap.keys()])
+    return Array.from(allIds)
+      .map((id) => {
+        const base = reviewMap.get(id) ?? timeMap.get(id)!
+        const reviews = reviewMap.get(id)?.review_count ?? 0
+        const hours = (timeMap.get(id)?.total_approved_seconds ?? 0) / 3600
+        const contributed = hours / 10 + reviews
+        return { id: base.id, display_name: base.display_name, avatar: base.avatar, value: contributed, label: contributed.toFixed(1) }
+      })
+      .sort((a, b) => b.value - a.value)
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">Welcome to the Fallout admin panel.</p>
       </div>
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
         <LeaderboardCard
           title="Reviews Completed"
           this_week={toCountRows(stats.this_week)}
@@ -187,6 +202,11 @@ export default function AdminDashboardIndex() {
           title="Time Audited"
           this_week={toTimeRows(stats.this_week)}
           all_time={toTimeRows(stats.all_time)}
+        />
+        <LeaderboardCard
+          title="Total Contributed"
+          this_week={toContributedRows(stats.this_week)}
+          all_time={toContributedRows(stats.all_time)}
         />
         <div className="flex flex-col gap-4 min-w-0">
           <Card className="t-card-lift max-w-full">
