@@ -159,8 +159,8 @@ function ReviewerProfileCard({
                 <p className="text-xs text-muted-foreground">
                   {profile.rc_reviews} RC · {profile.total_reviews} all-time
                 </p>
-                {hasLowWeek && (
-                  isResolved ? (
+                {hasLowWeek &&
+                  (isResolved ? (
                     <span title="All low weeks resolved" className="text-muted-foreground">
                       ✓
                     </span>
@@ -178,8 +178,7 @@ function ReviewerProfileCard({
                     >
                       ⚠
                     </button>
-                  )
-                )}
+                  ))}
               </div>
             </div>
             <Button
@@ -466,7 +465,12 @@ export default function RequirementsDesignDashboard() {
           </div>
         )}
       </div>
-      <Sheet open={returnedSheet !== null} onOpenChange={(open) => { if (!open) setReturnedSheet(null) }}>
+      <Sheet
+        open={returnedSheet !== null}
+        onOpenChange={(open) => {
+          if (!open) setReturnedSheet(null)
+        }}
+      >
         <SheetContent>
           <SheetHeader>
             <SheetTitle>Returned DR — {returnedSheet?.display_name}</SheetTitle>

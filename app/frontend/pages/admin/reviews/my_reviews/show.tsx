@@ -32,11 +32,16 @@ interface Props extends PageProps {
 
 function reviewTypeLabel(type: string): string {
   switch (type) {
-    case 'requirements_check_review': return 'RC'
-    case 'design_review': return 'Design'
-    case 'build_review': return 'Build'
-    case 'time_audit_review': return 'Time Audit'
-    default: return type
+    case 'requirements_check_review':
+      return 'RC'
+    case 'design_review':
+      return 'Design'
+    case 'build_review':
+      return 'Build'
+    case 'time_audit_review':
+      return 'Time Audit'
+    default:
+      return type
   }
 }
 
@@ -72,10 +77,7 @@ export default function MyReviewsShow() {
                     <Badge variant="outline" className="text-[10px]">
                       {reviewTypeLabel(r.review_type)}
                     </Badge>
-                    <Link
-                      href={`/admin/projects/${r.project_id}`}
-                      className="text-sm font-medium hover:underline"
-                    >
+                    <Link href={`/admin/projects/${r.project_id}`} className="text-sm font-medium hover:underline">
                       {r.project_name}
                     </Link>
                     <Link

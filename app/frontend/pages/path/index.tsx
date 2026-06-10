@@ -80,7 +80,10 @@ async function fireTicketConfetti() {
   const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 }
   const interval = setInterval(() => {
     const timeLeft = animationEnd - Date.now()
-    if (timeLeft <= 0) { clearInterval(interval); return }
+    if (timeLeft <= 0) {
+      clearInterval(interval)
+      return
+    }
     const particleCount = 50 * (timeLeft / duration)
     const x1 = Math.random() * (0.3 - 0.1) + 0.1
     const x2 = Math.random() * (0.9 - 0.7) + 0.7

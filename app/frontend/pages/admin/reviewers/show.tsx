@@ -433,7 +433,9 @@ export default function ReviewerShow() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">
             Reviews per week
-            <span className="ml-2 font-normal text-muted-foreground">({reviewer.rc_reviews} RC · {reviewer.total_reviews} all-time)</span>
+            <span className="ml-2 font-normal text-muted-foreground">
+              ({reviewer.rc_reviews} RC · {reviewer.total_reviews} all-time)
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>

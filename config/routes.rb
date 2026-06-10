@@ -43,6 +43,8 @@
 #                         admin_reviews_build_review GET    /admin/reviews/build_reviews/:id(.:format)                                                    admin/reviews/build_reviews#show
 #                                                    PATCH  /admin/reviews/build_reviews/:id(.:format)                                                    admin/reviews/build_reviews#update
 #                                                    PUT    /admin/reviews/build_reviews/:id(.:format)                                                    admin/reviews/build_reviews#update
+#                                 admin_reviews_mine GET    /admin/reviews/mine(.:format)                                                                 admin/reviews/my_reviews#show
+#                         admin_reviews_user_reviews GET    /admin/reviews/mine/:user_id(.:format)                                                        admin/reviews/my_reviews#show
 #                                admin_project_flags GET    /admin/project_flags(.:format)                                                                admin/project_flags#index
 #                                                    POST   /admin/project_flags(.:format)                                                                admin/project_flags#create
 #                                 admin_project_flag DELETE /admin/project_flags/:id(.:format)                                                            admin/project_flags#destroy
@@ -81,6 +83,7 @@
 #                       update_streak_day_admin_user PATCH  /admin/users/:id/update_streak_day(.:format)                                                  admin/users#update_streak_day
 #                     restore_streak_goal_admin_user PATCH  /admin/users/:id/restore_streak_goal(.:format)                                                admin/users#restore_streak_goal
 #                              update_ban_admin_user PATCH  /admin/users/:id/update_ban(.:format)                                                         admin/users#update_ban
+#            update_ticket_hours_override_admin_user PATCH  /admin/users/:id/update_ticket_hours_override(.:format)                                       admin/users#update_ticket_hours_override
 #              toggle_reviewer_suggestion_admin_user PATCH  /admin/users/:id/toggle_reviewer_suggestion(.:format)                                         admin/users#toggle_reviewer_suggestion
 #                              admin_activity_checks POST   /admin/activity_checks(.:format)                                                              admin/activity_checks#create
 #                           new_admin_activity_check GET    /admin/activity_checks/new(.:format)                                                          admin/activity_checks#new
@@ -101,6 +104,7 @@
 #                                                    POST   /admin/koi_transactions(.:format)                                                             admin/koi_transactions#create
 #                          new_admin_koi_transaction GET    /admin/koi_transactions/new(.:format)                                                         admin/koi_transactions#new
 #                       refetch_admin_you_tube_video POST   /admin/you_tube_videos/:id/refetch(.:format)                                                  admin/you_tube_videos#refetch
+#               audience_preview_admin_soup_campaign GET    /admin/soup_campaigns/:id/audience_preview(.:format)                                          admin/soup_campaigns#audience_preview
 #                  send_campaign_admin_soup_campaign POST   /admin/soup_campaigns/:id/send_campaign(.:format)                                             admin/soup_campaigns#send_campaign
 #                      test_send_admin_soup_campaign POST   /admin/soup_campaigns/:id/test_send(.:format)                                                 admin/soup_campaigns#test_send
 #                         cancel_admin_soup_campaign POST   /admin/soup_campaigns/:id/cancel(.:format)                                                    admin/soup_campaigns#cancel
@@ -173,6 +177,8 @@
 #                                               mail GET    /mails/:id(.:format)                                                                          mails#show
 #                                onboarding_projects GET    /projects/onboarding(.:format)                                                                projects#onboarding
 #                             export_journal_project GET    /projects/:id/export_journal(.:format)                                                        projects#export_journal
+#                              refresh_cover_project POST   /projects/:id/refresh_cover(.:format)                                                         projects#refresh_cover
+#                               cover_status_project GET    /projects/:id/cover_status(.:format)                                                          projects#cover_status
 #                            project_journal_entries POST   /projects/:project_id/journal_entries(.:format)                                               journal_entries#create
 #                          new_project_journal_entry GET    /projects/:project_id/journal_entries/new(.:format)                                           journal_entries#new
 #                      project_collaboration_invites POST   /projects/:project_id/collaboration_invites(.:format)                                         projects/collaboration_invites#create

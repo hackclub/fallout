@@ -72,7 +72,15 @@ function buildNavSections(): { items: NavItem[] }[] {
       items: [{ label: 'Dashboard', href: '/admin', icon: LayoutDashboard, statKey: null }],
     },
     {
-      items: [{ label: 'RC Returns', href: '/admin/dashboard/requirements_design', icon: BadgeAlert, statKey: null, requirePermission: 'is_admin' }],
+      items: [
+        {
+          label: 'RC Returns',
+          href: '/admin/dashboard/requirements_design',
+          icon: BadgeAlert,
+          statKey: null,
+          requirePermission: 'is_admin',
+        },
+      ],
     },
     {
       items: [

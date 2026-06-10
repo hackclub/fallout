@@ -299,9 +299,17 @@ class Ship < ApplicationRecord
 
   def ensure_phase_two_review!
     return unless phase_one_complete?
+    return unless owns_recordings? # Superseded ship — keep it out of the phase-two queue (see #derive_status)
 
     review_class = ship_type_design? ? DesignReview : BuildReview
     review_class.find_or_create_by!(ship: self)
+  end
+
+  # A ship owns recordings until a newer cycle's ship re-claims its journal entries
+  # (claim_journal_entries! reassigns ship_id). A superseded ship is left owning none.
+  # Queried directly so the check is correct under concurrency.
+  def owns_recordings?
+    journal_entries.kept.joins(:recordings).exists?
   end
 
   # Admin-only swap between DesignReview and BuildReview for a pending ship. Carries
@@ -488,8 +496,13 @@ class Ship < ApplicationRecord
     # Approval is gated solely on the phase-two review (DR for design ships, BR for
     # build ships). TA/RC approval merely unlocks phase two via ensure_phase_two_review! —
     # a missing or pending phase-two review must never let a ship reach :approved.
-    return "approved" if phase_two_review&.approved?
-    "pending"
+    return "pending" unless phase_two_review&.approved?
+    # A superseded ship — one whose journal entries were all re-claimed by a newer cycle,
+    # so it owns no kept recordings — must never reach :approved, or a stale/duplicate ship
+    # can be approved for currency already paid on the live ship (2026-06-10 incident: ship
+    # #260 was a duplicate of #323). Legitimate ships always own recordings.
+    return "pending" unless owns_recordings?
+    "approved"
   end
 
   def phase_two_review

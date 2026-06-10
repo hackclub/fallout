@@ -181,7 +181,13 @@ export default function AdminDashboardIndex() {
         const reviews = reviewMap.get(id)?.review_count ?? 0
         const hours = (timeMap.get(id)?.total_approved_seconds ?? 0) / 3600
         const contributed = hours / 10 + reviews
-        return { id: base.id, display_name: base.display_name, avatar: base.avatar, value: contributed, label: contributed.toFixed(1) }
+        return {
+          id: base.id,
+          display_name: base.display_name,
+          avatar: base.avatar,
+          value: contributed,
+          label: contributed.toFixed(1),
+        }
       })
       .sort((a, b) => b.value - a.value)
   }

@@ -24,7 +24,14 @@ import type { AuditLogEntry } from '@/components/admin/AuditLog'
 import { ChevronLeftIcon, ExternalLinkIcon, ClockIcon, StarIcon } from 'lucide-react'
 import { useLiveReload } from '@/lib/useLiveReload'
 import { ReviewStatusBadge } from '@/components/admin/ReviewStatusBadge'
-import type { AdminProjectDetail, PagyProps, SiblingStatus, SiblingStatuses, SharedProps, PreviousReview } from '@/types'
+import type {
+  AdminProjectDetail,
+  PagyProps,
+  SiblingStatus,
+  SiblingStatuses,
+  SharedProps,
+  PreviousReview,
+} from '@/types'
 
 function BurnoutToggle({ projectId, isBurnout }: { projectId: number; isBurnout: boolean }) {
   const [saving, setSaving] = useState(false)
@@ -260,11 +267,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function reviewTypeLabel(type: string): string {
   switch (type) {
-    case 'requirements_check_review': return 'RC'
-    case 'design_review': return 'Design'
-    case 'build_review': return 'Build'
-    case 'time_audit_review': return 'Time Audit'
-    default: return type
+    case 'requirements_check_review':
+      return 'RC'
+    case 'design_review':
+      return 'Design'
+    case 'build_review':
+      return 'Build'
+    case 'time_audit_review':
+      return 'Time Audit'
+    default:
+      return type
   }
 }
 
@@ -484,7 +496,9 @@ export default function AdminProjectsShow({
         <div className="mt-8">
           <div className="flex items-center gap-2 mb-4">
             <h2 className="text-lg font-semibold tracking-tight">Reviews</h2>
-            <Badge variant="secondary" className="text-sm">{all_reviews.length}</Badge>
+            <Badge variant="secondary" className="text-sm">
+              {all_reviews.length}
+            </Badge>
           </div>
           <Card className="py-0">
             <div className="divide-y divide-border">
@@ -496,12 +510,16 @@ export default function AdminProjectsShow({
                       <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
                         {reviewTypeLabel(r.review_type)}
                       </span>
-                      <Link href={`/admin/reviews/${r.ship_id}`} className="text-[10px] text-muted-foreground hover:underline">
+                      <Link
+                        href={`/admin/reviews/${r.ship_id}`}
+                        className="text-[10px] text-muted-foreground hover:underline"
+                      >
                         Ship {r.ship_id}
                       </Link>
                     </div>
                     <span className="text-xs text-muted-foreground shrink-0">
-                      {r.reviewer_display_name && `${r.reviewer_display_name} · `}{r.reviewed_at}
+                      {r.reviewer_display_name && `${r.reviewer_display_name} · `}
+                      {r.reviewed_at}
                     </span>
                   </div>
                   {r.feedback && (
