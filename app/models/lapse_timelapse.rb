@@ -37,6 +37,10 @@
 #  fk_rails_...  (user_id => users.id)
 #
 class LapseTimelapse < ApplicationRecord
+  # Visibilities allowed to back a journal entry. Anything else (FAILED_PROCESSING,
+  # still-rendering, private, etc.) must not be attachable — see #attachable?.
+  ATTACHABLE_VISIBILITIES = %w[PUBLIC UNLISTED].freeze
+
   belongs_to :user
   has_one :recording, as: :recordable, dependent: :destroy # Destroying a timelapse removes its journal link
 
@@ -65,5 +69,13 @@ class LapseTimelapse < ApplicationRecord
       owner_handle: data.dig("owner", "handle"),
       last_refreshed_at: Time.current
     )
+  end
+
+  # Gate for attaching to a journal entry: Lapse must have actually rendered a video
+  # (playback_url present) and the timelapse must be public/unlisted — never a
+  # failed-processing or footage-less render. Enforced at attach time so logged hours
+  # always have real, viewable footage behind them. Call after refetch_data!.
+  def attachable?
+    playback_url.present? && ATTACHABLE_VISIBILITIES.include?(visibility)
   end
 end

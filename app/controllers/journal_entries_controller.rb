@@ -1,4 +1,8 @@
 class JournalEntriesController < ApplicationController
+  # Raised when a selected recording can't legitimately back a journal entry
+  # (e.g. a Lapse timelapse with no rendered footage / not public-or-unlisted).
+  class UnattachableRecording < StandardError; end
+
   allow_trial_access only: %i[preview] # Trial users have unverified emails — block journal creation to prevent abuse
   skip_after_action :verify_authorized # No index action — blanket skip required (Rails 8.1 callback validation)
   skip_after_action :verify_policy_scoped # No index action — blanket skip required (Rails 8.1 callback validation)
@@ -81,6 +85,11 @@ class JournalEntriesController < ApplicationController
         timelapse_ids.each do |tid|
           timelapse = current_user.lapse_timelapses.find_or_create_by!(lapse_timelapse_id: tid)
           timelapse.refetch_data! # Fetches from Lapse API to verify and populate cached fields
+          # Reject failed-processing or footage-less timelapses so logged hours always
+          # have real, viewable footage; the surrounding transaction rolls back the row.
+          unless timelapse.attachable?
+            raise UnattachableRecording, "“#{timelapse.name.presence || tid}” has no published video on Lapse and can't be attached."
+          end
           @journal_entry.recordings.create!(recordable: timelapse, user: current_user)
         end
 
@@ -115,6 +124,8 @@ class JournalEntriesController < ApplicationController
           end
         end
       end
+    rescue UnattachableRecording => e
+      return render_journal_entry_error(e.message)
     rescue ActiveRecord::RecordInvalid => e
       return render_journal_entry_error(friendly_journal_entry_error(e.record))
     end
