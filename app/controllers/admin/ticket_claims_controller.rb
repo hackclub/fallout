@@ -40,6 +40,17 @@ class Admin::TicketClaimsController < Admin::ApplicationController
     redirect_to admin_ticket_claims_path
   end
 
+  def reject
+    @claim = TicketClaim.find(params[:id])
+
+    if @claim.rejected?
+      return redirect_to admin_ticket_claims_path, inertia: { errors: { base: [ "Claim is already rejected" ] } }
+    end
+
+    @claim.update!(state: :rejected)
+    redirect_to admin_ticket_claims_path
+  end
+
   private
 
   def serialize_claim(claim)

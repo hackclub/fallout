@@ -426,7 +426,10 @@ Rails.application.routes.draw do
       resources :shop_items, only: [ :index, :create, :update, :destroy ] # Admin shop item management
       resources :shop_orders, only: [ :index, :show, :update ] # Admin order management
       resources :ticket_claims, only: [ :index ] do # Admin event ticket claim review
-        member { patch :approve }
+        member do
+          patch :approve
+          patch :reject
+        end
       end
       resources :koi_transactions, only: [ :index, :new, :create ] # Admin koi adjustments
       resources :you_tube_videos, only: [] do

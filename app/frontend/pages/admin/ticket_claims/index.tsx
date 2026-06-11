@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/admin/ui/alert-dialog'
-import { CheckIcon, ClockIcon, ExternalLinkIcon } from 'lucide-react'
+import { CheckIcon, ClockIcon, ExternalLinkIcon, XIcon } from 'lucide-react'
 
 type Project = {
   id: number
@@ -74,13 +74,12 @@ function ClaimCard({ claim }: { claim: Claim }) {
 
   function approve() {
     setProcessing(true)
-    router.patch(
-      `/admin/ticket_claims/${claim.id}/approve`,
-      {},
-      {
-        onFinish: () => setProcessing(false),
-      },
-    )
+    router.patch(`/admin/ticket_claims/${claim.id}/approve`, {}, { onFinish: () => setProcessing(false) })
+  }
+
+  function reject() {
+    setProcessing(true)
+    router.patch(`/admin/ticket_claims/${claim.id}/reject`, {}, { onFinish: () => setProcessing(false) })
   }
 
   return (
@@ -107,29 +106,54 @@ function ClaimCard({ claim }: { claim: Claim }) {
             </Button>
 
             {claim.state === 'pending' && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" disabled={processing}>
-                    <CheckIcon className="size-3.5" />
-                    Approve
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Approve ticket for {claim.user.display_name}?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will mark the claim as approved and register <strong>{claim.user.display_name}</strong> (
-                      {claim.user.email}) with the Attend API. They'll receive an invitation email.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={approve} disabled={processing}>
-                      Approve & send invite
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={processing}>
+                      <XIcon className="size-3.5" />
+                      Reject
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Reject ticket claim for {claim.user.display_name}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will mark their claim as rejected. They will not receive a ticket.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction variant="destructive" onClick={reject} disabled={processing}>
+                        Reject
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" disabled={processing}>
+                      <CheckIcon className="size-3.5" />
+                      Approve
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Approve ticket for {claim.user.display_name}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will mark the claim as approved and register <strong>{claim.user.display_name}</strong> (
+                        {claim.user.email}) with the Attend API. They'll receive an invitation email.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={approve} disabled={processing}>
+                        Approve & send invite
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
             )}
           </div>
         </div>
