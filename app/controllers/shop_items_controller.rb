@@ -1,5 +1,12 @@
 class ShopItemsController < ApplicationController
   def index
+    # Direct visits (not modal) redirect to /path which opens the shop as a popup
+    unless request.headers["X-InertiaUI-Modal"].present?
+      skip_authorization
+      skip_policy_scope
+      return redirect_to "/path", flash: { open_modal: "shop" }
+    end
+
     authorize ShopItem # Enforces Flipper :shop flag via index? policy
     @shop_items = policy_scope(ShopItem).order(price: :asc)
 

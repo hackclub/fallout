@@ -2,7 +2,7 @@
 
 class ShopOrderPolicy < ApplicationPolicy
   def index?
-    admin? # Order list is admin-only; users see their orders via their profile
+    true # Users can list their own orders; Scope limits to their records
   end
 
   def show?

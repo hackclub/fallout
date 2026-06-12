@@ -4,8 +4,31 @@ class ShopOrdersController < ApplicationController
   skip_after_action :verify_authorized
   skip_after_action :verify_policy_scoped
 
-  before_action :set_shop_item
+  before_action :set_shop_item, only: %i[new create show]
   before_action :require_enabled_item, only: %i[new create] # Only block orders on unavailable items, not viewing existing ones
+
+  def index
+    @shop_orders = policy_scope(ShopOrder).includes(:shop_item).order(created_at: :desc)
+    skip_authorization # Scoping enforces access; no single record to authorize
+
+    render inertia: "shop_orders/index", props: {
+      orders: @shop_orders.map do |o|
+        {
+          id: o.id,
+          state: o.state,
+          frozen_price: o.frozen_price,
+          quantity: o.quantity,
+          created_at: o.created_at.strftime("%b %d, %Y"),
+          shop_item: {
+            id: o.shop_item.id,
+            name: o.shop_item.name,
+            image_url: o.shop_item.image_url,
+            currency: o.shop_item.currency
+          }
+        }
+      end
+    }
+  end
 
   def show
     @shop_order = @shop_item.shop_orders.find(params[:id])

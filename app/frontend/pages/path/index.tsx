@@ -496,6 +496,15 @@ export default function PathIndex() {
     sixtyHoursScript,
   ])
 
+  const shopRedirectTriggered = useRef(false)
+  useEffect(() => {
+    if (shopRedirectTriggered.current) return
+    if (!introFinished || flash?.open_modal !== 'shop' || stack.length > 0) return
+
+    shopRedirectTriggered.current = true
+    void visitModal('/shop')
+  }, [introFinished, flash, stack.length, visitModal])
+
   function reloadPathProgress() {
     router.reload({ only: ['has_projects', 'journal_entry_count', 'critter_variants'] })
   }

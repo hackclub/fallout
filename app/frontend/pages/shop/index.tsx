@@ -204,6 +204,14 @@ export default function ShopIndex({
           </button>
         )}
 
+        <Link
+          href="/orders"
+          className="absolute right-0 top-0 font-bold underline"
+          style={{ color: '#BE987F' }}
+        >
+          Orders
+        </Link>
+
         <h1 className=" font-bold whitespace-nowrap text-2xl sm:text-3xl md:text-4xl text-dark-brown">The Shop</h1>
         <div className="my-2 mx-auto text-sm sm:text-base text-brown text-center max-w-sm leading-tight">
           Prizes unrelated to the inperson event will be available for purchase after the hackathon (July 7th)

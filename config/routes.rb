@@ -584,6 +584,7 @@ Rails.application.routes.draw do
   get "claim-ticket" => "ticket_claims#new", as: :claim_ticket
   post "claim-ticket" => "ticket_claims#create"
 
+  get "orders", to: "shop_orders#index", as: :my_shop_orders # Current user's purchase history
   resources :shop_items, path: "shop", only: [ :index, :show ] do # Koi shop (admin CRUD via /admin/shop_items)
     resources :shop_orders, only: [ :new, :create, :show ], path: "orders" # Purchase flow
   end
