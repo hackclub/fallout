@@ -10,7 +10,9 @@ Keep changes low impact, responses concise. No summaries, no testing. Reference 
 
 # Architecture Documentation
 
-Detailed architecture docs live in [agents-docs/](agents-docs/INDEX.md). Before working on an unfamiliar area, scan the index and read the relevant doc — they contain gotchas, patterns, and implementation details that prevent common mistakes. The docs are point-in-time snapshots and may be out of date; treat them as a starting overview and verify against the current code before relying on specifics. When you make changes that affect documented architecture (new controllers, models, policies, services, access control changes, new shared props, etc.), update the corresponding doc in `agents-docs/` as part of the change.
+Detailed architecture docs live in [agents-docs/](agents-docs/INDEX.md). Before working on an unfamiliar area, scan the index and read the relevant doc — they contain gotchas, patterns, and implementation details that prevent common mistakes. The docs are point-in-time snapshots and may be out of date; treat them as a starting overview and verify against the current code before relying on specifics.
+
+!!! IMPORTANT: When you make changes that affect documented architecture (new controllers, models, policies, services, access control changes, new shared props, etc.), YOU MUST update the corresponding doc in `agents-docs/` as part of the change.
 
 # Stack
 
