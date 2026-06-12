@@ -34,11 +34,18 @@ class Recording < ApplicationRecord
 
   # Enqueue activity analysis when a recording is attached to a journal entry
   after_create_commit :enqueue_activity_check
+  # Archive Lapse footage + metadata to R2 (disaster-recovery copy) on attach. after_create_commit
+  # so the timelapse row is committed/visible before the job runs; idempotent (skips if archived).
+  after_create_commit :enqueue_lapse_archive, if: -> { recordable_type == "LapseTimelapse" }
 
   private
 
   def enqueue_activity_check
     TimelapseActivityCheckJob.perform_later(recordable)
+  end
+
+  def enqueue_lapse_archive
+    ArchiveLapseTimelapseJob.perform_later(recordable_id)
   end
 
   def user_must_match_journal_user
