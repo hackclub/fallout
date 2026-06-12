@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class BlueprintService
-  def self.fetch_unfinished_projects(email)
+  def self.fetch_projects(email)
     base_url = ENV.fetch("BLUEPRINT_API_URL", "https://blueprint.hackclub.com")
     res = Faraday.get("#{base_url}/api/unfinished_projects", { email: email }) do |req|
       req.headers["Authorization"] = "Bearer #{ENV.fetch('BLUEPRINT_API_KEY')}"

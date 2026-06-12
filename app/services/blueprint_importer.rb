@@ -7,7 +7,7 @@
 #
 # Behaviour:
 #   - Reads approved rows from the Blueprint transfer Airtable table.
-#   - For each row: calls GET /api/unfinished_projects?email=X and finds the
+#   - For each row: calls GET /api/unfinished_projects?email=X (returns all projects) and finds the
 #     matching project by ID extracted from the Blueprint link.
 #   - Finds the Fallout user by email, then merges journal entries into an
 #     existing same-named project or creates a new one. Adds overridden hours
@@ -62,11 +62,11 @@ class BlueprintImporter
       end
 
       begin
-        raw_projects = BlueprintService.fetch_unfinished_projects(email)
+        raw_projects = BlueprintService.fetch_projects(email)
         raw_project  = raw_projects.find { |p| p["id"].to_i == bp_id }
 
         unless raw_project&.fetch("name", nil).present?
-          puts "SKIP (bp##{bp_id} not found in unfinished projects for #{email}): #{bp_link}"
+          puts "SKIP (bp##{bp_id} not found in projects for #{email}): #{bp_link}"
           stats[:skipped] += 1
           next
         end
