@@ -939,6 +939,76 @@ export default function LandingIndex() {
               </div>
             </div>
           </section>
+          <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-16 bg-beige text-dark-brown flex flex-col items-center gap-6">
+            <p className="text-xl md:text-2xl text-center text-brown font-bold max-w-2xl">Supported by</p>
+            <div className="flex flex-col items-center gap-8 w-full max-w-4xl">
+              <div className="relative flex-shrink-0 w-[67%] md:w-auto flex justify-center">
+                <img
+                  src="/landing/logos/seeed.webp"
+                  className="h-8 md:h-14 w-auto object-contain opacity-0"
+                  alt="Seeed Studio"
+                />
+                <div
+                  className="absolute inset-0 bg-dark-brown"
+                  style={{
+                    WebkitMaskImage: 'url(/landing/logos/seeed.webp)',
+                    WebkitMaskSize: 'contain',
+                    WebkitMaskPosition: 'center',
+                    WebkitMaskRepeat: 'no-repeat',
+                    maskImage: 'url(/landing/logos/seeed.webp)',
+                    maskSize: 'contain',
+                    maskPosition: 'center',
+                    maskRepeat: 'no-repeat',
+                  }}
+                ></div>
+              </div>
+              <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 w-full">
+                <div className="relative flex-shrink-0 w-[67%] md:w-auto flex justify-center">
+                  <img
+                    src="/landing/logos/easyeda.webp"
+                    className="h-12 md:h-20 w-auto object-contain opacity-0"
+                    alt="EasyEDA"
+                  />
+                  <div
+                    className="absolute inset-0 bg-dark-brown"
+                    style={{
+                      WebkitMaskImage: 'url(/landing/logos/easyeda.webp)',
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskPosition: 'center',
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskImage: 'url(/landing/logos/easyeda.webp)',
+                      maskSize: 'contain',
+                      maskPosition: 'center',
+                      maskRepeat: 'no-repeat',
+                    }}
+                  ></div>
+                </div>
+                <div className="relative flex-shrink-0 w-[67%] md:w-auto flex justify-center">
+                  <img
+                    src="/landing/logos/jlcpcb.webp"
+                    className="h-12 md:h-20 w-auto object-contain opacity-0"
+                    alt="JLCPCB"
+                  />
+                  <div
+                    className="absolute inset-0 bg-dark-brown"
+                    style={{
+                      WebkitMaskImage: 'url(/landing/logos/jlcpcb.webp)',
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskPosition: 'center',
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskImage: 'url(/landing/logos/jlcpcb.webp)',
+                      maskSize: 'contain',
+                      maskPosition: 'center',
+                      maskRepeat: 'no-repeat',
+                    }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <p className="text-base text-center text-brown max-w-xl">
+              Thank you to our sponsors for making this event a reality!
+            </p>
+          </section>
           <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-20 bg-beige text-dark-brown">
             <h2 className="text-6xl font-semibold mb-10 font-outfit">FAQ</h2>
             <div className="divide-y-2 divide-dark-brown border-y-2 border-dark-brown font-outfit">
