@@ -2,7 +2,7 @@
 
 module ShipChecks
   module ReadmeExplainsHow
-    DEFINITION = { key: :readme_explains_how, label: "README explains how to use/build it", deps: [ :readme_content ], visibility: :internal }.freeze
+    DEFINITION = { key: :readme_explains_how, label: "README explains how to use and build it", deps: [ :readme_content ], visibility: :internal }.freeze
 
     def self.call(ctx)
       content = ctx.readme_content
@@ -16,7 +16,7 @@ module ShipChecks
       chat = RubyLLM.chat
       response = chat.ask(<<~PROMPT)
         You are reviewing a hardware/electronics project README for a grant program.
-        Does this README clearly explain HOW to use OR build the project? It should include detailed instructions so someone else could replicate it.
+        Does this README clearly explain HOW to use AND build the project? It should include detailed instructions so someone else could replicate it.
 
         README content (truncated):
         #{content.truncate(4000)}
