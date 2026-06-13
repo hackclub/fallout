@@ -12,7 +12,9 @@
 #  discarded_at                       :datetime
 #  display_name                       :string           not null
 #  email                              :string           not null
+#  excluded_from_dashboard            :boolean          default(FALSE), not null
 #  excluded_from_reviewer_suggestions :boolean          default(FALSE), not null
+#  excluded_until                     :date
 #  first_name                         :string
 #  has_hca_address                    :boolean          default(FALSE), not null
 #  hca_token                          :text

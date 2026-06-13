@@ -37,6 +37,13 @@ export default function AdminLayout({ children, flush }: { children: ReactNode; 
   // Register the before-navigate handler once — captures ghost + direction
   useEffect(() => {
     const off = router.on('before', (event) => {
+      // Only treat GET visits as page navigations — form actions (patch/post/delete)
+      // often redirect back to the same page, which wouldn't change `pathname` and
+      // would leave the ghost/opacity stuck forever
+      if (event.detail.visit.method !== 'get') {
+        pendingDir.current = null
+        return
+      }
       const dest = event.detail.visit.url.pathname
       const fromIdx = navIndex(window.location.pathname)
       const toIdx = navIndex(dest)

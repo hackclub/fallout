@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_10_204847) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_13_203827) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -663,6 +663,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_204847) do
     t.index ["user_id"], name: "index_reviewer_notes_on_user_id"
   end
 
+  create_table "reviewer_settings", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.decimal "ta_hours_per_review_equivalent"
+    t.datetime "updated_at", null: false
+  end
+
   create_table "reviewer_unavailabilities", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.date "ends_on", null: false
@@ -983,7 +989,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_204847) do
     t.datetime "discarded_at"
     t.string "display_name", null: false
     t.string "email", null: false
+    t.boolean "excluded_from_dashboard", default: false, null: false
     t.boolean "excluded_from_reviewer_suggestions", default: false, null: false
+    t.date "excluded_until"
     t.string "first_name"
     t.boolean "has_hca_address", default: false, null: false
     t.string "hca_id"

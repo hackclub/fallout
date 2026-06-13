@@ -204,6 +204,21 @@ class Admin::UsersController < Admin::ApplicationController
     redirect_back_or_to admin_root_path
   end
 
+  def toggle_dashboard_exclusion
+    @user = User.find(params[:id])
+    authorize @user
+
+    excluding = !@user.excluded_from_dashboard
+    @user.update!(excluded_from_dashboard: excluding, excluded_until: excluding ? parse_date(params[:excluded_until]) : nil)
+
+    if excluding
+      reason = params[:reason].to_s.strip
+      ReviewerAdminNote.create!(reviewer: @user, author: current_user, body: reason) if reason.present?
+    end
+
+    redirect_back_or_to admin_root_path
+  end
+
   def update_ticket_hours_override
     @user = User.find(params[:id])
     authorize @user
@@ -286,6 +301,12 @@ class Admin::UsersController < Admin::ApplicationController
   end
 
   private
+
+  def parse_date(value)
+    Date.parse(value.to_s)
+  rescue ArgumentError
+    nil
+  end
 
   def serialize_user_row(user)
     row = {

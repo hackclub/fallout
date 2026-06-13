@@ -11,6 +11,7 @@ import { Bar, BarChart } from 'recharts'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/admin/ui/sheet'
 import { MessageCircleIcon, X } from 'lucide-react'
 import { PageProps } from '@inertiajs/core'
+import { LeaderboardCard, toContributedRows, type PeriodStats } from '@/components/admin/LeaderboardCard'
 
 interface ReturnedProject {
   id: number
@@ -64,6 +65,14 @@ interface Props extends PageProps {
   totals: Totals
   reviewer_profiles: ReviewerProfile[]
   non_reviewer_channel_members: NonReviewerMember[]
+  contribution_stats: {
+    all_time: PeriodStats
+    this_week: PeriodStats
+    hidden: {
+      all_time: PeriodStats
+      this_week: PeriodStats
+    }
+  }
 }
 
 function formatRate(value: number): string {
@@ -231,9 +240,26 @@ function ReviewerProfileCard({
 }
 
 export default function RequirementsDesignDashboard() {
-  const { leaderboard, totals, reviewer_profiles, non_reviewer_channel_members } = usePage<Props>().props
+  const { leaderboard, totals, reviewer_profiles, non_reviewer_channel_members, contribution_stats } =
+    usePage<Props>().props
   const { admin_permissions } = usePage<{ admin_permissions?: { is_admin: boolean } }>().props
   const isAdmin = admin_permissions?.is_admin ?? false
+
+  // Toggles excluded_from_dashboard; an optional reason is saved as a note on
+  // the user's /admin/reviewers/:id page (visible there under "Notes"). An
+  // optional excluded_until date returns the user to the visible list (flagged
+  // for review) once it passes, instead of staying hidden indefinitely.
+  function excuseFromContributions(id: number, reason: string, excludedUntil?: string) {
+    router.patch(
+      `/admin/users/${id}/toggle_dashboard_exclusion`,
+      { reason, excluded_until: excludedUntil },
+      { preserveScroll: true },
+    )
+  }
+
+  function unhideFromContributions(id: number) {
+    router.patch(`/admin/users/${id}/toggle_dashboard_exclusion`, {}, { preserveScroll: true })
+  }
 
   const [returnedSheet, setReturnedSheet] = useState<LeaderboardRow | null>(null)
 
@@ -340,63 +366,71 @@ export default function RequirementsDesignDashboard() {
         </Card>
       </div>
 
-      <Card>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">Rank</TableHead>
-                <TableHead>Reviewer</TableHead>
-                <TableHead className="text-right">Approved RC</TableHead>
-                <TableHead className="text-right">Returned DR</TableHead>
-                <TableHead className="text-right">Approved:Returned</TableHead>
-                <TableHead className="text-right">Return Rate</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {leaderboard.length === 0 ? (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardContent>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    No data :(
-                  </TableCell>
+                  <TableHead className="w-12">Rank</TableHead>
+                  <TableHead>Reviewer</TableHead>
+                  <TableHead className="text-right">Approved:Returned</TableHead>
+                  <TableHead className="text-right">Return Rate</TableHead>
                 </TableRow>
-              ) : (
-                leaderboard.map((row, index) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        {row.avatar ? (
-                          <img src={row.avatar} className="size-8 rounded-full shrink-0" alt="" />
-                        ) : (
-                          <div className="size-8 rounded-full bg-muted shrink-0" />
-                        )}
-                        <span className="font-medium">{row.display_name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{row.approved_projects}</TableCell>
-                    <TableCell className="text-right tabular-nums">{row.design_returned_projects}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {row.approved_projects}:{row.design_returned_projects}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {row.design_returned_projects > 0 ? (
-                        <button type="button" onClick={() => setReturnedSheet(row)}>
-                          <Badge variant="destructive" className="cursor-pointer hover:opacity-80">
-                            {formatRate(row.return_rate)}
-                          </Badge>
-                        </button>
-                      ) : (
-                        <Badge variant="secondary">{formatRate(row.return_rate)}</Badge>
-                      )}
+              </TableHeader>
+              <TableBody>
+                {leaderboard.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      No data :(
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                ) : (
+                  leaderboard.map((row, index) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          {row.avatar ? (
+                            <img src={row.avatar} className="size-8 rounded-full shrink-0" alt="" />
+                          ) : (
+                            <div className="size-8 rounded-full bg-muted shrink-0" />
+                          )}
+                          <span className="font-medium">{row.display_name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.approved_projects}:{row.design_returned_projects}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.design_returned_projects > 0 ? (
+                          <button type="button" onClick={() => setReturnedSheet(row)}>
+                            <Badge variant="destructive" className="cursor-pointer hover:opacity-80">
+                              {formatRate(row.return_rate)}
+                            </Badge>
+                          </button>
+                        ) : (
+                          <Badge variant="secondary">{formatRate(row.return_rate)}</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <LeaderboardCard
+          title="Total Contributed"
+          this_week={toContributedRows(contribution_stats.this_week)}
+          all_time={toContributedRows(contribution_stats.all_time)}
+          hidden_this_week={toContributedRows(contribution_stats.hidden.this_week)}
+          hidden_all_time={toContributedRows(contribution_stats.hidden.all_time)}
+          onExcuse={excuseFromContributions}
+          onUnhide={unhideFromContributions}
+        />
+      </div>
 
       <div>
         <div className="flex items-center justify-between mb-4">
