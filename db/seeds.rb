@@ -422,12 +422,12 @@ if Rails.env.development?
   seed_start = Date.new(2026, 1, 5) # First Monday of 2026
 
   reviewer_data = [
-    { display_name: "Alicen Chen",     email: "seed_alice@example.com",  roles: %w[requirements_checker] },
-    { display_name: "Bob Kim",         email: "seed_bob@example.com",    roles: %w[requirements_checker pass2_reviewer] },
-    { display_name: "Carol Wu",        email: "seed_carol@example.com",  roles: %w[pass2_reviewer] },
-    { display_name: "Dave Torres",     email: "seed_dave@example.com",   roles: %w[requirements_checker] }, # intentionally zero reviews
-    { display_name: "Eve Nakamura",    email: "seed_eve@example.com",    roles: %w[requirements_checker] },
-    { display_name: "Frank Rodriguez", email: "seed_frank@example.com",  roles: %w[pass2_reviewer] }        # recently onboarded
+    { display_name: "Alicen Chen",     email: "seed_alice@example.com",  roles: %w[requirements_checker],            slack_id: "USEED0101", hca_id: "seed-hca-alice" },
+    { display_name: "Bob Kim",         email: "seed_bob@example.com",    roles: %w[requirements_checker pass2_reviewer], slack_id: "USEED0102", hca_id: "seed-hca-bob" },
+    { display_name: "Carol Wu",        email: "seed_carol@example.com",  roles: %w[pass2_reviewer],                  slack_id: "USEED0103", hca_id: "seed-hca-carol" },
+    { display_name: "Dave Torres",     email: "seed_dave@example.com",   roles: %w[requirements_checker],            slack_id: "USEED0104", hca_id: "seed-hca-dave" }, # intentionally zero reviews
+    { display_name: "Eve Nakamura",    email: "seed_eve@example.com",    roles: %w[requirements_checker],            slack_id: "USEED0105", hca_id: "seed-hca-eve" },
+    { display_name: "Frank Rodriguez", email: "seed_frank@example.com",  roles: %w[pass2_reviewer],                  slack_id: "USEED0106", hca_id: "seed-hca-frank" } # recently onboarded
   ]
 
   non_reviewer_data = [
@@ -455,7 +455,7 @@ if Rails.env.development?
       updated_at:   Time.current
     } ])
   end
-  reviewer_data.each { |a| User.where(email: a[:email]).update_all(roles: a[:roles]) }
+  reviewer_data.each { |a| User.where(email: a[:email]).update_all(roles: a[:roles], slack_id: a[:slack_id], hca_id: a[:hca_id]) }
   non_reviewer_data.each { |a| User.where(email: a[:email]).update_all(slack_id: a[:slack_id], roles: []) }
 
   reviewers = reviewer_data.map { |a| User.find_by!(email: a[:email]) }

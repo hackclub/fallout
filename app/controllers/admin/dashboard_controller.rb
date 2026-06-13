@@ -6,19 +6,8 @@ class Admin::DashboardController < Admin::ApplicationController
     # Lambdas so these only run for the initial page render — Inertia partial
     # reloads (e.g. the sidebar's deferred admin_stats) skip lambda evaluation
     # for props they didn't ask for, avoiding ~35 wasted queries on each defer.
-    week_ago = 7.days.ago
-    terminal = %w[approved returned rejected]
-    completed_ta = TimeAuditReview.where(status: :approved).where.not(approved_public_seconds: nil)
-
     render inertia: "admin/dashboard/index", props: {
-      stats: -> {
-        reviewer_counts = review_count_stats(terminal, week_ago: week_ago)
-        time_audited = time_audited_stats(completed_ta, week_ago: week_ago)
-        {
-          all_time: { reviewers: reviewer_counts[:all_time], time_audited: time_audited[:all_time] },
-          this_week: { reviewers: reviewer_counts[:this_week], time_audited: time_audited[:this_week] }
-        }
-      },
+      stats: -> { contribution_stats },
       backlog_chart: -> { backlog_by_day },
       backlog_hours_chart: -> { backlog_hours_by_day },
       recent_activity: -> { recent_24h_activity }
@@ -30,7 +19,8 @@ class Admin::DashboardController < Admin::ApplicationController
       leaderboard: -> { requirements_to_design_return_leaderboard },
       totals: -> { requirements_to_design_return_totals },
       reviewer_profiles: -> { requirements_check_reviewer_profiles },
-      non_reviewer_channel_members: -> { slack_channel_non_reviewers("C0AGEPQ63DY") }
+      non_reviewer_channel_members: -> { slack_channel_non_reviewers("C0AGEPQ63DY") },
+      contribution_stats: -> { requirements_design_contribution_stats }
     }
   end
 
@@ -188,6 +178,125 @@ class Admin::DashboardController < Admin::ApplicationController
     return 0.0 if values.size < 2
     mean = values.sum / values.size
     Math.sqrt(values.sum { |v| (v - mean)**2 } / values.size)
+  end
+
+  # Combines review_count_stats and time_audited_stats into the shape the
+  # "Reviews Completed" / "Time Audited" / "Total Contributed" leaderboards expect.
+  def contribution_stats
+    week_ago = 7.days.ago
+    terminal = %w[approved returned rejected]
+    completed_ta = TimeAuditReview.where(status: :approved).where.not(approved_public_seconds: nil)
+
+    reviewer_counts = review_count_stats(terminal, week_ago: week_ago)
+    time_audited = time_audited_stats(completed_ta, week_ago: week_ago)
+    {
+      all_time: { reviewers: reviewer_counts[:all_time], time_audited: time_audited[:all_time] },
+      this_week: { reviewers: reviewer_counts[:this_week], time_audited: time_audited[:this_week] }
+    }
+  end
+
+  # contribution_stats, plus zero-value rows for every reviewer-role user with no
+  # recorded contributions and italic-flagged rows for RC-channel members who aren't
+  # reviewers yet — so "Total Contributed" surfaces everyone who could be contributing.
+  # Anyone with excluded_from_dashboard set is moved into `hidden` instead, so admins
+  # can excuse people (e.g. on leave) without deleting their contribution history.
+  # Once excluded_until passes, the row moves back to visible but flagged with
+  # needs_review so an admin can check on them and resolve the exclusion.
+  def requirements_design_contribution_stats
+    stats = contribution_stats
+    reviewers = all_reviewer_users
+    non_reviewers = slack_channel_non_reviewers("C0AGEPQ63DY")
+    excluded_ids, needs_review_ids = partition_excluded_ids
+    reasons = excluded_dashboard_reasons(excluded_ids | needs_review_ids)
+
+    visible_all_time, hidden_all_time =
+      split_contribution_period(stats[:all_time], reviewers, non_reviewers, excluded_ids, needs_review_ids, reasons)
+    visible_week, hidden_week =
+      split_contribution_period(stats[:this_week], reviewers, non_reviewers, excluded_ids, needs_review_ids, reasons)
+
+    {
+      all_time: visible_all_time,
+      this_week: visible_week,
+      hidden: { all_time: hidden_all_time, this_week: hidden_week }
+    }
+  end
+
+  # Partitions a period's reviewers/time_audited rows (plus the zero-value rows for
+  # reviewer-role users and non-reviewer channel members) into visible vs hidden
+  # based on excluded_ids, returning [visible_period_stats, hidden_period_stats].
+  # Visible rows whose id is in needs_review_ids get flagged + their reason attached.
+  def split_contribution_period(period_stats, reviewers, non_reviewers, excluded_ids, needs_review_ids, reasons)
+    visible_reviewers, hidden_reviewers = period_stats[:reviewers].partition { |r| !excluded_ids.include?(r[:id]) }
+    visible_time, hidden_time = period_stats[:time_audited].partition { |r| !excluded_ids.include?(r[:id]) }
+
+    visible_present = (visible_reviewers.map { |r| r[:id] } + visible_time.map { |r| r[:id] }).to_set
+    hidden_present = (hidden_reviewers.map { |r| r[:id] } + hidden_time.map { |r| r[:id] }).to_set
+
+    visible_pool, hidden_pool = reviewers.partition { |u| !excluded_ids.include?(u.id) }
+    visible_non_reviewer_pool, hidden_non_reviewer_pool = non_reviewers.partition { |u| !excluded_ids.include?(u[:id]) }
+
+    visible_reviewer_rows = visible_reviewers + zero_contribution_rows(visible_pool, visible_present) +
+      zero_contribution_rows(visible_non_reviewer_pool, visible_present, is_reviewer: false)
+    hidden_reviewer_rows = hidden_reviewers + zero_contribution_rows(hidden_pool, hidden_present) +
+      zero_contribution_rows(hidden_non_reviewer_pool, hidden_present, is_reviewer: false)
+
+    visible = {
+      reviewers: visible_reviewer_rows.map { |r| flag_needs_review(r, needs_review_ids, reasons) },
+      time_audited: visible_time.map { |r| flag_needs_review(r, needs_review_ids, reasons) }
+    }
+    hidden = {
+      reviewers: hidden_reviewer_rows.map { |r| r.merge(reason: reasons[r[:id]]) },
+      time_audited: hidden_time.map { |r| r.merge(reason: reasons[r[:id]]) }
+    }
+
+    [ visible, hidden ]
+  end
+
+  def flag_needs_review(row, needs_review_ids, reasons)
+    return row unless needs_review_ids.include?(row[:id])
+    row.merge(needs_review: true, reason: reasons[row[:id]])
+  end
+
+  # Builds zero-review_count rows for reviewer-role users (User records) or
+  # non-reviewer channel members (hashes) not already present in the period.
+  def zero_contribution_rows(entries, present_ids, is_reviewer: nil)
+    entries.reject { |e| present_ids.include?(e.is_a?(Hash) ? e[:id] : e.id) }.map do |e|
+      id, display_name, avatar = e.is_a?(Hash) ? [ e[:id], e[:display_name], e[:avatar] ] : [ e.id, e.display_name, e.avatar ]
+      row = { id: id, display_name: display_name, avatar: avatar, review_count: 0 }
+      row[:is_reviewer] = is_reviewer unless is_reviewer.nil?
+      row
+    end
+  end
+
+  # Splits excluded_from_dashboard users into still-excused (excluded_until is blank
+  # or in the future) vs expired (excluded_until has passed), returning
+  # [excluded_ids, needs_review_ids].
+  def partition_excluded_ids
+    today = Date.current
+    excluded_ids = Set.new
+    needs_review_ids = Set.new
+    User.where(excluded_from_dashboard: true).pluck(:id, :excluded_until).each do |id, excluded_until|
+      if excluded_until && excluded_until < today
+        needs_review_ids << id
+      else
+        excluded_ids << id
+      end
+    end
+    [ excluded_ids, needs_review_ids ]
+  end
+
+  # Most recent ReviewerAdminNote body per excluded reviewer, shown alongside their
+  # hidden leaderboard row so admins can see why they were excused.
+  def excluded_dashboard_reasons(excluded_ids)
+    return {} if excluded_ids.empty?
+    ReviewerAdminNote.where(reviewer_id: excluded_ids.to_a)
+      .order(created_at: :desc)
+      .group_by(&:reviewer_id)
+      .transform_values { |notes| notes.first.body }
+  end
+
+  def all_reviewer_users
+    @all_reviewer_users ||= User.where("roles && ARRAY[?]::varchar[]", User::REVIEWER_ROLES).to_a
   end
 
   # Counts completed reviews per reviewer across all four review types, returning
@@ -387,16 +496,34 @@ class Admin::DashboardController < Admin::ApplicationController
     SQL
     submitted_by_day = submitted_by_day.to_h { |r| [ Date.parse(r["day"].to_s), r["seconds"].to_f ] }
 
-    # TA-approved seconds per completion date — chain separate .where.not calls so both
-    # conditions are AND'd (a single .where.not(a: nil, b: nil) generates OR logic in Rails)
-    approved_by_day = TimeAuditReview
-      .where(status: :approved)
-      .where.not(completed_at: nil)
-      .where.not(approved_public_seconds: nil)
-      .group("completed_at::date")
-      .sum(:approved_public_seconds)
-      .filter_map { |k, v| [ Date.parse(k.to_s), v ] if k.present? }
-      .to_h
+    # TA-approved seconds per completion date, excluding each project's one-time
+    # manual_seconds bonus (added to approved_public_seconds on the project's first
+    # approved ship — see TimeAuditReview#add_manual_seconds_to_approved). Those seconds
+    # don't come from a Recording, so they have no entry in submitted_by_day and would
+    # otherwise inflate cum_approved_s past cum_submitted_s.
+    approved_by_day = ActiveRecord::Base.connection.execute(<<~SQL.squish).to_a
+      WITH first_approved_ships AS (
+        SELECT id, project_id,
+               ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at, id) AS rn
+        FROM ships
+        WHERE status = #{Ship.statuses[:approved]}
+      )
+      SELECT tar.completed_at::date AS day,
+             SUM(
+               tar.approved_public_seconds -
+               CASE WHEN fas.rn = 1 THEN p.manual_seconds ELSE 0 END
+             ) AS seconds
+      FROM time_audit_reviews tar
+      INNER JOIN ships s ON s.id = tar.ship_id
+      INNER JOIN projects p ON p.id = s.project_id
+      LEFT JOIN first_approved_ships fas ON fas.id = s.id
+      WHERE tar.status = #{TimeAuditReview.statuses[:approved]}
+        AND tar.completed_at IS NOT NULL
+        AND tar.approved_public_seconds IS NOT NULL
+      GROUP BY tar.completed_at::date
+      ORDER BY tar.completed_at::date
+    SQL
+    approved_by_day = approved_by_day.to_h { |r| [ Date.parse(r["day"].to_s), r["seconds"].to_f ] }
 
     # Ship count data (same structure as backlog_by_day)
     ships_by_day = Ship.where("created_at < ?", end_date.end_of_day)
@@ -515,35 +642,40 @@ class Admin::DashboardController < Admin::ApplicationController
   # Fallout account but haven't been granted requirements_checker or pass2_reviewer yet.
   # In development without a bot token, falls back to all non-reviewer users with a slack_id
   # so seed data is visible without needing a real Slack connection.
+  # Memoized per-request — both non_reviewer_channel_members and contribution_stats
+  # need this list, and it can make a Slack API call.
   def slack_channel_non_reviewers(channel_id)
-    reviewer_roles = %w[requirements_checker pass2_reviewer time_auditor admin]
+    @slack_channel_non_reviewers ||= {}
+    @slack_channel_non_reviewers[channel_id] ||= begin
+      reviewer_roles = %w[requirements_checker pass2_reviewer time_auditor admin]
 
-    if Rails.env.development? && ENV["SLACK_BOT_TOKEN"].blank?
-      return User
-        .where.not(slack_id: [ nil, "" ])
-        .where.not("roles && ARRAY[?]::varchar[]", reviewer_roles)
-        .where(excluded_from_reviewer_suggestions: false)
-        .map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
-        .sort_by { |u| u[:display_name] }
+      if Rails.env.development? && ENV["SLACK_BOT_TOKEN"].blank?
+        User
+          .where.not(slack_id: [ nil, "" ])
+          .where.not("roles && ARRAY[?]::varchar[]", reviewer_roles)
+          .where(excluded_from_reviewer_suggestions: false)
+          .map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
+          .sort_by { |u| u[:display_name] }
+      else
+        client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
+
+        member_slack_ids = []
+        cursor = nil
+        loop do
+          response = client.conversations_members(channel: channel_id, limit: 1000, cursor: cursor)
+          member_slack_ids.concat(response.members)
+          cursor = response.response_metadata&.next_cursor
+          break if cursor.blank?
+        end
+
+        User
+          .where(slack_id: member_slack_ids)
+          .where.not("roles && ARRAY[?]::varchar[]", reviewer_roles)
+          .where(excluded_from_reviewer_suggestions: false)
+          .map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
+          .sort_by { |u| u[:display_name] }
+      end
     end
-
-    client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
-
-    member_slack_ids = []
-    cursor = nil
-    loop do
-      response = client.conversations_members(channel: channel_id, limit: 1000, cursor: cursor)
-      member_slack_ids.concat(response.members)
-      cursor = response.response_metadata&.next_cursor
-      break if cursor.blank?
-    end
-
-    User
-      .where(slack_id: member_slack_ids)
-      .where.not("roles && ARRAY[?]::varchar[]", reviewer_roles)
-      .where(excluded_from_reviewer_suggestions: false)
-      .map { |u| { id: u.id, display_name: u.display_name, avatar: u.avatar } }
-      .sort_by { |u| u[:display_name] }
   rescue => e
     Rails.logger.error("slack_channel_non_reviewers failed: #{e.message}")
     []
@@ -582,7 +714,7 @@ class Admin::DashboardController < Admin::ApplicationController
 
     users = User.where(id: rows.map(&:first)).index_by(&:id)
 
-    rows.filter_map do |reviewer_id, approved_projects, returned_projects|
+    leaderboard_rows = rows.filter_map do |reviewer_id, approved_projects, returned_projects|
       user = users[reviewer_id]
       next unless user
 
@@ -599,7 +731,23 @@ class Admin::DashboardController < Admin::ApplicationController
         return_rate: return_rate,
         returned_dr_projects: returned_projects_by_reviewer[reviewer_id] || []
       }
-    end.sort_by { |row| [ -row[:return_rate], -row[:design_returned_projects], -row[:approved_projects] ] }
+    end
+
+    # Surface every reviewer-role user, even with zero approved RC reviews
+    present_ids = leaderboard_rows.map { |r| r[:id] }.to_set
+    missing_rows = all_reviewer_users.reject { |u| present_ids.include?(u.id) }.map do |u|
+      {
+        id: u.id,
+        display_name: u.display_name,
+        avatar: u.avatar,
+        approved_projects: 0,
+        design_returned_projects: 0,
+        return_rate: 0.0,
+        returned_dr_projects: []
+      }
+    end
+
+    (leaderboard_rows + missing_rows).sort_by { |row| [ -row[:return_rate], -row[:design_returned_projects], -row[:approved_projects] ] }
   end
 
   def requirements_to_design_return_totals

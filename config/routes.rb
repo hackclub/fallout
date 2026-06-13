@@ -427,6 +427,7 @@ Rails.application.routes.draw do
           patch :update_ban # Admin ban/unban — admin-only
           patch :update_ticket_hours_override # Admin per-user ticket hours threshold override
           patch :toggle_reviewer_suggestion # Exclude/include from "Not Yet a Reviewer" list
+          patch :toggle_dashboard_exclusion # Admin-only: hide/show a reviewer in the Total Contributed leaderboard
         end
       end
       resources :activity_checks, only: [ :new, :create ]
