@@ -204,11 +204,7 @@ export default function ShopIndex({
           </button>
         )}
 
-        <Link
-          href="/orders"
-          className="absolute right-0 top-0 font-bold underline"
-          style={{ color: '#BE987F' }}
-        >
+        <Link href="/orders" className="absolute right-0 top-0 font-bold underline" style={{ color: '#BE987F' }}>
           Orders
         </Link>
 
