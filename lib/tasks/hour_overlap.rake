@@ -99,30 +99,31 @@ namespace :ships do
   end
 
   # Backfill for the going-forward fix. Dry-run by default; APPLY=1 to write.
-  # Locks each approved ship's still-unclaimed review-lag entries (those its TA actually
-  # reviewed — bounded by ta.completed_at, since this runs long after later cycles exist and
-  # new_journal_entries is otherwise unbounded). Currency-neutral: approved_public_seconds
-  # already counted them; this only aligns ship_id so ship.total_hours matches the approval.
-  # Approved double-counting ships (e.g. ship 539) are untouched — entries a later ship already
-  # claimed are not NULL, so they are never re-grabbed here (keep-whole preserved).
+  # For each approved ship, claim the entries its TA actually reviewed (bounded by
+  # ta.completed_at) that aren't yet locked to it — both still-unclaimed (NULL) review-lag
+  # entries AND entries stranded on a *later non-approved* ship (e.g. entry 10266, reviewed by
+  # approved #539 but claimed by pending #874). new_journal_entries already excludes entries
+  # owned by *other approved* ships, so this never disturbs a finalized cycle (keep-whole).
+  # Currency-neutral: approved_public_seconds already counted these; this only aligns ship_id
+  # so ship.total_hours matches the approval and the next cycle can't re-count them.
   desc "Backfill journal-hour ownership for the overlap fix (dry-run unless APPLY=1)"
   task fix_hour_overlap: :environment do
     apply = ENV["APPLY"] == "1"
     puts apply ? "== APPLY ==" : "== DRY RUN (set APPLY=1 to write) =="
 
-    locked = 0
+    claimed = 0
     Ship.approved.includes(:time_audit_review).order(:created_at).find_each do |ship|
       completed_at = ship.time_audit_review&.completed_at
       next unless completed_at
       pending = ship.new_journal_entries
-        .where(ship_id: nil)
         .where("journal_entries.created_at <= ?", completed_at)
+        .where("journal_entries.ship_id IS NULL OR journal_entries.ship_id <> ?", ship.id)
       n = pending.count
       next if n.zero?
-      locked += n
-      puts "  ship ##{ship.id} (project #{ship.project_id}): lock #{n} entries"
+      claimed += n
+      puts "  ship ##{ship.id} (project #{ship.project_id}): claim #{n} entries (from #{pending.distinct.pluck(:ship_id).map { |i| i || 'nil' }.join(',')})"
       pending.update_all(ship_id: ship.id) if apply
     end
-    puts "total entries #{apply ? 'locked' : 'to lock'}: #{locked}"
+    puts "total entries #{apply ? 'claimed' : 'to claim'}: #{claimed}"
   end
 end
