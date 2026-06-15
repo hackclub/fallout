@@ -271,7 +271,13 @@ class Ship < ApplicationRecord
 
   def new_journal_entries
     cutoff = previous_approved_ship&.created_at || Time.at(0)
-    project.journal_entries.kept.where("journal_entries.created_at > ?", cutoff)
+    scope = project.journal_entries.kept.where("journal_entries.created_at > ?", cutoff)
+    # Exclude entries locked to a *different approved* ship — that cycle is finalized, so a
+    # later ship whose created_at window overlaps the review lag must not re-count its
+    # hours/koi. Entries owned by returned/rejected ships stay visible so a re-ship reclaims
+    # them. Mirrors the claim_journal_entries! filter, which the compute path previously lacked.
+    locked_ids = project.ships.approved.where.not(id: id).pluck(:id)
+    locked_ids.any? ? scope.where("journal_entries.ship_id IS NULL OR journal_entries.ship_id NOT IN (?)", locked_ids) : scope
   end
 
   def previous_journal_entries
@@ -372,6 +378,9 @@ class Ship < ApplicationRecord
         attrs[:approved_public_seconds] = nil
       end
       update!(attrs)
+      # Lock every entry this ship's TA reviewed onto the ship so a later cycle can't re-claim
+      # and re-count them through its (unbounded) created_at window — see new_journal_entries.
+      lock_reviewed_journal_entries! if new_status == "approved"
     end
     cancel_pending_reviews! if returned? || rejected?
   end
@@ -472,6 +481,13 @@ class Ship < ApplicationRecord
       scope # No approved ships — all entries are claimable
     end
     scope.update_all(ship_id: id)
+  end
+
+  # Claim every still-unclaimed entry this ship's TA reviewed (the review-lag entries logged
+  # after submission). Called on the :approved transition to finalize this cycle's set so the
+  # next ship excludes them — see new_journal_entries.
+  def lock_reviewed_journal_entries!
+    new_journal_entries.where(ship_id: nil).update_all(ship_id: id)
   end
 
   TERMINAL_STATUSES = %w[approved returned rejected].freeze
