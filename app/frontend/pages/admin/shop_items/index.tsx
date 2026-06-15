@@ -1,389 +1,285 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import type { ReactNode } from 'react'
-import { router, usePage } from '@inertiajs/react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { router, Link } from '@inertiajs/react'
+import { Search, Plus, ChevronRight, ImageOff, Store, X } from 'lucide-react'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Button } from '@/components/admin/ui/button'
-import { Alert, AlertDescription } from '@/components/admin/ui/alert'
+import { Input } from '@/components/admin/ui/input'
+import { Badge } from '@/components/admin/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/admin/ui/table'
-import type { SharedProps } from '@/types'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/admin/ui/tooltip'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/admin/ui/select'
+import {
+  type ShopItem,
+  type Currency,
+  CURRENCY_LABELS,
+  FLAGS,
+  STAR_ICON,
+  unitFor,
+  hasUsdEquivalent,
+  priceToUsd,
+} from '@/components/admin/shop/shopItem'
 
-type ShopItem = {
-  id: number
-  name: string
-  description: string
-  price: number
-  image_url: string
-  status: 'available' | 'unavailable'
-  featured: boolean
-  currency: 'koi' | 'gold' | 'hours'
-  grants_streak_freeze: boolean
-  requires_shipping: boolean
-  requires_date_selection: boolean
+type Stats = { total: number; available: number; unavailable: number; featured: number }
+type Filters = { q?: string; status?: string; currency?: string; featured?: string }
+
+const ALL = '__all__'
+
+function applyFilters(next: Filters) {
+  const params: Record<string, string> = {}
+  if (next.q) params.q = next.q
+  if (next.status) params.status = next.status
+  if (next.currency) params.currency = next.currency
+  if (next.featured) params.featured = next.featured
+  router.get('/admin/shop_items', params, { preserveState: true, preserveScroll: true, replace: true })
 }
 
-type RowState = Omit<ShopItem, 'id'>
-
-const BLANK_ROW: RowState = {
-  name: '',
-  description: '',
-  price: 0,
-  image_url: '',
-  status: 'available',
-  featured: false,
-  currency: 'koi',
-  grants_streak_freeze: false,
-  requires_shipping: true,
-  requires_date_selection: false,
-}
-
-function itemToRow(item: ShopItem): RowState {
-  return {
-    name: item.name,
-    description: item.description,
-    price: item.price,
-    image_url: item.image_url,
-    status: item.status,
-    featured: item.featured,
-    currency: item.currency,
-    grants_streak_freeze: item.grants_streak_freeze,
-    requires_shipping: item.requires_shipping,
-    requires_date_selection: item.requires_date_selection,
-  }
-}
-
-function isDirty(original: ShopItem, current: RowState) {
-  return (Object.keys(current) as (keyof RowState)[]).some((k) => current[k] !== original[k])
-}
-
-const KOI_PER_USD = 7 / 5
-
-const inputClass = 'w-full border border-input rounded-md px-2 py-1 text-sm'
-
-function EditableRow({
-  label,
-  row,
-  onChange,
-  onSave,
-  onDelete,
-  saveLabel,
-  saving,
-  error,
-}: {
-  label?: string
-  row: RowState
-  onChange: (field: keyof RowState, value: string | number | boolean) => void
-  onSave: () => void
-  onDelete?: () => void
-  saveLabel: string
-  saving: boolean
-  error?: string
-}) {
-  const [usdInput, setUsdInput] = useState(() =>
-    row.currency === 'koi' || row.currency === 'gold' ? String(+(row.price / KOI_PER_USD).toFixed(2)) : '',
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="px-4 py-3">
+      <p className="text-2xl font-semibold tabular-nums">{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
   )
-  const skipSyncRef = useRef(false)
+}
 
+export default function AdminShopItemsIndex({
+  shop_items,
+  stats,
+  filters,
+}: {
+  shop_items: ShopItem[]
+  stats: Stats
+  filters: Filters
+}) {
+  const [q, setQ] = useState(filters.q ?? '')
+  const firstRender = useRef(true)
+  const hasFilters = !!(filters.q || filters.status || filters.currency || filters.featured)
+
+  // Debounce the free-text search; selects apply immediately.
   useEffect(() => {
-    if (skipSyncRef.current) {
-      skipSyncRef.current = false
+    if (firstRender.current) {
+      firstRender.current = false
       return
     }
-    setUsdInput(row.currency === 'koi' || row.currency === 'gold' ? String(+(row.price / KOI_PER_USD).toFixed(2)) : '')
-  }, [row.price, row.currency])
-
-  const handleUsdChange = useCallback(
-    (val: string) => {
-      setUsdInput(val)
-      const usd = parseFloat(val)
-      if (!isNaN(usd) && usd > 0) {
-        skipSyncRef.current = true
-        onChange('price', Math.round(usd * KOI_PER_USD))
-      }
-    },
-    [onChange],
-  )
+    const t = setTimeout(() => applyFilters({ ...filters, q }), 300)
+    return () => clearTimeout(t)
+  }, [q])
 
   return (
-    <TableRow className="align-top">
-      <TableCell>
-        <select
-          value={row.status}
-          onChange={(e) => onChange('status', e.target.value)}
-          className={`${inputClass} whitespace-nowrap`}
-        >
-          <option value="available">Available</option>
-          <option value="unavailable">Unavailable</option>
-        </select>
-      </TableCell>
-      <TableCell className="text-center">
-        <input
-          type="checkbox"
-          checked={!!row.featured}
-          onChange={(e) => onChange('featured', e.target.checked)}
-          className="w-4 h-4 cursor-pointer"
-        />
-      </TableCell>
-      <TableCell className="text-center">
-        <input
-          type="checkbox"
-          checked={!!row.grants_streak_freeze}
-          onChange={(e) => onChange('grants_streak_freeze', e.target.checked)}
-          className="w-4 h-4 cursor-pointer"
-        />
-      </TableCell>
-      <TableCell className="text-center">
-        <input
-          type="checkbox"
-          checked={!!row.requires_shipping}
-          onChange={(e) => onChange('requires_shipping', e.target.checked)}
-          className="w-4 h-4 cursor-pointer"
-        />
-      </TableCell>
-      <TableCell className="text-center">
-        <input
-          type="checkbox"
-          checked={!!row.requires_date_selection}
-          onChange={(e) => onChange('requires_date_selection', e.target.checked)}
-          className="w-4 h-4 cursor-pointer"
-        />
-      </TableCell>
-      <TableCell>
-        <select value={row.currency} onChange={(e) => onChange('currency', e.target.value)} className={inputClass}>
-          <option value="koi">Koi</option>
-          <option value="gold">Gold</option>
-          <option value="hours">Hours</option>
-        </select>
-      </TableCell>
-      <TableCell>
-        <input
-          type="text"
-          value={row.name}
-          onChange={(e) => onChange('name', e.target.value)}
-          className={inputClass}
-          placeholder={label}
-        />
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-1">
-          <input
-            type="number"
-            value={row.price}
-            min={1}
-            onChange={(e) => onChange('price', e.target.value)}
-            className={inputClass}
-          />
-          <span className="text-xs text-muted-foreground shrink-0">
-            {row.currency === 'hours' ? 'h' : row.currency}
-          </span>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Shop items</h1>
+          <p className="text-sm text-muted-foreground">Manage everything buyers can spend koi, gold and hours on.</p>
         </div>
-      </TableCell>
-      <TableCell>
-        {(row.currency === 'koi' || row.currency === 'gold') && (
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-muted-foreground shrink-0">$</span>
-            <input
-              type="number"
-              value={usdInput}
-              min={0}
-              step={0.01}
-              onChange={(e) => handleUsdChange(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-        )}
-      </TableCell>
-      <TableCell>
-        <textarea
-          value={row.description}
-          rows={2}
-          onChange={(e) => onChange('description', e.target.value)}
-          className={inputClass}
-        />
-      </TableCell>
-      <TableCell>
-        <div className="flex gap-2 items-start">
-          {row.image_url && (
-            <img src={row.image_url} alt="" className="w-10 h-10 object-cover rounded shrink-0 border border-border" />
-          )}
-          <input
-            type="text"
-            value={row.image_url}
-            onChange={(e) => onChange('image_url', e.target.value)}
-            className={inputClass}
-            placeholder="https://..."
-          />
-        </div>
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        {error && <p className="text-xs text-destructive mb-1">{error}</p>}
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={onSave} disabled={saving}>
-            {saving ? 'Saving...' : saveLabel}
-          </Button>
-          {onDelete && (
-            <Button size="sm" variant="destructive" onClick={onDelete}>
-              Delete
-            </Button>
-          )}
-        </div>
-      </TableCell>
-    </TableRow>
-  )
-}
-
-export default function AdminShopItemsIndex({ shop_items }: { shop_items: ShopItem[] }) {
-  const { errors } = usePage<SharedProps>().props
-  const [rows, setRows] = useState<Record<number, RowState>>(
-    Object.fromEntries(shop_items.map((item) => [item.id, itemToRow(item)])),
-  )
-  useEffect(() => {
-    setRows((prev) => {
-      const next = { ...prev }
-      shop_items.forEach((item) => {
-        if (!next[item.id]) next[item.id] = itemToRow(item)
-      })
-      return next
-    })
-  }, [shop_items])
-
-  const [saving, setSaving] = useState<Record<number, boolean>>({})
-  const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
-  const [newRow, setNewRow] = useState<RowState | null>(null)
-  const [creating, setCreating] = useState(false)
-
-  function update(id: number, field: keyof RowState, value: string | number | boolean) {
-    setRows((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
-  }
-
-  function save(item: ShopItem) {
-    const row = rows[item.id]
-    setSaving((prev) => ({ ...prev, [item.id]: true }))
-    setRowErrors((prev) => ({ ...prev, [item.id]: '' }))
-    router.patch(
-      `/admin/shop_items/${item.id}`,
-      { shop_item: row },
-      {
-        preserveScroll: true,
-        onError: () => {
-          setSaving((prev) => ({ ...prev, [item.id]: false }))
-          setRowErrors((prev) => ({ ...prev, [item.id]: 'Failed to save' }))
-        },
-      },
-    )
-  }
-
-  function saveAll() {
-    shop_items.filter((item) => isDirty(item, rows[item.id])).forEach((item) => save(item))
-  }
-
-  function destroy(item: ShopItem) {
-    if (!confirm(`Delete "${item.name}"? This cannot be undone.`)) return
-    router.delete(`/admin/shop_items/${item.id}`, { preserveScroll: true })
-  }
-
-  function create() {
-    if (!newRow) return
-    setCreating(true)
-    router.post(
-      '/admin/shop_items',
-      { shop_item: newRow },
-      {
-        preserveScroll: true,
-        onSuccess: () => {
-          setCreating(false)
-          setNewRow(null)
-        },
-        onError: () => setCreating(false),
-      },
-    )
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Shop Items</h1>
-        <div className="flex gap-2">
-          {shop_items.some((item) => isDirty(item, rows[item.id])) && (
-            <Button variant="outline" size="sm" onClick={saveAll}>
-              Save All
-            </Button>
-          )}
-          {!newRow && (
-            <Button variant="outline" size="sm" onClick={() => setNewRow({ ...BLANK_ROW })}>
-              + New Item
-            </Button>
-          )}
-        </div>
+        <Button asChild>
+          <Link href="/admin/shop_items/new">
+            <Plus className="size-4" />
+            New item
+          </Link>
+        </Button>
       </div>
 
-      {Object.keys(errors).length > 0 && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertDescription>
-            {Object.values(errors)
-              .flat()
-              .map((msg, i) => (
-                <p key={i}>{msg}</p>
-              ))}
-          </AlertDescription>
-        </Alert>
-      )}
+      <div className="flex flex-wrap divide-x divide-border rounded-lg border border-border">
+        <Stat label="Total items" value={stats.total} />
+        <Stat label="Available" value={stats.available} />
+        <Stat label="Unavailable" value={stats.unavailable} />
+        <Stat label="Featured" value={stats.featured} />
+      </div>
 
-      <div className="overflow-x-auto rounded-md border border-border">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-56 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search name or description…"
+            className="pl-9"
+          />
+        </div>
+        <Select
+          value={filters.status || ALL}
+          onValueChange={(v) => applyFilters({ ...filters, status: v === ALL ? '' : v })}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All statuses</SelectItem>
+            <SelectItem value="available">Available</SelectItem>
+            <SelectItem value="unavailable">Unavailable</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={filters.currency || ALL}
+          onValueChange={(v) => applyFilters({ ...filters, currency: v === ALL ? '' : v })}
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Currency" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All currencies</SelectItem>
+            {(Object.keys(CURRENCY_LABELS) as Currency[]).map((c) => (
+              <SelectItem key={c} value={c}>
+                {CURRENCY_LABELS[c]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filters.featured || ALL}
+          onValueChange={(v) => applyFilters({ ...filters, featured: v === ALL ? '' : v })}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Featured" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All items</SelectItem>
+            <SelectItem value="true">Featured only</SelectItem>
+            <SelectItem value="false">Not featured</SelectItem>
+          </SelectContent>
+        </Select>
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setQ('')
+              applyFilters({})
+            }}
+          >
+            <X className="size-4" />
+            Clear
+          </Button>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-border">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="whitespace-nowrap">Status</TableHead>
-              <TableHead className="whitespace-nowrap">Featured</TableHead>
-              <TableHead className="whitespace-normal">Streak Freeze</TableHead>
-              <TableHead className="whitespace-normal">Needs Shipping</TableHead>
-              <TableHead className="whitespace-normal">Date Picker</TableHead>
-              <TableHead className="whitespace-nowrap">Currency</TableHead>
-              <TableHead className="min-w-36">Name</TableHead>
-              <TableHead className="min-w-24">Price</TableHead>
-              <TableHead className="min-w-24">USD</TableHead>
-              <TableHead className="min-w-52">Description</TableHead>
-              <TableHead className="min-w-48">Image URL</TableHead>
-              <TableHead></TableHead>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Item</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Properties</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Orders</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {shop_items.map((item) => {
-              const row = rows[item.id]
-              if (!row) return null
-              const dirty = isDirty(item, row)
-              return (
-                <EditableRow
+            <TooltipProvider delayDuration={150}>
+              {shop_items.map((item) => (
+                <TableRow
                   key={item.id}
-                  row={row}
-                  onChange={(field, value) => update(item.id, field, value)}
-                  onSave={() => save(item)}
-                  onDelete={() => destroy(item)}
-                  saveLabel={dirty ? 'Save' : 'Saved'}
-                  saving={!!saving[item.id]}
-                  error={rowErrors[item.id]}
-                />
-              )
-            })}
-            {newRow && (
-              <EditableRow
-                label="New item name"
-                row={newRow}
-                onChange={(field, value) => setNewRow((prev) => (prev ? { ...prev, [field]: value } : prev))}
-                onSave={create}
-                saveLabel="Create"
-                saving={creating}
-              />
-            )}
-            {shop_items.length === 0 && !newRow && (
-              <TableRow>
-                <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
-                  No shop items yet.
+                  onClick={() => router.visit(`/admin/shop_items/${item.id}/edit`)}
+                  className="cursor-pointer"
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt="" className="size-full object-cover" />
+                        ) : (
+                          <ImageOff className="size-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium">{item.name || 'Untitled'}</span>
+                          {item.featured && <STAR_ICON className="size-3.5 fill-current text-amber-500" />}
+                        </div>
+                        {item.description && (
+                          <p className="max-w-md truncate text-xs text-muted-foreground">{item.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-medium tabular-nums">
+                      {item.price} {unitFor(item.currency)}
+                    </span>
+                    {hasUsdEquivalent(item.currency) && priceToUsd(item.price) && (
+                      <p className="text-xs text-muted-foreground">≈ ${priceToUsd(item.price)}</p>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      {FLAGS.filter((f) => item[f.key]).map(({ key, label, icon: Icon }) => (
+                        <Tooltip key={key}>
+                          <TooltipTrigger asChild>
+                            <span className="flex size-6 items-center justify-center rounded-md border border-border text-muted-foreground">
+                              <Icon className="size-3.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{label}</TooltipContent>
+                        </Tooltip>
+                      ))}
+                      {!FLAGS.some((f) => item[f.key]) && <span className="text-xs text-muted-foreground">—</span>}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={item.status === 'available' ? 'default' : 'outline'}>
+                      {item.status === 'available' ? 'Available' : 'Unavailable'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">{item.orders_count ?? 0}</TableCell>
+                  <TableCell>
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TooltipProvider>
+
+            {shop_items.length === 0 && (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={6} className="py-16">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+                      <Store className="size-6 text-muted-foreground" />
+                    </div>
+                    {hasFilters ? (
+                      <>
+                        <p className="font-medium">No items match these filters</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setQ('')
+                            applyFilters({})
+                          }}
+                        >
+                          Clear filters
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <p className="font-medium">No shop items yet</p>
+                          <p className="text-sm text-muted-foreground">
+                            Create your first item to start the shop.
+                          </p>
+                        </div>
+                        <Button asChild size="sm">
+                          <Link href="/admin/shop_items/new">
+                            <Plus className="size-4" />
+                            New item
+                          </Link>
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      {shop_items.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {shop_items.length} item{shop_items.length === 1 ? '' : 's'} shown
+          {hasFilters && ` of ${stats.total} total`}
+        </p>
+      )}
     </div>
   )
 }

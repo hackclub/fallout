@@ -7,11 +7,9 @@ class Admin::TicketClaimsController < Admin::ApplicationController
 
   def index
     @claims = TicketClaim.includes(:user).order(created_at: :asc)
-    @claims = @claims.where(state: params[:state]) if params[:state].present?
 
     render inertia: "admin/ticket_claims/index", props: {
-      claims: @claims.map { |claim| serialize_claim(claim) },
-      state_filter: params[:state].to_s
+      claims: @claims.map { |claim| serialize_claim(claim) }
     }
   end
 

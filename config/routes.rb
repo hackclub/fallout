@@ -433,7 +433,7 @@ Rails.application.routes.draw do
       resources :hours_stats, only: [ :index ] do
         collection { post :refresh }
       end
-      resources :shop_items, only: [ :index, :create, :update, :destroy ] # Admin shop item management
+      resources :shop_items, only: [ :index, :new, :create, :edit, :update, :destroy ] # Admin shop item management
       resources :shop_orders, only: [ :index, :show, :update ] # Admin order management
       resources :ticket_claims, only: [ :index ] do # Admin event ticket claim review
         member do
