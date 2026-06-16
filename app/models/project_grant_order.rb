@@ -94,8 +94,12 @@ class ProjectGrantOrder < ApplicationRecord
 
   def user_can_afford
     return unless user && frozen_koi_amount && frozen_gold_amount
-    return if user.koi >= frozen_koi_amount && user.gold >= frozen_gold_amount
 
-    errors.add(:base, "You don't have enough koi or gold for this grant")
+    short = []
+    short << "koi" if frozen_koi_amount.positive? && user.koi < frozen_koi_amount
+    short << "gold" if frozen_gold_amount.positive? && user.gold < frozen_gold_amount
+    return if short.empty?
+
+    errors.add(:base, "You don't have enough #{short.join(" and ")} for this grant")
   end
 end
