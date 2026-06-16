@@ -1,7 +1,21 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/admin/ui/card'
 import { Input } from '@/components/admin/ui/input'
-import { ChevronDown, ChevronUp, Eye, EyeOff, Check, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Eye, EyeOff, Check, X, MessageCircleIcon, TrendingDown } from 'lucide-react'
+
+export function formatTrackerDate(date: Date): string {
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+  const diffHours = Math.floor(diffMs / (60 * 60 * 1000))
+  const diffMins = Math.floor(diffMs / (60 * 1000))
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays === 1) return 'yesterday'
+  return `${diffDays}d ago`
+}
 
 export interface ReviewCountStat {
   id: number
@@ -11,6 +25,10 @@ export interface ReviewCountStat {
   is_reviewer?: boolean
   reason?: string | null
   needs_review?: boolean
+  excluded_until?: string | null
+  reduced_expectations_reason?: string | null
+  reduced_expectations_until?: string | null
+  reduced_expectations_target?: number | null
 }
 
 export interface TimeAuditedStat {
@@ -20,6 +38,10 @@ export interface TimeAuditedStat {
   total_approved_seconds: number
   reason?: string | null
   needs_review?: boolean
+  excluded_until?: string | null
+  reduced_expectations_reason?: string | null
+  reduced_expectations_until?: string | null
+  reduced_expectations_target?: number | null
 }
 
 export interface PeriodStats {
@@ -36,6 +58,10 @@ export interface RowItem {
   is_reviewer?: boolean
   reason?: string | null
   needs_review?: boolean
+  excluded_until?: string | null
+  reduced_expectations_reason?: string | null
+  reduced_expectations_until?: string | null
+  reduced_expectations_target?: number | null
 }
 
 export function formatDuration(seconds: number): string {
@@ -68,15 +94,21 @@ export function toContributedRows(data: PeriodStats): RowItem[] {
       const reviews = reviewMap.get(id)?.review_count ?? 0
       const hours = (timeMap.get(id)?.total_approved_seconds ?? 0) / 3600
       const contributed = hours / 10 + reviews
+      const rv = reviewMap.get(id)
+      const tv = timeMap.get(id)
       return {
         id: base.id,
         display_name: base.display_name,
         avatar: base.avatar,
         value: contributed,
         label: contributed.toFixed(1),
-        is_reviewer: reviewMap.get(id)?.is_reviewer,
-        reason: reviewMap.get(id)?.reason ?? timeMap.get(id)?.reason,
-        needs_review: reviewMap.get(id)?.needs_review ?? timeMap.get(id)?.needs_review,
+        is_reviewer: rv?.is_reviewer,
+        reason: rv?.reason ?? tv?.reason,
+        needs_review: rv?.needs_review ?? tv?.needs_review,
+        excluded_until: rv?.excluded_until ?? tv?.excluded_until,
+        reduced_expectations_reason: rv?.reduced_expectations_reason ?? tv?.reduced_expectations_reason,
+        reduced_expectations_until: rv?.reduced_expectations_until ?? tv?.reduced_expectations_until,
+        reduced_expectations_target: rv?.reduced_expectations_target ?? tv?.reduced_expectations_target,
       }
     })
     .sort((a, b) => b.value - a.value)
@@ -85,17 +117,30 @@ export function toContributedRows(data: PeriodStats): RowItem[] {
 function RankRow({
   item,
   rank,
+  dmDate,
+  onToggleDm,
   onExcuse,
   onUnhide,
+  onReduceExpectations,
+  onUnreduce,
 }: {
   item: RowItem
   rank: number
+  dmDate?: Date | null
+  onToggleDm?: () => void
   onExcuse?: (id: number, reason: string, excludedUntil?: string) => void
   onUnhide?: (id: number) => void
+  onReduceExpectations?: (id: number, reason: string, target: number, until?: string) => void
+  onUnreduce?: (id: number) => void
 }) {
   const [excusing, setExcusing] = useState(false)
   const [reason, setReason] = useState('')
   const [excludedUntil, setExcludedUntil] = useState('')
+
+  const [reducing, setReducing] = useState(false)
+  const [reduceReason, setReduceReason] = useState('')
+  const [reduceTarget, setReduceTarget] = useState('')
+  const [reducedUntil, setReducedUntil] = useState('')
 
   function submitExcuse() {
     onExcuse?.(item.id, reason, excludedUntil || undefined)
@@ -104,9 +149,29 @@ function RankRow({
     setExcludedUntil('')
   }
 
+  function submitReduce() {
+    onReduceExpectations?.(item.id, reduceReason, parseFloat(reduceTarget) || 0, reducedUntil || undefined)
+    setReducing(false)
+    setReduceReason('')
+    setReduceTarget('')
+    setReducedUntil('')
+  }
+
+  const hasReducedExpectations = item.reduced_expectations_reason != null
+
+  const rowBg = item.needs_review
+    ? 'border-l-2 border-l-destructive bg-destructive/10 pl-2'
+    : hasReducedExpectations
+      ? 'bg-blue-50 dark:bg-blue-950/20'
+      : ''
+
+  function formatDate(iso: string) {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
   return (
     <div
-      className={`t-row-enter group flex items-center gap-3 py-2 border-b last:border-0 ${item.needs_review ? 'border-l-2 border-l-destructive bg-destructive/10 pl-2' : ''}`}
+      className={`t-row-enter group flex items-center gap-3 py-2 border-b last:border-0 ${rowBg}`}
       style={{ animationDelay: `${Math.min(rank - 1, 8) * 30}ms` }}
     >
       <div className="w-6 text-center text-sm font-bold text-muted-foreground shrink-0">{rank}</div>
@@ -120,6 +185,20 @@ function RankRow({
           {item.display_name}
         </p>
         {item.reason && <p className="text-xs text-muted-foreground truncate">{item.reason}</p>}
+        {item.excluded_until && (
+          <p className="text-xs text-muted-foreground truncate">until {formatDate(item.excluded_until)}</p>
+        )}
+        {hasReducedExpectations && (
+          <p className="text-xs text-yellow-700 truncate">
+            {[
+              item.reduced_expectations_reason,
+              item.reduced_expectations_target != null ? `target: ${item.reduced_expectations_target}` : null,
+              item.reduced_expectations_until ? `until ${formatDate(item.reduced_expectations_until)}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        )}
       </div>
       {excusing ? (
         <div className="flex items-center gap-1 shrink-0">
@@ -158,9 +237,88 @@ function RankRow({
             <X className="size-3.5" />
           </button>
         </div>
+      ) : reducing ? (
+        <div className="flex items-center gap-1 shrink-0">
+          <Input
+            placeholder="Reason (optional)"
+            value={reduceReason}
+            onChange={(e) => setReduceReason(e.target.value)}
+            className="h-7 text-xs w-32"
+            autoFocus
+          />
+          <Input
+            type="number"
+            placeholder="Target"
+            step="0.1"
+            min="0"
+            value={reduceTarget}
+            onChange={(e) => setReduceTarget(e.target.value)}
+            title="Expected contribution target"
+            className="h-7 text-xs w-16"
+          />
+          <Input
+            type="date"
+            value={reducedUntil}
+            onChange={(e) => setReducedUntil(e.target.value)}
+            title="Reduced until (optional)"
+            className="h-7 text-xs w-32"
+          />
+          <button
+            type="button"
+            onClick={submitReduce}
+            title="Confirm"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Check className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setReducing(false)
+              setReduceReason('')
+              setReduceTarget('')
+              setReducedUntil('')
+            }}
+            title="Cancel"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
       ) : (
         <>
+          {onToggleDm && (
+            <button
+              type="button"
+              onClick={onToggleDm}
+              title={dmDate ? `DMed ${dmDate.toLocaleString()} — click to unmark` : 'Mark as DMed'}
+              className={`shrink-0 flex items-center gap-0.5 text-muted-foreground hover:text-foreground ${dmDate ? '' : 'opacity-0 group-hover:opacity-100'}`}
+            >
+              <MessageCircleIcon className="size-3.5" />
+              {dmDate && <span className="text-xs tabular-nums">{formatTrackerDate(dmDate)}</span>}
+            </button>
+          )}
           <p className="text-sm font-semibold tabular-nums shrink-0">{item.label}</p>
+          {onReduceExpectations && !hasReducedExpectations && (
+            <button
+              type="button"
+              onClick={() => setReducing(true)}
+              title="Set reduced expectations"
+              className="text-muted-foreground hover:text-foreground shrink-0 opacity-0 group-hover:opacity-100"
+            >
+              <TrendingDown className="size-3.5" />
+            </button>
+          )}
+          {onUnreduce && hasReducedExpectations && (
+            <button
+              type="button"
+              onClick={() => onUnreduce(item.id)}
+              title="Clear reduced expectations"
+              className="text-yellow-600 hover:text-foreground shrink-0"
+            >
+              <TrendingDown className="size-3.5" />
+            </button>
+          )}
           {onExcuse && (
             <button
               type="button"
@@ -193,16 +351,24 @@ export function LeaderboardCard({
   all_time,
   hidden_this_week,
   hidden_all_time,
+  dmStates,
+  onToggleDm,
   onExcuse,
   onUnhide,
+  onReduceExpectations,
+  onUnreduce,
 }: {
   title: string
   this_week: RowItem[]
   all_time: RowItem[]
   hidden_this_week?: RowItem[]
   hidden_all_time?: RowItem[]
+  dmStates?: Record<number, Date | null>
+  onToggleDm?: (id: number) => void
   onExcuse?: (id: number, reason: string, excludedUntil?: string) => void
   onUnhide?: (id: number) => void
+  onReduceExpectations?: (id: number, reason: string, target: number, until?: string) => void
+  onUnreduce?: (id: number) => void
 }) {
   const [tab, setTab] = useState<'this_week' | 'all_time'>('this_week')
   const [showHidden, setShowHidden] = useState(false)
@@ -257,7 +423,19 @@ export function LeaderboardCard({
           {rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">{tab === 'this_week' ? 'No data this week.' : 'No data.'}</p>
           ) : (
-            rows.map((r, i) => <RankRow key={r.id} item={r} rank={i + 1} onExcuse={onExcuse} onUnhide={onUnhide} />)
+            rows.map((r, i) => (
+              <RankRow
+                key={r.id}
+                item={r}
+                rank={i + 1}
+                dmDate={dmStates?.[r.id]}
+                onToggleDm={onToggleDm ? () => onToggleDm(r.id) : undefined}
+                onExcuse={onExcuse}
+                onUnhide={onUnhide}
+                onReduceExpectations={onReduceExpectations}
+                onUnreduce={onUnreduce}
+              />
+            ))
           )}
         </div>
         {hiddenRows.length > 0 && (
@@ -273,7 +451,14 @@ export function LeaderboardCard({
             {showHidden && (
               <div className="mt-1">
                 {hiddenRows.map((r, i) => (
-                  <RankRow key={r.id} item={r} rank={i + 1} onUnhide={onUnhide} />
+                  <RankRow
+                    key={r.id}
+                    item={r}
+                    rank={i + 1}
+                    dmDate={dmStates?.[r.id]}
+                    onToggleDm={onToggleDm ? () => onToggleDm(r.id) : undefined}
+                    onUnhide={onUnhide}
+                  />
                 ))}
               </div>
             )}

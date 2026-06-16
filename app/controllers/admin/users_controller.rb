@@ -219,6 +219,21 @@ class Admin::UsersController < Admin::ApplicationController
     redirect_back_or_to admin_root_path
   end
 
+  def toggle_reduced_expectations
+    @user = User.find(params[:id])
+    authorize @user
+
+    enabling = !@user.reduced_expectations
+    @user.update!(
+      reduced_expectations:        enabling,
+      reduced_expectations_reason: enabling ? params[:reason].to_s.strip.presence : nil,
+      reduced_expectations_until:  enabling ? parse_date(params[:reduced_until]) : nil,
+      reduced_expectations_target: enabling && params[:target].to_s.strip.present? ? params[:target].to_f : nil
+    )
+
+    redirect_back_or_to admin_root_path
+  end
+
   def update_ticket_hours_override
     @user = User.find(params[:id])
     authorize @user

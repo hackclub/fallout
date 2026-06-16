@@ -35,6 +35,10 @@ class UserPolicy < ApplicationPolicy
     admin?
   end
 
+  def toggle_reduced_expectations?
+    admin?
+  end
+
   def update_ticket_hours_override?
     admin?
   end

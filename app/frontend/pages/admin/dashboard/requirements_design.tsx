@@ -11,7 +11,12 @@ import { Bar, BarChart } from 'recharts'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/admin/ui/sheet'
 import { MessageCircleIcon, X } from 'lucide-react'
 import { PageProps } from '@inertiajs/core'
-import { LeaderboardCard, toContributedRows, type PeriodStats } from '@/components/admin/LeaderboardCard'
+import {
+  LeaderboardCard,
+  toContributedRows,
+  formatTrackerDate,
+  type PeriodStats,
+} from '@/components/admin/LeaderboardCard'
 
 interface ReturnedProject {
   id: number
@@ -116,20 +121,6 @@ function removeTrackerDate(prefix: string, id: number): void {
   try {
     localStorage.removeItem(`${prefix}${id}`)
   } catch {}
-}
-
-function formatTrackerDate(date: Date): string {
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
-  const diffHours = Math.floor(diffMs / (60 * 60 * 1000))
-  const diffMins = Math.floor(diffMs / (60 * 1000))
-
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays === 1) return 'yesterday'
-  return `${diffDays}d ago`
 }
 
 function unresolvedLowWeeks(profile: ReviewerProfile): ReviewWeek[] {
@@ -259,6 +250,18 @@ export default function RequirementsDesignDashboard() {
 
   function unhideFromContributions(id: number) {
     router.patch(`/admin/users/${id}/toggle_dashboard_exclusion`, {}, { preserveScroll: true })
+  }
+
+  function reduceExpectations(id: number, reason: string, target: number, until?: string) {
+    router.patch(
+      `/admin/users/${id}/toggle_reduced_expectations`,
+      { reason, target, reduced_until: until },
+      { preserveScroll: true },
+    )
+  }
+
+  function unreduceExpectations(id: number) {
+    router.patch(`/admin/users/${id}/toggle_reduced_expectations`, {}, { preserveScroll: true })
   }
 
   const [returnedSheet, setReturnedSheet] = useState<LeaderboardRow | null>(null)
@@ -427,8 +430,12 @@ export default function RequirementsDesignDashboard() {
           all_time={toContributedRows(contribution_stats.all_time)}
           hidden_this_week={toContributedRows(contribution_stats.hidden.this_week)}
           hidden_all_time={toContributedRows(contribution_stats.hidden.all_time)}
+          dmStates={dmStates}
+          onToggleDm={handleToggle}
           onExcuse={excuseFromContributions}
           onUnhide={unhideFromContributions}
+          onReduceExpectations={reduceExpectations}
+          onUnreduce={unreduceExpectations}
         />
       </div>
 

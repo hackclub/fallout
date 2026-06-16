@@ -27,6 +27,10 @@
 #  pending_lookout_tokens             :string           default([]), not null, is an Array
 #  professor_enrolled_at              :datetime
 #  pronouns                           :string
+#  reduced_expectations               :boolean          default(FALSE), not null
+#  reduced_expectations_reason        :string
+#  reduced_expectations_target        :decimal(, )
+#  reduced_expectations_until         :date
 #  roles                              :string           default([]), not null, is an Array
 #  slack_token                        :text
 #  streak_freezes                     :integer          default(1), not null

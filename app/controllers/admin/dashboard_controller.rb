@@ -206,13 +206,14 @@ class Admin::DashboardController < Admin::ApplicationController
     stats = contribution_stats
     reviewers = all_reviewer_users
     non_reviewers = slack_channel_non_reviewers("C0AGEPQ63DY")
-    excluded_ids, needs_review_ids = partition_excluded_ids
+    excluded_ids, needs_review_ids, excluded_until_by_id = partition_excluded_ids
     reasons = excluded_dashboard_reasons(excluded_ids | needs_review_ids)
+    reduced_by_id = reduced_expectations_data
 
     visible_all_time, hidden_all_time =
-      split_contribution_period(stats[:all_time], reviewers, non_reviewers, excluded_ids, needs_review_ids, reasons)
+      split_contribution_period(stats[:all_time], reviewers, non_reviewers, excluded_ids, needs_review_ids, reasons, excluded_until_by_id, reduced_by_id)
     visible_week, hidden_week =
-      split_contribution_period(stats[:this_week], reviewers, non_reviewers, excluded_ids, needs_review_ids, reasons)
+      split_contribution_period(stats[:this_week], reviewers, non_reviewers, excluded_ids, needs_review_ids, reasons, excluded_until_by_id, reduced_by_id)
 
     {
       all_time: visible_all_time,
@@ -225,7 +226,7 @@ class Admin::DashboardController < Admin::ApplicationController
   # reviewer-role users and non-reviewer channel members) into visible vs hidden
   # based on excluded_ids, returning [visible_period_stats, hidden_period_stats].
   # Visible rows whose id is in needs_review_ids get flagged + their reason attached.
-  def split_contribution_period(period_stats, reviewers, non_reviewers, excluded_ids, needs_review_ids, reasons)
+  def split_contribution_period(period_stats, reviewers, non_reviewers, excluded_ids, needs_review_ids, reasons, excluded_until_by_id = {}, reduced_by_id = {})
     visible_reviewers, hidden_reviewers = period_stats[:reviewers].partition { |r| !excluded_ids.include?(r[:id]) }
     visible_time, hidden_time = period_stats[:time_audited].partition { |r| !excluded_ids.include?(r[:id]) }
 
@@ -241,12 +242,12 @@ class Admin::DashboardController < Admin::ApplicationController
       zero_contribution_rows(hidden_non_reviewer_pool, hidden_present, is_reviewer: false)
 
     visible = {
-      reviewers: visible_reviewer_rows.map { |r| flag_needs_review(r, needs_review_ids, reasons) },
-      time_audited: visible_time.map { |r| flag_needs_review(r, needs_review_ids, reasons) }
+      reviewers: visible_reviewer_rows.map { |r| annotate_visible_row(r, needs_review_ids, reasons, reduced_by_id) },
+      time_audited: visible_time.map { |r| annotate_visible_row(r, needs_review_ids, reasons, reduced_by_id) }
     }
     hidden = {
-      reviewers: hidden_reviewer_rows.map { |r| r.merge(reason: reasons[r[:id]]) },
-      time_audited: hidden_time.map { |r| r.merge(reason: reasons[r[:id]]) }
+      reviewers: hidden_reviewer_rows.map { |r| r.merge(reason: reasons[r[:id]], excluded_until: excluded_until_by_id[r[:id]]&.iso8601) },
+      time_audited: hidden_time.map { |r| r.merge(reason: reasons[r[:id]], excluded_until: excluded_until_by_id[r[:id]]&.iso8601) }
     }
 
     [ visible, hidden ]
@@ -255,6 +256,23 @@ class Admin::DashboardController < Admin::ApplicationController
   def flag_needs_review(row, needs_review_ids, reasons)
     return row unless needs_review_ids.include?(row[:id])
     row.merge(needs_review: true, reason: reasons[row[:id]])
+  end
+
+  def annotate_visible_row(row, needs_review_ids, reasons, reduced_by_id)
+    row = flag_needs_review(row, needs_review_ids, reasons)
+    re = reduced_by_id[row[:id]]
+    return row unless re
+    row.merge(
+      reduced_expectations_reason: re[:reason],
+      reduced_expectations_until:  re[:until]&.iso8601,
+      reduced_expectations_target: re[:target]&.to_f
+    )
+  end
+
+  def reduced_expectations_data
+    User.where(reduced_expectations: true)
+        .pluck(:id, :reduced_expectations_reason, :reduced_expectations_until, :reduced_expectations_target)
+        .to_h { |id, reason, until_date, target| [ id, { reason: reason, until: until_date, target: target } ] }
   end
 
   # Builds zero-review_count rows for reviewer-role users (User records) or
@@ -275,14 +293,16 @@ class Admin::DashboardController < Admin::ApplicationController
     today = Date.current
     excluded_ids = Set.new
     needs_review_ids = Set.new
+    excluded_until_by_id = {}
     User.where(excluded_from_dashboard: true).pluck(:id, :excluded_until).each do |id, excluded_until|
       if excluded_until && excluded_until < today
         needs_review_ids << id
       else
         excluded_ids << id
+        excluded_until_by_id[id] = excluded_until if excluded_until
       end
     end
-    [ excluded_ids, needs_review_ids ]
+    [ excluded_ids, needs_review_ids, excluded_until_by_id ]
   end
 
   # Most recent ReviewerAdminNote body per excluded reviewer, shown alongside their

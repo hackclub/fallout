@@ -1011,6 +1011,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_13_203827) do
     t.string "pending_lookout_tokens", default: [], null: false, array: true
     t.datetime "professor_enrolled_at"
     t.string "pronouns"
+    t.boolean "reduced_expectations", default: false, null: false
+    t.string "reduced_expectations_reason"
+    t.decimal "reduced_expectations_target"
+    t.date "reduced_expectations_until"
     t.string "roles", default: [], null: false, array: true
     t.string "slack_id"
     t.text "slack_token"
