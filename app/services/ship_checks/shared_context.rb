@@ -185,7 +185,10 @@ module ShipChecks
       return :no_csv unless bom_content && bom_path&.downcase&.end_with?(".csv")
       # Fail closed: any parse error (malformed CSV, bad encoding, etc.) on this
       # user-supplied file is reported as :malformed rather than raising.
-      CSV.parse(bom_content)
+      # Normalize ", "field"" → ","field"" so spaces after delimiters don't
+      # cause Ruby's strict CSV parser to treat a quoted value as unquoted.
+      normalized = bom_content.gsub(/,[ \t]+(?=")/, ",")
+      CSV.parse(normalized)
     rescue StandardError
       :malformed
     end
