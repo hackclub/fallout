@@ -942,29 +942,87 @@ export default function LandingIndex() {
           <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-16 bg-beige text-dark-brown flex flex-col items-center gap-6">
             <p className="text-xl md:text-2xl text-center text-brown font-bold max-w-2xl">Supported by</p>
             <div className="flex flex-col items-center gap-8 md:gap-10 w-full max-w-4xl">
-              <div className="flex justify-center">
+              <div className="relative flex-shrink-0 flex justify-center">
                 <img
                   src="/landing/logos/seeed.webp"
-                  className="h-12 md:h-24 w-auto max-w-full object-contain"
+                  className="h-12 md:h-24 w-auto object-contain opacity-0"
                   alt="Seeed Studio"
                 />
+                <div
+                  className="absolute inset-0 bg-dark-brown"
+                  style={{
+                    WebkitMaskImage: 'url(/landing/logos/seeed.webp)',
+                    WebkitMaskSize: 'contain',
+                    WebkitMaskPosition: 'center',
+                    WebkitMaskRepeat: 'no-repeat',
+                    maskImage: 'url(/landing/logos/seeed.webp)',
+                    maskSize: 'contain',
+                    maskPosition: 'center',
+                    maskRepeat: 'no-repeat',
+                  }}
+                ></div>
               </div>
               <div className="flex flex-wrap justify-center items-center gap-8 md:gap-14 w-full">
-                <img
-                  src="/landing/logos/jukebox.svg"
-                  className="h-12 md:h-16 w-auto max-w-full object-contain"
-                  alt="Jukebox"
-                />
-                <img
-                  src="/landing/logos/easyeda.svg"
-                  className="h-7 md:h-12 w-auto max-w-full object-contain"
-                  alt="EasyEDA"
-                />
-                <img
-                  src="/landing/logos/jlcpcb.svg"
-                  className="h-7 md:h-12 w-auto max-w-full object-contain"
-                  alt="JLCPCB"
-                />
+                <div className="relative flex-shrink-0 flex justify-center">
+                  <img
+                    src="/landing/logos/jukebox.svg"
+                    className="h-7 md:h-12 w-auto object-contain opacity-0"
+                    alt="Jukebox"
+                  />
+                  <div
+                    className="absolute inset-0 bg-dark-brown"
+                    style={{
+                      WebkitMaskImage: 'url(/landing/logos/jukebox.svg)',
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskPosition: 'center',
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskImage: 'url(/landing/logos/jukebox.svg)',
+                      maskSize: 'contain',
+                      maskPosition: 'center',
+                      maskRepeat: 'no-repeat',
+                    }}
+                  ></div>
+                </div>
+                <div className="relative flex-shrink-0 flex justify-center">
+                  <img
+                    src="/landing/logos/easyeda.svg"
+                    className="h-7 md:h-12 w-auto object-contain opacity-0"
+                    alt="EasyEDA"
+                  />
+                  <div
+                    className="absolute inset-0 bg-dark-brown"
+                    style={{
+                      WebkitMaskImage: 'url(/landing/logos/easyeda.svg)',
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskPosition: 'center',
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskImage: 'url(/landing/logos/easyeda.svg)',
+                      maskSize: 'contain',
+                      maskPosition: 'center',
+                      maskRepeat: 'no-repeat',
+                    }}
+                  ></div>
+                </div>
+                <div className="relative flex-shrink-0 flex justify-center">
+                  <img
+                    src="/landing/logos/jlcpcb.svg"
+                    className="h-7 md:h-12 w-auto object-contain opacity-0"
+                    alt="JLCPCB"
+                  />
+                  <div
+                    className="absolute inset-0 bg-dark-brown"
+                    style={{
+                      WebkitMaskImage: 'url(/landing/logos/jlcpcb.svg)',
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskPosition: 'center',
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskImage: 'url(/landing/logos/jlcpcb.svg)',
+                      maskSize: 'contain',
+                      maskPosition: 'center',
+                      maskRepeat: 'no-repeat',
+                    }}
+                  ></div>
+                </div>
               </div>
             </div>
             <p className="text-base text-center text-brown max-w-xl">
