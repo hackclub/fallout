@@ -173,17 +173,33 @@ class SoupCampaign < ApplicationRecord
     return [] unless targeting_supported?
     return [] if query.blank?
 
-    scope = User.verified.kept
-    filters = query.lines.map(&:strip).reject(&:blank?)
+    base = User.verified.kept
+    mode, filters = extract_match_mode(query.lines.map(&:strip).reject(&:blank?))
+    return [] if filters.empty?
 
-    filters.each do |filter|
-      scope = apply_target_filter(scope, filter)
+    if mode == :any
+      # OR: union each filter's matches, computed independently against the full base scope.
+      filters.flat_map { |filter| apply_target_filter(base, filter).distinct.pluck(:id) }.uniq
+    else
+      # AND: chain filters so each narrows the previous scope.
+      filters.reduce(base) { |scope, filter| apply_target_filter(scope, filter) }.distinct.pluck(:id)
     end
-
-    scope.distinct.pluck(:id)
   rescue ArgumentError => e
     errors.add(:target_user_ids_text, e.message)
     []
+  end
+
+  # Pulls an optional `match: all|any` directive out of the filter lines. Defaults to :all
+  # (every filter must match); :any unions the filters so a user matching any one is included.
+  def extract_match_mode(lines)
+    mode = :all
+    filters = lines.reject do |line|
+      next false unless (m = line.match(/\Amatch:\s*(all|any)\z/i))
+
+      mode = m[1].downcase.to_sym
+      true
+    end
+    [ mode, filters ]
   end
 
   def apply_target_filter(scope, filter)
@@ -197,25 +213,30 @@ class SoupCampaign < ApplicationRecord
       Regexp.last_match(1).downcase == "true" ? scope.joins(projects: :ships) : scope.where.not(id: User.joins(projects: :ships).select(:id))
     when /\Aqualified:\s*(true|false)\z/i
       filter_by_ticket_qualification(scope, Regexp.last_match(1).downcase == "true")
-    when /\Atotal_time_logged_seconds\s*(>=|<=|=|>|<)\s*(\d+)\z/i
-      operator = Regexp.last_match(1)
-      threshold = Regexp.last_match(2).to_i
-      filter_by_total_time(scope, operator, threshold)
+    when /\Atotal_time_(logged|submitted)_seconds\s*(>=|<=|=|>|<)\s*(\d+)\z/i
+      metric = Regexp.last_match(1).downcase
+      operator = Regexp.last_match(2)
+      threshold = Regexp.last_match(3).to_i
+      filter_by_total_time(scope, operator, threshold, shipped_only: metric == "submitted")
     else
       raise ArgumentError, "unsupported audience filter: #{filter}"
     end
   end
 
-  def filter_by_total_time(scope, operator, threshold)
+  # shipped_only restricts to logged time the user has actually submitted (attached to a ship,
+  # any status), matching User#shipped_time_logged_seconds. Default counts all logged time.
+  def filter_by_total_time(scope, operator, threshold, shipped_only: false)
     user_ids = scope.pluck(:id)
     return scope.none if user_ids.empty?
 
-    seconds_by_user = compute_batch_user_seconds(user_ids)
-    matching_ids = seconds_by_user.select { |_, secs| secs.public_send(operator, threshold) }.keys
+    seconds_by_user = compute_batch_user_seconds(user_ids, shipped_only: shipped_only)
+    # Iterate the full id list (not just hash keys) so users with zero attributed seconds
+    # still match <, <= and = 0 — they're absent from the totals hash otherwise.
+    matching_ids = user_ids.select { |uid| seconds_by_user[uid].to_i.public_send(operator, threshold) }
     scope.where(id: matching_ids)
   end
 
-  def compute_batch_user_seconds(user_ids)
+  def compute_batch_user_seconds(user_ids, shipped_only: false)
     user_set = user_ids.to_set
     totals = Hash.new(0)
 
@@ -241,7 +262,9 @@ class SoupCampaign < ApplicationRecord
     all_project_ids = (owned_pids + collab_pids + je_author_pids + je_collab_pids).uniq
     return totals if all_project_ids.empty?
 
-    all_je_ids = JournalEntry.kept.where(project_id: all_project_ids).pluck(:id)
+    je_scope = JournalEntry.kept.where(project_id: all_project_ids)
+    je_scope = je_scope.where.not(ship_id: nil) if shipped_only # submitted == attached to a ship
+    all_je_ids = je_scope.pluck(:id)
     return totals if all_je_ids.empty?
 
     je_seconds = JournalEntry.batch_time_logged(all_je_ids)
@@ -257,20 +280,23 @@ class SoupCampaign < ApplicationRecord
       attr_set.each { |uid| totals[uid] += share if user_set.include?(uid) }
     end
 
-    project_members = Hash.new { |h, k| h[k] = [] }
-    Project.kept.where(id: all_project_ids, user_id: user_ids)
-      .pluck(:id, :user_id).each { |pid, uid| project_members[pid] << uid }
-    Collaborator.kept
-      .where(user_id: user_ids, collaboratable_type: "Project", collaboratable_id: all_project_ids)
-      .pluck(:collaboratable_id, :user_id)
-      .each { |pid, uid| project_members[pid] << uid }
+    # manual_seconds is project-level, not attached to a ship — exclude it from submitted totals.
+    unless shipped_only
+      project_members = Hash.new { |h, k| h[k] = [] }
+      Project.kept.where(id: all_project_ids, user_id: user_ids)
+        .pluck(:id, :user_id).each { |pid, uid| project_members[pid] << uid }
+      Collaborator.kept
+        .where(user_id: user_ids, collaboratable_type: "Project", collaboratable_id: all_project_ids)
+        .pluck(:collaboratable_id, :user_id)
+        .each { |pid, uid| project_members[pid] << uid }
 
-    member_counts = Project.batch_member_counts(all_project_ids)
-    Project.kept.where(id: all_project_ids).where("manual_seconds > 0")
-      .pluck(:id, :manual_seconds).each do |pid, manual|
-      mc = member_counts[pid].to_i
-      next unless mc.positive?
-      project_members[pid].each { |uid| totals[uid] += manual / mc }
+      member_counts = Project.batch_member_counts(all_project_ids)
+      Project.kept.where(id: all_project_ids).where("manual_seconds > 0")
+        .pluck(:id, :manual_seconds).each do |pid, manual|
+        mc = member_counts[pid].to_i
+        next unless mc.positive?
+        project_members[pid].each { |uid| totals[uid] += manual / mc }
+      end
     end
 
     totals

@@ -284,9 +284,11 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
   def audience_query_help
     [
       "ids: 1, 2, 3",
+      "match: any",
       "qualified: true",
       "has_ships: false",
-      "total_time_logged_seconds >= 72000"
+      "total_time_logged_seconds >= 72000",
+      "total_time_submitted_seconds < 216000"
     ]
   end
 

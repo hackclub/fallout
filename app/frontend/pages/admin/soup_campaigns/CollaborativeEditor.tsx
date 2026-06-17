@@ -22,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/admin/ui/alert-dialog'
 import { ArrowLeftIcon, TrashIcon, SendIcon, WifiIcon, WifiOffIcon } from 'lucide-react'
+import AudienceBuilder from './AudienceBuilder'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,7 +56,6 @@ interface Props {
   campaign: Campaign
   current_user_presence: CurrentUserPresence
   yjs_state: string | null
-  audience_query_help?: string[]
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -424,12 +424,7 @@ function SlackPreview({ fields }: { fields: Record<Field, string> }) {
 
 // ── Main collaborative editor ─────────────────────────────────────────────────
 
-export default function SoupCampaignCollaborativeEditor({
-  campaign,
-  current_user_presence,
-  yjs_state,
-  audience_query_help = [],
-}: Props) {
+export default function SoupCampaignCollaborativeEditor({ campaign, current_user_presence, yjs_state }: Props) {
   const ydocRef = useRef<Y.Doc | null>(null)
   const awarenessRef = useRef<Awareness | null>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createConsumer>['subscriptions']['create']> | null>(null)
@@ -867,34 +862,23 @@ export default function SoupCampaignCollaborativeEditor({
             />
           </section>
 
-          <section>
-            <label className="text-sm font-semibold tracking-tight mb-1 block">Audience targeting</label>
-            <p className="text-xs text-muted-foreground mb-3">
-              Leave blank to send to the full Soup audience. Use one safe filter per line to target specific Fallout
-              users.
-            </p>
-            <CollabEditor
-              yText={ydoc.getText('target_user_ids')}
-              awareness={awareness}
-              placeholderText={'qualified: true\nhas_ships: false\ntotal_time_logged_seconds >= 72000'}
-              minHeight="6rem"
-              mono
-              onFocus={() => handleFieldFocus('target_user_ids')}
-              onBlur={handleFieldBlur}
-            />
-            {audience_query_help.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {audience_query_help.map((example) => (
-                  <code
-                    key={example}
-                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground"
-                  >
-                    {example}
-                  </code>
-                ))}
-              </div>
-            )}
-          </section>
+          <AudienceBuilder
+            yText={ydoc.getText('target_user_ids')}
+            ydoc={ydoc}
+            onFocus={() => handleFieldFocus('target_user_ids')}
+            onBlur={handleFieldBlur}
+            rawEditor={
+              <CollabEditor
+                yText={ydoc.getText('target_user_ids')}
+                awareness={awareness}
+                placeholderText={'total_time_logged_seconds > 216000\ntotal_time_submitted_seconds < 216000'}
+                minHeight="6rem"
+                mono
+                onFocus={() => handleFieldFocus('target_user_ids')}
+                onBlur={handleFieldBlur}
+              />
+            }
+          />
 
           {/* Image */}
           <section>
