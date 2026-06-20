@@ -127,8 +127,10 @@ class Projects::ShipsController < ApplicationController
       return
     end
 
+    superseded = false
     ActiveRecord::Base.transaction do
-      current_ship.supersede! # cancels its reviews + marks superseded so the new ship can be created
+      superseded = current_ship.supersede! # cancels its reviews + marks superseded; false if a reviewer just finalized it
+      next unless superseded
       @project.ships.create!(
         ship_type: @project.built_irl? ? :build : :design,
         frozen_demo_link: @project.demo_video_link.presence || @project.demo_link,
@@ -138,7 +140,11 @@ class Projects::ShipsController < ApplicationController
       )
     end
 
-    redirect_to project_path(@project), notice: "Re-shipped! Your project is back at the bottom of the review queue."
+    if superseded
+      redirect_to project_path(@project), notice: "Re-shipped! Your project is back at the bottom of the review queue."
+    else
+      redirect_to project_path(@project), alert: "A reviewer just updated this submission - refresh to see its latest status."
+    end
   end
 
   private

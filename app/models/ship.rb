@@ -362,13 +362,22 @@ class Ship < ApplicationRecord
   # Cancels its pending reviews (removing them from reviewer queues) and marks the ship
   # :superseded — a terminal state that never awards currency or notifies the user.
   # The fresh ship is created separately by the controller (no preflight, bottom of queue).
+  # Returns true if it superseded the ship, false if a reviewer concurrently finalized it
+  # (so it's no longer pending and there's nothing to pull back) — callers skip creating the
+  # replacement in that case.
   def supersede!
-    raise ActiveRecord::RecordInvalid.new(self), "ship is not pending" unless pending?
-
+    superseded = false
     with_lock do
+      # Re-check under the row lock: a reviewer may have returned/approved/rejected between
+      # selection and now. with_lock reloads self and resets the association cache, so both the
+      # ship status and per-review states read fresh. Bail without raising if no longer pending.
+      next unless pending?
+
       cancel_pending_reviews! # leaves the queue; each review skips ship recompute
       update!(status: :superseded)
+      superseded = true
     end
+    superseded
   end
 
   def recompute_status!
