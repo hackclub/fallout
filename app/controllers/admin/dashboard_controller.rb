@@ -479,7 +479,8 @@ class Admin::DashboardController < Admin::ApplicationController
   end
 
   # For each day since launch, computes:
-  #   hours  — recording hours in ships not yet TA-approved (i.e. hours backlog)
+  #   hours  — recording hours in ships whose time-audit review is not yet terminal
+  #            (approved/returned/rejected) — i.e. the hours-review backlog
   #   total  — ship_backlog + hours_backlog / TA_HOURS_PER_REVIEW_EQUIVALENT
   #             (converts hours to review-effort units and adds to ship count)
   def backlog_hours_by_day
@@ -488,17 +489,24 @@ class Admin::DashboardController < Admin::ApplicationController
     ta_equiv   = Admin::ReviewersController::TA_HOURS_PER_REVIEW_EQUIVALENT.to_f
     terminal   = %w[approved returned rejected]
 
-    # Single query: recording durations per ship creation date (all history)
-    submitted_by_day = ActiveRecord::Base.connection.execute(<<~SQL.squish).to_a
-      SELECT ships.created_at::date AS day,
-             COALESCE(SUM(
-               CASE recordings.recordable_type
-                 WHEN 'LapseTimelapse'   THEN lt.duration
-                 WHEN 'LookoutTimelapse' THEN lot.duration
-                 WHEN 'YouTubeVideo'     THEN ytv.duration_seconds::float * ytv.stretch_multiplier
-                 ELSE 0
-               END
-             ), 0) AS seconds
+    terminal_ints = terminal.map { |s| TimeAuditReview.statuses[s] }.join(", ")
+
+    # Recording-seconds per ship, attributed to current ship ownership (journal_entries.ship_id).
+    # Hours ENTER the backlog on the ship's creation date and LEAVE on the date its time-audit
+    # review reaches a terminal state — using the SAME submitted seconds both times, so the hours
+    # backlog clears in lockstep with the ship backlog (cum_ships - cum_ta) regardless of how the
+    # reviewer trimmed the approved figure. Using approved_public_seconds here is wrong: it's the
+    # adjusted value (not what entered the queue), and carry-forward re-approvals + manual_seconds
+    # bonuses let cumulative approved overshoot cumulative submitted, clamping the line to 0.
+    duration_case = <<~SQL.squish
+      CASE recordings.recordable_type
+        WHEN 'LapseTimelapse'   THEN lt.duration
+        WHEN 'LookoutTimelapse' THEN lot.duration
+        WHEN 'YouTubeVideo'     THEN ytv.duration_seconds::float * ytv.stretch_multiplier
+        ELSE 0
+      END
+    SQL
+    recording_joins = <<~SQL.squish
       FROM recordings
       INNER JOIN journal_entries
         ON journal_entries.id = recordings.journal_entry_id
@@ -511,39 +519,23 @@ class Admin::DashboardController < Admin::ApplicationController
         ON lot.id = recordings.recordable_id AND recordings.recordable_type = 'LookoutTimelapse'
       LEFT JOIN you_tube_videos ytv
         ON ytv.id = recordings.recordable_id AND recordings.recordable_type = 'YouTubeVideo'
-      GROUP BY ships.created_at::date
-      ORDER BY ships.created_at::date
     SQL
-    submitted_by_day = submitted_by_day.to_h { |r| [ Date.parse(r["day"].to_s), r["seconds"].to_f ] }
 
-    # TA-approved seconds per completion date, excluding each project's one-time
-    # manual_seconds bonus (added to approved_public_seconds on the project's first
-    # approved ship — see TimeAuditReview#add_manual_seconds_to_approved). Those seconds
-    # don't come from a Recording, so they have no entry in submitted_by_day and would
-    # otherwise inflate cum_approved_s past cum_submitted_s.
-    approved_by_day = ActiveRecord::Base.connection.execute(<<~SQL.squish).to_a
-      WITH first_approved_ships AS (
-        SELECT id, project_id,
-               ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at, id) AS rn
-        FROM ships
-        WHERE status = #{Ship.statuses[:approved]}
-      )
-      SELECT tar.completed_at::date AS day,
-             SUM(
-               tar.approved_public_seconds -
-               CASE WHEN fas.rn = 1 THEN p.manual_seconds ELSE 0 END
-             ) AS seconds
-      FROM time_audit_reviews tar
-      INNER JOIN ships s ON s.id = tar.ship_id
-      INNER JOIN projects p ON p.id = s.project_id
-      LEFT JOIN first_approved_ships fas ON fas.id = s.id
-      WHERE tar.status = #{TimeAuditReview.statuses[:approved]}
-        AND tar.completed_at IS NOT NULL
-        AND tar.approved_public_seconds IS NOT NULL
-      GROUP BY tar.completed_at::date
-      ORDER BY tar.completed_at::date
+    added_by_day = ActiveRecord::Base.connection.execute(<<~SQL.squish).to_a
+      SELECT ships.created_at::date AS day, COALESCE(SUM(#{duration_case}), 0) AS seconds
+      #{recording_joins}
+      GROUP BY ships.created_at::date
     SQL
-    approved_by_day = approved_by_day.to_h { |r| [ Date.parse(r["day"].to_s), r["seconds"].to_f ] }
+    added_by_day = added_by_day.to_h { |r| [ Date.parse(r["day"].to_s), r["seconds"].to_f ] }
+
+    removed_by_day = ActiveRecord::Base.connection.execute(<<~SQL.squish).to_a
+      SELECT tar.updated_at::date AS day, COALESCE(SUM(#{duration_case}), 0) AS seconds
+      #{recording_joins}
+      INNER JOIN time_audit_reviews tar
+        ON tar.ship_id = ships.id AND tar.status IN (#{terminal_ints})
+      GROUP BY tar.updated_at::date
+    SQL
+    removed_by_day = removed_by_day.to_h { |r| [ Date.parse(r["day"].to_s), r["seconds"].to_f ] }
 
     # Ship count data (same structure as backlog_by_day)
     ships_by_day = Ship.where("created_at < ?", end_date.end_of_day)
@@ -556,18 +548,18 @@ class Admin::DashboardController < Admin::ApplicationController
       .to_h
 
     # Pre-start cumulative totals
-    cum_submitted_s = submitted_by_day.sum { |d, s| d < start_date ? s : 0 }
-    cum_approved_s  = approved_by_day.sum  { |d, s| d < start_date ? s : 0 }
-    cum_ships       = Ship.where("created_at < ?", start_date).count
-    cum_ta          = TimeAuditReview.where(status: terminal).where("updated_at < ?", start_date).count
+    cum_added_s   = added_by_day.sum   { |d, s| d < start_date ? s : 0 }
+    cum_removed_s = removed_by_day.sum { |d, s| d < start_date ? s : 0 }
+    cum_ships     = Ship.where("created_at < ?", start_date).count
+    cum_ta        = TimeAuditReview.where(status: terminal).where("updated_at < ?", start_date).count
 
     (start_date..end_date).map do |date|
-      cum_submitted_s += submitted_by_day[date].to_f
-      cum_approved_s  += approved_by_day[date].to_f
-      cum_ships       += ships_by_day[date].to_i
-      cum_ta          += ta_by_day[date].to_i
+      cum_added_s   += added_by_day[date].to_f
+      cum_removed_s += removed_by_day[date].to_f
+      cum_ships     += ships_by_day[date].to_i
+      cum_ta        += ta_by_day[date].to_i
 
-      hours_backlog = [ (cum_submitted_s - cum_approved_s) / 3600.0, 0 ].max.round(1)
+      hours_backlog = [ (cum_added_s - cum_removed_s) / 3600.0, 0 ].max.round(1)
       ship_backlog  = [ cum_ships - cum_ta, 0 ].max
       total         = (ship_backlog + hours_backlog / ta_equiv).round(2)
 
