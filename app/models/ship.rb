@@ -48,7 +48,9 @@ class Ship < ApplicationRecord
   has_many :reviewer_notes, dependent: :nullify
   has_many :project_flags, dependent: :nullify
 
-  enum :status, { pending: 0, approved: 1, returned: 2, rejected: 3, awaiting_identity: 4 }
+  # superseded: a still-pending ship the user pulled out of the queue via re-ship.
+  # Terminal, currency-neutral, and notification-silent — see #supersede!.
+  enum :status, { pending: 0, approved: 1, returned: 2, rejected: 3, awaiting_identity: 4, superseded: 5 }
   enum :ship_type, { design: 0, build: 1 }, prefix: true
 
   serialize :frozen_hca_data, coder: JSON
@@ -356,7 +358,21 @@ class Ship < ApplicationRecord
     end
   end
 
+  # Pull a still-pending ship out of the review queue so the user can re-ship it.
+  # Cancels its pending reviews (removing them from reviewer queues) and marks the ship
+  # :superseded — a terminal state that never awards currency or notifies the user.
+  # The fresh ship is created separately by the controller (no preflight, bottom of queue).
+  def supersede!
+    raise ActiveRecord::RecordInvalid.new(self), "ship is not pending" unless pending?
+
+    with_lock do
+      cancel_pending_reviews! # leaves the queue; each review skips ship recompute
+      update!(status: :superseded)
+    end
+  end
+
   def recompute_status!
+    return if superseded? # Terminal — derive_status can't represent it; never recompute back to pending
     new_status = derive_status
     if status != new_status
       attrs = { status: new_status }
@@ -490,7 +506,7 @@ class Ship < ApplicationRecord
     new_journal_entries.where(ship_id: nil).update_all(ship_id: id)
   end
 
-  TERMINAL_STATUSES = %w[approved returned rejected].freeze
+  TERMINAL_STATUSES = %w[approved returned rejected superseded].freeze
 
   # Prevent admin from bypassing the review pipeline by directly changing a terminal ship status
   def status_transition_allowed
@@ -617,6 +633,7 @@ class Ship < ApplicationRecord
   # Idempotency is enforced per member by partial unique indexes; failures are logged
   # but do NOT roll back the approval — operators reconcile via the rake task.
   def award_ship_review_currency!
+    return unless approved? # Awarders no-op for other statuses; skip the preload query entirely (e.g. on supersede)
     ship = Ship.includes(project: { user: {}, collaborators: :user }).find(id) # preload to avoid N+1
 
     if ship_type_design?

@@ -67,7 +67,7 @@ ship = @project.ships.build(
 
 | Column | Notes |
 |---|---|
-| `status` | enum: `pending`, `approved`, `returned`, `rejected`, `awaiting_identity` |
+| `status` | enum: `pending`, `approved`, `returned`, `rejected`, `awaiting_identity`, `superseded` (terminal; set by `#supersede!` when the user re-ships a still-pending submission — see §8.5) |
 | `ship_type` | enum (prefix `ship_type_`): `design` (default 0), `build` (1) — chooses Phase 2 reviewer |
 | `frozen_demo_link`, `frozen_repo_link`, `frozen_screenshot`, `frozen_hca_data` | snapshot at submission. `frozen_hca_data` is `serialize coder: JSON` + `encrypts` |
 | `approved_public_seconds` | mirrored from `time_audit_review.approved_public_seconds` **only when the ship reaches `:approved`** (set inside `recompute_status!` in the same `update!` as the status flip; cleared on any other transition). Self-describing: `approved_public_seconds > 0` ⇒ ship is fully approved. |
@@ -343,6 +343,18 @@ See `carry_forward_ta_annotations!` above (Section 2). The key win: a re-ship wh
 ### Multiple Re-ships in Quick Succession
 
 If a user submits ship A, gets returned, fixes, submits ship B → ship A is in terminal `returned` state (still has its history). Ship B claims entries from after the previous-**approved** cutoff (which is unchanged because A was returned, not approved). Both A and B coexist in the DB as separate rows — A's reviews stay in their terminal states forever as audit trail.
+
+### User-Initiated Re-ship While Pending (the "Reship!" button)
+
+Distinct from the returned/rejected re-ship above: a user can pull a **still-`pending`** submission out of the queue and replace it with a fresh one — for when they pushed a fix after submitting but before review.
+
+- **Entry point**: `POST /projects/:id/ships/reship` → `Projects::ShipsController#reship`, gated by `ProjectPolicy#reship?` (true only while a `pending` ship exists, verified owner only — the exact inverse of `ship?`). Surfaced as a "Reship!" button on the project page (both the header, where "Submit" normally sits, and under the pending ship's review-progress steps). The button opens a confirm popup with a **5-second hold-to-confirm** control. **No preflight check runs** for a re-ship.
+- **`Ship#supersede!`**: in a row lock, calls `cancel_pending_reviews!` (flips the pending TA/RC/DR/BR to `cancelled`, removing them from reviewer queues; each skips ship recompute) then sets the ship to **`:superseded`**. The controller then creates a fresh ship in the same transaction (identity gate mirrored from `#create` → `:pending` or `:awaiting_identity`), which lands at the **bottom of the queue** (new `created_at`) and seeds new reviews via the usual `after_create`.
+- **`superseded` is terminal & inert**: added to `TERMINAL_STATUSES` (no transition out). `notify_status_change` has no case for it (no email). `award_ship_review_currency!` early-returns `unless approved?` (no currency, no preload query). `recompute_status!` early-returns for `superseded` (the status can't be represented by `derive_status`, which would otherwise try to flip it back to `pending` and hit the terminal-transition validation).
+- **Already-approved phase-1 reviews survive**: `supersede!` only cancels *pending* reviews. An approved TA on the now-superseded ship stays approved and feeds `carry_forward_ta_annotations!` on the new ship — including the auto-approve optimization when all recordings were already reviewed.
+- **Reviewer context is preserved**: `ReviewerNote`s are **project-scoped** (`serialize_reviewer_notes(project)` reads `project.reviewer_notes`), so they display across all ships/cycles — a re-ship never loses them. The superseded ship is never destroyed, so `dependent: :nullify` doesn't fire; cancelled reviews are kept for audit. (Per-review `feedback` only lands at a terminal return/reject decision, which moves the ship out of `pending` → `reship?` is false → the user gets the normal "Resubmit" flow instead.)
+- **Journal entries** re-attach to the new ship via `claim_journal_entries!` (superseded ∉ approved, so its entries are reclaimable); the superseded ship ends up owning no recordings.
+- The admin **reship-ratio** analytics metric (`reship_ratio_for_window`) intentionally still counts only `returned`/`rejected` predecessors — it measures failure-driven redos, not voluntary in-queue re-ships.
 
 ---
 

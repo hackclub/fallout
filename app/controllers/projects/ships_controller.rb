@@ -116,6 +116,31 @@ class Projects::ShipsController < ApplicationController
     end
   end
 
+  # POST /projects/:project_id/ships/reship — pull the in-review ship out of the queue
+  # and submit a fresh one. No preflight check; the new ship lands at the bottom of the queue.
+  def reship
+    authorize @project, :reship?
+
+    current_ship = @project.ships.pending.order(created_at: :desc).first
+    if current_ship.nil?
+      redirect_to project_path(@project), inertia: { errors: { reship: "No submission in review to re-ship." } }
+      return
+    end
+
+    ActiveRecord::Base.transaction do
+      current_ship.supersede! # cancels its reviews + marks superseded so the new ship can be created
+      @project.ships.create!(
+        ship_type: @project.built_irl? ? :build : :design,
+        frozen_demo_link: @project.demo_video_link.presence || @project.demo_link,
+        frozen_repo_link: @project.repo_link,
+        # Mirror #create's identity gate: hold out of the queue until HCA-verified with an address.
+        status: current_user.fully_identity_gated? ? :pending : :awaiting_identity
+      )
+    end
+
+    redirect_to project_path(@project), notice: "Re-shipped! Your project is back at the bottom of the review queue."
+  end
+
   private
 
   def set_project

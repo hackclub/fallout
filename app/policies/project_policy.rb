@@ -65,6 +65,14 @@ class ProjectPolicy < ApplicationPolicy
     !user.trial? && owner? # Only verified project owners can submit for review
   end
 
+  def reship?
+    return false if record.discarded?
+    return false unless record.ships.where(status: :pending).exists? # Only an in-queue submission can be pulled back and re-shipped
+    return false unless user.present?
+
+    !user.trial? && owner? # Same gate as ship? — verified owners only
+  end
+
   def refresh_cover?
     return false if record.discarded?
     return false unless user.present?

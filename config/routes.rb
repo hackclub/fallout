@@ -569,6 +569,7 @@ Rails.application.routes.draw do
         get :preflight # Legacy route — redirects to /projects/:id/ship
         post "preflight/run", action: :run # Frontend kicks off preflight scan
         get "preflight/status", action: :status # Polled by frontend for real-time check updates
+        post :reship # Pull the in-review ship out of the queue and submit a fresh one (no preflight)
       end
     end
   end
