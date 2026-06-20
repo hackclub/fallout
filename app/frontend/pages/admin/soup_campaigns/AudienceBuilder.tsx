@@ -12,15 +12,16 @@ import { PlusIcon, XIcon, UsersIcon, PencilIcon } from 'lucide-react'
 // point of the builder is that staff think in hours, not in 216000-second thresholds.
 
 type Op = '>=' | '>' | '=' | '<' | '<='
-type Kind = 'logged' | 'submitted' | 'qualified' | 'has_ships' | 'ids' | 'raw'
+type Kind = 'logged' | 'submitted' | 'qualified' | 'has_ships' | 'ids' | 'koi' | 'gold' | 'raw'
 type Mode = 'all' | 'any'
 
 interface Row {
   id: string
   kind: Kind
-  op?: Op // logged / submitted
+  op?: Op // logged / submitted / koi / gold
   hours?: string // logged / submitted fixed value (string so the field can be empty mid-edit)
   hoursVar?: string // logged / submitted variable name (e.g. 'ticket_hours') — mutually exclusive with hours
+  amount?: string // koi / gold numeric value
   bool?: boolean // qualified / has_ships
   ids?: string // ids (comma-separated)
   raw?: string // unrecognized line, preserved verbatim
@@ -32,6 +33,11 @@ const TIME_VARIABLES: { value: string; label: string; title: string }[] = [
     value: 'ticket_hours',
     label: 'Ticket hours',
     title: "Each user's required hours (60h default, or their individual override)",
+  },
+  {
+    value: 'approved_hours',
+    label: 'Approved hours',
+    title: "Each user's TA-approved hours — compare to find users with unreviewed work",
   },
 ]
 
@@ -48,12 +54,17 @@ const TIME_OPS: { value: Op; label: string }[] = [
   { value: '<', label: 'less than' },
 ]
 
-const FIELD_META: Record<Exclude<Kind, 'raw'>, { label: string; type: 'time' | 'bool' | 'ids' }> = {
+const FIELD_META: Record<
+  Exclude<Kind, 'raw'>,
+  { label: string; type: 'time' | 'bool' | 'ids' | 'numeric'; unit?: string }
+> = {
   logged: { label: 'Logged hours', type: 'time' },
   submitted: { label: 'Submitted hours', type: 'time' },
   qualified: { label: 'Qualified for ticket', type: 'bool' },
   has_ships: { label: 'Has shipped a project', type: 'bool' },
   ids: { label: 'Specific user IDs', type: 'ids' },
+  koi: { label: 'Koi balance', type: 'numeric', unit: 'koi' },
+  gold: { label: 'Gold balance', type: 'numeric', unit: 'gold' },
 }
 
 let _uid = 0
@@ -91,7 +102,9 @@ function parseQuery(text: string): Query {
           hours: isVar ? '' : secondsToHours(Number(m[3])),
           hoursVar: isVar ? m[3] : undefined,
         })
-      } else rows.push({ id: `p${i}`, kind: 'raw', raw: line })
+      } else if ((m = line.match(/^(koi|gold)\s*(>=|<=|=|>|<)\s*(\d+)$/i)))
+        rows.push({ id: `p${i}`, kind: m[1].toLowerCase() as Kind, op: m[2] as Op, amount: m[3] })
+      else rows.push({ id: `p${i}`, kind: 'raw', raw: line })
     })
   return { mode, rows }
 }
@@ -111,6 +124,12 @@ function serializeRow(r: Row): string {
       const h = parseFloat(r.hours ?? '')
       if (!isFinite(h) || (r.hours ?? '').trim() === '') return ''
       return `${field} ${r.op ?? '>='} ${Math.round(h * 3600)}`
+    }
+    case 'koi':
+    case 'gold': {
+      const n = parseInt(r.amount ?? '', 10)
+      if (!isFinite(n) || (r.amount ?? '').trim() === '') return ''
+      return `${r.kind} ${r.op ?? '>='} ${n}`
     }
     case 'raw':
       return r.raw ?? ''
@@ -135,6 +154,9 @@ function defaultRow(kind: Kind, id: string): Row {
       return { id, kind, bool: true }
     case 'ids':
       return { id, kind, ids: '' }
+    case 'koi':
+    case 'gold':
+      return { id, kind, op: '>=', amount: '' }
     default:
       return { id, kind: 'raw', raw: '' }
   }
@@ -410,6 +432,37 @@ function RowEditor({
             <SelectItem value="false">No</SelectItem>
           </SelectContent>
         </Select>
+      )}
+
+      {meta.type === 'numeric' && (
+        <>
+          <Select value={row.op ?? '>='} onValueChange={(v) => onUpdate(row.id, { op: v as Op })}>
+            <SelectTrigger className="h-8 w-[8.5rem] shrink-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TIME_OPS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              value={row.amount ?? ''}
+              onChange={(e) => onUpdate(row.id, { amount: e.target.value })}
+              placeholder="0"
+              className="h-8 w-24"
+              aria-label={`${meta.label} threshold`}
+            />
+            <span className="text-sm text-muted-foreground">{meta.unit}</span>
+          </div>
+        </>
       )}
 
       {meta.type === 'ids' && (
