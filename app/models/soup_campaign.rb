@@ -223,8 +223,9 @@ class SoupCampaign < ApplicationRecord
     end
   end
 
-  # shipped_only restricts to logged time the user has actually submitted (attached to a ship,
-  # any status), matching User#shipped_time_logged_seconds. Default counts all logged time.
+  # shipped_only restricts journal-entry time to entries attached to a ship (any status).
+  # manual_seconds are always included — they're admin-set hours that can't be tied to a ship
+  # but count toward a user's total regardless of mode.
   def filter_by_total_time(scope, operator, threshold, shipped_only: false)
     user_ids = scope.pluck(:id)
     return scope.none if user_ids.empty?
@@ -265,38 +266,37 @@ class SoupCampaign < ApplicationRecord
     je_scope = JournalEntry.kept.where(project_id: all_project_ids)
     je_scope = je_scope.where.not(ship_id: nil) if shipped_only # submitted == attached to a ship
     all_je_ids = je_scope.pluck(:id)
-    return totals if all_je_ids.empty?
 
-    je_seconds = JournalEntry.batch_time_logged(all_je_ids)
-    je_attributions = JournalEntry.batch_attributed_user_ids(all_je_ids)
-    je_authors = JournalEntry.where(id: all_je_ids).pluck(:id, :user_id).to_h
+    unless all_je_ids.empty?
+      je_seconds = JournalEntry.batch_time_logged(all_je_ids)
+      je_attributions = JournalEntry.batch_attributed_user_ids(all_je_ids)
+      je_authors = JournalEntry.where(id: all_je_ids).pluck(:id, :user_id).to_h
 
-    je_seconds.each do |je_id, total_secs|
-      author_id = je_authors[je_id]
-      next unless author_id
-      attr_set = ([ author_id ] | (je_attributions[je_id] || [])).uniq
-      next if attr_set.empty?
-      share = total_secs / attr_set.size
-      attr_set.each { |uid| totals[uid] += share if user_set.include?(uid) }
+      je_seconds.each do |je_id, total_secs|
+        author_id = je_authors[je_id]
+        next unless author_id
+        attr_set = ([ author_id ] | (je_attributions[je_id] || [])).uniq
+        next if attr_set.empty?
+        share = total_secs / attr_set.size
+        attr_set.each { |uid| totals[uid] += share if user_set.include?(uid) }
+      end
     end
 
-    # manual_seconds is project-level, not attached to a ship — exclude it from submitted totals.
-    unless shipped_only
-      project_members = Hash.new { |h, k| h[k] = [] }
-      Project.kept.where(id: all_project_ids, user_id: user_ids)
-        .pluck(:id, :user_id).each { |pid, uid| project_members[pid] << uid }
-      Collaborator.kept
-        .where(user_id: user_ids, collaboratable_type: "Project", collaboratable_id: all_project_ids)
-        .pluck(:collaboratable_id, :user_id)
-        .each { |pid, uid| project_members[pid] << uid }
+    # manual_seconds is project-level and can't be attached to a ship, but always counts.
+    project_members = Hash.new { |h, k| h[k] = [] }
+    Project.kept.where(id: all_project_ids, user_id: user_ids)
+      .pluck(:id, :user_id).each { |pid, uid| project_members[pid] << uid }
+    Collaborator.kept
+      .where(user_id: user_ids, collaboratable_type: "Project", collaboratable_id: all_project_ids)
+      .pluck(:collaboratable_id, :user_id)
+      .each { |pid, uid| project_members[pid] << uid }
 
-      member_counts = Project.batch_member_counts(all_project_ids)
-      Project.kept.where(id: all_project_ids).where("manual_seconds > 0")
-        .pluck(:id, :manual_seconds).each do |pid, manual|
-        mc = member_counts[pid].to_i
-        next unless mc.positive?
-        project_members[pid].each { |uid| totals[uid] += manual / mc }
-      end
+    member_counts = Project.batch_member_counts(all_project_ids)
+    Project.kept.where(id: all_project_ids).where("manual_seconds > 0")
+      .pluck(:id, :manual_seconds).each do |pid, manual|
+      mc = member_counts[pid].to_i
+      next unless mc.positive?
+      project_members[pid].each { |uid| totals[uid] += manual / mc }
     end
 
     totals
