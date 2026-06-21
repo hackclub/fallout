@@ -16,7 +16,7 @@ class ShopItemsController < ApplicationController
       gold_balance: current_user.gold,
       user_hours: (current_user.total_time_logged_seconds / 3600.0).floor,
       approved_hours: (current_user.approved_time_logged_seconds / 3600.0).round(1),
-      ticket_hours_threshold: current_user.ticket_hours_override || TicketClaimsController::TICKET_HOURS_THRESHOLD,
+      ticket_hours_threshold: current_user.ticket_hours_threshold,
       ticket_claim_state: current_user.ticket_claim&.state,
       is_modal: request.headers["X-InertiaUI-Modal"].present?,
       user_id: current_user.id,
