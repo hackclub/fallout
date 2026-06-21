@@ -5,4 +5,6 @@ shared:
   hcb_top_ups: User-funded top-ups via HCB donations onto the user's grant card
   disable_new_submissions: Block submitting projects that have never been shipped before (resubmissions of already-shipped projects still allowed)
   new_submissions_override: Per-user override allowing first-time project submissions even while disable_new_submissions is on
+  limit_reships: Cap each project at one reship on/after June 21 00:00 EDT — applies to the reship button and resubmitting a returned ship (first-time submissions excluded)
+  reship_limit_override: Per-user override exempting a user from the limit_reships one-reship cap
 

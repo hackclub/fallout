@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 class ProjectPolicy < ApplicationPolicy
+  # On/after this instant, the :limit_reships flag caps a project at one reship (see #reship_limit_reached?).
+  RESHIP_LIMIT_CUTOFF = ActiveSupport::TimeZone["America/New_York"].local(2026, 6, 21)
+
   def index?
     true
   end
@@ -68,6 +71,8 @@ class ProjectPolicy < ApplicationPolicy
       return false
     end
 
+    return false if reship_limit_reached? # Resubmitting a returned ship counts as a reship under :limit_reships
+
     !user.trial? && owner? # Only verified project owners can submit for review
   end
 
@@ -75,6 +80,8 @@ class ProjectPolicy < ApplicationPolicy
     return false if record.discarded?
     return false unless record.ships.where(status: :pending).exists? # Only an in-queue submission can be pulled back and re-shipped
     return false unless user.present?
+
+    return false if reship_limit_reached? # Same one-reship cap as ship? under :limit_reships
 
     !user.trial? && owner? # Same gate as ship? — verified owners only
   end
@@ -90,6 +97,22 @@ class ProjectPolicy < ApplicationPolicy
     return false unless user.present? && !user.trial? && collaborators_enabled?
 
     owner? # Only verified project owners manage collaborators from the user-facing project page.
+  end
+
+  private
+
+  # When :limit_reships is on, a project may be re-shipped at most once on/after RESHIP_LIMIT_CUTOFF.
+  # A "reship" is any new submission on a project that already has a ship — both the reship button and
+  # resubmitting after a returned ship. Ships before the cutoff don't count; a project's first-ever ship
+  # is an initial submission (governed by :disable_new_submissions), not a reship, so it's excluded.
+  def reship_limit_reached?
+    return false unless Flipper.enabled?(:limit_reships)
+    return false if Flipper.enabled?(:reship_limit_override, user) # Per-user exemption from the one-reship cap
+    return false unless record.ships.exists?
+
+    reships_after_cutoff = record.ships.where(created_at: RESHIP_LIMIT_CUTOFF..).count
+    reships_after_cutoff -= 1 if record.ships.minimum(:created_at) >= RESHIP_LIMIT_CUTOFF
+    reships_after_cutoff >= 1
   end
 
   class Scope < ApplicationPolicy::Scope
