@@ -22,8 +22,8 @@ module ShipChecks
       ShipCheckService::CheckResult.new(
         key: "bom_exists",
         label: DEFINITION[:label],
-        status: found ? :passed : :failed,
-        message: found ? nil : "Add a Bill of Materials (BOM.csv) to your repository",
+        status: found ? :passed : :warn,
+        message: found ? nil : "We couldn't find a Bill of Materials (BOM.csv) in your repository. You need one!",
         visibility: :user
       )
     end
