@@ -58,7 +58,8 @@ class ApplicationController < ActionController::Base
       collaborators: Flipper.enabled?(:collaborators, current_user),
       shop: Flipper.enabled?(:shop, current_user),
       grant_fulfillment: true,
-      hcb_top_ups: Flipper.enabled?(:hcb_top_ups, current_user)
+      hcb_top_ups: Flipper.enabled?(:hcb_top_ups, current_user),
+      limit_reships: Flipper.enabled?(:limit_reships) # Drives the "last chance" typed-confirmation modal on ship/reship
     }
   }
   # has_unread_mail and current_streak are scoped to PathController only (see PathController)

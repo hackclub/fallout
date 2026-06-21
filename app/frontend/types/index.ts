@@ -22,6 +22,7 @@ export interface Features {
   collaborators?: boolean
   shop?: boolean
   grant_fulfillment: true
+  limit_reships?: boolean
 }
 
 export type IdentityGateState = 'unverified' | 'pending' | 'verified_no_address' | 'verified_with_address'
@@ -128,6 +129,7 @@ export interface ProjectDetail {
   description: string | null
   demo_link: string | null
   repo_link: string | null
+  built_irl: boolean
   is_unlisted: boolean
   tags: string[]
   user_display_name: string

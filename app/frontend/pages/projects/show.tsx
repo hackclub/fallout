@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { router } from '@inertiajs/react'
+import { router, usePage } from '@inertiajs/react'
 import { Modal, ModalLink, useModal } from '@inertiaui/modal-react'
 import { BookOpenIcon, ClockIcon, CheckIcon, InformationCircleIcon } from '@heroicons/react/16/solid'
 import { EllipsisHorizontalIcon } from '@heroicons/react/20/solid'
@@ -20,7 +20,15 @@ import TimeAgo from '@/components/shared/TimeAgo'
 import Timeline from '@/components/shared/Timeline'
 import { SlidingNumber } from '@/components/shared/SlidingNumber'
 import TextMorph from '@/components/shared/TextMorph'
-import type { ProjectDetail, JournalEntryCard, CollaboratorInfo, ShipEvent, JournalSwitchableProject } from '@/types'
+import ShipWarningModal from '@/components/projects/ShipWarningModal'
+import type {
+  ProjectDetail,
+  JournalEntryCard,
+  CollaboratorInfo,
+  ShipEvent,
+  JournalSwitchableProject,
+  SharedProps,
+} from '@/types'
 
 function formatTime(seconds: number): string {
   if (seconds === 0) return '0min'
@@ -245,7 +253,13 @@ export default function ProjectsShow({
   const [deleteEntry, setDeleteEntry] = useState<JournalEntryCard | null>(null)
   const [deletingEntry, setDeletingEntry] = useState(false)
   const [reshipOpen, setReshipOpen] = useState(false)
+  const [shipWarnOpen, setShipWarnOpen] = useState(false)
   const [reshipping, setReshipping] = useState(false)
+  const { features } = usePage<SharedProps>().props
+  const shipUrl = `/projects/${project.id}/ship`
+  const requirementsUrl = project.built_irl
+    ? '/docs/requirements/submitting-build'
+    : '/docs/requirements/submitting-design'
   const [holding, setHolding] = useState(false)
   const [holdProgress, setHoldProgress] = useState(0)
   const holdFrameRef = useRef<number | null>(null)
@@ -468,6 +482,21 @@ export default function ProjectsShow({
     })
   }
 
+  // During the lockdown, gate ship/resubmit behind the typed "last chance" warning. Abandon-pending
+  // reships are unlimited, so the Reship! button keeps its plain hold-to-confirm regardless of the flag.
+  function requestShip() {
+    if (features.limit_reships) {
+      setShipWarnOpen(true)
+    } else {
+      router.visit(shipUrl)
+    }
+  }
+
+  function openReship() {
+    setHoldProgress(0)
+    setReshipOpen(true)
+  }
+
   function closeReshipDialog() {
     if (reshipping) return
     cancelHold()
@@ -507,7 +536,9 @@ export default function ProjectsShow({
       {},
       {
         preserveScroll: true,
-        onSuccess: () => setReshipOpen(false),
+        onSuccess: () => {
+          setReshipOpen(false)
+        },
         onError: () => notify('alert', 'Failed to re-ship. Please try again.'),
         onFinish: () => {
           setReshipping(false)
@@ -960,18 +991,12 @@ export default function ProjectsShow({
               )}
             </div>
             {can.ship && (
-              <Button onClick={() => router.visit(`/projects/${project.id}/ship`)} className="px-6 py-2 text-sm">
+              <Button onClick={requestShip} className="px-6 py-2 text-sm">
                 Submit
               </Button>
             )}
             {can.reship && (
-              <Button
-                onClick={() => {
-                  setHoldProgress(0)
-                  setReshipOpen(true)
-                }}
-                className="px-6 py-2 text-sm"
-              >
+              <Button onClick={openReship} className="px-6 py-2 text-sm">
                 Reship!
               </Button>
             )}
@@ -1071,10 +1096,7 @@ export default function ProjectsShow({
                             <div className="space-y-3">
                               <p className="text-sm text-dark-brown whitespace-pre-wrap">{ship.feedback}</p>
                               {can.ship && (
-                                <Button
-                                  onClick={() => router.visit(`/projects/${project.id}/ship`)}
-                                  className="px-4 py-1.5 text-sm"
-                                >
+                                <Button onClick={requestShip} className="px-4 py-1.5 text-sm">
                                   Resubmit
                                 </Button>
                               )}
@@ -1098,13 +1120,7 @@ export default function ProjectsShow({
                             <div className="space-y-3">
                               <ReviewProgress ship={ship} />
                               {can.reship && (
-                                <Button
-                                  onClick={() => {
-                                    setHoldProgress(0)
-                                    setReshipOpen(true)
-                                  }}
-                                  className="px-4 py-1.5 text-sm"
-                                >
+                                <Button onClick={openReship} className="px-4 py-1.5 text-sm">
                                   Reship!
                                 </Button>
                               )}
@@ -1311,6 +1327,13 @@ export default function ProjectsShow({
           </div>
         </div>
       )}
+
+      <ShipWarningModal
+        open={shipWarnOpen}
+        requirementsUrl={requirementsUrl}
+        onConfirm={() => router.visit(shipUrl)}
+        onCancel={() => setShipWarnOpen(false)}
+      />
 
       {reshipOpen && <div className="fixed inset-0 z-20 backdrop-brightness-75" />}
 

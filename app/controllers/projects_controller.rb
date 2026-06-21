@@ -289,6 +289,7 @@ class ProjectsController < ApplicationController
       description: project.description,
       demo_link: project.demo_link,
       repo_link: project.repo_link,
+      built_irl: project.built_irl?, # Picks the design vs build requirements doc in the reship warning
       is_unlisted: project.is_unlisted,
       tags: project.tags,
       user_display_name: project.user.display_name,
