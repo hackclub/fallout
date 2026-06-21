@@ -501,10 +501,17 @@ class User < ApplicationRecord
     ticket_hours_override || TICKET_HOURS_THRESHOLD
   end
 
-  # Hours-only ticket qualification — mirrors the rounding used by the ticket claim flow so
-  # the reviewer-queue filter and the claim gate agree. Does NOT consider the identity gate.
+  # Hours-only ticket qualification on TA-APPROVED hours — the real claim gate. Mirrors the
+  # rounding the ticket claim flow uses. Does NOT consider the identity gate.
   def meets_ticket_hours?
     (approved_time_logged_seconds / 3600.0).round(1) >= ticket_hours_threshold
+  end
+
+  # Same bar measured against SUBMITTED (shipped, pre-approval) hours — a looser signal used by
+  # the reviewer-queue "can get a ticket" filter. Catches users on track to qualify whose hours
+  # are still in review, unlike meets_ticket_hours? which only counts TA-approved time.
+  def submitted_ticket_hours?
+    (shipped_time_logged_seconds / 3600.0).round(1) >= ticket_hours_threshold
   end
 
   # Time the user has attributed to journals that are attached to a ship (any status) —

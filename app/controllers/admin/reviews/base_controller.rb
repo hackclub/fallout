@@ -110,13 +110,14 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     "review_ticket_filter:#{params[:controller]}"
   end
 
-  # Restricts the pending queue to ships whose owner currently qualifies for a summit ticket
-  # (approved hours >= their per-user override, else the default threshold). Owner User records
-  # are already loaded via the index `includes`, so only the approved-hours aggregation runs
-  # here — computed once per distinct owner.
+  # Restricts the pending queue to ships whose owner is on track for a summit ticket — i.e. has
+  # SUBMITTED (shipped, pre-approval) hours >= their per-user override (else the default). Uses
+  # submitted rather than approved hours so reviewers can prioritise owners whose hours are still
+  # in review. Owner User records are already loaded via the index `includes`, so only the
+  # shipped-hours aggregation runs here — computed once per distinct owner.
   def filter_ticket_eligible(reviews)
     owners = reviews.map { |r| r.ship.project.user }.uniq(&:id)
-    eligible_ids = owners.select(&:meets_ticket_hours?).map(&:id).to_set
+    eligible_ids = owners.select(&:submitted_ticket_hours?).map(&:id).to_set
     reviews.select { |r| eligible_ids.include?(r.ship.project.user_id) }
   end
 
