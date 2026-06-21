@@ -2,10 +2,12 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
   def index
     # Filter/sort chrome and stats keys render instantly; the heavy queue lists are deferred
     # so the page shell appears immediately and the tables show a skeleton until data lands.
+    ticket_eligible = parse_ticket_filter
     render inertia: {
       start_reviewing_path: next_admin_reviews_time_audits_path,
+      ticket_eligible: ticket_eligible,
       **review_stats_props(TimeAuditReview),
-      **deferred_index_props
+      **deferred_index_props(ticket_eligible)
     }
   end
 
@@ -77,7 +79,7 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
 
   # Memoized loader shared by the deferred index props so the heavy queue query runs once per
   # deferred request even though pending_reviews/all_reviews/pagy are separate Inertia props.
-  def deferred_index_props
+  def deferred_index_props(ticket_eligible)
     memo = nil
     load = lambda do
       memo ||= begin
@@ -85,6 +87,7 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
           .includes(ship: [ :project, :requirements_check_review, :time_audit_review, project: :user ], reviewer: [])
 
         pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).order(created_at: :asc).load
+        pending_reviews = filter_ticket_eligible(pending_reviews) if ticket_eligible
         @pagy, @all_reviews = pagy(base.order(created_at: :desc))
         flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
         Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)

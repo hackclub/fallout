@@ -226,10 +226,22 @@ before_action :redirect_to_onboarding!
 ```ruby
 def set_current_user
   @current_user = User.find_by(id: session[:user_id]) if session[:user_id]
+  @true_user = session[:impersonator_id] ? User.find_by(id: session[:impersonator_id]) : @current_user
 end
 ```
 - `User.find_by(id: ...)` uses Rails STI automatically — returns `TrialUser` instance if `type='TrialUser'`, `User` instance if `type=nil`.
 - Sets `@current_user = nil` if no session or user not found.
+- `@true_user` is the real human behind the request — the admin during impersonation, otherwise `current_user` (see Admin Impersonation below).
+
+## Admin Impersonation
+
+Admins can browse the app as another user. The mechanism is intentionally thin: while impersonating, `session[:user_id]` **is** the target's id, so the entire pipeline (Pundit, ActionCable, shared props, analytics) sees exactly what that user sees — with the target's (lesser) privileges, never the admin's. The real admin id is parked in `session[:impersonator_id]` for the exit path and audit attribution.
+
+- **Helpers** (`Authentication` concern): `true_user` (the admin while impersonating), `impersonating?` (`session[:impersonator_id]` present and ≠ current_user). Both are `helper_method`s and available to `inertia_share`.
+- **Audit attribution**: `user_for_paper_trail` is overridden to return `true_user&.id`, so PaperTrail `whodunnit` records the **admin** (a clean integer id) for any change made during impersonation — not the target. Start/stop are also logged to `Rails.logger` with admin id, target id, and IP.
+- **Start** — `POST /admin/users/:id/impersonate` → `Admin::UsersController#impersonate` (inside `AdminConstraint`, double-gated by `require_admin!` + `authorize` → `UserPolicy#impersonate? == admin?`). Refuses staff (privilege escalation, incl. `hcb` money access), self, trial, discarded, banned, and un-onboarded targets — the last three would otherwise trap a `before_action` redirect before the user could exit.
+- **Stop** — `DELETE /impersonate` → `ImpersonationsController#destroy`. Lives **outside** the admin constraint because the effective user is the non-staff target (would fail `AdminConstraint`). Restores `session[:user_id]` from `impersonator_id` and redirects back to the admin user page. Blanket-skips both Pundit verify callbacks (no `index`; session-scoped, nothing to authorize).
+- **Frontend**: `impersonation` shared prop (nil unless active; exposes only the admin display name — no PII — and `stop_path`) drives a fixed `ImpersonationBanner` in `DefaultLayout`. The admin user-show page offers an "Impersonate" button gated by the same rules as the server (`STAFF_ROLES`, not self/banned/discarded).
 
 ### `authenticate_user!`
 ```ruby

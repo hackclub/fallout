@@ -47,6 +47,15 @@ class ApplicationController < ActionController::Base
       }
     }
   }
+  # Drives the global "you're impersonating" banner + exit button. nil unless an admin is
+  # actively impersonating. Exposes only the admin's display name (no PII) and the exit path.
+  inertia_share impersonation: -> {
+    next nil unless impersonating?
+    {
+      impersonator_name: true_user.display_name,
+      stop_path: stop_impersonating_path
+    }
+  }
   inertia_share flash: -> { flash.to_hash }
   inertia_share sign_in_path: -> { signin_path(login_hint: current_user&.trial? ? current_user.email : nil) } # Prefill HCA email for trial users upgrading to full accounts
   inertia_share sign_out_path: -> { signout_path }

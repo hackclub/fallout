@@ -130,6 +130,33 @@ class Admin::UsersController < Admin::ApplicationController
     render inertia: props
   end
 
+  def impersonate
+    @user = User.find(params[:id])
+    authorize @user
+
+    # Impersonation must never grant access the admin doesn't already have, and must never
+    # trap the exit flow. Refuse staff (privilege escalation — incl. `hcb` money access),
+    # self, trial accounts, and any user a before_action would bounce before they could exit.
+    reason =
+      if @user == current_user then "You can't impersonate yourself."
+      elsif @user.staff? then "Staff accounts can't be impersonated."
+      elsif @user.trial? then "Trial accounts can't be impersonated."
+      elsif @user.discarded? then "Deleted accounts can't be impersonated."
+      elsif @user.is_banned? then "Banned accounts can't be impersonated."
+      elsif @user.needs_onboarding? then "Users who haven't onboarded can't be impersonated."
+      elsif impersonating? then "You're already impersonating — exit first."
+      end
+    if reason
+      redirect_to admin_user_path(@user), alert: reason
+      return
+    end
+
+    Rails.logger.info("[impersonation] start admin=#{current_user.id} target=#{@user.id} ip=#{request.remote_ip}")
+    session[:impersonator_id] = current_user.id # Real admin, restored on exit (see ImpersonationsController)
+    session[:user_id] = @user.id
+    redirect_to root_path, notice: "Now impersonating #{@user.display_name}."
+  end
+
   def update_roles
     @user = User.find(params[:id])
     authorize @user

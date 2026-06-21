@@ -422,6 +422,7 @@ Rails.application.routes.draw do
       resources :users, only: [] do
         member do
           patch :update_roles
+          post :impersonate # Admin-only: start an impersonation session as this user
           patch :update_streak_day # Admin streak day status override
           patch :restore_streak_goal # Admin streak goal restore (fills blank/missed days with frozen)
           patch :update_ban # Admin ban/unban — admin-only
@@ -482,6 +483,11 @@ Rails.application.routes.draw do
       end
     end
   end
+
+  # Exit an impersonation session. Intentionally OUTSIDE the admin constraint — while
+  # impersonating, the effective user is the (non-staff) target, so they'd fail the
+  # AdminConstraint. The controller restores the original admin session.
+  delete "impersonate", to: "impersonations#destroy", as: :stop_impersonating
 
   # Read-only inspector linked from YSWS Unified DB rows so external 3rd-party
   # auditors can see the review timeline + reviewer attribution behind a ship's

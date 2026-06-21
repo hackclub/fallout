@@ -160,6 +160,11 @@ class User < ApplicationRecord
   ADMIN_ASSIGNABLE_ROLES = (VALID_ROLES - %w[user hcb]).freeze
   SLACK_WELCOME_CHANNELS = %w[C037157AL30 C0ACG0XQWGN C0ACJ290090].freeze
 
+  # Default approved-hours bar to qualify for a summit ticket. Per-user overrides live in
+  # the ticket_hours_override column. Single source of truth — referenced by the ticket
+  # claim flow and the reviewer queues' "can get a ticket" filter.
+  TICKET_HOURS_THRESHOLD = 60
+
   # Ban types in priority order (highest first). Higher-priority bans take precedence.
   BAN_PRIORITY = %w[fallout conduct hcb hardware age hackatime].freeze
   # Ban types set/managed manually by humans — UserBanCheckJob will not override these
@@ -489,6 +494,17 @@ class User < ApplicationRecord
     all_ids = projects_attributable_to_self_ids
     return 0 if all_ids.empty?
     Project.batch_user_approved_seconds(all_ids, self).values.sum
+  end
+
+  # Approved-hours bar this user must clear for a ticket (their override, else the default).
+  def ticket_hours_threshold
+    ticket_hours_override || TICKET_HOURS_THRESHOLD
+  end
+
+  # Hours-only ticket qualification — mirrors the rounding used by the ticket claim flow so
+  # the reviewer-queue filter and the claim gate agree. Does NOT consider the identity gate.
+  def meets_ticket_hours?
+    (approved_time_logged_seconds / 3600.0).round(1) >= ticket_hours_threshold
   end
 
   # Time the user has attributed to journals that are attached to a ship (any status) —

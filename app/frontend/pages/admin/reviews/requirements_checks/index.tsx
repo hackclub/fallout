@@ -7,6 +7,7 @@ import { DataTable } from '@/components/admin/DataTable'
 import { DataTableSkeleton } from '@/components/admin/DataTableSkeleton'
 import { buildPendingColumns, buildAllColumns } from '@/components/admin/reviewColumns'
 import { ReviewStatsHeader, type ReviewStats, type ReviewStatKey } from '@/components/admin/ReviewStats'
+import TicketFilterButton from '@/components/admin/TicketFilterButton'
 import type { ReviewRow, PagyProps } from '@/types'
 
 const BASE_PATH = '/admin/reviews/requirements_checks'
@@ -17,6 +18,7 @@ export default function RequirementsChecksIndex({
   pagy,
   start_reviewing_path,
   current_sort,
+  ticket_eligible,
   stats_keys,
   stats,
   sla_days,
@@ -26,6 +28,7 @@ export default function RequirementsChecksIndex({
   pagy?: PagyProps
   start_reviewing_path: string
   current_sort: 'hours' | 'waiting'
+  ticket_eligible: boolean
   stats_keys: ReviewStatKey[]
   stats?: ReviewStats
   sla_days?: number
@@ -65,6 +68,7 @@ export default function RequirementsChecksIndex({
             )}
           </h2>
           <div className="flex items-center gap-2">
+            <TicketFilterButton basePath={BASE_PATH} active={ticket_eligible} />
             <Button
               variant={sortByHours ? 'default' : 'outline'}
               size="sm"

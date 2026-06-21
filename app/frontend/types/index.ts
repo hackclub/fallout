@@ -33,8 +33,14 @@ export interface IdentityGate {
   address_url: string
 }
 
+export interface Impersonation {
+  impersonator_name: string
+  stop_path: string
+}
+
 export interface SharedProps {
   auth: { user: User | null }
+  impersonation: Impersonation | null
   flash: FlashData
   features: Features
   sign_in_path: string

@@ -44,6 +44,10 @@ import type {
   PagyProps,
 } from '@/types'
 
+// Mirrors the server-side refusal in Admin::UsersController#impersonate — staff can't be
+// impersonated (privilege escalation), so don't offer the button for them.
+const STAFF_ROLES = ['admin', 'time_auditor', 'requirements_checker', 'pass2_reviewer', 'hcb']
+
 const projectColumns: ColumnDef<AdminProjectRow>[] = [
   {
     accessorKey: 'id',
@@ -855,6 +859,36 @@ export default function AdminUsersShow({
         </div>
 
         <div className="flex items-center gap-2">
+          {isAdmin &&
+            !is_self &&
+            !user.is_discarded &&
+            !user.is_banned &&
+            !user.roles.some((r) => STAFF_ROLES.includes(r)) && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <ShieldIcon data-icon="inline-start" />
+                    Impersonate
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Impersonate {user.display_name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      You'll browse the app as this user with their permissions. Your admin access is suspended until
+                      you exit. Actions you take are logged and attributed to you. Use a banner at the top of the page
+                      to stop impersonating.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => router.post(`/admin/users/${user.id}/impersonate`)}>
+                      Impersonate
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           {user.slack_id && (
             <Button variant="outline" size="sm" asChild>
               <a

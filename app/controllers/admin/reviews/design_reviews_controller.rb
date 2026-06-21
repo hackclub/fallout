@@ -3,11 +3,13 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
     # parse_sort persists the sort preference in session — keep it on the critical path so the
     # eager current_sort prop is correct. The heavy queue lists are deferred behind a skeleton.
     sort = parse_sort
+    ticket_eligible = parse_ticket_filter
     render inertia: {
       start_reviewing_path: next_admin_reviews_design_reviews_path,
       current_sort: sort,
+      ticket_eligible: ticket_eligible,
       **review_stats_props(DesignReview),
-      **deferred_index_props(sort)
+      **deferred_index_props(sort, ticket_eligible)
     }
   end
 
@@ -108,7 +110,7 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
 
   # Memoized loader shared by the deferred index props so the heavy queue query runs once per
   # deferred request even though pending_reviews/all_reviews/pagy are separate Inertia props.
-  def deferred_index_props(sort)
+  def deferred_index_props(sort, ticket_eligible)
     memo = nil
     load = lambda do
       memo ||= begin
@@ -119,6 +121,7 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
         # the DR row is created later (after TA approval), so DR.created_at doesn't
         # reflect how long the student has actually been waiting.
         pending_reviews = base.pending.where.not(ship_id: flagged_ship_ids).joins(:ship).order("ships.created_at ASC").load
+        pending_reviews = filter_ticket_eligible(pending_reviews) if ticket_eligible
         @pagy, @all_reviews = pagy(base.order(created_at: :desc))
         flagged_ids = ProjectFlag.distinct.pluck(:project_id).to_set
         Ship.preload_cycle_started_at((pending_reviews + @all_reviews).map(&:ship)) # avoid N+1 in serialize_review_row (dedup done inside)

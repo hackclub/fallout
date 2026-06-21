@@ -99,6 +99,27 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
     "review_sort:#{params[:controller]}"
   end
 
+  # Whether the "users that can get a ticket" filter is active. Persisted in session (like
+  # sort) so it survives PATCH/redirect cycles where the query param isn't re-sent.
+  def parse_ticket_filter
+    session[review_ticket_filter_session_key] = params[:ticket] if params[:ticket].in?(%w[eligible all])
+    session[review_ticket_filter_session_key] == "eligible"
+  end
+
+  def review_ticket_filter_session_key
+    "review_ticket_filter:#{params[:controller]}"
+  end
+
+  # Restricts the pending queue to ships whose owner currently qualifies for a summit ticket
+  # (approved hours >= their per-user override, else the default threshold). Owner User records
+  # are already loaded via the index `includes`, so only the approved-hours aggregation runs
+  # here — computed once per distinct owner.
+  def filter_ticket_eligible(reviews)
+    owners = reviews.map { |r| r.ship.project.user }.uniq(&:id)
+    eligible_ids = owners.select(&:meets_ticket_hours?).map(&:id).to_set
+    reviews.select { |r| eligible_ids.include?(r.ship.project.user_id) }
+  end
+
   # Flagged projects are visible in the All table but excluded from the pending queue
   def flagged_ship_ids
     Ship.where(project_id: ProjectFlag.select(:project_id)).select(:id)

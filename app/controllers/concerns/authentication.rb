@@ -10,7 +10,7 @@ module Authentication
       before_action :redirect_discarded_trial_user!
       before_action :authenticate_verified_user!
       before_action :redirect_to_onboarding!
-      helper_method :current_user, :user_signed_in?
+      helper_method :current_user, :user_signed_in?, :true_user, :impersonating?
   end
 
   class_methods do
@@ -45,10 +45,29 @@ module Authentication
 
   def set_current_user
     @current_user = User.find_by(id: session[:user_id]) if session[:user_id]
+    # During admin impersonation `current_user` is the impersonated target (so the whole
+    # request pipeline, Pundit, and the UI see exactly what that user would). The real admin
+    # is tracked separately in `true_user` for audit attribution and the exit path.
+    @true_user = session[:impersonator_id] ? User.find_by(id: session[:impersonator_id]) : @current_user
   end
 
   def current_user
     @current_user
+  end
+
+  # The actual human behind the request — the admin while impersonating, otherwise current_user.
+  def true_user
+    @true_user
+  end
+
+  def impersonating?
+    session[:impersonator_id].present? && true_user.present? && true_user != current_user
+  end
+
+  # Attribute PaperTrail changes to the real human even while impersonating, so destructive
+  # actions taken during an impersonation session trace back to the admin who performed them.
+  def user_for_paper_trail
+    true_user&.id
   end
 
   def redirect_banned_user!

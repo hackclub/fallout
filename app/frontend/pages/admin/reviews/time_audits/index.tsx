@@ -7,6 +7,7 @@ import { DataTable } from '@/components/admin/DataTable'
 import { DataTableSkeleton } from '@/components/admin/DataTableSkeleton'
 import { buildPendingColumns, buildAllColumns } from '@/components/admin/reviewColumns'
 import { ReviewStatsHeader, type ReviewStats, type ReviewStatKey } from '@/components/admin/ReviewStats'
+import TicketFilterButton from '@/components/admin/TicketFilterButton'
 import type { ReviewRow, PagyProps } from '@/types'
 
 const BASE_PATH = '/admin/reviews/time_audits'
@@ -16,6 +17,7 @@ export default function TimeAuditsIndex({
   all_reviews,
   pagy,
   start_reviewing_path,
+  ticket_eligible,
   stats_keys,
   stats,
   sla_days,
@@ -24,6 +26,7 @@ export default function TimeAuditsIndex({
   all_reviews?: ReviewRow[]
   pagy?: PagyProps
   start_reviewing_path: string
+  ticket_eligible: boolean
   stats_keys: ReviewStatKey[]
   stats?: ReviewStats
   sla_days?: number
@@ -49,11 +52,14 @@ export default function TimeAuditsIndex({
               </Badge>
             )}
           </h2>
-          {pending_reviews && pending_reviews.length > 0 && (
-            <Button asChild size="sm">
-              <Link href={start_reviewing_path}>Start Reviewing</Link>
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <TicketFilterButton basePath={BASE_PATH} active={ticket_eligible} />
+            {pending_reviews && pending_reviews.length > 0 && (
+              <Button asChild size="sm">
+                <Link href={start_reviewing_path}>Start Reviewing</Link>
+              </Button>
+            )}
+          </div>
         </div>
         <Deferred data="pending_reviews" fallback={<DataTableSkeleton columns={pendingColumns.length} />}>
           <DataTable
