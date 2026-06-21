@@ -62,6 +62,12 @@ class ProjectPolicy < ApplicationPolicy
     return false if record.ships.where(status: %i[pending awaiting_identity]).exists? # Block while a submission is queued or held for identity verification
     return false unless user.present?
 
+    # Kill switch for first-time submissions: when :disable_new_submissions is on, projects that have
+    # never been shipped are blocked, unless the user is granted the :new_submissions_override actor flag.
+    if !record.ships.exists? && Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, user)
+      return false
+    end
+
     !user.trial? && owner? # Only verified project owners can submit for review
   end
 
