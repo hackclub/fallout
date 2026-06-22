@@ -33,6 +33,13 @@ RUN apt-get update -qq && \
 # Harden ImageMagick: disable coders/paths used for ImageTragick-class RCE.
 COPY config/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 
+# Node.js for yt-dlp's JS challenge solver (n-challenge). Without a JS runtime, yt-dlp can't
+# solve YouTube's n-challenge and only gets storyboard-only format lists.
+ARG NODE_VERSION=22
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
+    apt-get install --no-install-recommends -y nodejs && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
 # yt-dlp installed as a Python package (not the linux_exe binary) so it uses the system Python
 # and can detect JS runtimes (node) via shutil.which for the n-challenge solver.
 # DELIBERATELY not pinned: YouTube changes extraction constantly, stale yt-dlp breaks downloads.
