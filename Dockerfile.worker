@@ -18,7 +18,6 @@ ARG LIBVIPS42_VERSION=8.14.1-3+deb12u3
 ARG SQLITE3_VERSION=3.40.1-2+deb12u2
 ARG FFMPEG_VERSION=7:5.1.9-0+deb12u1
 ARG IMAGEMAGICK_VERSION=8:6.9.11.60+dfsg-1.6+deb12u10
-
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
       curl="${CURL_VERSION}" \
@@ -26,32 +25,21 @@ RUN apt-get update -qq && \
       libvips42="${LIBVIPS42_VERSION}" \
       sqlite3="${SQLITE3_VERSION}" \
       ffmpeg="${FFMPEG_VERSION}" \
-      imagemagick="${IMAGEMAGICK_VERSION}" && \
+      imagemagick="${IMAGEMAGICK_VERSION}" \
+      python3 \
+      python3-pip && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Harden ImageMagick: disable coders/paths used for ImageTragick-class RCE.
 COPY config/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 
-# yt-dlp (self-contained Linux binary) for YouTubeTimelapseService. DELIBERATELY not pinned to a
-# fixed Debian-style version like the tools above: YouTube changes extraction constantly, so a
-# stale yt-dlp is the single most common cause of downloads breaking. Default tracks `latest`;
-# override with --build-arg YTDLP_VERSION=<release-tag> for a reproducible build. The --version
-# call verifies the binary actually runs, failing the build if the download is corrupt.
-ARG NODE_RUNTIME_VERSION=22
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_RUNTIME_VERSION}.x | bash - && \
-    apt-get install --no-install-recommends -y nodejs && \
-    rm -rf /var/lib/apt/lists /var/cache/apt/archives
-
+# yt-dlp installed as a Python package (not the linux_exe binary) so it uses the system Python
+# and can detect JS runtimes (node) via shutil.which for the n-challenge solver.
+# DELIBERATELY not pinned: YouTube changes extraction constantly, stale yt-dlp breaks downloads.
 ARG YTDLP_VERSION=latest
-RUN set -eux; \
-    if [ "$YTDLP_VERSION" = "latest" ]; then \
-      url="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"; \
-    else \
-      url="https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp_linux"; \
-    fi; \
-    curl -fsSL "$url" -o /usr/local/bin/yt-dlp; \
-    chmod 0755 /usr/local/bin/yt-dlp; \
-    /usr/local/bin/yt-dlp --version
+RUN pip3 install --break-system-packages \
+      $([ "$YTDLP_VERSION" = "latest" ] && echo "yt-dlp[default]" || echo "yt-dlp[default]==${YTDLP_VERSION}") && \
+    yt-dlp --version
 
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
