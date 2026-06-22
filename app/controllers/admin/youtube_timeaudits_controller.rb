@@ -46,6 +46,7 @@ class Admin::YoutubeTimeauditsController < Admin::ApplicationController
     skip_authorization
     candidates = YouTubeVideo.where(id: queue_video_ids)
       .where(processing_status: YouTubeVideo.processing_statuses.values_at(*PROCESSABLE_STATUSES))
+      .order(created_at: :asc)
     candidates.each { |video| enqueue!(video, force: false) }
     render json: { ok: true, enqueued: candidates.size }
   end
