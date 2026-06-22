@@ -33,8 +33,8 @@ class YouTubeTimelapseService
   MAX_HEIGHT = 720            # bound R2 size while keeping IDE text legible for the reviewer
   UPLOAD_RETRIES = 4
   FFPROBE_TIMEOUT = 30
-  YTDLP_TIMEOUT = 30.minutes.to_i  # raw downloads can be GBs; bound so one video can't pin a worker
-  FFMPEG_TIMEOUT = 30.minutes.to_i
+  YTDLP_TIMEOUT = 150.minutes.to_i  # raw downloads can be GBs; bound so one video can't pin a worker
+  FFMPEG_TIMEOUT = 150.minutes.to_i
   PRESIGN_TTL = 6.hours        # comfortably outlives a review session; re-minted each render
 
   # yt-dlp stderr fragments that mean the video is permanently gone (vs a transient block).
