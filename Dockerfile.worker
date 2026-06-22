@@ -37,6 +37,11 @@ COPY config/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 # stale yt-dlp is the single most common cause of downloads breaking. Default tracks `latest`;
 # override with --build-arg YTDLP_VERSION=<release-tag> for a reproducible build. The --version
 # call verifies the binary actually runs, failing the build if the download is corrupt.
+ARG NODE_RUNTIME_VERSION=22
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_RUNTIME_VERSION}.x | bash - && \
+    apt-get install --no-install-recommends -y nodejs && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
 ARG YTDLP_VERSION=latest
 RUN set -eux; \
     if [ "$YTDLP_VERSION" = "latest" ]; then \
