@@ -99,7 +99,7 @@ gem "query_count", "~> 1.1"
 
 gem "redcarpet", "~> 3.6"
 
-gem "aws-sdk-s3", "~> 1.219", require: false
+gem "aws-sdk-s3", "~> 1.224", require: false
 
 gem "pagy", "~> 43.5"
 gem "pg_search", "~> 2.3"
