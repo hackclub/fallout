@@ -32,6 +32,22 @@ RUN apt-get update -qq && \
 # Harden ImageMagick: disable coders/paths used for ImageTragick-class RCE.
 COPY config/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 
+# yt-dlp (self-contained Linux binary) for YouTubeTimelapseService. DELIBERATELY not pinned to a
+# fixed Debian-style version like the tools above: YouTube changes extraction constantly, so a
+# stale yt-dlp is the single most common cause of downloads breaking. Default tracks `latest`;
+# override with --build-arg YTDLP_VERSION=<release-tag> for a reproducible build. The --version
+# call verifies the binary actually runs, failing the build if the download is corrupt.
+ARG YTDLP_VERSION=latest
+RUN set -eux; \
+    if [ "$YTDLP_VERSION" = "latest" ]; then \
+      url="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"; \
+    else \
+      url="https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp_linux"; \
+    fi; \
+    curl -fsSL "$url" -o /usr/local/bin/yt-dlp; \
+    chmod 0755 /usr/local/bin/yt-dlp; \
+    /usr/local/bin/yt-dlp --version
+
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \

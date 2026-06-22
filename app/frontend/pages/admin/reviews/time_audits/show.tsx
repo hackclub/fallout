@@ -1027,7 +1027,9 @@ function RecordingBlock({
   const [preview, setPreview] = useState<{ start: number; end: number; type: 'removed' | 'deflated' } | null>(null)
   const [sliderTrackEl, setSliderTrackEl] = useState<Element | null>(null)
 
-  const isYouTube = recording.type === 'YouTubeVideo'
+  // Only UNprocessed YouTube uses the iframe + 120× + stretch path. A processed YouTube video has a
+  // 60× timelapse playback_url and flows through the native player / 60× billing path, exactly like Lapse/Lookout.
+  const isYouTube = recording.type === 'YouTubeVideo' && !recording.timelapse_ready
   const hasPlaybackUrl = !!recording.playback_url
   const isMissingDuration = isYouTube && recording.duration === 0
   const [refetching, setRefetching] = useState(false)
@@ -1505,17 +1507,18 @@ const EntrySection = memo(
       })
 
     const entryApprovedSeconds = useMemo(() => {
-      // Recompute base: replace each YouTube recording's duration with duration * stretch_multiplier
+      // Unprocessed YouTube scales its raw duration by stretch_multiplier; timelapse footage (Lapse,
+      // Lookout, processed YouTube) already stores real seconds (base ×1) and deducts segments ×60.
       let total = 0
       for (const rec of entry.recordings) {
         const recData = annotations.recordings?.[String(rec.id)]
-        const multiplier = rec.type === 'YouTubeVideo' ? (recData?.stretch_multiplier ?? 1) : 1
+        const multiplier = rec.type === 'YouTubeVideo' && !rec.timelapse_ready ? (recData?.stretch_multiplier ?? 1) : 1
         total += rec.duration * multiplier
       }
       for (const rec of entry.recordings) {
         const recData = annotations.recordings?.[String(rec.id)]
         if (!recData?.segments) continue
-        const multiplier = rec.type === 'YouTubeVideo' ? (recData.stretch_multiplier ?? 1) : 60
+        const multiplier = rec.type === 'YouTubeVideo' && !rec.timelapse_ready ? (recData.stretch_multiplier ?? 1) : 60
         for (const seg of recData.segments) {
           const videoRange = seg.end_seconds - seg.start_seconds
           const realRange = videoRange * multiplier
@@ -1599,7 +1602,11 @@ const EntrySection = memo(
                     recording={rec}
                     description={recAnnotation?.description ?? ''}
                     segments={recAnnotation?.segments ?? []}
-                    multiplier={rec.type === 'YouTubeVideo' ? (recAnnotation?.stretch_multiplier ?? 1) : 60}
+                    multiplier={
+                      rec.type === 'YouTubeVideo' && !rec.timelapse_ready
+                        ? (recAnnotation?.stretch_multiplier ?? 1)
+                        : 60
+                    }
                     saved={savedRecordings.has(recId)}
                     readOnly={readOnly}
                     onDescriptionChange={(d) => onDescriptionChange(rec.id, d)}
@@ -1901,14 +1908,17 @@ export default function TimeAuditsShow({
       let entryTime = 0
       for (const rec of entry.recordings) {
         const recData = annotations.recordings?.[String(rec.id)]
-        const baseMultiplier = rec.type === 'YouTubeVideo' ? (recData?.stretch_multiplier ?? 1) : 1
+        // Processed YouTube is a 60× timelapse: base ×1 (duration already real), like Lapse/Lookout.
+        const baseMultiplier =
+          rec.type === 'YouTubeVideo' && !rec.timelapse_ready ? (recData?.stretch_multiplier ?? 1) : 1
         entryTime += rec.duration * baseMultiplier
       }
       const recs = annotations.recordings
       if (recs) {
         for (const rec of entry.recordings) {
           const recData = recs[String(rec.id)]
-          const multiplier = rec.type === 'YouTubeVideo' ? (recData?.stretch_multiplier ?? 1) : 60
+          const multiplier =
+            rec.type === 'YouTubeVideo' && !rec.timelapse_ready ? (recData?.stretch_multiplier ?? 1) : 60
           if (!recData?.segments) continue
           for (const seg of recData.segments) {
             const videoRange = seg.end_seconds - seg.start_seconds

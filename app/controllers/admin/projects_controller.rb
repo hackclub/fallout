@@ -219,8 +219,10 @@ class Admin::ProjectsController < Admin::ApplicationController
   end
 
   def compute_removed_seconds(segments, recording: nil, rec_data: {})
-    # YouTube stretch_multiplier lets reviewers treat a YT video as a timelapse (e.g. ×60)
-    multiplier = recording&.recordable.is_a?(YouTubeVideo) ? (rec_data["stretch_multiplier"]&.to_f || 1.0) : 60.0
+    # Only UNprocessed YouTube uses the reviewer's stretch_multiplier; a processed YouTube video is a
+    # real 60× timelapse and deducts like Lapse/Lookout (segments are in timelapse-video seconds).
+    raw_youtube = recording&.recordable.is_a?(YouTubeVideo) && !recording.recordable.timelapse_ready?
+    multiplier = raw_youtube ? (rec_data["stretch_multiplier"]&.to_f || 1.0) : 60.0
     segments.sum do |seg|
       video_range = seg["end_seconds"].to_f - seg["start_seconds"].to_f
       real_range = video_range * multiplier
@@ -273,8 +275,10 @@ class Admin::ProjectsController < Admin::ApplicationController
     return unless current_user.admin?
 
     recordable = recording.recordable
-    return unless recordable.is_a?(LapseTimelapse) || recordable.is_a?(LookoutTimelapse)
+    return recordable.playback_url.presence if recordable.is_a?(LapseTimelapse) || recordable.is_a?(LookoutTimelapse)
+    # A processed YouTube video plays from its archived 60× timelapse via a presigned R2 URL.
+    return YouTubeTimelapseService.new.presigned_playback_url(recordable) if recordable.is_a?(YouTubeVideo) && recordable.timelapse_ready?
 
-    recordable.playback_url.presence
+    nil
   end
 end

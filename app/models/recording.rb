@@ -41,6 +41,11 @@ class Recording < ApplicationRecord
   private
 
   def enqueue_activity_check
+    # YouTube footage is activity-checked only by YouTubeTimelapseService once an admin processes it
+    # into a 60× timelapse — the plain checker can't download YouTube and would stamp an empty result,
+    # so it must stay the sole writer of YouTube inactive_segments/activity_checked_at.
+    return if recordable_type == "YouTubeVideo"
+
     TimelapseActivityCheckJob.perform_later(recordable)
   end
 

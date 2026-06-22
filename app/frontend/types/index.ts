@@ -473,6 +473,7 @@ export interface ReviewRecording {
   recordable_id?: number
   video_id?: string
   yt_duration_seconds?: number
+  timelapse_ready?: boolean // YouTube video processed into a 60× timelapse — render/bill like Lapse/Lookout
   inactive_segments?: InactiveSegment[]
   inactive_percentage?: number
   activity_checked?: boolean

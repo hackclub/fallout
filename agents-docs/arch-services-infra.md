@@ -75,6 +75,22 @@ Video metadata fetching and caching.
 - **Live streams**: `was_live` derived from `liveBroadcastContent` + `liveStreamingDetails`; recently-ended streams fall back to `actualEndTime - actualStartTime` for duration and are re-fetched after 1 day via `YouTubeVideoRefetchJob`
 - **Env**: `YOUTUBE_API_KEY` (falls back to `GOOGLE_CLOUD_API_KEY`)
 
+### YouTube timelapse conversion — `app/services/you_tube_timelapse_service.rb`
+
+Makes YouTube footage audit like Lapse/Lookout. Raw YouTube plays through a janky iframe + 120× seek hack with no activity analysis; once converted to a **60× timelapse** it flows through the native player + the shared `TimelapseActivityChecker`, and bills identically (see arch-ship-and-koi `compute_approved_public_seconds`).
+
+- **`process!(video, force:)`** (one yt-dlp fetch per video — minimizing bot-detection exposure):
+  1. `yt-dlp` downloads the raw video (≤720p) to a temp file. Cookies come from the `YT_DLP_COOKIES` secret, written to a `0600` temp file and passed via `--cookies` (server-IP downloads otherwise hit YouTube's bot wall). Failures are classified `Unavailable(:gone)` (private/deleted — permanent) vs `Unavailable(:blocked)` (bot challenge / rate limit — transient).
+  2. `ffmpeg` transcodes to a 60× / 20fps / ≤720p timelapse (`setpts=PTS/60,fps=20`, `+faststart` so the `<video>` tag can stream from R2). 1h real → 1min of video. The large raw download is discarded; **only the timelapse is stored**.
+  3. `TimelapseActivityChecker.run_on_file` runs on the timelapse — **unchanged**, because a 60× timelapse matches the checker's existing "1 timelapse-sec ≈ 1 real-min" convention.
+  4. Upload to R2 under `youtube-timelapse/<id>/{timelapse.mp4,metadata.json}` via a self-managed `aws-sdk-s3` client (same `R2_*` env + `with_r2_retry` as `LapseArchiveService`).
+  5. One atomic `update!`: `processed_at`, `timelapse_*`, `inactive_*`/`activity_checked_at`, `processing_status: :done`. `duration_seconds` is backfilled from ffprobe **only if blank** — never overwritten (it's the billing source of truth). `stretch_multiplier` stays `1`.
+- **`presigned_playback_url(video, expires_in: 6.hours)`** — `Aws::S3::Presigner` GET URL for the timelapse, minted per Inertia render (a stale URL 403s → reload re-mints). Exposed to TA reviewers in `time_audits_controller#serialize_recording` (like Lapse/Lookout `playback_url`), and admin-only in `projects_controller#recording_playback_url`. `timelapse_ready?` (⇔ `processed_at.present?`) is the single source of truth, serialized to the frontend so a processed video renders/bills via the Lapse path.
+- **Progress**: `processing_status` enum (`pending/downloading/transcoding/uploading/done/failed`) + `processing_progress` (0–100, parsed from yt-dlp `--newline` % and ffmpeg `-progress`, throttled) drive the dashboard's live bars.
+- **Trigger**: NOT automatic on `Recording` create (`enqueue_activity_check` skips YouTube — the new service is the sole writer of YouTube `inactive_*`/`activity_checked_at`). Admins run it from the dashboard via `ProcessYouTubeTimelapseJob` (queue `:heavy`).
+- **Dashboard**: unlisted admin-only page at `/admin/youtube-timeaudit` (`Admin::YoutubeTimeauditsController`, `require_admin!`, inside the `AdminConstraint` routing block, not in `AdminSidebar`). Lists every `YouTubeVideo` with project/author context, per-video live progress bars (polls `#status`), and Process / Re-run / "View audit" actions. `#process_all` enqueues every not-yet-processed, not-in-flight video.
+- **Worker image**: `Dockerfile.worker` installs a self-contained `yt-dlp` binary. Deliberately tracks `latest` (override with `--build-arg YTDLP_VERSION=<tag>`) — unlike the other pinned tools, a stale yt-dlp is the top cause of YouTube downloads breaking. `ffmpeg` is already present for the activity checker.
+
 ### Hackatime — `app/services/hackatime_service.rb`
 
 Time tracking verification.
@@ -209,6 +225,7 @@ Admin dashboard: MissionControl::Jobs at `/jobs` (admin-only constraint).
 ### Direct R2 use (non-ActiveStorage)
 
 - `lapse-archive/<lapse_timelapse_id>/` — Lapse disaster-recovery archive written by `LapseArchiveService` via a self-managed `aws-sdk-s3` client (same `R2_*` env). Reserved prefix; ActiveStorage keys are random and slashless so they never overlap. See the Lapse section above.
+- `youtube-timelapse/<you_tube_video_id>/` — 60× timelapse (`timelapse.mp4` + `metadata.json`) written by `YouTubeTimelapseService`, same self-managed client. Unlike the Lapse archive (disaster recovery), this **is** the playback source — served to reviewers via a presigned GET URL. Reserved prefix. See the YouTube timelapse section above.
 
 ### Caching
 

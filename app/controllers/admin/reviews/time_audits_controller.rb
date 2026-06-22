@@ -223,14 +223,29 @@ class Admin::Reviews::TimeAuditsController < Admin::Reviews::BaseController
     when LapseTimelapse
       base.merge(playback_url: recordable.playback_url, thumbnail_url: recordable.thumbnail_url)
     when YouTubeVideo
-      base.merge(
-        recordable_id: recordable.id, # YouTubeVideo record id for admin refetch action
-        video_id: recordable.video_id,
-        thumbnail_url: recordable.thumbnail_url,
-        yt_duration_seconds: recordable.duration_seconds # used as timeline fallback before YT player loads
-      )
+      if recordable.timelapse_ready?
+        # Processed: present like a Lapse/Lookout timelapse — native player + 60× billing.
+        base.merge(
+          timelapse_ready: true,
+          playback_url: youtube_timelapse_service.presigned_playback_url(recordable),
+          thumbnail_url: recordable.thumbnail_url
+        )
+      else
+        base.merge(
+          timelapse_ready: false,
+          recordable_id: recordable.id, # YouTubeVideo record id for admin refetch action
+          video_id: recordable.video_id,
+          thumbnail_url: recordable.thumbnail_url,
+          yt_duration_seconds: recordable.duration_seconds # used as timeline fallback before YT player loads
+        )
+      end
     else
       base
     end
+  end
+
+  # Memoized so a request serializing many recordings reuses one R2 signer (presigning is local, no network).
+  def youtube_timelapse_service
+    @youtube_timelapse_service ||= YouTubeTimelapseService.new
   end
 end

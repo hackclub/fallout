@@ -456,6 +456,13 @@ Rails.application.routes.draw do
           post :refetch # Re-fetch YouTube metadata for videos with missing duration
         end
       end
+
+      # Unlisted admin tooling: process YouTube footage into 60× timelapses for time auditing.
+      # Inside AdminConstraint (admin-only) + controller require_admin!. Not in AdminSidebar.
+      get  "youtube-timeaudit"             => "youtube_timeaudits#index",         as: :youtube_timeaudits
+      get  "youtube-timeaudit/status"      => "youtube_timeaudits#status",        as: :youtube_timeaudits_status
+      post "youtube-timeaudit/process_all" => "youtube_timeaudits#process_all",   as: :process_all_youtube_timeaudits
+      post "youtube-timeaudit/:id/process" => "youtube_timeaudits#process_video", as: :process_youtube_timeaudit
       resources :soup_campaigns, only: [ :index, :show, :new, :create, :update, :edit, :destroy ] do
         member do
           get :audience_preview

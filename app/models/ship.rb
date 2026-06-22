@@ -600,16 +600,20 @@ class Ship < ApplicationRecord
     new_journal_entries.includes(recordings: :recordable).each do |entry|
       entry.recordings.each do |rec|
         rec_annotations = annotations.dig("recordings", rec.id.to_s) || {}
-        # YouTube stretch_multiplier lets reviewers treat a YT video as a timelapse (e.g. ×60)
-        multiplier = rec.recordable.is_a?(YouTubeVideo) ? (rec_annotations["stretch_multiplier"]&.to_f || 1.0) : 60.0
+        # A processed YouTube video is a real 60× timelapse — bill it exactly like Lapse/Lookout
+        # (segments ×60, duration already real seconds). Only an UNprocessed YouTube video uses the
+        # reviewer-set stretch_multiplier against its real-time iframe footage.
+        raw_youtube = rec.recordable.is_a?(YouTubeVideo) && !rec.recordable.timelapse_ready?
+        multiplier = raw_youtube ? (rec_annotations["stretch_multiplier"]&.to_f || 1.0) : 60.0
         raw_duration =
           case rec.recordable
           when LookoutTimelapse, LapseTimelapse then rec.recordable.duration.to_i
           when YouTubeVideo                     then rec.recordable.duration_seconds.to_i
           else 0
           end
-        # For YouTube, base is raw video seconds * stretch_multiplier. For timelapse, duration is already in real seconds.
-        base_duration = rec.recordable.is_a?(YouTubeVideo) ? raw_duration * multiplier : raw_duration
+        # Unprocessed YouTube base = raw video seconds × stretch_multiplier. Timelapse footage
+        # (Lapse, Lookout, processed YouTube) already stores duration in real seconds.
+        base_duration = raw_youtube ? raw_duration * multiplier : raw_duration
         total += base_duration
         segments = rec_annotations["segments"] || []
         segments.each do |seg|
