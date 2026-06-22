@@ -33,15 +33,20 @@ RUN apt-get update -qq && \
 # Harden ImageMagick: disable coders/paths used for ImageTragick-class RCE.
 COPY config/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 
-# Node.js for yt-dlp's JS challenge solver (n-challenge). Without a JS runtime, yt-dlp can't
-# solve YouTube's n-challenge and only gets storyboard-only format lists.
-ARG NODE_VERSION=22
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
-    apt-get install --no-install-recommends -y nodejs && \
-    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+# Deno for yt-dlp's JS challenge solver (n-challenge). Without a JS runtime, yt-dlp can't solve
+# YouTube's n-challenge and only gets storyboard-only format lists. Deno is yt-dlp's best-tested
+# EJS runtime; node is NOT detected by the current yt-dlp release. Ships as a standalone binary
+# (a zip, extracted with the system python3 since the image has no unzip).
+ARG DENO_VERSION=v2.8.3
+RUN set -eux; \
+    curl -fsSL "https://github.com/denoland/deno/releases/download/${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip" -o /tmp/deno.zip; \
+    python3 -c "import zipfile; zipfile.ZipFile('/tmp/deno.zip').extractall('/usr/local/bin')"; \
+    chmod 0755 /usr/local/bin/deno; \
+    rm /tmp/deno.zip; \
+    deno --version
 
 # yt-dlp installed as a Python package (not the linux_exe binary) so it uses the system Python
-# and can detect JS runtimes (node) via shutil.which for the n-challenge solver.
+# and can detect the deno JS runtime for the n-challenge solver.
 # DELIBERATELY not pinned: YouTube changes extraction constantly, stale yt-dlp breaks downloads.
 ARG YTDLP_VERSION=latest
 RUN pip3 install --break-system-packages \
