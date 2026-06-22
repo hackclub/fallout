@@ -514,9 +514,9 @@ class User < ApplicationRecord
     (shipped_time_logged_seconds / 3600.0).round(1) >= ticket_hours_threshold
   end
 
-  # Time the user has attributed to journals that are attached to a ship (any status) —
-  # i.e. logged time they've actually submitted, before TA approval. Sits between total
-  # (all logged) and approved (TA-blessed): total >= shipped >= approved.
+  # Time the user has attributed to journals attached to a ship (any status), plus their
+  # share of project-level manual_seconds. Sits between total (all logged) and approved
+  # (TA-blessed): total >= shipped >= approved.
   def shipped_time_logged_seconds
     all_ids = projects_attributable_to_self_ids
     return 0 if all_ids.empty?

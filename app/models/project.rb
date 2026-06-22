@@ -248,8 +248,8 @@ class Project < ApplicationRecord
   end
 
   # Shipped counterpart of batch_user_logged_seconds: the user's attributed share of journal
-  # time on journals attached to a ship (any status), per project. Excludes manual_seconds —
-  # project-level manual time isn't tied to a ship.
+  # time on journals attached to a ship (any status), per project. manual_seconds are always
+  # included — they're admin-set hours that can't be tied to a ship but count regardless.
   def self.batch_user_shipped_seconds(project_ids, user)
     return {} if project_ids.empty? || user.nil?
 
@@ -260,6 +260,16 @@ class Project < ApplicationRecord
 
     result = Hash.new(0)
     user_seconds_by_je.each { |je_id, secs| result[project_by_je[je_id]] += secs }
+
+    member_counts = batch_member_counts(project_ids)
+    manuals = where(id: project_ids).pluck(:id, :manual_seconds).to_h
+    member_pids = project_ids_user_is_member_of(project_ids, user)
+    project_ids.each do |pid|
+      next unless member_pids.include?(pid)
+      mc = member_counts[pid].to_i
+      result[pid] += manuals[pid].to_i / mc if mc.positive?
+    end
+
     result
   end
 
