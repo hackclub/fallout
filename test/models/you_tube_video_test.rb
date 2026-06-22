@@ -17,7 +17,7 @@
 #  processed_at               :datetime
 #  processing_error           :text
 #  processing_progress        :integer          default(0), not null
-#  processing_status          :integer          default("pending"), not null
+#  processing_status          :integer          default("unqueued"), not null
 #  published_at               :datetime
 #  stretch_multiplier         :integer          default(1), not null
 #  tags                       :text
