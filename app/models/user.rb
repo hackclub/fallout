@@ -600,11 +600,16 @@ class User < ApplicationRecord
       h[u.id] = (u.total_time_logged_seconds / 3600.0).floor
     end
 
+    on_track = where(id: user_ids).each_with_object({}) do |u, h|
+      h[u.id] = (u.shipped_time_logged_seconds / 3600.0).round(1) >= u.ticket_hours_threshold
+    end
+
     {
       first_project_created_at: Project.kept.where(user_id: user_ids).group(:user_id).minimum(:created_at),
       latest_visit_country: latest_visit_country,
       last_journal_at: JournalEntry.kept.where(user_id: user_ids).group(:user_id).maximum(:created_at),
-      db_hours: db_hours
+      db_hours: db_hours,
+      on_track: on_track
     }
   end
 
@@ -623,7 +628,8 @@ class User < ApplicationRecord
       "Deleted At" => ->(u) { u.discarded_at&.iso8601 },
       "Email Verified" => ->(u) { !u.trial? },
       "Is Active" => ->(u, pre) { pre[:last_journal_at][u.id].present? && pre[:last_journal_at][u.id] >= 8.days.ago },
-      "DB Hours Logged" => ->(u, pre) { pre[:db_hours][u.id] || 0 }
+      "DB Hours Logged" => ->(u, pre) { pre[:db_hours][u.id] || 0 },
+      "Ontrack" => ->(u, pre) { pre[:on_track][u.id] || false }
     }
   end
 
