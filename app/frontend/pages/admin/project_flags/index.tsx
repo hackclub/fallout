@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
-import { Link, Deferred } from '@inertiajs/react'
+import { Link, Deferred, router } from '@inertiajs/react'
 import type { ColumnDef } from '@tanstack/react-table'
 import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
+import { Button } from '@/components/admin/ui/button'
 import { Skeleton } from '@/components/admin/ui/skeleton'
 import { DataTable } from '@/components/admin/DataTable'
 import { DataTableSkeleton } from '@/components/admin/DataTableSkeleton'
@@ -72,6 +73,21 @@ const columns: ColumnDef<ProjectFlag>[] = [
     accessorKey: 'created_at',
     header: 'Flagged',
     cell: ({ row }) => <TimeAgo datetime={row.original.created_at} />,
+  },
+  {
+    id: 'actions',
+    cell: ({ row }) => (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          if (!confirm('Remove this flag?')) return
+          router.delete(`/admin/project_flags/${row.original.id}`)
+        }}
+      >
+        Unflag
+      </Button>
+    ),
   },
 ]
 
