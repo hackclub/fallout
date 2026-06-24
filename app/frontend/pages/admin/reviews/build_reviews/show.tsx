@@ -1052,9 +1052,8 @@ export default function BuildReviewsShow({
                 <Button
                   className="w-full"
                   variant="default"
-                  disabled={submitting || !internalReason.trim()}
+                  disabled={submitting}
                   onClick={() => handleSubmit('approved')}
-                  title={!internalReason.trim() ? 'Internal reason is required when approving' : undefined}
                 >
                   {submitting ? (
                     <LoaderIcon className="size-4 animate-spin mr-1" />

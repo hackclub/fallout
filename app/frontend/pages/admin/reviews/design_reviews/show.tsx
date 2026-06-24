@@ -740,9 +740,9 @@ export default function DesignReviewsShow({
   }, [])
 
   // Cmd/Ctrl+Enter inside the feedback textarea: choose between Approve and Return.
-  // Approve when an internal reason is present (it's required for approval anyway);
-  // otherwise treat the draft as a Return if feedback exists. Falls back to focusing
-  // the right textarea so the reviewer sees what's missing.
+  // Approve when an internal reason is present; otherwise treat the draft as a Return
+  // if feedback exists. Falls back to focusing the right textarea so the reviewer sees
+  // what's missing.
   const handleModifierEnter = useCallback(() => {
     if (isTerminal || submitting) return
     const hasReason = internalReason.trim().length > 0
@@ -787,10 +787,6 @@ export default function DesignReviewsShow({
     p: {
       handler: () => {
         if (isTerminal || submitting) return
-        if (!internalReason.trim()) {
-          notify('alert', 'Internal reason is required when approving.')
-          return
-        }
         handleSubmit('approved')
       },
       requireModifier: true,
@@ -1301,9 +1297,8 @@ export default function DesignReviewsShow({
                   <div className="grid grid-cols-2 gap-2">
                     <Button
                       variant="outline"
-                      disabled={submitting || !internalReason.trim()}
+                      disabled={submitting}
                       onClick={() => handleSubmit('approved')}
-                      title={!internalReason.trim() ? 'Internal reason is required when approving' : undefined}
                       className="border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-700 disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900"
                     >
                       {submitting && pendingStatus === 'approved' ? (
