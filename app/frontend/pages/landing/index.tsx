@@ -1200,7 +1200,7 @@ export default function LandingIndex() {
             </div>
           </section>
           <footer className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 bg-beige text-dark-brown pb-8 relative">
-            <div className="max-w-6xl mx-auto">
+            <div className="max-w-6xl mx-auto xl:mx-0">
               <p className="mb-4 text-lg md:text-xl font-rc-full">
                 A project by{' '}
                 <a
