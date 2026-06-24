@@ -1023,6 +1023,46 @@ export default function LandingIndex() {
                     }}
                   ></div>
                 </div>
+                <div className="relative flex-shrink-0 flex justify-center">
+                  <img
+                    src="/landing/logos/chaihuo.webp"
+                    className="h-10 md:h-16 w-auto object-contain opacity-0"
+                    alt="Chaihuo"
+                  />
+                  <div
+                    className="absolute inset-0 bg-dark-brown"
+                    style={{
+                      WebkitMaskImage: 'url(/landing/logos/chaihuo.webp)',
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskPosition: 'center',
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskImage: 'url(/landing/logos/chaihuo.webp)',
+                      maskSize: 'contain',
+                      maskPosition: 'center',
+                      maskRepeat: 'no-repeat',
+                    }}
+                  ></div>
+                </div>
+                <div className="relative flex-shrink-0 flex justify-center">
+                  <img
+                    src="/landing/logos/cloudcity.webp"
+                    className="h-7 md:h-12 w-auto object-contain opacity-0"
+                    alt="Cloud City"
+                  />
+                  <div
+                    className="absolute inset-0 bg-dark-brown"
+                    style={{
+                      WebkitMaskImage: 'url(/landing/logos/cloudcity.webp)',
+                      WebkitMaskSize: 'contain',
+                      WebkitMaskPosition: 'center',
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskImage: 'url(/landing/logos/cloudcity.webp)',
+                      maskSize: 'contain',
+                      maskPosition: 'center',
+                      maskRepeat: 'no-repeat',
+                    }}
+                  ></div>
+                </div>
               </div>
             </div>
             <p className="text-base text-center text-brown max-w-xl">
