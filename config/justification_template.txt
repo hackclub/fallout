@@ -163,7 +163,7 @@ In total, {TOTAL_DEFLATION} deflation was applied.
 
 The final reviewer was asked to justify why this ship meets the standards of the Unified DB:
 
-{INTERNAL_NOTES|"UNFILLED - DO NOT SUBMIT"}
+{INTERNAL_NOTES|"(no notes)"}
 
 !! To inspect the full review for this ship, including timelapses & journals, see: {INSPECT_URL}
 
