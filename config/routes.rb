@@ -628,6 +628,7 @@ Rails.application.routes.draw do
     get slug => "tracking_redirects#show", defaults: { slug: slug }
   end
 
+  get "guide" => redirect("/guide.pdf") # Participant's guide PDF
   get "faq" => redirect("/docs/faq") # Shortcut to FAQ docs page
   get "unsubscribe/soup/:token" => "soup_campaign_unsubscribes#show", as: :soup_campaign_unsubscribe
   post "unsubscribe/soup/:token" => "soup_campaign_unsubscribes#create"
