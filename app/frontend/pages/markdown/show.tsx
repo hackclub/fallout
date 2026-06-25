@@ -5,7 +5,15 @@ import MarkdownLayout from '@/layouts/MarkdownLayout'
 import DocVideo from '@/components/docs/DocVideo'
 import { createRoot } from 'react-dom/client'
 
-function MarkdownShow({ content_html, page_title }: { content_html: string; page_title: string }) {
+function MarkdownShow({
+  content_html,
+  page_title,
+  background_color,
+}: {
+  content_html: string
+  page_title: string
+  background_color?: string
+}) {
   const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -57,7 +65,11 @@ function MarkdownShow({ content_html, page_title }: { content_html: string; page
   return (
     <>
       <Head title={`${page_title} - Fallout`}>
-        <style>{`:root { background-color: #fffcf5; } @media (prefers-color-scheme: dark) { :root { background-color: #1a1412; } }`}</style>
+        <style>
+          {background_color
+            ? `:root { background-color: ${background_color}; }`
+            : `:root { background-color: #fffcf5; } @media (prefers-color-scheme: dark) { :root { background-color: #1a1412; } }`}
+        </style>
       </Head>
       <div ref={contentRef} className="markdown-content" dangerouslySetInnerHTML={{ __html: content_html }} />
     </>

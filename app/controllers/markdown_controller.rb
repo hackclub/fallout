@@ -32,7 +32,8 @@ class MarkdownController < ApplicationController
       page_title: page_title,
       menu_items: helpers.docs_grouped_menu_items,
       index_title: index_title,
-      search_index: helpers.docs_search_index
+      search_index: helpers.docs_search_index,
+      background_color: meta&.dig(:background_color)
     }
   end
 

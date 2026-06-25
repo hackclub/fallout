@@ -531,7 +531,7 @@ module MarkdownHelper
   end
 
   def build_guide_metadata(path)
-    meta = { title: nil, description: nil, priority: nil, unlisted: false }
+    meta = { title: nil, description: nil, priority: nil, unlisted: false, background_color: nil }
     in_table = false
     File.foreach(path) do |raw|
       line = raw.rstrip
@@ -557,6 +557,8 @@ module MarkdownHelper
             meta[:priority] = Integer(val) rescue nil
           when "unlisted"
             meta[:unlisted] = val.to_s.downcase == "true"
+          when "background_color"
+            meta[:background_color] = val.presence
           end
         end
       else
