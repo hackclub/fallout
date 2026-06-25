@@ -3,11 +3,11 @@
 | background_color | #002226 |
 | --- | --- |
 
-<img src="/letter-cover.webp" alt="Fallout Participant's Guide cover" style="width:100%" />
+<img src="/letter-cover.webp" alt="Fallout Participant's Guide cover" style="width:100%;max-height:none;height:auto;object-fit:unset" />
 
 # Participant's Guide
 
-> Dear Operatives,
+<!-- > Dear Operatives,
 > This transmission is highly classified. Unauthorized access is strictly forbidden.
 >
 > Congratulations. Your months of hard work paid off; you have been selected for **Operation: Fallout**.
@@ -19,7 +19,7 @@
 > Our intelligence team has narrowed a seven-day window to prevent this catastrophe. Report to our secure facility in Shenzhen, China, on July 1, 2026. Upon arrival, you will receive your assignment, equipment, and team.
 >
 > Sincerely,
-> Fallout — 2026-06-24
+> Fallout — 2026-06-24 -->
 
 ---
 
