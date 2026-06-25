@@ -12,7 +12,17 @@ import { PlusIcon, XIcon, UsersIcon, PencilIcon } from 'lucide-react'
 // point of the builder is that staff think in hours, not in 216000-second thresholds.
 
 type Op = '>=' | '>' | '=' | '<' | '<='
-type Kind = 'logged' | 'submitted' | 'qualified' | 'has_ships' | 'ids' | 'koi' | 'gold' | 'raw'
+type Kind =
+  | 'logged'
+  | 'submitted'
+  | 'approved'
+  | 'qualified'
+  | 'has_ticket'
+  | 'has_ships'
+  | 'ids'
+  | 'koi'
+  | 'gold'
+  | 'raw'
 type Mode = 'all' | 'any'
 
 interface Row {
@@ -60,7 +70,9 @@ const FIELD_META: Record<
 > = {
   logged: { label: 'Logged hours', type: 'time' },
   submitted: { label: 'Submitted hours', type: 'time' },
+  approved: { label: 'Approved hours', type: 'time' },
   qualified: { label: 'Qualified for ticket', type: 'bool' },
+  has_ticket: { label: 'Has a ticket', type: 'bool' },
   has_ships: { label: 'Has shipped a project', type: 'bool' },
   ids: { label: 'Specific user IDs', type: 'ids' },
   koi: { label: 'Koi balance', type: 'numeric', unit: 'koi' },
@@ -93,11 +105,13 @@ function parseQuery(text: string): Query {
         rows.push({ id: `p${i}`, kind: 'has_ships', bool: m[1].toLowerCase() === 'true' })
       else if ((m = line.match(/^qualified:\s*(true|false)$/i)))
         rows.push({ id: `p${i}`, kind: 'qualified', bool: m[1].toLowerCase() === 'true' })
-      else if ((m = line.match(/^total_time_(logged|submitted)_seconds\s*(>=|<=|=|>|<)\s*(\d+|[a-z_]+)$/i))) {
+      else if ((m = line.match(/^has_ticket:\s*(true|false)$/i)))
+        rows.push({ id: `p${i}`, kind: 'has_ticket', bool: m[1].toLowerCase() === 'true' })
+      else if ((m = line.match(/^total_time_(logged|submitted|approved)_seconds\s*(>=|<=|=|>|<)\s*(\d+|[a-z_]+)$/i))) {
         const isVar = !/^\d+$/.test(m[3])
         rows.push({
           id: `p${i}`,
-          kind: m[1].toLowerCase() === 'submitted' ? 'submitted' : 'logged',
+          kind: m[1].toLowerCase() as 'logged' | 'submitted' | 'approved',
           op: m[2] as Op,
           hours: isVar ? '' : secondsToHours(Number(m[3])),
           hoursVar: isVar ? m[3] : undefined,
@@ -117,9 +131,12 @@ function serializeRow(r: Row): string {
       return `has_ships: ${r.bool ? 'true' : 'false'}`
     case 'qualified':
       return `qualified: ${r.bool ? 'true' : 'false'}`
+    case 'has_ticket':
+      return `has_ticket: ${r.bool ? 'true' : 'false'}`
     case 'logged':
-    case 'submitted': {
-      const field = r.kind === 'submitted' ? 'total_time_submitted_seconds' : 'total_time_logged_seconds'
+    case 'submitted':
+    case 'approved': {
+      const field = `total_time_${r.kind}_seconds`
       if (r.hoursVar) return `${field} ${r.op ?? '>='} ${r.hoursVar}`
       const h = parseFloat(r.hours ?? '')
       if (!isFinite(h) || (r.hours ?? '').trim() === '') return ''
@@ -148,8 +165,10 @@ function defaultRow(kind: Kind, id: string): Row {
   switch (kind) {
     case 'logged':
     case 'submitted':
+    case 'approved':
       return { id, kind, op: '>', hours: '' }
     case 'qualified':
+    case 'has_ticket':
     case 'has_ships':
       return { id, kind, bool: true }
     case 'ids':

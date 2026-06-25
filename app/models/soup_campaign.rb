@@ -213,12 +213,14 @@ class SoupCampaign < ApplicationRecord
       Regexp.last_match(1).downcase == "true" ? scope.joins(projects: :ships) : scope.where.not(id: User.joins(projects: :ships).select(:id))
     when /\Aqualified:\s*(true|false)\z/i
       filter_by_ticket_qualification(scope, Regexp.last_match(1).downcase == "true")
-    when /\Atotal_time_(logged|submitted)_seconds\s*(>=|<=|=|>|<)\s*(\d+|[a-z_]+)\z/i
+    when /\Ahas_ticket:\s*(true|false)\z/i
+      filter_by_ticket_presence(scope, Regexp.last_match(1).downcase == "true")
+    when /\Atotal_time_(logged|submitted|approved)_seconds\s*(>=|<=|=|>|<)\s*(\d+|[a-z_]+)\z/i
       metric    = Regexp.last_match(1).downcase
       operator  = Regexp.last_match(2)
       raw       = Regexp.last_match(3)
       threshold = raw.match?(/\A\d+\z/) ? raw.to_i : raw.to_sym
-      filter_by_total_time(scope, operator, threshold, shipped_only: metric == "submitted")
+      filter_by_total_time(scope, operator, threshold, metric: metric.to_sym)
     when /\Akoi\s*(>=|<=|=|>|<)\s*(\d+)\z/i
       filter_by_currency(scope, :koi, Regexp.last_match(1), Regexp.last_match(2).to_i)
     when /\Agold\s*(>=|<=|=|>|<)\s*(\d+)\z/i
@@ -228,16 +230,21 @@ class SoupCampaign < ApplicationRecord
     end
   end
 
-  # shipped_only restricts journal-entry time to entries attached to a ship (any status).
-  # manual_seconds are always included — they're admin-set hours that can't be tied to a ship
-  # but count toward a user's total regardless of mode.
+  # metric selects which seconds to compare: :logged (all journal time), :submitted (time on
+  # shipped journal entries) or :approved (TA-approved seconds only).
+  # manual_seconds are always included for :logged/:submitted — they're admin-set hours that
+  # can't be tied to a ship but count toward a user's total regardless of mode.
   # threshold can be an Integer (fixed seconds) or a Symbol variable (e.g. :ticket_hours —
   # resolved per-user so each user is compared against their own value).
-  def filter_by_total_time(scope, operator, threshold, shipped_only: false)
+  def filter_by_total_time(scope, operator, threshold, metric: :logged)
     user_ids = scope.pluck(:id)
     return scope.none if user_ids.empty?
 
-    seconds_by_user = compute_batch_user_seconds(user_ids, shipped_only: shipped_only)
+    seconds_by_user = if metric == :approved
+      batch_approved_seconds(user_ids)
+    else
+      compute_batch_user_seconds(user_ids, shipped_only: metric == :submitted)
+    end
     threshold_by_user = threshold.is_a?(Symbol) ? resolve_variable(user_ids, threshold) : nil
 
     # Iterate the full id list (not just hash keys) so users with zero attributed seconds
@@ -425,6 +432,12 @@ class SoupCampaign < ApplicationRecord
     approved_claims = User.joins(:ticket_claim).merge(TicketClaim.approved).select(:id)
 
     qualified ? scope.where(id: approved_claims) : scope.where.not(id: approved_claims)
+  end
+
+  def filter_by_ticket_presence(scope, has_ticket)
+    with_claims = User.joins(:ticket_claim).select(:id)
+
+    has_ticket ? scope.where(id: with_claims) : scope.where.not(id: with_claims)
   end
 
   def generate_unsubscribe_token

@@ -286,9 +286,11 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       "ids: 1, 2, 3",
       "match: any",
       "qualified: true",
+      "has_ticket: true",
       "has_ships: false",
       "total_time_logged_seconds >= 72000",
-      "total_time_submitted_seconds < 216000"
+      "total_time_submitted_seconds < 216000",
+      "total_time_approved_seconds >= 216000"
     ]
   end
 
