@@ -59,15 +59,42 @@ class Admin::Reviews::RequirementsChecksController < Admin::Reviews::BaseControl
   def update
     authorize @review
 
-    # Checkpoint message is optional — attach it if found, but never block the review. The Slack
-    # lookup runs in a background job so the slow API calls don't time out the submit request.
     needs_checkpoint = @review.checkpoint_message_url.blank?
     provided_permalink = params.dig(:requirements_check_review, :checkpoint_message_url)
+    returning = params.dig(:requirements_check_review, :status) == "returned"
+    checkpoint_just_stored = false
+
+    # A returned RC must carry a checkpoint message so the submitter gets a Slack thread explaining
+    # the return — resolve it synchronously and block the submit if missing. Approvals/rejections
+    # stay best-effort: the slow Slack lookup runs off the request path in a background job below.
+    if returning && needs_checkpoint
+      slack_id = @review.ship.project.user.slack_id
+      url, failure = resolve_checkpoint_message(slack_id, provided_permalink)
+      if url.nil?
+        msg = failure == :wrong_mention \
+          ? "That message doesn't mention @#{@review.ship.project.user.display_name}. Did you tag the wrong person?" \
+          : "No checkpoint message found in #fallout-checkpoint mentioning this user in the past 24 hours. Please paste the message link."
+        return redirect_back fallback_location: admin_reviews_requirements_check_path(@review),
+                             inertia: { errors: { checkpoint_message_url: [ msg ] } }
+      end
+      @review.update_columns(checkpoint_message_url: url)
+      checkpoint_just_stored = true
+    end
 
     @review.finalizing_user = current_user # Reviewable#stamp_finalizing_reviewer backfills reviewer_id on terminal save when claim was cleared mid-session
     if @review.update(review_params)
       if @review.approved? || @review.returned? || @review.rejected?
-        if needs_checkpoint
+        if checkpoint_just_stored
+          PostCheckpointThreadJob.perform_later(
+            message_ts: SlackCheckpointService.extract_ts(@review.checkpoint_message_url),
+            ship_id: @review.ship_id,
+            review_type: "requirements_check",
+            review_status: @review.status,
+            base_url: request.base_url,
+            project_url: project_url(@review.ship.project),
+            repo_url: @review.ship.project.repo_link
+          )
+        elsif needs_checkpoint
           ResolveRequirementsCheckCheckpointJob.perform_later(
             review_id: @review.id,
             provided_permalink: provided_permalink,
