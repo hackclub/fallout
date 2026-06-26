@@ -437,7 +437,9 @@ Rails.application.routes.draw do
         collection { post :refresh }
       end
       resources :shop_items, only: [ :index, :new, :create, :edit, :update, :destroy ] # Admin shop item management
-      resources :shop_orders, only: [ :index, :show, :update ] # Admin order management
+      resources :shop_orders, only: [ :index, :show, :update ] do # Admin order management
+        patch :bulk_update, on: :collection # Apply one state to many orders at once
+      end
       resources :ticket_claims, only: [ :index ] do # Admin event ticket claim review
         member do
           patch :approve
