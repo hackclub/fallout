@@ -165,6 +165,10 @@ class User < ApplicationRecord
   # claim flow and the reviewer queues' "can get a ticket" filter.
   TICKET_HOURS_THRESHOLD = 60
 
+  # Approved-hours grace below the bar a user may claim with, provided their submitted
+  # (pre-approval) hours already clear the full bar. Deliberately not surfaced to users.
+  TICKET_HOURS_GRACE = 5
+
   # Ban types in priority order (highest first). Higher-priority bans take precedence.
   BAN_PRIORITY = %w[fallout conduct hcb hardware age hackatime].freeze
   # Ban types set/managed manually by humans — UserBanCheckJob will not override these
@@ -503,8 +507,14 @@ class User < ApplicationRecord
 
   # Hours-only ticket qualification on TA-APPROVED hours — the real claim gate. Mirrors the
   # rounding the ticket claim flow uses. Does NOT consider the identity gate.
+  #
+  # Grace: a user whose SUBMITTED (pre-approval) hours already clear the full bar may claim while
+  # still up to TICKET_HOURS_GRACE approved hours short — the remainder is just waiting on review.
+  # Deliberately invisible: the displayed required bar stays at the full threshold everywhere.
   def meets_ticket_hours?
-    (approved_time_logged_seconds / 3600.0).round(1) >= ticket_hours_threshold
+    approved = (approved_time_logged_seconds / 3600.0).round(1)
+    return true if approved >= ticket_hours_threshold
+    approved >= (ticket_hours_threshold - TICKET_HOURS_GRACE) && submitted_ticket_hours?
   end
 
   # Same bar measured against SUBMITTED (shipped, pre-approval) hours — a looser signal used by

@@ -6,13 +6,12 @@ class TicketClaimsController < ApplicationController
   def new
     skip_authorization
 
-    threshold = current_user.ticket_hours_threshold
     approved_hours = (current_user.approved_time_logged_seconds / 3600.0).round(1)
     identity_blocked = current_user.identity_gate_state != :verified_with_address
 
     render inertia: "shop/claim_ticket", props: {
       approved_hours: approved_hours,
-      can_claim: approved_hours >= threshold && !identity_blocked,
+      can_claim: current_user.meets_ticket_hours? && !identity_blocked,
       identity_blocked: identity_blocked,
       identity_state: current_user.identity_gate_state,
       already_claimed: current_user.ticket_claim.present?
