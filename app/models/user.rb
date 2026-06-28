@@ -505,6 +505,12 @@ class User < ApplicationRecord
     ticket_hours_override || TICKET_HOURS_THRESHOLD
   end
 
+  # Global kill switch for ticket claiming, with a per-user exemption. Mirrors the
+  # disable_new_submissions / new_submissions_override pattern.
+  def ticket_claims_disabled?
+    Flipper.enabled?(:disable_ticket_claims) && !Flipper.enabled?(:ticket_claims_override, self)
+  end
+
   # Hours-only ticket qualification on TA-APPROVED hours — the real claim gate. Mirrors the
   # rounding the ticket claim flow uses. Does NOT consider the identity gate.
   #

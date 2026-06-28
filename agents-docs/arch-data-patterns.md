@@ -115,6 +115,7 @@ Non-exhaustive — `app/policies/` has grown to cover review queues, shop/orders
 | `:collaborators` | Project/journal collaboration features | Policies, controllers, shared props |
 | `:shop` | Shop/redemption features | Controllers, shared props |
 | `:hcb_top_ups` | HCB project funding top-ups | Controllers, shared props |
+| `:disable_ticket_claims` / `:ticket_claims_override` | Global kill switch for summit ticket claiming + per-user exemption (mirrors the submission/reship gate pattern); checked via `User#ticket_claims_disabled?` | `TicketClaimsController`, `ShopItemsController` |
 
 **Usage pattern:**
 ```ruby

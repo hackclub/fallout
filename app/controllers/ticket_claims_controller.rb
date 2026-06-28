@@ -8,12 +8,14 @@ class TicketClaimsController < ApplicationController
 
     approved_hours = (current_user.approved_time_logged_seconds / 3600.0).round(1)
     identity_blocked = current_user.identity_gate_state != :verified_with_address
+    claiming_disabled = current_user.ticket_claims_disabled?
 
     render inertia: "shop/claim_ticket", props: {
       approved_hours: approved_hours,
-      can_claim: current_user.meets_ticket_hours? && !identity_blocked,
+      can_claim: current_user.meets_ticket_hours? && !identity_blocked && !claiming_disabled,
       identity_blocked: identity_blocked,
       identity_state: current_user.identity_gate_state,
+      claiming_disabled: claiming_disabled,
       already_claimed: current_user.ticket_claim.present?
     }
   end
@@ -23,6 +25,10 @@ class TicketClaimsController < ApplicationController
 
     if current_user.ticket_claim.present?
       return redirect_to shop_items_path, notice: "You have already submitted a ticket claim"
+    end
+
+    if current_user.ticket_claims_disabled?
+      return redirect_to claim_ticket_path, inertia: { errors: { base: [ "Ticket claiming is currently closed" ] } }
     end
 
     if current_user.identity_gate_state != :verified_with_address

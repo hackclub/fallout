@@ -33,6 +33,7 @@ export default function ShopIndex({
   ticket_hours_threshold,
   ticket_claimable,
   ticket_claim_state,
+  ticket_claims_disabled,
   user_id,
   pending_dialog,
 }: {
@@ -44,6 +45,7 @@ export default function ShopIndex({
   ticket_hours_threshold: number
   ticket_claimable: boolean
   ticket_claim_state: 'pending' | 'approved' | 'rejected' | null
+  ticket_claims_disabled: boolean
   user_id: number
   pending_dialog: string | null
 }) {
@@ -256,7 +258,19 @@ export default function ShopIndex({
                 <span className="text-2xl font-bold text-dark-brown shrink-0">{item.price}h</span>
               </div>
               <div className="mt-auto flex flex-col gap-2">
-                {!ticket_claimable && (
+                {ticket_claim_state === 'pending' ? (
+                  <div className="w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-dark-brown font-bold flex items-center justify-center text-sm cursor-default select-none">
+                    Claim submitted — pending review
+                  </div>
+                ) : ticket_claim_state === 'approved' ? (
+                  <div className="w-full h-10 bg-dark-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center text-base cursor-default select-none">
+                    Ticket approved!
+                  </div>
+                ) : ticket_claims_disabled ? (
+                  <div className="w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center cursor-not-allowed text-base px-2 text-center select-none">
+                    Claiming closed
+                  </div>
+                ) : !ticket_claimable ? (
                   <div className="w-full h-10 bg-brown border-2 border-dark-brown rounded-sm overflow-hidden relative">
                     <div
                       className="h-full bg-dark-brown transition-all duration-500"
@@ -266,31 +280,20 @@ export default function ShopIndex({
                       {user_hours}h / {ticket_hours_threshold}h
                     </span>
                   </div>
+                ) : identityBlocked ? (
+                  <div className="w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center cursor-not-allowed text-base px-2 text-center select-none">
+                    {identity_gate?.state === 'verified_no_address'
+                      ? 'Add address to claim'
+                      : 'Verify identity to claim'}
+                  </div>
+                ) : (
+                  <Link
+                    href="/claim-ticket"
+                    className="w-full h-10 bg-dark-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center text-2xl active:scale-94 transition-transform tracking-widest"
+                  >
+                    CLAIM
+                  </Link>
                 )}
-                {ticket_claimable ? (
-                  ticket_claim_state === 'pending' ? (
-                    <div className="w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-dark-brown font-bold flex items-center justify-center text-sm cursor-default select-none">
-                      Claim submitted — pending review
-                    </div>
-                  ) : ticket_claim_state === 'approved' ? (
-                    <div className="w-full h-10 bg-dark-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center text-base cursor-default select-none">
-                      Ticket approved!
-                    </div>
-                  ) : identityBlocked ? (
-                    <div className="w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center cursor-not-allowed text-base px-2 text-center select-none">
-                      {identity_gate?.state === 'verified_no_address'
-                        ? 'Add address to claim'
-                        : 'Verify identity to claim'}
-                    </div>
-                  ) : (
-                    <Link
-                      href="/claim-ticket"
-                      className="w-full h-10 bg-dark-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center text-2xl active:scale-94 transition-transform tracking-widest"
-                    >
-                      CLAIM
-                    </Link>
-                  )
-                ) : null}
               </div>
             </li>
           ))}

@@ -7,4 +7,6 @@ shared:
   new_submissions_override: Per-user override allowing first-time project submissions even while disable_new_submissions is on
   limit_reships: Cap each project at one resubmission of a returned ship on/after June 21 00:00 EDT — abandoning a pending ship (reship button) is unlimited and does not count
   reship_limit_override: Per-user override exempting a user from the limit_reships one-reship cap
+  disable_ticket_claims: Block claiming a Fallout summit ticket entirely (existing claims are unaffected)
+  ticket_claims_override: Per-user override allowing a user to claim a ticket even while disable_ticket_claims is on
 

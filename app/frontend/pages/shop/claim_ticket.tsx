@@ -10,12 +10,14 @@ export default function ClaimTicket({
   can_claim,
   identity_blocked,
   identity_state,
+  claiming_disabled,
   already_claimed,
 }: {
   approved_hours: number
   can_claim: boolean
   identity_blocked: boolean
   identity_state: string
+  claiming_disabled: boolean
   already_claimed: boolean
 }) {
   const { errors } = usePage<SharedProps>().props
@@ -128,6 +130,10 @@ export default function ClaimTicket({
             {alreadyClaimed ? (
               <div className="inline-flex min-w-44 items-center justify-center py-4 px-6 lg:px-10 lg:min-w-52 lg:py-5 bg-brown text-dark-brown rounded-xl font-bold text-xl lg:text-2xl border-dark-brown border-2 opacity-70 cursor-default select-none">
                 Already claimed
+              </div>
+            ) : claiming_disabled ? (
+              <div className="inline-flex min-w-44 items-center justify-center py-4 px-6 lg:px-10 lg:min-w-52 lg:py-5 bg-brown text-light-brown rounded-xl font-bold text-xl lg:text-2xl border-dark-brown border-2 cursor-not-allowed select-none text-center">
+                Claiming closed
               </div>
             ) : identity_blocked ? (
               <div className="mt-auto w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center cursor-not-allowed text-base px-2 text-center select-none">
