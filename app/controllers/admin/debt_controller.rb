@@ -62,7 +62,9 @@ class Admin::DebtController < Admin::ApplicationController
       # Per-project approved seconds; summed for the approved total and reused for the project list.
       approved_by_project = Project.batch_user_approved_seconds(user.projects_attributable_to_self_ids, user)
       approved_hours = (approved_by_project.values.sum / 3600.0).round(1)
-      threshold = user.ticket_hours_threshold
+      # Debt always targets the flat 60h bar — the per-user ticket_hours_override only lowered the
+      # bar for *claiming* a ticket (grace/comped), but everyone clears debt by reaching 60 approved.
+      threshold = User::TICKET_HOURS_THRESHOLD
       in_debt = approved_hours < threshold
 
       # Skip people who are fine and were never checked in on — the console is for active debt.
