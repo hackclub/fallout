@@ -32,6 +32,7 @@ import {
   BarChart2,
   BadgeAlert,
   Ticket,
+  Scale,
 } from 'lucide-react'
 
 interface AdminStats {
@@ -168,6 +169,15 @@ function buildNavSections(): { items: NavItem[] }[] {
           label: 'Tickets',
           href: '/admin/ticket_claims',
           icon: Ticket,
+          statKey: null,
+          requirePermission: 'is_admin',
+        },
+        {
+          // Debtors are computed from approved-ticket holders' hours — too expensive for a deferred
+          // sidebar pill on every page, so no statKey.
+          label: 'Debt',
+          href: '/admin/debt',
+          icon: Scale,
           statKey: null,
           requirePermission: 'is_admin',
         },

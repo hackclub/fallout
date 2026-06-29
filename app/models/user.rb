@@ -132,6 +132,8 @@ class User < ApplicationRecord
   has_one :active_hcb_grant_card, -> { where(status: "active") }, class_name: "HcbGrantCard"
   has_many :project_grant_orders, dependent: :restrict_with_error
   has_one :ticket_claim, dependent: :destroy
+  has_many :debt_check_ins, dependent: :destroy # admin check-ins logged against this user while in debt
+  has_many :authored_debt_check_ins, class_name: "DebtCheckIn", foreign_key: :author_id, dependent: :nullify, inverse_of: :author
   has_many :project_funding_topups, dependent: :restrict_with_error
   has_many :reviewer_notes
   has_many :reviewer_admin_notes, foreign_key: :reviewer_id, dependent: :destroy, inverse_of: :reviewer

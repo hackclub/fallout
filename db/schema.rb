@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_22_062254) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -170,6 +170,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_22_062254) do
     t.index ["journal_entry_id"], name: "index_critters_on_journal_entry_id"
     t.index ["user_id", "created_at"], name: "index_critters_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_critters_on_user_id"
+  end
+
+  create_table "debt_check_ins", force: :cascade do |t|
+    t.bigint "author_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "discarded_at"
+    t.text "note", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["author_id"], name: "index_debt_check_ins_on_author_id"
+    t.index ["discarded_at"], name: "index_debt_check_ins_on_discarded_at"
+    t.index ["user_id", "created_at"], name: "index_debt_check_ins_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_debt_check_ins_on_user_id"
   end
 
   create_table "design_reviews", force: :cascade do |t|
@@ -1087,6 +1100,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_22_062254) do
   add_foreign_key "collaborators", "users"
   add_foreign_key "critters", "journal_entries"
   add_foreign_key "critters", "users"
+  add_foreign_key "debt_check_ins", "users"
+  add_foreign_key "debt_check_ins", "users", column: "author_id"
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
   add_foreign_key "dialog_campaigns", "users"

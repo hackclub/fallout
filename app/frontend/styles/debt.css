@@ -1,0 +1,217 @@
+/* Debt console — a self-contained "Aqua gel" surface system, scoped to .debt-console so it
+   never leaks into the rest of the shadcn admin. The gel recipe is lifted from the Figma
+   spec (Gel White / Gel Blue): a base fill, a top white gloss, layered inset highlights, and
+   a soft drop shadow. Everything degrades gracefully and respects reduced motion. */
+
+.debt-console {
+  --gel-radius: 12px;
+  --gel-blue-top: #4286f5;
+  --gel-blue-bottom: #1f4ee8;
+  --gel-blue-edge: rgba(14, 43, 139, 0.6);
+  --gel-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------------- Gel surfaces ---------------- */
+
+.debt-console .gel {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--gel-radius);
+  border: 0.5px solid rgba(0, 0, 0, 0.15);
+}
+
+/* The top sheen — a fading white gloss painted over the surface, like wet glass. */
+.debt-console .gel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Gel White — neutral surface for stat tiles, cards, secondary buttons. */
+.debt-console .gel-white {
+  background: #e9e9ea;
+  box-shadow:
+    0 2px 4px 0 rgba(0, 0, 0, 0.1),
+    0 0.5px 0.5px 0 rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+    inset 0 -0.5px 1px 0 rgba(0, 0, 0, 0.18),
+    inset 0 -2px 4px 0 #ffffff;
+}
+.debt-console .gel-white::before {
+  background: linear-gradient(to top, rgba(255, 255, 255, 0) 0%, #ffffff 100%);
+  opacity: 0.9;
+}
+
+/* Gel Blue — the brand accent: hero, primary actions, the "owed/approved" channel. */
+.debt-console .gel-blue {
+  border-color: var(--gel-blue-edge);
+  background: linear-gradient(to bottom, var(--gel-blue-top), var(--gel-blue-bottom));
+  color: #fff;
+  box-shadow:
+    0 2px 4px 0 rgba(0, 0, 0, 0.1),
+    0 0.5px 0.5px 0 rgba(0, 0, 0, 0.15),
+    0 4px 8px -2px rgba(31, 78, 232, 0.2),
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -0.5px 0 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 4px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+/* Aqua sheen: bright top half, a crisp mid break, a faint lower darkening. */
+.debt-console .gel-blue::before {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.14) 48%,
+    rgba(255, 255, 255, 0) 50%,
+    rgba(0, 0, 0, 0.07) 100%
+  );
+}
+.debt-console .gel-blue,
+.debt-console .gel-blue * {
+  text-shadow:
+    0 1px 3px rgba(211, 211, 211, 0.55),
+    0 0.5px 0.5px rgba(0, 0, 0, 0.3);
+}
+
+/* ---------------- Interactive (buttons / clickable rows) ---------------- */
+
+.debt-console .gel-btn {
+  cursor: pointer;
+  transition:
+    transform 120ms var(--gel-ease),
+    box-shadow 200ms var(--gel-ease),
+    filter 200ms var(--gel-ease);
+}
+.debt-console .gel-btn:hover {
+  filter: brightness(1.04);
+}
+.debt-console .gel-btn:active {
+  transform: scale(0.97);
+}
+.debt-console .gel-btn:focus-visible {
+  outline: 2px solid var(--gel-blue-top);
+  outline-offset: 2px;
+}
+
+/* Check-in reveal button: arrows live just inside the clipped edges; Motion springs them
+   in/out. The button clips so an arrow sliding past an edge simply disappears. */
+.debt-console .gel-reveal {
+  position: relative;
+  overflow: hidden;
+}
+.debt-console .gel-reveal__arrow {
+  position: absolute;
+  top: 50%;
+  margin-top: -0.4375rem; /* center the 0.875rem (14px) glyph */
+  display: flex;
+  pointer-events: none;
+}
+.debt-console .gel-reveal__arrow--lead {
+  left: 0.5rem;
+}
+.debt-console .gel-reveal__arrow--trail {
+  right: 0.5rem;
+}
+
+/* ---------------- Triple hours bar (logged ⊇ submitted ⊇ approved) ---------------- */
+
+.debt-console .gel-meter {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.06);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+}
+.debt-console .gel-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  transition: width 420ms var(--gel-ease);
+}
+/* logged: faint slate; submitted: mid blue; approved: full blue gel on top. */
+.debt-console .gel-fill-logged {
+  background: rgba(31, 78, 232, 0.16);
+}
+.debt-console .gel-fill-submitted {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0 6px, rgba(255, 255, 255, 0) 6px 15px),
+    linear-gradient(to bottom, #9db8f7, #7a9bf0);
+  background-size:
+    21px 100%,
+    100% 100%;
+  animation: gel-stripes 8s linear infinite;
+}
+.debt-console .gel-fill-approved {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0 6px, rgba(255, 255, 255, 0) 6px 15px),
+    linear-gradient(to bottom, var(--gel-blue-top), var(--gel-blue-bottom));
+  background-size:
+    21px 100%,
+    100% 100%;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.12);
+  animation: gel-stripes 8s linear infinite;
+}
+/* A slow, calm pinstripe drift — only the stripe layer scrolls; the gradient stays put. */
+@keyframes gel-stripes {
+  to {
+    background-position:
+      -21px 0,
+      0 0;
+  }
+}
+.debt-console .gel-fill-approved::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 50% 0;
+  border-radius: inherit;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0));
+}
+
+/* ---------------- Dark mode — gel goes to a polished graphite, blue stays vivid ---------------- */
+
+.admin.dark .debt-console .gel-white {
+  background: #2a2a2c;
+  box-shadow:
+    0 2px 6px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset 0 -2px 4px 0 rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--foreground);
+}
+.admin.dark .debt-console .gel-white::before {
+  background: linear-gradient(to top, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.08) 100%);
+  opacity: 1;
+}
+.admin.dark .debt-console .gel-meter {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.admin.dark .debt-console .gel-fill-logged {
+  background: rgba(120, 155, 240, 0.22);
+}
+
+/* ---------------- Motion guard ---------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .debt-console .gel-btn,
+  .debt-console .gel-fill {
+    transition: none;
+  }
+  .debt-console .gel-btn:active {
+    transform: none;
+  }
+  /* Hold the pinstripes still — keep the stripe texture, drop the drift. */
+  .debt-console .gel-fill-submitted,
+  .debt-console .gel-fill-approved {
+    animation: none;
+  }
+}

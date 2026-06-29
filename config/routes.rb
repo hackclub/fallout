@@ -450,6 +450,10 @@ Rails.application.routes.draw do
           patch :bulk_reject
         end
       end
+      # Debt console — users holding an approved ticket but still under their approved-hours bar.
+      get    "debt"               => "debt#index",           as: :debt
+      post   "debt/check_ins"     => "debt#create_check_in",  as: :debt_check_ins
+      delete "debt/check_ins/:id" => "debt#destroy_check_in", as: :debt_check_in
       resources :koi_transactions, only: [ :index, :new, :create ] do # Admin koi adjustments
         get :users_search, on: :collection # Autocomplete for the adjustment user picker
       end
