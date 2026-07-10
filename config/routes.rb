@@ -363,6 +363,15 @@ Rails.application.routes.draw do
           end
           collection { get :next }
         end
+        # Backfill queues: add missing internal justifications to already-approved DR/BR.
+        resources :design_review_backfills, only: [ :index, :show, :update ] do
+          member { post :heartbeat }
+          collection { get :next }
+        end
+        resources :build_review_backfills, only: [ :index, :show, :update ] do
+          member { post :heartbeat }
+          collection { get :next }
+        end
         get  "mine",          to: "my_reviews#show",  as: :mine
         get  "mine/:user_id", to: "my_reviews#show",  as: :user_reviews
       end

@@ -34,6 +34,8 @@ class Admin::ApplicationController < ApplicationController
       pending_requirements_checks_count: RequirementsCheckReview.pending.async_count,
       pending_design_reviews_count: DesignReview.pending.async_count,
       pending_build_reviews_count: BuildReview.pending.async_count,
+      pending_design_review_backfills_count: DesignReview.approved.where("internal_reason IS NULL OR internal_reason = ''").async_count,
+      pending_build_review_backfills_count: BuildReview.approved.where("internal_reason IS NULL OR internal_reason = ''").async_count,
       flagged_projects_count: ProjectFlag.distinct.async_count(:project_id)
     }
     promises.transform_values(&:value)

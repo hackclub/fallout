@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_10_035443) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -98,6 +98,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_120000) do
 
   create_table "build_reviews", force: :cascade do |t|
     t.jsonb "annotations"
+    t.datetime "backfill_claim_expires_at"
+    t.bigint "backfill_reviewer_id"
     t.datetime "claim_expires_at"
     t.datetime "completed_at"
     t.datetime "created_at", null: false
@@ -112,9 +114,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_120000) do
     t.bigint "ship_id", null: false
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
+    t.index ["backfill_reviewer_id"], name: "index_build_reviews_on_backfill_reviewer_id"
     t.index ["completed_at"], name: "index_build_reviews_on_completed_at"
     t.index ["reviewer_id"], name: "index_build_reviews_on_reviewer_id"
     t.index ["ship_id"], name: "index_build_reviews_on_ship_id", unique: true
+    t.index ["status", "backfill_claim_expires_at"], name: "index_build_reviews_on_status_and_backfill_claim_expires_at"
     t.index ["status", "claim_expires_at"], name: "index_build_reviews_on_status_and_claim_expires_at"
     t.index ["status"], name: "index_build_reviews_on_status"
   end
@@ -187,6 +191,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_120000) do
 
   create_table "design_reviews", force: :cascade do |t|
     t.jsonb "annotations"
+    t.datetime "backfill_claim_expires_at"
+    t.bigint "backfill_reviewer_id"
     t.string "checkpoint_message_url"
     t.datetime "claim_expires_at"
     t.datetime "completed_at"
@@ -202,9 +208,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_120000) do
     t.bigint "ship_id", null: false
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
+    t.index ["backfill_reviewer_id"], name: "index_design_reviews_on_backfill_reviewer_id"
     t.index ["completed_at"], name: "index_design_reviews_on_completed_at"
     t.index ["reviewer_id"], name: "index_design_reviews_on_reviewer_id"
     t.index ["ship_id"], name: "index_design_reviews_on_ship_id", unique: true
+    t.index ["status", "backfill_claim_expires_at"], name: "index_design_reviews_on_status_and_backfill_claim_expires_at"
     t.index ["status", "claim_expires_at"], name: "index_design_reviews_on_status_and_claim_expires_at"
     t.index ["status"], name: "index_design_reviews_on_status"
   end
@@ -1093,6 +1101,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_120000) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "build_reviews", "ships"
+  add_foreign_key "build_reviews", "users", column: "backfill_reviewer_id"
   add_foreign_key "build_reviews", "users", column: "reviewer_id"
   add_foreign_key "collaboration_invites", "projects"
   add_foreign_key "collaboration_invites", "users", column: "invitee_id"
@@ -1103,6 +1112,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_120000) do
   add_foreign_key "debt_check_ins", "users"
   add_foreign_key "debt_check_ins", "users", column: "author_id"
   add_foreign_key "design_reviews", "ships"
+  add_foreign_key "design_reviews", "users", column: "backfill_reviewer_id"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"
   add_foreign_key "dialog_campaigns", "users"
   add_foreign_key "featured_projects", "projects"

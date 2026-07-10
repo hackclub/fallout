@@ -342,6 +342,8 @@ function TopBar({
   notesCount,
   projectFlagged,
   flagging,
+  endSessionHref,
+  showFlag = true,
   onSkip,
   onToggleNotes,
   onFlag,
@@ -350,6 +352,8 @@ function TopBar({
   notesCount: number
   projectFlagged: boolean
   flagging: boolean
+  endSessionHref: string
+  showFlag?: boolean
   onSkip: () => void
   onToggleNotes: () => void
   onFlag: (reason: string) => void
@@ -359,7 +363,7 @@ function TopBar({
   return (
     <div className="z-50 bg-muted/40 border-b border-border px-4 py-2 flex items-center gap-3 shrink-0">
       <Button variant="outline" size="sm" asChild>
-        <Link href="/admin/reviews/build_reviews">End Session</Link>
+        <Link href={endSessionHref}>End Session</Link>
       </Button>
       <Button variant="ghost" size="sm" onClick={onSkip}>
         Skip
@@ -433,43 +437,44 @@ function TopBar({
           Notes{notesCount > 0 && ` (${notesCount})`}
         </Button>
 
-        {projectFlagged ? (
-          <Badge variant="destructive">Flagged</Badge>
-        ) : (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
-                <FlagIcon data-icon="inline-start" />
-                Flag Project
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Flag Project for Fraud</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will remove the project from all review queues. The user will not be notified — the project will
-                  still appear as pending to them.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <Textarea
-                placeholder="Reason for flagging..."
-                value={flagReason}
-                onChange={(e) => setFlagReason(e.target.value)}
-                className="min-h-20"
-              />
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  disabled={!flagReason.trim() || flagging}
-                  onClick={() => onFlag(flagReason.trim())}
-                >
+        {showFlag &&
+          (projectFlagged ? (
+            <Badge variant="destructive">Flagged</Badge>
+          ) : (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <FlagIcon data-icon="inline-start" />
                   Flag Project
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Flag Project for Fraud</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove the project from all review queues. The user will not be notified — the project
+                    will still appear as pending to them.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <Textarea
+                  placeholder="Reason for flagging..."
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  className="min-h-20"
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    disabled={!flagReason.trim() || flagging}
+                    onClick={() => onFlag(flagReason.trim())}
+                  >
+                    Flag Project
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ))}
       </div>
     </div>
   )
@@ -493,9 +498,10 @@ interface PageProps {
   can: { update: boolean; swap_type: boolean }
   skip: string | null
   heartbeat_path: string
-  swap_type_path: string
+  swap_type_path: string | null
   next_path: string
   index_path: string
+  backfill?: boolean
 }
 
 export default function BuildReviewsShow({
@@ -516,9 +522,12 @@ export default function BuildReviewsShow({
   heartbeat_path,
   swap_type_path,
   next_path,
+  index_path,
+  backfill = false,
 }: PageProps) {
   const isTerminal = review.status !== 'pending'
-  useReviewHeartbeat(heartbeat_path, !isTerminal)
+  // Backfill edits an approved (terminal) review but still holds a live claim, so heartbeat regardless.
+  useReviewHeartbeat(heartbeat_path, backfill || !isTerminal)
 
   const [feedback, setFeedback] = useState(review.feedback || '')
   const [internalReason, setInternalReason] = useState(review.internal_reason || '')
@@ -638,6 +647,35 @@ export default function BuildReviewsShow({
     [review.id, feedback, internalReason, hoursAdjInput, goldAdjInput, demoLinkInput, skip],
   )
 
+  // Backfill: save only the internal fields (internal reason + hours) plus the editable
+  // demo link. Feedback, status, and gold are frozen. Advances to the next-oldest review.
+  const handleBackfillSave = useCallback(() => {
+    if (submitting || !internalReason.trim()) return
+    setSubmitting(true)
+    const url = skip ? `${index_path}/${review.id}?skip=${skip}` : `${index_path}/${review.id}`
+    const hoursAdjSeconds = hoursAdjInput !== '' ? Math.round((parseFloat(hoursAdjInput) || 0) * 3600) : null
+    router.patch(
+      url,
+      {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        build_review: {
+          internal_reason: internalReason.trim() || null,
+          hours_adjustment: hoursAdjSeconds,
+        } as any,
+        demo_link: demoLinkInput.trim(),
+      },
+      {
+        onError: (errs) => {
+          const message = Object.entries(errs as Record<string, string | string[]>)
+            .map(([field, val]) => `${field.replace(/_/g, ' ')}: ${Array.isArray(val) ? val.join(', ') : val}`)
+            .join('; ')
+          notify('alert', `Could not save backfill${message ? ` — ${message}` : ''}`)
+        },
+        onFinish: () => setSubmitting(false),
+      },
+    )
+  }, [submitting, internalReason, hoursAdjInput, demoLinkInput, skip, index_path, review.id])
+
   return (
     <div className="h-screen flex flex-col overflow-hidden border-t-3 border-orange-500">
       <TopBar
@@ -645,6 +683,8 @@ export default function BuildReviewsShow({
         notesCount={notes.length}
         projectFlagged={isFlagged}
         flagging={flagging}
+        endSessionHref={index_path}
+        showFlag={!backfill}
         onSkip={handleSkip}
         onToggleNotes={() => setNotesOpen((v) => !v)}
         onFlag={handleFlag}
@@ -885,7 +925,117 @@ export default function BuildReviewsShow({
 
         {/* Right: review form / read-only summary */}
         <div className="w-80 shrink-0 overflow-y-auto p-4 space-y-4">
-          {isTerminal ? (
+          {backfill ? (
+            <>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Backfill Internal Reason
+              </h3>
+
+              <div className="flex items-center gap-2">
+                <Badge
+                  className={
+                    review.status === 'approved'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                      : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                  }
+                >
+                  {review.status}
+                </Badge>
+                {review.reviewer_display_name && (
+                  <span className="text-xs text-muted-foreground">by {review.reviewer_display_name}</span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">
+                  Internal Reason <span className="text-muted-foreground/60">(not shown to user)</span>
+                </label>
+                <Textarea
+                  value={internalReason}
+                  onChange={(e) => setInternalReason(e.target.value)}
+                  placeholder="Justify the original decision..."
+                  className="h-24 text-sm resize-y"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">
+                  Demo Link <span className="text-muted-foreground/60">(optional)</span>
+                </label>
+                <Input
+                  type="url"
+                  value={demoLinkInput}
+                  onChange={(e) => setDemoLinkInput(e.target.value)}
+                  placeholder="https://..."
+                  className="h-8 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground">
+                  Modify Hours <span className="text-muted-foreground/60">(not shown to user)</span>
+                </label>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground font-mono whitespace-nowrap">
+                    {userFacingHours.toFixed(1)}h
+                  </span>
+                  <span className="text-muted-foreground">→</span>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    value={hoursAdjInput}
+                    onChange={(e) => setHoursAdjInput(e.target.value)}
+                    placeholder="0"
+                    className="h-8 text-sm font-mono w-20 text-center"
+                  />
+                  <span className="text-muted-foreground">→</span>
+                  <span
+                    className={`font-mono whitespace-nowrap ${hoursAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
+                  >
+                    {internalHours.toFixed(1)}h
+                  </span>
+                </div>
+              </div>
+
+              <Separator />
+
+              {review.feedback && (
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">
+                    Feedback <span className="text-muted-foreground/60">(locked)</span>
+                  </label>
+                  <p className="text-sm whitespace-pre-wrap rounded-md border border-border bg-muted/40 px-2.5 py-2">
+                    {review.feedback}
+                  </p>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Gold (locked):</span>
+                <span className="font-mono">
+                  {finalGold}
+                  {review.gold_adjustment != null && review.gold_adjustment !== 0
+                    ? ` (${review.gold_adjustment >= 0 ? '+' : ''}${review.gold_adjustment} adj)`
+                    : ''}
+                </span>
+              </div>
+
+              <div className="pt-2">
+                <Button
+                  className="w-full"
+                  variant="default"
+                  disabled={submitting || !internalReason.trim()}
+                  onClick={handleBackfillSave}
+                >
+                  {submitting ? (
+                    <LoaderIcon className="size-4 animate-spin mr-1" />
+                  ) : (
+                    <CheckIcon data-icon="inline-start" />
+                  )}
+                  Save Backfill
+                </Button>
+              </div>
+            </>
+          ) : isTerminal ? (
             <>
               <div className="space-y-2">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Review Complete</h3>
@@ -1091,7 +1241,7 @@ export default function BuildReviewsShow({
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => router.post(swap_type_path)}>
+                        <AlertDialogAction onClick={() => swap_type_path && router.post(swap_type_path)}>
                           Move to Design Review
                         </AlertDialogAction>
                       </AlertDialogFooter>

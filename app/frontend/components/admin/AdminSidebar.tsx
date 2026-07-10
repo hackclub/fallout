@@ -43,6 +43,8 @@ interface AdminStats {
   pending_requirements_checks_count: number
   pending_design_reviews_count: number
   pending_build_reviews_count: number
+  pending_design_review_backfills_count: number
+  pending_build_review_backfills_count: number
   flagged_projects_count: number
 }
 
@@ -118,6 +120,20 @@ function buildNavSections(): { items: NavItem[] }[] {
           href: '/admin/reviews/build_reviews',
           icon: Hammer,
           statKey: 'pending_build_reviews_count',
+          requirePermission: 'can_review_build_reviews',
+        },
+        {
+          label: 'DR Backfill',
+          href: '/admin/reviews/design_review_backfills',
+          icon: Compass,
+          statKey: 'pending_design_review_backfills_count',
+          requirePermission: 'can_review_design_reviews',
+        },
+        {
+          label: 'BR Backfill',
+          href: '/admin/reviews/build_review_backfills',
+          icon: Hammer,
+          statKey: 'pending_build_review_backfills_count',
           requirePermission: 'can_review_build_reviews',
         },
         {

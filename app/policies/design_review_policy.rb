@@ -23,6 +23,18 @@ class DesignReviewPolicy < ApplicationPolicy
     admin? && record.pending? && record.ship.pending? # Admins only; only swap while still pending
   end
 
+  # -- Backfill: add a missing internal justification to an already-approved review --
+
+  def backfill?
+    return true if admin?
+    return false if record.ship.project.flagged? # Only admins can view flagged reviews
+    staff_reviewer? && record.approved? # Backfill only touches completed (approved) reviews
+  end
+
+  def backfill_update?
+    record.approved? && (admin? || record.backfill_claimed_by?(user)) # Only the active backfill claimer can edit
+  end
+
   private
 
   def active_claimer?
