@@ -73,6 +73,8 @@ type Overview = {
 }
 type PageProps = {
   threshold_default: number
+  snapshot_cutoff: string
+  snapshot_built: boolean
   debtors?: Debtor[]
   overview?: Overview
 }
@@ -561,7 +563,13 @@ function RosterSkeleton() {
   )
 }
 
-export default function AdminDebtIndex({ threshold_default, debtors, overview }: PageProps) {
+export default function AdminDebtIndex({
+  threshold_default,
+  snapshot_cutoff,
+  snapshot_built,
+  debtors,
+  overview,
+}: PageProps) {
   const { errors } = usePage<{ errors?: { base?: string[] } }>().props
 
   // Keep a local mirror of the deferred data so check-in mutations (which re-defer the roster)
@@ -630,7 +638,8 @@ export default function AdminDebtIndex({ threshold_default, debtors, overview }:
             <div>
               <h1 className="text-2xl font-semibold tracking-tight leading-none">Debt</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Holders of an approved ticket still under {threshold_default}h of approved hours. Help them clear it.
+                Holders of an approved ticket still under {threshold_default}h of approved hours as of {snapshot_cutoff}
+                . Help them clear it.
               </p>
             </div>
           </div>
@@ -639,6 +648,14 @@ export default function AdminDebtIndex({ threshold_default, debtors, overview }:
         {errors?.base && (
           <div className="mb-4 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
             {Array.isArray(errors.base) ? errors.base.join(' ') : errors.base}
+          </div>
+        )}
+
+        {!snapshot_built && (
+          <div className="mb-4 rounded-md border border-amber-500 bg-amber-500/10 p-3 text-sm text-amber-700">
+            The {snapshot_cutoff} approved-hours snapshot hasn't been built yet, so no debt can be computed. Run{' '}
+            <code className="rounded bg-amber-500/20 px-1 py-0.5 font-mono text-xs">bin/rails debt:snapshot</code> to
+            build it.
           </div>
         )}
 

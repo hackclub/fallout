@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_082120) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_12_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -187,6 +187,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_082120) do
     t.index ["discarded_at"], name: "index_debt_check_ins_on_discarded_at"
     t.index ["user_id", "created_at"], name: "index_debt_check_ins_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_debt_check_ins_on_user_id"
+  end
+
+  create_table "debt_snapshots", force: :cascade do |t|
+    t.integer "approved_seconds", default: 0, null: false
+    t.jsonb "approved_seconds_by_project", default: {}, null: false
+    t.datetime "computed_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "cutoff_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["cutoff_at"], name: "index_debt_snapshots_on_cutoff_at"
+    t.index ["user_id", "cutoff_at"], name: "index_debt_snapshots_on_user_id_and_cutoff_at", unique: true
+    t.index ["user_id"], name: "index_debt_snapshots_on_user_id"
   end
 
   create_table "design_reviews", force: :cascade do |t|
@@ -1114,6 +1127,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_082120) do
   add_foreign_key "critters", "users"
   add_foreign_key "debt_check_ins", "users"
   add_foreign_key "debt_check_ins", "users", column: "author_id"
+  add_foreign_key "debt_snapshots", "users"
   add_foreign_key "design_reviews", "ships"
   add_foreign_key "design_reviews", "users", column: "backfill_reviewer_id"
   add_foreign_key "design_reviews", "users", column: "reviewer_id"

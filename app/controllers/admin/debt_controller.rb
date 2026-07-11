@@ -53,6 +53,8 @@ class Admin::DebtController < Admin::ApplicationController
     end
     {
       threshold_default: User::TICKET_HOURS_THRESHOLD,
+      snapshot_cutoff: DebtSnapshot::CUTOFF.strftime("%b %d, %Y"),
+      snapshot_built: DebtSnapshot.built_for?, # false ⇒ backfill hasn't run; page must not flag everyone
       debtors: InertiaRails.defer(group: "roster") { load.call[:debtors] },
       overview: InertiaRails.defer(group: "roster") { load.call[:overview] }
     }
@@ -60,22 +62,31 @@ class Admin::DebtController < Admin::ApplicationController
 
   # Returns { debtors: [...], overview: {...} }.
   #
-  # A user is "in debt" when they hold an approved ticket but their TA-approved hours are still
-  # under their personal threshold (override, else 60). We also surface users who have since
-  # cleared the bar but carry check-in history, so admins can see how an outreach resolved.
+  # A user is "in debt" when they hold an approved ticket but their TA-approved hours *as of the
+  # snapshot cutoff* (July 1) are still under the flat 60h bar — work approved after the cutoff can't
+  # retroactively clear debt. Approved hours come from the frozen DebtSnapshot (see DebtSnapshotBuilder),
+  # not a live recompute. We also surface users who have since cleared the bar but carry check-in
+  # history, so admins can see how an outreach resolved.
   def build_roster
+    # No snapshot means the backfill hasn't run; return nothing rather than flagging every holder as
+    # in-debt off a missing figure. The frontend shows a "run debt:snapshot" notice via snapshot_built.
+    return { debtors: [], overview: build_overview([]) } unless DebtSnapshot.built_for?
+
     candidates = User.joins(:ticket_claim).merge(TicketClaim.approved).includes(:ticket_claim, :debt_hidden_by).to_a
     check_ins_by_user = DebtCheckIn.kept
       .where(user_id: candidates.map(&:id))
       .includes(:author)
       .newest_first
       .group_by(&:user_id)
+    snapshots_by_user = DebtSnapshot.where(user_id: candidates.map(&:id), cutoff_at: DebtSnapshot::CUTOFF).index_by(&:user_id)
 
     rows = candidates.filter_map do |user|
       check_ins = check_ins_by_user[user.id] || []
-      # Per-project approved seconds; summed for the approved total and reused for the project list.
-      approved_by_project = Project.batch_user_approved_seconds(user.projects_attributable_to_self_ids, user)
-      approved_hours = (approved_by_project.values.sum / 3600.0).round(1)
+      snapshot = snapshots_by_user[user.id]
+      # Frozen per-project approved seconds as of the cutoff; summed for the total and reused for the
+      # project list. A missing row (holder onboarded after the backfill) reads as zero approved ⇒ in debt.
+      approved_by_project = snapshot&.approved_by_project_ints || {}
+      approved_hours = ((snapshot&.approved_seconds || 0) / 3600.0).round(1)
       # Debt always targets the flat 60h bar — the per-user ticket_hours_override only lowered the
       # bar for *claiming* a ticket (grace/comped), but everyone clears debt by reaching 60 approved.
       threshold = User::TICKET_HOURS_THRESHOLD
