@@ -25,6 +25,15 @@ module Fallout
     # Allow reading existing plaintext values while transitioning to encrypted device_token
     config.active_record.encryption.support_unencrypted_data = true
 
+    # PaperTrail serializes `versions.object` as YAML; reifying versions (DebtSnapshotBuilder's
+    # version_at) needs these value classes allowlisted for YAML safe-load or Psych raises
+    # DisallowedClass. Standard set recommended by PaperTrail's README — data types only, no
+    # arbitrary-code-execution surface.
+    config.active_record.yaml_column_permitted_classes = [
+      Symbol, Date, Time, BigDecimal,
+      ActiveSupport::TimeWithZone, ActiveSupport::TimeZone
+    ]
+
     # Mission Control Jobs — disable built-in HTTP Basic Auth; access gated by AdminConstraint in routes
     MissionControl::Jobs.base_controller_class = "Admin::EngineController"
     config.mission_control.jobs.http_basic_auth_enabled = false
