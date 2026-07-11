@@ -297,14 +297,23 @@ function DebtorSheetBody({ debtor, cutoff }: { debtor: Debtor; cutoff: string })
             <span className="font-semibold text-[#1f4ee8] tabular-nums">{debtor.remaining_hours}h</span>
             <span className="text-muted-foreground"> of approved hours left to work off their debt.</span>
             <div className="mt-1 text-xs text-muted-foreground">
-              In debt because they had{' '}
+              Entered debt with{' '}
               <span className="font-medium text-foreground tabular-nums">{debtor.snapshot_hours}h</span> approved on{' '}
               {cutoff}.
             </div>
           </div>
         ) : (
-          <div className="mt-3 flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-            <PartyPopper className="size-4" /> Cleared the bar by {cutoff}.
+          <div className="mt-3 text-sm">
+            <div className="flex items-center gap-1.5 font-medium text-emerald-600">
+              <PartyPopper className="size-4" /> Cleared the bar.
+            </div>
+            {debtor.snapshot_hours < debtor.threshold && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Entered debt with{' '}
+                <span className="font-medium text-foreground tabular-nums">{debtor.snapshot_hours}h</span> approved on{' '}
+                {cutoff} — worked it off since.
+              </div>
+            )}
           </div>
         )}
       </section>
