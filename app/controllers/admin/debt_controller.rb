@@ -27,6 +27,20 @@ class Admin::DebtController < Admin::ApplicationController
     redirect_to admin_debt_path
   end
 
+  # Hiding is a persistent, reversible flag — a hidden user stays out of the console and its export
+  # until an admin unhides them. We record who/when for auditability.
+  def hide
+    user = User.find(params[:user_id])
+    user.update!(debt_hidden_at: Time.current, debt_hidden_by: current_user)
+    redirect_to admin_debt_path
+  end
+
+  def unhide
+    user = User.find(params[:user_id])
+    user.update!(debt_hidden_at: nil, debt_hidden_by: nil)
+    redirect_to admin_debt_path
+  end
+
   private
 
   # The roster computation walks every approved-ticket holder and sums their attributed hours,
@@ -50,7 +64,7 @@ class Admin::DebtController < Admin::ApplicationController
   # under their personal threshold (override, else 60). We also surface users who have since
   # cleared the bar but carry check-in history, so admins can see how an outreach resolved.
   def build_roster
-    candidates = User.joins(:ticket_claim).merge(TicketClaim.approved).includes(:ticket_claim).to_a
+    candidates = User.joins(:ticket_claim).merge(TicketClaim.approved).includes(:ticket_claim, :debt_hidden_by).to_a
     check_ins_by_user = DebtCheckIn.kept
       .where(user_id: candidates.map(&:id))
       .includes(:author)
@@ -68,7 +82,8 @@ class Admin::DebtController < Admin::ApplicationController
       in_debt = approved_hours < threshold
 
       # Skip people who are fine and were never checked in on — the console is for active debt.
-      next unless in_debt || check_ins.any?
+      # Hidden users are always kept so they remain visible under the Hidden filter and can be unhidden.
+      next unless in_debt || check_ins.any? || user.debt_hidden?
 
       serialize_debtor(user, approved_hours:, threshold:, in_debt:, approved_by_project:, check_ins:)
     end
@@ -101,6 +116,8 @@ class Admin::DebtController < Admin::ApplicationController
       remaining_hours: [ (threshold - approved_hours).round(1), 0 ].max,
       progress_pct: threshold.positive? ? [ (approved_hours / threshold * 100).round, 100 ].min : 100,
       in_debt: in_debt,
+      hidden: user.debt_hidden?,
+      hidden_by: user.debt_hidden_by&.display_name,
       ticket_approved_at: user.ticket_claim&.updated_at&.strftime("%b %d, %Y"),
       projects: projects,
       check_ins: check_ins.map { |c| serialize_check_in(c) }
@@ -118,10 +135,11 @@ class Admin::DebtController < Admin::ApplicationController
   end
 
   def build_overview(rows)
-    active = rows.select { |r| r[:in_debt] }
+    visible = rows.reject { |r| r[:hidden] } # hidden users don't count toward the console's overview
+    active = visible.select { |r| r[:in_debt] }
     {
       in_debt_count: active.size,
-      cleared_count: rows.size - active.size,
+      cleared_count: visible.size - active.size,
       hours_owed: active.sum { |r| r[:remaining_hours] }.round(1),
       needs_checkin_count: active.count { |r| r[:check_ins].empty? },
       close_count: active.count { |r| r[:progress_pct] >= 75 },

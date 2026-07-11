@@ -8,6 +8,7 @@
 #  ban_type                           :string
 #  bio                                :text
 #  country                            :string
+#  debt_hidden_at                     :datetime
 #  device_token                       :text
 #  discarded_at                       :datetime
 #  display_name                       :string           not null
@@ -43,15 +44,21 @@
 #  verification_status                :string
 #  created_at                         :datetime         not null
 #  updated_at                         :datetime         not null
+#  debt_hidden_by_id                  :bigint
 #  hca_id                             :string
 #  slack_id                           :string
 #
 # Indexes
 #
+#  index_users_on_debt_hidden_by_id   (debt_hidden_by_id)
 #  index_users_on_device_token        (device_token)
 #  index_users_on_discarded_at        (discarded_at)
 #  index_users_on_hca_id              (hca_id) UNIQUE WHERE (hca_id IS NOT NULL)
 #  index_users_unique_verified_email  (email) UNIQUE WHERE ((type IS NULL) AND (discarded_at IS NULL))
+#
+# Foreign Keys
+#
+#  fk_rails_...  (debt_hidden_by_id => users.id)
 #
 #  id                                 :bigint           not null, primary key
 #  avatar                             :string           not null

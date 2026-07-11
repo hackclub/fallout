@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_10_035443) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_082120) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1010,6 +1010,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_035443) do
     t.text "bio"
     t.string "country"
     t.datetime "created_at", null: false
+    t.datetime "debt_hidden_at"
+    t.bigint "debt_hidden_by_id"
     t.text "device_token"
     t.datetime "discarded_at"
     t.string "display_name", null: false
@@ -1046,6 +1048,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_035443) do
     t.string "type"
     t.datetime "updated_at", null: false
     t.string "verification_status"
+    t.index ["debt_hidden_by_id"], name: "index_users_on_debt_hidden_by_id"
     t.index ["device_token"], name: "index_users_on_device_token"
     t.index ["discarded_at"], name: "index_users_on_discarded_at"
     t.index ["email"], name: "index_users_unique_verified_email", unique: true, where: "((type IS NULL) AND (discarded_at IS NULL))"
@@ -1184,4 +1187,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_035443) do
   add_foreign_key "ticket_claims", "users"
   add_foreign_key "time_audit_reviews", "ships"
   add_foreign_key "time_audit_reviews", "users", column: "reviewer_id"
+  add_foreign_key "users", "users", column: "debt_hidden_by_id"
 end

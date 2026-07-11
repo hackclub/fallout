@@ -8,6 +8,7 @@
 #  ban_type                           :string
 #  bio                                :text
 #  country                            :string
+#  debt_hidden_at                     :datetime
 #  device_token                       :text
 #  discarded_at                       :datetime
 #  display_name                       :string           not null
@@ -43,15 +44,21 @@
 #  verification_status                :string
 #  created_at                         :datetime         not null
 #  updated_at                         :datetime         not null
+#  debt_hidden_by_id                  :bigint
 #  hca_id                             :string
 #  slack_id                           :string
 #
 # Indexes
 #
+#  index_users_on_debt_hidden_by_id   (debt_hidden_by_id)
 #  index_users_on_device_token        (device_token)
 #  index_users_on_discarded_at        (discarded_at)
 #  index_users_on_hca_id              (hca_id) UNIQUE WHERE (hca_id IS NOT NULL)
 #  index_users_unique_verified_email  (email) UNIQUE WHERE ((type IS NULL) AND (discarded_at IS NULL))
+#
+# Foreign Keys
+#
+#  fk_rails_...  (debt_hidden_by_id => users.id)
 #
 class User < ApplicationRecord
   include Discardable
@@ -134,6 +141,7 @@ class User < ApplicationRecord
   has_one :ticket_claim, dependent: :destroy
   has_many :debt_check_ins, dependent: :destroy # admin check-ins logged against this user while in debt
   has_many :authored_debt_check_ins, class_name: "DebtCheckIn", foreign_key: :author_id, dependent: :nullify, inverse_of: :author
+  belongs_to :debt_hidden_by, class_name: "User", optional: true # admin who hid this user from the debt console
   has_many :project_funding_topups, dependent: :restrict_with_error
   has_many :reviewer_notes
   has_many :reviewer_admin_notes, foreign_key: :reviewer_id, dependent: :destroy, inverse_of: :reviewer
@@ -147,6 +155,8 @@ class User < ApplicationRecord
   encrypts :device_token, deterministic: true # Deterministic so find_by lookups work
 
   scope :verified, -> { where(type: nil) } # STI: verified users have type=nil; TrialUser subclass has type='TrialUser'
+  scope :debt_hidden, -> { where.not(debt_hidden_at: nil) } # excluded from the debt console + its export
+  scope :debt_visible, -> { where(debt_hidden_at: nil) }
 
   validates :avatar, :display_name, :email, :timezone, presence: true
   validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
@@ -505,6 +515,10 @@ class User < ApplicationRecord
   # Approved-hours bar this user must clear for a ticket (their override, else the default).
   def ticket_hours_threshold
     ticket_hours_override || TICKET_HOURS_THRESHOLD
+  end
+
+  def debt_hidden?
+    debt_hidden_at.present?
   end
 
   # Global kill switch for ticket claiming, with a per-user exemption. Mirrors the

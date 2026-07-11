@@ -6,6 +6,7 @@ import AdminLayout from '@/layouts/AdminLayout'
 import { Badge } from '@/components/admin/ui/badge'
 import { Textarea } from '@/components/admin/ui/textarea'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/admin/ui/input-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/admin/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/admin/ui/tooltip'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/admin/ui/sheet'
 import {
@@ -21,6 +22,9 @@ import {
 } from '@/components/admin/ui/alert-dialog'
 import {
   ArrowRight,
+  Download,
+  Eye,
+  EyeOff,
   ExternalLink,
   FolderOpen,
   MessageSquarePlus,
@@ -53,6 +57,8 @@ type Debtor = {
   remaining_hours: number
   progress_pct: number
   in_debt: boolean
+  hidden: boolean
+  hidden_by: string | null
   ticket_approved_at: string | null
   projects: DebtProject[]
   check_ins: CheckIn[]
@@ -71,14 +77,72 @@ type PageProps = {
   overview?: Overview
 }
 
-type FilterKey = 'active' | 'needs_checkin' | 'close' | 'cleared' | 'all'
+type FilterKey = 'active' | 'needs_checkin' | 'close' | 'cleared' | 'all' | 'hidden'
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'active', label: 'Active debt' },
   { key: 'needs_checkin', label: 'Needs check-in' },
   { key: 'close', label: 'Close to clearing' },
   { key: 'cleared', label: 'Cleared' },
   { key: 'all', label: 'All' },
+  { key: 'hidden', label: 'Hidden' },
 ]
+
+type SortKey = 'default' | 'logged_desc' | 'logged_asc'
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'default', label: 'Priority (default)' },
+  { key: 'logged_desc', label: 'Logged hours · high → low' },
+  { key: 'logged_asc', label: 'Logged hours · low → high' },
+]
+
+function toCsv(rows: Debtor[]): string {
+  const headers = [
+    'Name',
+    'Email',
+    'Approved hours',
+    'Submitted hours',
+    'Logged hours',
+    'Threshold',
+    'Remaining hours',
+    'Progress %',
+    'Status',
+    'Ticket approved',
+    'Check-ins',
+    'Latest check-in',
+  ]
+  const esc = (v: string | number) => {
+    const s = String(v)
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const lines = rows.map((r) =>
+    [
+      r.display_name,
+      r.email,
+      r.approved_hours,
+      r.shipped_hours,
+      r.logged_hours,
+      r.threshold,
+      r.remaining_hours,
+      r.progress_pct,
+      r.in_debt ? 'In debt' : 'Cleared',
+      r.ticket_approved_at ?? '',
+      r.check_ins.length,
+      r.check_ins[0]?.note ?? '',
+    ]
+      .map(esc)
+      .join(','),
+  )
+  return [headers.join(','), ...lines].join('\n')
+}
+
+function downloadCsv(rows: Debtor[]) {
+  const blob = new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'debt-roster.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 // Shared column template so the roster header and every row line up to the same grid.
 const ROW_GRID =
@@ -277,7 +341,53 @@ function DebtorSheetBody({ debtor }: { debtor: Debtor }) {
         >
           <Ticket className="size-3.5" /> Ticket claims
         </Link>
+        {debtor.hidden ? (
+          <button
+            type="button"
+            onClick={() =>
+              router.delete(`/admin/debt/hidden/${debtor.id}`, { preserveScroll: true, preserveState: true })
+            }
+            className="gel gel-white gel-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium"
+          >
+            <Eye className="size-3.5" /> Unhide from debt
+          </button>
+        ) : (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                className="gel gel-white gel-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium"
+              >
+                <EyeOff className="size-3.5" /> Hide from debt
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Hide {debtor.display_name} from debt?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  They'll be removed from the console and every CSV export until an admin unhides them from the Hidden
+                  tab. Nothing else about their account changes.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() =>
+                    router.post(`/admin/debt/hidden/${debtor.id}`, {}, { preserveScroll: true, preserveState: true })
+                  }
+                >
+                  Hide
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
+      {debtor.hidden && (
+        <p className="-mt-3 text-xs text-muted-foreground">
+          Hidden from the debt console{debtor.hidden_by ? ` by ${debtor.hidden_by}` : ''}.
+        </p>
+      )}
 
       {/* Check-in log */}
       <section>
@@ -466,23 +576,28 @@ export default function AdminDebtIndex({ threshold_default, debtors, overview }:
   }, [overview])
 
   const [filter, setFilter] = useState<FilterKey>('active')
+  const [sort, setSort] = useState<SortKey>('default')
   const [search, setSearch] = useState('')
   const [openId, setOpenId] = useState<number | null>(null)
 
   const counts = useMemo(() => {
-    const active = rows.filter((r) => r.in_debt)
+    const shown = rows.filter((r) => !r.hidden) // hidden users are excluded from every non-hidden tally
+    const active = shown.filter((r) => r.in_debt)
     return {
       active: active.length,
       needs_checkin: active.filter((r) => r.check_ins.length === 0).length,
       close: active.filter((r) => r.progress_pct >= 75).length,
-      cleared: rows.length - active.length,
-      all: rows.length,
+      cleared: shown.length - active.length,
+      all: shown.length,
+      hidden: rows.length - shown.length,
     }
   }, [rows])
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
+    const filtered = rows.filter((r) => {
+      if (filter === 'hidden') return r.hidden
+      if (r.hidden) return false // hidden users never surface outside the Hidden tab
       if (filter === 'active' && !r.in_debt) return false
       if (filter === 'needs_checkin' && !(r.in_debt && r.check_ins.length === 0)) return false
       if (filter === 'close' && !(r.in_debt && r.progress_pct >= 75)) return false
@@ -494,7 +609,11 @@ export default function AdminDebtIndex({ threshold_default, debtors, overview }:
         r.projects.some((p) => p.name.toLowerCase().includes(q))
       )
     })
-  }, [rows, filter, search])
+    if (sort === 'default') return filtered // preserve server ordering (active debt first, closest-to-clearing last)
+    return [...filtered].sort((a, b) =>
+      sort === 'logged_desc' ? b.logged_hours - a.logged_hours : a.logged_hours - b.logged_hours,
+    )
+  }, [rows, filter, search, sort])
 
   const selected = openId != null ? (rows.find((r) => r.id === openId) ?? null) : null
   const initialLoading = !ov && rows.length === 0
@@ -589,6 +708,27 @@ export default function AdminDebtIndex({ threshold_default, debtors, overview }:
               placeholder="Search name, email, project…"
             />
           </InputGroup>
+          <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              {SORTS.map((s) => (
+                <SelectItem key={s.key} value={s.key}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <button
+            type="button"
+            onClick={() => downloadCsv(visible.filter((r) => !r.hidden))}
+            disabled={visible.every((r) => r.hidden)}
+            className="gel gel-white gel-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <Download className="size-3.5" />
+            Export CSV
+          </button>
         </div>
 
         {/* Roster */}

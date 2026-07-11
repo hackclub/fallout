@@ -463,6 +463,8 @@ Rails.application.routes.draw do
       get    "debt"               => "debt#index",           as: :debt
       post   "debt/check_ins"     => "debt#create_check_in",  as: :debt_check_ins
       delete "debt/check_ins/:id" => "debt#destroy_check_in", as: :debt_check_in
+      post   "debt/hidden/:user_id"   => "debt#hide",   as: :debt_hide
+      delete "debt/hidden/:user_id"   => "debt#unhide", as: :debt_unhide
       resources :koi_transactions, only: [ :index, :new, :create ] do # Admin koi adjustments
         get :users_search, on: :collection # Autocomplete for the adjustment user picker
       end
