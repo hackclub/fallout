@@ -63,10 +63,11 @@ class Admin::DebtController < Admin::ApplicationController
   # Returns { debtors: [...], overview: {...} }.
   #
   # A user is "in debt" when they hold an approved ticket but their TA-approved hours *as of the
-  # snapshot cutoff* (July 1) are still under the flat 60h bar — work approved after the cutoff can't
-  # retroactively clear debt. Approved hours come from the frozen DebtSnapshot (see DebtSnapshotBuilder),
-  # not a live recompute. We also surface users who have since cleared the bar but carry check-in
-  # history, so admins can see how an outreach resolved.
+  # snapshot cutoff* (July 1) were still under the flat 60h bar — the deadline determination is frozen
+  # in DebtSnapshot (see DebtSnapshotBuilder), so work approved after the cutoff can't retroactively
+  # clear it. Everything *displayed* (approved hours, per-project breakdown, progress) stays LIVE so
+  # admins see current progress toward working the debt off. We also surface users who were fine at
+  # the cutoff but carry check-in history, so admins can see how an outreach resolved.
   def build_roster
     # No snapshot means the backfill hasn't run; return nothing rather than flagging every holder as
     # in-debt off a missing figure. The frontend shows a "run debt:snapshot" notice via snapshot_built.
@@ -82,28 +83,30 @@ class Admin::DebtController < Admin::ApplicationController
 
     rows = candidates.filter_map do |user|
       check_ins = check_ins_by_user[user.id] || []
-      snapshot = snapshots_by_user[user.id]
-      # Frozen per-project approved seconds as of the cutoff; summed for the total and reused for the
-      # project list. A missing row (holder onboarded after the backfill) reads as zero approved ⇒ in debt.
-      approved_by_project = snapshot&.approved_by_project_ints || {}
-      approved_hours = ((snapshot&.approved_seconds || 0) / 3600.0).round(1)
+      # In-debt is decided ONLY by the frozen cutoff figure. A missing row (holder onboarded after
+      # the backfill) reads as zero approved at the cutoff ⇒ in debt.
+      snapshot_hours = ((snapshots_by_user[user.id]&.approved_seconds || 0) / 3600.0).round(1)
       # Debt always targets the flat 60h bar — the per-user ticket_hours_override only lowered the
-      # bar for *claiming* a ticket (grace/comped), but everyone clears debt by reaching 60 approved.
+      # bar for *claiming* a ticket (grace/comped), but everyone owed 60 approved by the cutoff.
       threshold = User::TICKET_HOURS_THRESHOLD
-      in_debt = approved_hours < threshold
+      in_debt = snapshot_hours < threshold
 
       # Skip people who are fine and were never checked in on — the console is for active debt.
       # Hidden users are always kept so they remain visible under the Hidden filter and can be unhidden.
       next unless in_debt || check_ins.any? || user.debt_hidden?
 
-      serialize_debtor(user, approved_hours:, threshold:, in_debt:, approved_by_project:, check_ins:)
+      # Live per-project approved seconds — displayed figures track current progress, not the cutoff.
+      approved_by_project = Project.batch_user_approved_seconds(user.projects_attributable_to_self_ids, user)
+      approved_hours = (approved_by_project.values.sum / 3600.0).round(1)
+
+      serialize_debtor(user, approved_hours:, snapshot_hours:, threshold:, in_debt:, approved_by_project:, check_ins:)
     end
 
     rows.sort_by! { |r| [ r[:in_debt] ? 0 : 1, r[:progress_pct] ] } # active debt first, closest-to-clearing last
     { debtors: rows, overview: build_overview(rows) }
   end
 
-  def serialize_debtor(user, approved_hours:, threshold:, in_debt:, approved_by_project:, check_ins:)
+  def serialize_debtor(user, approved_hours:, snapshot_hours:, threshold:, in_debt:, approved_by_project:, check_ins:)
     shipped_hours = (user.shipped_time_logged_seconds / 3600.0).round(1)
     logged_hours = (user.total_time_logged_seconds / 3600.0).round(1)
 
@@ -122,6 +125,7 @@ class Admin::DebtController < Admin::ApplicationController
       avatar: user.avatar,
       threshold: threshold,
       approved_hours: approved_hours,
+      snapshot_hours: snapshot_hours, # frozen as-of-cutoff figure the in_debt flag was decided on
       shipped_hours: shipped_hours,
       logged_hours: logged_hours,
       remaining_hours: [ (threshold - approved_hours).round(1), 0 ].max,

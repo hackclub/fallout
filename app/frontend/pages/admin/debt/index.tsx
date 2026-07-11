@@ -52,6 +52,7 @@ type Debtor = {
   avatar: string
   threshold: number
   approved_hours: number
+  snapshot_hours: number
   shipped_hours: number
   logged_hours: number
   remaining_hours: number
@@ -101,6 +102,7 @@ function toCsv(rows: Debtor[]): string {
     'Name',
     'Email',
     'Approved hours',
+    'Approved at cutoff',
     'Submitted hours',
     'Logged hours',
     'Threshold',
@@ -120,6 +122,7 @@ function toCsv(rows: Debtor[]): string {
       r.display_name,
       r.email,
       r.approved_hours,
+      r.snapshot_hours,
       r.shipped_hours,
       r.logged_hours,
       r.threshold,
@@ -274,7 +277,7 @@ function CheckInForm({ debtor }: { debtor: Debtor }) {
   )
 }
 
-function DebtorSheetBody({ debtor }: { debtor: Debtor }) {
+function DebtorSheetBody({ debtor, cutoff }: { debtor: Debtor; cutoff: string }) {
   return (
     <div className="flex flex-col gap-6 px-5 pb-8 pt-5">
       {/* Hours breakdown */}
@@ -292,11 +295,16 @@ function DebtorSheetBody({ debtor }: { debtor: Debtor }) {
         {debtor.in_debt ? (
           <div className="mt-3 text-sm">
             <span className="font-semibold text-[#1f4ee8] tabular-nums">{debtor.remaining_hours}h</span>
-            <span className="text-muted-foreground"> of approved hours left to clear their debt.</span>
+            <span className="text-muted-foreground"> of approved hours left to work off their debt.</span>
+            <div className="mt-1 text-xs text-muted-foreground">
+              In debt because they had{' '}
+              <span className="font-medium text-foreground tabular-nums">{debtor.snapshot_hours}h</span> approved on{' '}
+              {cutoff}.
+            </div>
           </div>
         ) : (
           <div className="mt-3 flex items-center gap-1.5 text-sm font-medium text-emerald-600">
-            <PartyPopper className="size-4" /> Cleared the bar.
+            <PartyPopper className="size-4" /> Cleared the bar by {cutoff}.
           </div>
         )}
       </section>
@@ -800,7 +808,7 @@ export default function AdminDebtIndex({
                     <p className="mt-1 text-xs text-muted-foreground">Ticket approved {selected.ticket_approved_at}</p>
                   )}
                 </SheetHeader>
-                <DebtorSheetBody debtor={selected} />
+                <DebtorSheetBody debtor={selected} cutoff={snapshot_cutoff} />
               </>
             )}
           </SheetContent>
