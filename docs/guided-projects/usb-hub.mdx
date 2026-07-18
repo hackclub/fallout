@@ -352,11 +352,11 @@ Next, finish wiring the remaining pins on your downstream USB connectors.
 
 - **GND** and **SH** (shield) connect to **GND**.
 
-- For USB-C downstream ports, wire them the same way as the upstream port, **except** you’ll need to add **56 kΩ pull-up resistors on the CC pins** instead of pull-downs.
+- For USB-C downstream ports, wire them the same way as the upstream port, **except** you’ll need to add **5.6 kΩ pull-up resistors on the CC pins** instead of pull-downs.
 
 For the USB-C downstream ports, the **CC pins** use **pull-up resistors** instead of pull-downs. The standard way to show a pull-up in a schematic is to have the resistor **pointing up** toward the voltage supply.
 
-So for each downstream USB-C port, place a **56 kΩ resistor** on the CC1 and CC2 pins, orient it pointing up, and wire the other end to **+5 V**.
+So for each downstream USB-C port, place a **5.6 kΩ resistor** on the CC1 and CC2 pins, orient it pointing up, and wire the other end to **+5 V**.
 
 If you’ve followed all these steps, your schematic should now look clean and complete, with all power, data, and control signals properly connected.
 
