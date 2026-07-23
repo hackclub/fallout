@@ -16,7 +16,7 @@ WORKDIR /rails
 
 # Install base packages — pinned to current Debian 12 (bookworm) stable versions to
 # block unreviewed upgrades; update deliberately when Debian rolls a point release.
-ARG CURL_VERSION=7.88.1-10+deb12u14
+ARG CURL_VERSION=7.88.1-10+deb12u15
 ARG LIBJEMALLOC2_VERSION=5.3.0-1
 ARG LIBVIPS42_VERSION=8.14.1-3+deb12u3
 # Enables PDF rendering through libvips (built with --enable-poppler upstream;
