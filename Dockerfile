@@ -85,7 +85,7 @@ RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 
 
 # Final stage for app image
-FROM base
+FROM base AS app
 
 # Re-declare and re-export so the Ruby Sentry SDK can read it at runtime
 ARG SENTRY_RELEASE=""

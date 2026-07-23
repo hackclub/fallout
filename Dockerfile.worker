@@ -87,7 +87,7 @@ ENV SENTRY_RELEASE=${SENTRY_RELEASE}
 
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 
-FROM base
+FROM base AS app
 
 # Re-declare and re-export so the Ruby Sentry SDK can read it at runtime
 ARG SENTRY_RELEASE=""
