@@ -14,10 +14,11 @@
 #
 # Indexes
 #
-#  index_journal_entries_on_discarded_at  (discarded_at)
-#  index_journal_entries_on_project_id    (project_id)
-#  index_journal_entries_on_ship_id       (ship_id)
-#  index_journal_entries_on_user_id       (user_id)
+#  index_journal_entries_on_discarded_at     (discarded_at)
+#  index_journal_entries_on_project_id       (project_id)
+#  index_journal_entries_on_search_tsvector  (to_tsvector('simple'::regconfig, COALESCE(content, ''::text))) USING gin
+#  index_journal_entries_on_ship_id          (ship_id)
+#  index_journal_entries_on_user_id          (user_id)
 #
 # Foreign Keys
 #
@@ -33,9 +34,12 @@ class JournalEntry < ApplicationRecord
 
   has_paper_trail
 
+  # Content-only so the GIN expression index on journal_entries can serve the
+  # query — an associated_against join would force a per-row tsvector recompute.
+  # Call sites that also need project name/description matches use
+  # search_including_project below.
   pg_search_scope :search,
                   against: :content,
-                  associated_against: { project: %i[name description] },
                   using: { tsearch: { prefix: true } }
 
   meilisearch auto_index: false, auto_remove: false do
@@ -94,6 +98,16 @@ class JournalEntry < ApplicationRecord
   scope :public_for_explore, -> {
     kept.where(project_id: Project.public_for_explore.select(:id))
   }
+
+  # Meilisearch-down fallback that mirrors the Meilisearch index's project_name
+  # coverage: content matches OR entries of projects whose name/description
+  # match. Both subqueries are served by GIN expression indexes; reorder(nil)
+  # strips pg_search's rank ORDER BY so the tsvector isn't recomputed for
+  # ordering inside the subquery.
+  def self.search_including_project(query)
+    where(id: search(query).reorder(nil).select(:id))
+      .or(where(project_id: Project.search(query).reorder(nil).select(:id)))
+  end
 
   def time_logged
     self.class.batch_time_logged([ id ])[id].to_i

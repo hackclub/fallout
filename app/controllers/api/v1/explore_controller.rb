@@ -81,7 +81,7 @@ class Api::V1::ExploreController < Api::V1::BaseController
           .map(&:id)
         scope = scope.where(id: matching_ids)
       rescue Meilisearch::ApiError, Meilisearch::CommunicationError, Errno::ECONNREFUSED
-        scope = scope.search(query)
+        scope = scope.merge(JournalEntry.search_including_project(query))
       end
     end
 

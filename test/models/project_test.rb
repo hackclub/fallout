@@ -26,6 +26,7 @@
 #  index_projects_on_discarded_at                  (discarded_at)
 #  index_projects_on_is_unlisted                   (is_unlisted)
 #  index_projects_on_name_trgm                     (name) USING gin
+#  index_projects_on_search_tsvector               (((to_tsvector('simple'::regconfig, COALESCE((name)::text, ''::text)) || to_tsvector('simple'::regconfig, COALESCE(description, ''::text))))) USING gin
 #  index_projects_on_tags                          (tags) USING gin
 #  index_projects_on_unified_thumbnail_checked_at  (unified_thumbnail_checked_at)
 #  index_projects_on_user_id                       (user_id)

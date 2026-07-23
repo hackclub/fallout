@@ -54,6 +54,7 @@
 #  index_users_on_device_token        (device_token)
 #  index_users_on_discarded_at        (discarded_at)
 #  index_users_on_hca_id              (hca_id) UNIQUE WHERE (hca_id IS NOT NULL)
+#  index_users_on_search_tsvector     (((to_tsvector('simple'::regconfig, COALESCE((display_name)::text, ''::text)) || to_tsvector('simple'::regconfig, COALESCE((email)::text, ''::text))))) USING gin
 #  index_users_unique_verified_email  (email) UNIQUE WHERE ((type IS NULL) AND (discarded_at IS NULL))
 #
 # Foreign Keys

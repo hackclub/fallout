@@ -144,6 +144,8 @@ end
 
 Two-tier ranking for project search: direct matches on project name/description rank above projects only matched via their journal content. Inside each tier, Meilisearch's own score order is preserved.
 
+The pg_search fallback is fast even without Meilisearch: GIN expression indexes (`index_projects_on_search_tsvector`, `index_journal_entries_on_search_tsvector`, `index_users_on_search_tsvector`, migration `20260723000000`) match the exact tsvector expressions pg_search generates, so fallback queries are index-served. `JournalEntry.search` is content-only (an `associated_against` join would defeat the index); journal feed fallbacks that also need project-name matches use `JournalEntry.search_including_project`, which ORs in entries of projects whose name/description match — mirroring the Meilisearch index's `project_name` coverage. Admin users/projects search has the same rescue-to-pg_search fallback (losing only typo tolerance). If a searched column list changes in a `pg_search_scope`, the corresponding index expression must change with it.
+
 The `is_unlisted = false` Meilisearch filter is required — without it, unlisted projects can be surfaced via journal-content matches even though they're filtered out of the public scope at SQL time. Belt-and-suspenders, but cheap.
 
 ---

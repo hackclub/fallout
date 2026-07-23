@@ -346,7 +346,13 @@ class Admin::UsersController < Admin::ApplicationController
           # Meilisearch returns a relevance-ordered list of IDs. Re-apply via a
           # positional ORDER to preserve that order, otherwise typo-tolerant matches
           # sink to the bottom and the visible result feels broken for short queries.
-          ranked_ids = User.ms_search(params[:query], limit: 200).map(&:id)
+          ranked_ids = begin
+            User.ms_search(params[:query], limit: 200).map(&:id)
+          rescue Meilisearch::ApiError, Meilisearch::CommunicationError, Errno::ECONNREFUSED
+            # pg_search fallback (rank-ordered, GIN-indexed) keeps admin search
+            # working when Meilisearch is down. Loses typo tolerance only.
+            User.search(params[:query]).limit(200).pluck(:id)
+          end
           if ranked_ids.any?
             order_sql = ActiveRecord::Base.send(:sanitize_sql_array, [ "array_position(ARRAY[?]::bigint[], users.id)", ranked_ids ])
             search_scope = search_scope.where(id: ranked_ids).reorder(Arel.sql(order_sql))

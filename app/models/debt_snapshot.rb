@@ -21,6 +21,7 @@
 #
 #  fk_rails_...  (user_id => users.id)
 #
+
 # A frozen, point-in-time record of a ticket-holder's TA-approved hours as of a cutoff. The debt
 # console judges debt against this snapshot (approved-as-of-cutoff < 60h) rather than live hours, so
 # work approved after the cutoff can't retroactively clear someone's debt. The cutoff is a fixed

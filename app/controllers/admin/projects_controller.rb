@@ -90,7 +90,13 @@ class Admin::ProjectsController < Admin::ApplicationController
           # Meilisearch returns a relevance-ordered list of IDs. Re-apply via a positional
           # ORDER to preserve relevance — keeps typo-tolerant / partial-word matches at the
           # top instead of sinking to the bottom under created_at desc.
-          ranked_ids = Project.ms_search(params[:query], limit: 200).map(&:id)
+          ranked_ids = begin
+            Project.ms_search(params[:query], limit: 200).map(&:id)
+          rescue Meilisearch::ApiError, Meilisearch::CommunicationError, Errno::ECONNREFUSED
+            # pg_search fallback (rank-ordered, GIN-indexed) keeps admin search
+            # working when Meilisearch is down. Loses typo tolerance only.
+            Project.search(params[:query]).limit(200).pluck(:id)
+          end
           if ranked_ids.any?
             order_sql = ActiveRecord::Base.send(:sanitize_sql_array, [ "array_position(ARRAY[?]::bigint[], projects.id)", ranked_ids ])
             search_scope = search_scope.where(id: ranked_ids).reorder(Arel.sql(order_sql))
