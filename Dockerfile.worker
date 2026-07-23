@@ -70,7 +70,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 COPY Gemfile Gemfile.lock ./
-RUN bundle install && \
+# --jobs 1: parallel gem builds race on mkmf's global $stdout/$stderr reopen under
+# the BuildKit builder, failing native extensions with Errno::EBADF. Serialize to avoid it.
+RUN bundle install --jobs 1 && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
     bundle exec bootsnap precompile --gemfile
 
