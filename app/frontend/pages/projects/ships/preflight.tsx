@@ -15,7 +15,7 @@ type Step = 'guidelines' | 'checklist' | 'scan' | 'submitted'
 const DESIGN_CHECKLIST_ITEMS = [
   "My digital design is complete and I've tried my best to make sure it'll work",
   "I've documented my design and README so that others can replicate my design and understand how it works.",
-  'My design is closer to a product than a demo. Components are well integrated: not handing in mid air, glued, taped, etc.',
+  'My design is closer to a product than a demo. Components are well integrated: not hanging in mid air, glued, taped, etc.',
   'My work is original. If I followed a tutorial, I made significant modifications and improvements to make it my own.',
   'I have an zine page: A5 sized, with required information and renders of my design.',
 ]
@@ -24,7 +24,7 @@ const BUILD_CHECKLIST_ITEMS = [
   'I have a complete digital design that is up to date with my build.',
   "I've built my digital design irl and updated my GitHub readme, repo, and zine to include details of it (i.e photos)",
   "I've documented both my design, build process and README so that others can replicate my project and understand how it works.",
-  'My project is closer to a product than a demo. Components are well integrated: not handing in mid air, glued, taped, etc.',
+  'My project is closer to a product than a demo. Components are well integrated: not hanging in mid air, glued, taped, etc.',
   'My work is original. If I followed a tutorial, I made significant modifications and improvements to make it my own.',
   'I have an zine page: A5 sized, with required information and photos of my IRL build.',
 ]
