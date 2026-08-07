@@ -73,7 +73,7 @@ group :test do
 end
 
 
-gem "faraday", "~> 2.13"
+gem "faraday", "~> 2.14"
 gem "rubyzip", "~> 3.0"
 gem "amatch", "~> 0.4"
 
