@@ -3,9 +3,12 @@
   <img src="public/fallout-black.svg" width="400px" height="auto" alt="Fallout">
 </picture>
 
-## Build 60h of hardware projects and qualify for a hardware hackathon in Shenzhen, China from July 1-7th.
-[Start building now!
-](https://fallout.hackclub.com/)
+## Build 60h of hardware projects and qualify for a hardware hackathon in Shenzhen, China from July 1-7th, 2026.
+[🎥 Check out the recap video
+](https://youtu.be/dTGFOKblRc4)
+
+This repo contains the platform used to track participant's project progress, and other operational tools for the program.
+
 ## Local Development Setup
 
 ### 1. Prerequisites
