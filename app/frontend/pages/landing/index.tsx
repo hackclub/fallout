@@ -527,10 +527,10 @@ export default function LandingIndex() {
                   >
                     <span className="relative overflow-hidden block leading-none">
                       <span className="block transition-transform duration-300 group-hover:translate-y-full">
-                        {submitting ? '...' : 'START NOW'}
+                        {submitting ? '...' : 'SIGN UP'}
                       </span>
                       <span className="absolute inset-0 block transition-transform duration-300 -translate-y-full group-hover:translate-y-0">
-                        {submitting ? '...' : 'START NOW'}
+                        {submitting ? '...' : 'SIGN UP'}
                       </span>
                     </span>
                   </button>
