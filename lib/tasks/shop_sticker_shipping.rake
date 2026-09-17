@@ -101,9 +101,12 @@ namespace :shop do
       u = gorders.first.user
       qty_by_item = Hash.new(0)
       gorders.each { |o| qty_by_item[o.shop_item_id] += o.quantity }
-      rubber = ordered_item_ids.filter_map { |id| n = qty_by_item[id]; "#{n}x #{label_for[id]}" if n.positive? }.join(", ")
+      items_line = ordered_item_ids.filter_map { |id| n = qty_by_item[id]; "#{n}x #{label_for[id]}" if n.positive? }.join(", ")
       order_ids = gorders.map(&:id).sort.join(",")
       phone = gorders.map { |o| o.phone.to_s.strip }.reject(&:empty?).first
+      # Rubber Stamps: a tel line (phone as stored, incl. its + country code when present)
+      # followed by the package contents. The tel line is omitted when no phone is on file.
+      rubber = [ (phone.present? ? "tel: #{phone}" : nil), items_line ].compact.join("\n")
 
       addr = match_hca_address(identities[user_id], blob)
       if addr

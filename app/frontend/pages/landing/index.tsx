@@ -499,7 +499,7 @@ export default function LandingIndex() {
 
           <div className="relative flex flex-col items-center w-full px-4 md:px-0 gap-3 sm:gap-4 pt-20">
             <div className="text-sm md:text-xl lg:text-2xl tracking-[5%] text-center  md:mt-6">
-              Start now to join us in Shenzhen, July 1-7
+              Event Ended · Shenzhen, China · July 1-7, 2026
             </div>
 
             <h1 className="text-center tracking-[5%] text-shadow-md text-shadow-blue font-outfit text-2xl xs:text-4xl md:text-6xl font-semibold max-w-5xl">
@@ -613,7 +613,7 @@ export default function LandingIndex() {
                     free hardware hackathon in Shenzhen, China.
                   </span>
                 </p>
-                <p className="mt-8 text-xl md:text-2xl xl:text-3xl">
+                <p className="mt-5 text-xl md:text-2xl xl:text-3xl">
                   Qualify by designing and{' '}
                   <span
                     ref={highlight2Ref}
@@ -627,6 +627,20 @@ export default function LandingIndex() {
                     building 60h
                   </span>
                   , with components funded by us!
+                </p>
+                <p className="mt-5 text-xl md:text-2xl xl:text-3xl">
+                  Fallout has ended, check out{' '}
+                  <span
+                    ref={highlight2Ref}
+                    style={{
+                      backgroundImage: 'linear-gradient(var(--color-green), var(--color-green))',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'left center',
+                      backgroundSize: '0% 100%',
+                    }}
+                  >
+                    <a href="https://hackclub.com/programs?utm_source=fallout-landing">other programs by Hack Club</a>
+                  </span>
                 </p>
               </div>
               <div className="relative my-6 sm:absolute sm:-bottom-30 sm:left-20 lg:left-10  bg-white max-w-full md:w-120 shadow-md border-2 border-dark-brown z-10 text-dark-brown p-4 text-xl md:text-2xl">
@@ -660,23 +674,7 @@ export default function LandingIndex() {
                 </p>
               </div>
             </section>
-            <section className="w-full md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-20 md:pt-60 md:pb-40 text-dark-brown flex flex-col items-center justify-center gap-6 font-bold text-center">
-              <span className="text-2xl xs:text-3xl text-brown">My parents are worried!</span>
-              <div className="gap-4 sm:gap-10 text-beige flex flex-col sm:flex-row items-center justify-center w-full">
-                <a
-                  href="https://hack.club/fallout-parent-call"
-                  className="inline-block bg-brown w-full max-w-70 py-4 text-2xl rounded-sm hover:bg-dark-brown transition-all"
-                >
-                  Book a call with us
-                </a>
-                <a
-                  href="https://docs.google.com/document/d/1dXDIBm7SWui5rbK3zh7188UmLC0cv_dsMj7ynr3POho/edit?tab=t.q4hvz46um9np"
-                  className="inline-block bg-brown w-full max-w-70 py-4 text-2xl rounded-sm hover:bg-dark-brown transition-all"
-                >
-                  Parent Guide
-                </a>
-              </div>
-            </section>
+            <section className="w-full md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-10 md:pt-30 md:pb-30 text-dark-brown flex flex-col items-center justify-center gap-6 font-bold text-center"></section>
             <div className="md:pt-0 md:qualify-outer">
               <section className="md:qualify-section md:sticky md:top-[calc(50svh-15rem)] flex flex-col md:flex-row justify-between w-full text-beige gap-4 md:min-h-120">
                 <div className="flex-3/4 lg:flex-3/4 w-full flex justify-center md:block">
@@ -712,6 +710,9 @@ export default function LandingIndex() {
                 </div>
                 <div className="relative flex flex-col h-fit bg-blue border-2 border-dark-brown p-6 md:p-10 text-beige rounded-sm">
                   <div className="text-white flex flex-col w-full md:w-fit space-y-4">
+                    <p className="ml-8 list-decimal text-lg sm:text-xl xl:text-2xl space-y-3 text-center">
+                      Fallout has ended and qualifications have closed, but here's what it looked like.
+                    </p>
                     <span className="text-4xl lg:text-6xl font-semibold text-center font-outfit">HOW TO QUALIFY</span>
                     <ol className="ml-8 list-decimal leading-8 text-xl sm:text-2xl xl:text-3xl space-y-3">
                       <li>Design your project</li>
@@ -721,8 +722,9 @@ export default function LandingIndex() {
                       <li>Publish + Share online</li>
                       <li>Repeat until you've spent 60 hours</li>
                     </ol>
+                    <p></p>
                   </div>
-                  <div className="md:absolute -bottom-24 right-10 mx-auto sm:mx-0 w-full sm:ml-auto mt-10 bg-white md:w-80 shadow-md border-2 border-dark-brown z-10 text-dark-brown p-4 text-xl sm:text-2xl">
+                  <div className="md:absolute -bottom-32 right-10 mx-auto sm:mx-0 w-full sm:ml-auto mt-10 bg-white md:w-80 shadow-md border-2 border-dark-brown z-10 text-dark-brown p-4 text-xl sm:text-2xl">
                     <p>As long as you spend 60h on your projects, you can come to Shenzhen, China!</p>
                   </div>
                 </div>
@@ -787,158 +789,7 @@ export default function LandingIndex() {
               <h2 className="text-8xl lg:text-9xl lg:text-[10rem] font-semibold font-outfit whitespace-nowrap">深圳</h2>
             </div>
           </section>
-          <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-20 bg-beige text-dark-brown">
-            <div className="w-full border-[1.5px] border-dark-brown relative px-6 py-16 flex flex-col items-center">
-              <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-beige px-4">
-                <img src="/landing/flag.svg" alt="Hack Club" className="h-12 object-contain" />
-              </div>
-              <h3 className="w-full font-bold text-brown mb-4 uppercase mt-2">
-                {/* Mobile version (two lines, equal width) */}
-                <div className="md:hidden w-[85%] mx-auto flex flex-col items-center">
-                  <svg viewBox="0 0 100 24" className="w-full h-auto overflow-visible fill-current">
-                    <text
-                      x="50%"
-                      y="22"
-                      textAnchor="middle"
-                      fontSize="26"
-                      fontWeight="bold"
-                      textLength="100"
-                      lengthAdjust="spacing"
-                    >
-                      EARN A
-                    </text>
-                  </svg>
-                  <svg viewBox="0 0 100 14" className="w-full h-auto overflow-visible fill-current mt-1">
-                    <text
-                      x="50%"
-                      y="12"
-                      textAnchor="middle"
-                      fontSize="15"
-                      fontWeight="bold"
-                      textLength="100"
-                      lengthAdjust="spacing"
-                    >
-                      CERTIFICATE
-                    </text>
-                  </svg>
-                </div>
-                {/* Desktop version (single line) */}
-                <div className="hidden md:block text-center text-3xl md:text-5xl tracking-wide">EARN A CERTIFICATE</div>
-              </h3>
-              <p className="text-xl md:text-2xl text-center text-brown mb-8 max-w-2xl mt-4 md:mt-0">
-                Upon the completion of 60 hours for Fallout,
-                <br />
-                get a certificate recognized by
-              </p>
-
-              <div className="flex flex-col items-center gap-6 md:gap-8 w-full max-w-4xl">
-                <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 w-full">
-                  <div className="relative flex-shrink-0 w-[67%] md:w-auto flex justify-center">
-                    <img
-                      src="/landing/logos/mit.webp"
-                      className="w-full h-auto md:h-24 md:w-auto object-contain opacity-0"
-                      alt="MIT School of Engineering"
-                    />
-                    <div
-                      className="absolute inset-0 bg-brown"
-                      style={{
-                        WebkitMaskImage: 'url(/landing/logos/mit.webp)',
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskPosition: 'center',
-                        WebkitMaskRepeat: 'no-repeat',
-                        maskImage: 'url(/landing/logos/mit.webp)',
-                        maskSize: 'contain',
-                        maskPosition: 'center',
-                        maskRepeat: 'no-repeat',
-                      }}
-                    ></div>
-                  </div>
-                  <div className="relative flex-shrink-0 w-[67%] md:w-auto flex justify-center">
-                    <img
-                      src="/landing/logos/github.webp"
-                      className="w-full h-auto md:h-20 md:w-auto object-contain opacity-0"
-                      alt="GitHub"
-                    />
-                    <div
-                      className="absolute inset-0 bg-brown"
-                      style={{
-                        WebkitMaskImage: 'url(/landing/logos/github.webp)',
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskPosition: 'center',
-                        WebkitMaskRepeat: 'no-repeat',
-                        maskImage: 'url(/landing/logos/github.webp)',
-                        maskSize: 'contain',
-                        maskPosition: 'center',
-                        maskRepeat: 'no-repeat',
-                      }}
-                    ></div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap justify-center items-center gap-6 md:gap-12 w-full">
-                  <div className="relative flex-shrink-0 w-[67%] md:w-auto flex justify-center">
-                    <img
-                      src="/landing/logos/amd.webp"
-                      className="w-full h-auto md:h-16 md:w-auto object-contain opacity-0"
-                      alt="AMD"
-                    />
-                    <div
-                      className="absolute inset-0 bg-brown"
-                      style={{
-                        WebkitMaskImage: 'url(/landing/logos/amd.webp)',
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskPosition: 'center',
-                        WebkitMaskRepeat: 'no-repeat',
-                        maskImage: 'url(/landing/logos/amd.webp)',
-                        maskSize: 'contain',
-                        maskPosition: 'center',
-                        maskRepeat: 'no-repeat',
-                      }}
-                    ></div>
-                  </div>
-                  <div className="relative flex-shrink-0 w-[67%] md:w-auto flex justify-center">
-                    <img
-                      src="/landing/logos/cac.webp"
-                      className="w-full h-auto md:h-20 md:w-auto object-contain opacity-0"
-                      alt="Congressional App Challenge"
-                    />
-                    <div
-                      className="absolute inset-0 bg-brown"
-                      style={{
-                        WebkitMaskImage: 'url(/landing/logos/cac.webp)',
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskPosition: 'center',
-                        WebkitMaskRepeat: 'no-repeat',
-                        maskImage: 'url(/landing/logos/cac.webp)',
-                        maskSize: 'contain',
-                        maskPosition: 'center',
-                        maskRepeat: 'no-repeat',
-                      }}
-                    ></div>
-                  </div>
-                  <div className="relative flex-shrink-0 w-[67%] md:w-auto flex justify-center">
-                    <img
-                      src="/landing/logos/gwc.webp"
-                      className="w-full h-auto md:h-20 md:w-auto object-contain opacity-0"
-                      alt="Girls Who Code"
-                    />
-                    <div
-                      className="absolute inset-0 bg-brown"
-                      style={{
-                        WebkitMaskImage: 'url(/landing/logos/gwc.webp)',
-                        WebkitMaskSize: 'contain',
-                        WebkitMaskPosition: 'center',
-                        WebkitMaskRepeat: 'no-repeat',
-                        maskImage: 'url(/landing/logos/gwc.webp)',
-                        maskSize: 'contain',
-                        maskPosition: 'center',
-                        maskRepeat: 'no-repeat',
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-20 bg-beige text-dark-brown"></section>
           <section className="px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 py-16 bg-beige text-dark-brown flex flex-col items-center gap-6">
             <p className="text-xl md:text-2xl text-center text-brown font-bold max-w-2xl">Supported by</p>
             <div className="flex flex-col items-center gap-8 md:gap-10 w-full max-w-4xl">
@@ -1074,17 +925,53 @@ export default function LandingIndex() {
             <div className="divide-y-2 divide-dark-brown border-y-2 border-dark-brown font-outfit">
               {[
                 {
+                  q: 'How do I join?',
+                  a: (
+                    <>
+                      <strong>Unfortunately, Fallout has ended and you can no longer join.</strong> Hack Club runs a
+                      bunch of other programs similar to Fallout throughout the year, with hackathons around the world
+                      and lots of ways to fund your projects. Check them out{' '}
+                      <a href="https://hackclub.com/programs?utm_source=fallout-landing" target="_blank">
+                        here
+                      </a>
+                      !
+                    </>
+                  ),
+                },
+                {
                   q: "Can I join if I'm a beginner?",
                   a: (
                     <>
                       Absolutely! We have <strong>beginner friendly guided projects</strong> and{' '}
                       <strong>weekly calls</strong> where you can ask for help!
+                      <br />
+                      <br />
+                      <strong>Unfortunately, Fallout has ended and you can no longer join.</strong> Hack Club runs a
+                      bunch of other programs similar to Fallout throughout the year, with hackathons around the world
+                      and lots of ways to fund your projects. Check them out{' '}
+                      <a href="https://hackclub.com/programs?utm_source=fallout-landing" target="_blank">
+                        here
+                      </a>
+                      !
                     </>
                   ),
                 },
                 {
                   q: 'Can I work in teams?',
-                  a: <>Yes! After creating a new project, you can invite your teammates!</>,
+                  a: (
+                    <>
+                      Yes! After creating a new project, you can invite your teammates!
+                      <br />
+                      <br />
+                      <strong>Unfortunately, Fallout has ended and you can no longer join.</strong> Hack Club runs a
+                      bunch of other programs similar to Fallout throughout the year, with hackathons around the world
+                      and lots of ways to fund your projects. Check them out{' '}
+                      <a href="https://hackclub.com/programs?utm_source=fallout-landing" target="_blank">
+                        here
+                      </a>
+                      !
+                    </>
+                  ),
                 },
                 {
                   q: 'Am I eligible?',
@@ -1092,6 +979,15 @@ export default function LandingIndex() {
                     <>
                       You must be a <strong>teenager (ages 13–18)</strong>, and under 19 before{' '}
                       <strong>August 2026</strong>.
+                      <br />
+                      <br />
+                      <strong>Unfortunately, Fallout has ended and you can no longer join.</strong> Hack Club runs a
+                      bunch of other programs similar to Fallout throughout the year, with hackathons around the world
+                      and lots of ways to fund your projects. Check them out{' '}
+                      <a href="https://hackclub.com/programs?utm_source=fallout-landing" target="_blank">
+                        here
+                      </a>
+                      !
                     </>
                   ),
                 },

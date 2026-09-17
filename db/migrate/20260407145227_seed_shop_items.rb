@@ -1,4 +1,14 @@
 class SeedShopItems < ActiveRecord::Migration[8.1]
+  # Migration-local model: the app's ShopItem has validations for columns
+  # (currency, etc.) that don't exist yet at this point in the migration history.
+  class ShopItem < ActiveRecord::Base
+    self.table_name = "shop_items"
+  end
+
+  NAMES = [ "Web Cam", "Bench Power Supply", "Keycaps", "Fume Extractor", "Stickers",
+            "Flipper Zero", "Fallout 4 (the game)", "Pinecil", "Renran", "Bambu Lab P1S",
+            "Bambu Lab A1 Mini", "Ticket to Fallout", "Travel Grant", "eSIM Grant" ].freeze
+
   def up
     ShopItem.create!([
       { name: "Web Cam", description: "Logitech C270", price: 63, image_url: "https://cdn.hackclub.com/019d5b86-266d-7bfc-b711-61b6123eae3e/webcam.webp", status: "unavailable", featured: false, ticket: false },
@@ -19,8 +29,6 @@ class SeedShopItems < ActiveRecord::Migration[8.1]
   end
 
   def down
-    ShopItem.where(name: [ "Web Cam", "Bench Power Supply", "Keycaps", "Fume Extractor", "Stickers",
-                           "Flipper Zero", "Fallout 4 (the game)", "Pinecil", "Renran", "Bambu Lab P1S",
-                           "Bambu Lab A1 Mini", "Ticket to Fallout", "Travel Grant", "eSIM Grant" ]).destroy_all
+    ShopItem.where(name: NAMES).delete_all
   end
 end
