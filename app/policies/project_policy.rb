@@ -1,10 +1,6 @@
 # frozen_string_literal: true
 
 class ProjectPolicy < ApplicationPolicy
-  # On/after this instant, the :limit_reships flag caps a project at one returned-ship resubmission
-  # (see #return_reship_limit_reached?).
-  RESHIP_LIMIT_CUTOFF = ActiveSupport::TimeZone["America/New_York"].local(2026, 6, 21)
-
   # A Blueprint/Stasis transfer made after this instant waives the :disable_new_submissions kill switch
   # (see #recent_transfer? — late transferees still get their first submission).
   TRANSFER_WAIVER_CUTOFF = ActiveSupport::TimeZone["America/New_York"].local(2026, 6, 17)
@@ -79,7 +75,8 @@ class ProjectPolicy < ApplicationPolicy
     return false unless user.present?
 
     return false if !record.ships.exists? && new_submissions_disabled? # Kill switch blocks first-time submissions
-    return false if return_reship_limit_reached? # Resubmitting a returned ship is capped post-cutoff under :limit_reships
+    return false if final_review_used? # The project already spent its one post-cutoff review
+    return false if resubmit_deadline_passed? # The returned ship's grace window has closed
 
     !user.trial? && owner? # Only verified project owners can submit for review
   end
@@ -89,8 +86,8 @@ class ProjectPolicy < ApplicationPolicy
     return false unless record.ships.where(status: :pending).exists? # Only an in-queue submission can be pulled back and re-shipped
     return false unless user.present?
 
-    # Note: abandon-pending reships are intentionally NOT subject to :limit_reships — only returned-ship
-    # resubmissions (handled in #ship?) count toward the post-cutoff cap.
+    return false if final_review_used? # Swapping an in-flight ship stays allowed until a verdict lands
+
     !user.trial? && owner? # Same gate as ship? — verified owners only
   end
 
@@ -101,14 +98,28 @@ class ProjectPolicy < ApplicationPolicy
     !user.trial? && owner? # Cover refresh hits the GitHub API — verified owners only (mirrors ship?)
   end
 
-  # True when Submit is blocked *only* by the :disable_new_submissions kill switch — drives the
-  # still-clickable Submit button that raises the "submissions have closed" popup instead of disappearing.
-  def ship_closed?
-    return false if record.discarded?
-    return false unless user.present? && !user.trial? && owner?
-    return false if record.ships.exists? # Closure only applies to projects that have never shipped
+  # Why Submit is unavailable to someone who would otherwise be able to use it — drives the
+  # still-clickable Submit button that raises an explanatory popup instead of disappearing. nil when
+  # Submit works, or when this user has no business submitting at all (then the button stays hidden).
+  def ship_block_reason
+    return nil if ship?
+    return nil if record.discarded?
+    return nil unless user.present? && !user.trial? && owner?
+    return nil if record.ships.where(status: %i[pending awaiting_identity]).exists? # Already in the queue
 
-    new_submissions_disabled?
+    return :submissions_closed if !record.ships.exists? && new_submissions_disabled?
+    return :final_review_used if final_review_used?
+    return :deadline_passed if resubmit_deadline_passed?
+
+    nil
+  end
+
+  # The wind-down rules are live for this user: the :final_reviews flag is on and they hold no per-user
+  # exemption. Public so callers can avoid surfacing a resubmit deadline that isn't actually enforced.
+  def final_reviews_enabled?
+    return false unless user.present?
+
+    Flipper.enabled?(:final_reviews) && !Flipper.enabled?(:final_reviews_override, user)
   end
 
   def manage_collaborators?
@@ -124,7 +135,7 @@ class ProjectPolicy < ApplicationPolicy
   # transferred from Blueprint/Stasis after TRANSFER_WAIVER_CUTOFF (late transferees still deserve
   # their first submission).
   def new_submissions_disabled?
-    return @new_submissions_disabled if defined?(@new_submissions_disabled) # Memoized — ship? and ship_closed? both ask on the same render
+    return @new_submissions_disabled if defined?(@new_submissions_disabled) # Memoized — ship? and ship_block_reason both ask on the same render
 
     @new_submissions_disabled =
       if !Flipper.enabled?(:disable_new_submissions) || Flipper.enabled?(:new_submissions_override, user)
@@ -144,18 +155,34 @@ class ProjectPolicy < ApplicationPolicy
           .any? { |entry| entry.content&.match?(TRANSFER_MARKER) }
   end
 
-  # When :limit_reships is on, a project may resubmit a RETURNED ship at most once on/after
-  # RESHIP_LIMIT_CUTOFF. The first post-cutoff return-resubmission is allowed; any subsequent one is
-  # blocked. Abandon-pending reships (the Reship! button — preceding ship superseded, not returned) don't
-  # count and stay unlimited; first-time submissions are governed by :disable_new_submissions.
-  def return_reship_limit_reached?
-    return false unless Flipper.enabled?(:limit_reships)
-    return false if Flipper.enabled?(:reship_limit_override, user) # Per-user exemption from the cap
+  # A submission made on/after FINAL_REVIEW_CUTOFF has already received a reviewer verdict, which
+  # permanently closes the project to further submissions whatever that verdict was. Superseded ships
+  # are excluded by REVIEWED_STATUSES — the user pulled those back before any reviewer finished.
+  def final_review_used?
+    return false unless final_reviews_enabled?
 
-    ships = record.ships.order(:created_at).to_a
-    # A return-resubmission is a ship whose immediately-preceding ship had been returned. Count those
-    # created on/after the cutoff — one is allowed, so the cap is reached once a prior one already exists.
-    ships.each_cons(2).count { |prev, ship| ship.created_at >= RESHIP_LIMIT_CUTOFF && prev.status == "returned" } >= 1
+    return @final_review_used if defined?(@final_review_used) # Memoized — ship?, reship? and ship_block_reason all ask
+
+    @final_review_used = record.ships
+                               .where(status: Ship::REVIEWED_STATUSES)
+                               .where(created_at: Ship::FINAL_REVIEW_CUTOFF..)
+                               .exists?
+  end
+
+  # True once the grace window on the project's latest returned ship has closed. Superseded ships are
+  # skipped so an abandoned reship doesn't mask the return that actually started the clock.
+  def resubmit_deadline_passed?
+    return false unless final_reviews_enabled?
+
+    deadline = current_ship_resubmit_deadline
+    deadline.present? && Time.current > deadline
+  end
+
+  def current_ship_resubmit_deadline
+    return @current_ship_resubmit_deadline if defined?(@current_ship_resubmit_deadline)
+
+    latest = record.ships.where.not(status: :superseded).order(:created_at).last
+    @current_ship_resubmit_deadline = latest&.resubmit_deadline
   end
 
   class Scope < ApplicationPolicy::Scope

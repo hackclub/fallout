@@ -116,7 +116,7 @@ Non-exhaustive — `app/policies/` has grown to cover review queues, shop/orders
 | `:shop` | Shop/redemption features | Controllers, shared props |
 | `:hcb_top_ups` | HCB project funding top-ups | Controllers, shared props |
 | `:disable_new_submissions` / `:new_submissions_override` | End-of-program kill switch: blocks project creation (`create?`, `new?`, `onboarding?`) **and** first-time submissions (`ship?` on never-shipped projects). Waived per-user by the override flag, and per-project by a post-`TRANSFER_WAIVER_CUTOFF` Blueprint/Stasis transfer | `ProjectPolicy`, `submissions_closed` shared prop |
-| `:limit_reships` / `:reship_limit_override` | One returned-ship resubmission per project post-cutoff + per-user exemption | `ProjectPolicy`, `features` shared prop |
+| `:final_reviews` / `:final_reviews_override` | Program wind-down + per-user exemption: a returned ship must be resubmitted within `Ship::RESUBMIT_GRACE_PERIOD` (3 days), and any ship created on/after `Ship::FINAL_REVIEW_CUTOFF` is the project's last whatever its verdict | `ProjectPolicy`, `Ship#resubmit_deadline`, `features` shared prop |
 | `:disable_ticket_claims` / `:ticket_claims_override` | Global kill switch for summit ticket claiming + per-user exemption (mirrors the submission/reship gate pattern); checked via `User#ticket_claims_disabled?` | `TicketClaimsController`, `ShopItemsController` |
 
 **Usage pattern:**
@@ -149,8 +149,8 @@ inertia_share submissions_closed: -> {
 rendered and clickable and fires `notify('alert', SUBMISSIONS_CLOSED_MESSAGE)` (from
 `@/lib/notifications`) instead of navigating — a missing/disabled button reads as a bug. Entry points:
 the `+` button on `projects/index`, the first path star in `PathNode`, and the `Submit` button on
-`projects/show` (gated by the `can.ship_closed` prop, true only when the kill switch is the *sole*
-reason `ship?` is false).
+`projects/show` (gated by the `can.ship_block_reason` prop, which also names *which* rule blocked it so
+the popup can explain itself — see `SHIP_BLOCK_MESSAGES`).
 
 ## 4. PaperTrail Auditing
 

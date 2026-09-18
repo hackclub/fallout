@@ -68,7 +68,7 @@ class ApplicationController < ActionController::Base
       shop: Flipper.enabled?(:shop, current_user),
       grant_fulfillment: true,
       hcb_top_ups: Flipper.enabled?(:hcb_top_ups, current_user),
-      limit_reships: Flipper.enabled?(:limit_reships) # Drives the "last chance" typed-confirmation modal on ship/reship
+      final_reviews: Flipper.enabled?(:final_reviews) && !Flipper.enabled?(:final_reviews_override, current_user) # Drives the "last chance" typed-confirmation modal on submit
     }
   }
   # Drives the "submissions have closed" popup on the project-creation entry points. Shared for trial

@@ -13,13 +13,14 @@ import Input from '@/components/shared/Input'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { performModalMutation } from '@/lib/modalMutation'
-import { notify, SUBMISSIONS_CLOSED_MESSAGE } from '@/lib/notifications'
+import { notify, SHIP_BLOCK_MESSAGES, SUBMISSIONS_CLOSED_MESSAGE } from '@/lib/notifications'
 import { relativeAgeParts } from '@/lib/relativeAge'
 import { useNowTick } from '@/lib/useNowTick'
 import TimeAgo from '@/components/shared/TimeAgo'
 import Timeline from '@/components/shared/Timeline'
 import { SlidingNumber } from '@/components/shared/SlidingNumber'
 import TextMorph from '@/components/shared/TextMorph'
+import ResubmitCountdown from '@/components/projects/ResubmitCountdown'
 import ShipWarningModal from '@/components/projects/ShipWarningModal'
 import type {
   ProjectDetail,
@@ -220,7 +221,7 @@ export default function ProjectsShow({
     export_journal: boolean
     share: boolean
     ship: boolean
-    ship_closed: boolean
+    ship_block_reason: string | null
     reship: boolean
     manage_collaborators: boolean
     create_journal_entry: boolean
@@ -261,6 +262,10 @@ export default function ProjectsShow({
   const requirementsUrl = project.built_irl
     ? '/docs/requirements/submitting-build'
     : '/docs/requirements/submitting-design'
+  // Ships arrive newest-first; superseded ones were pulled back by the user before any reviewer verdict.
+  // Only this ship's return is actionable — older returned ships in the timeline are already spent.
+  const currentShip = ships.find((ship) => ship.status !== 'superseded') ?? null
+  const resubmitDeadlineIso = currentShip?.resubmit_deadline_iso ?? null
   const [holding, setHolding] = useState(false)
   const [holdProgress, setHoldProgress] = useState(0)
   const holdFrameRef = useRef<number | null>(null)
@@ -483,14 +488,19 @@ export default function ProjectsShow({
     })
   }
 
-  // During the lockdown, gate ship/resubmit behind the typed "last chance" warning. Abandon-pending
-  // reships are unlimited, so the Reship! button keeps its plain hold-to-confirm regardless of the flag.
+  // During the wind-down every submission is the project's last, so gate ship/resubmit behind the typed
+  // "last chance" warning. Abandon-pending reships consume no review, so the Reship! button keeps its
+  // plain hold-to-confirm regardless of the flag.
   function requestShip() {
-    if (features.limit_reships) {
+    if (features.final_reviews) {
       setShipWarnOpen(true)
     } else {
       router.visit(shipUrl)
     }
+  }
+
+  function notifyShipBlocked() {
+    notify('alert', SHIP_BLOCK_MESSAGES[can.ship_block_reason ?? ''] ?? SUBMISSIONS_CLOSED_MESSAGE)
   }
 
   function openReship() {
@@ -992,12 +1002,15 @@ export default function ProjectsShow({
               )}
             </div>
             {can.ship && (
-              <Button onClick={requestShip} className="px-6 py-2 text-sm">
-                Submit
-              </Button>
+              <div className="flex flex-col items-end gap-1">
+                {resubmitDeadlineIso && <ResubmitCountdown deadlineIso={resubmitDeadlineIso} />}
+                <Button onClick={requestShip} className="px-6 py-2 text-sm">
+                  Submit
+                </Button>
+              </div>
             )}
-            {can.ship_closed && (
-              <Button onClick={() => notify('alert', SUBMISSIONS_CLOSED_MESSAGE)} className="px-6 py-2 text-sm">
+            {can.ship_block_reason && (
+              <Button unavailable onClick={notifyShipBlocked} className="px-6 py-2 text-sm">
                 Submit
               </Button>
             )}
@@ -1101,10 +1114,22 @@ export default function ProjectsShow({
                           >
                             <div className="space-y-3">
                               <p className="text-sm text-dark-brown whitespace-pre-wrap">{ship.feedback}</p>
-                              {can.ship && (
-                                <Button onClick={requestShip} className="px-4 py-1.5 text-sm">
-                                  Resubmit
-                                </Button>
+                              {ship.id === currentShip?.id && (
+                                <div className="flex items-center gap-3">
+                                  {can.ship && (
+                                    <Button onClick={requestShip} className="px-4 py-1.5 text-sm">
+                                      Resubmit
+                                    </Button>
+                                  )}
+                                  {can.ship_block_reason && (
+                                    <Button unavailable onClick={notifyShipBlocked} className="px-4 py-1.5 text-sm">
+                                      Resubmit
+                                    </Button>
+                                  )}
+                                  {can.ship && ship.resubmit_deadline_iso && (
+                                    <ResubmitCountdown deadlineIso={ship.resubmit_deadline_iso} />
+                                  )}
+                                </div>
                               )}
                             </div>
                           </Timeline.DetailItem>

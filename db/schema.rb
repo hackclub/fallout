@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_29_182032) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_18_143247) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -758,6 +758,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_182032) do
     t.jsonb "preflight_results"
     t.bigint "preflight_run_id"
     t.bigint "project_id", null: false
+    t.datetime "returned_at"
     t.bigint "reviewer_id"
     t.integer "ship_type", default: 0, null: false
     t.integer "status", default: 0, null: false

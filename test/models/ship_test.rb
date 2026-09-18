@@ -11,6 +11,7 @@
 #  frozen_screenshot       :string
 #  justification           :string
 #  preflight_results       :jsonb
+#  returned_at             :datetime
 #  ship_type               :integer          default("design"), not null
 #  status                  :integer          default("pending"), not null
 #  created_at              :datetime         not null

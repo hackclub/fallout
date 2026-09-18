@@ -295,6 +295,30 @@ textarea:focus {
   will-change: transform;
 }
 
+@keyframes countdown-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+.countdown-breathe {
+  animation: countdown-breathe 2.1s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform;
+}
+
+/* Motion guard — the countdown still reads red and urgent, it just holds still. */
+@media (prefers-reduced-motion: reduce) {
+  .countdown-breathe {
+    animation: none;
+  }
+}
+
 .markdown-content {
   margin: 2rem auto;
   padding: 0 1rem;

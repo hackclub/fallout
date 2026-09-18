@@ -11,6 +11,7 @@
 #  frozen_screenshot       :string
 #  justification           :string
 #  preflight_results       :jsonb
+#  returned_at             :datetime
 #  ship_type               :integer          default("design"), not null
 #  status                  :integer          default("pending"), not null
 #  created_at              :datetime         not null
@@ -34,6 +35,19 @@
 #  fk_rails_...  (reviewer_id => users.id)
 #
 class Ship < ApplicationRecord
+  # Wind-down of the review program. A returned ship may be resubmitted until RESUBMIT_GRACE_PERIOD
+  # after it was returned; anything already returned when the wind-down started gets a full grace
+  # period measured from FINAL_REVIEW_CUTOFF instead, so nobody loses time they were never told about.
+  # Ships returned more than one grace period before the cutoff are already past their deadline.
+  # Separately, any ship *created* on/after the cutoff is the project's last (see
+  # ProjectPolicy#final_review_used?). Both are gated by the :final_reviews Flipper flag.
+  FINAL_REVIEW_CUTOFF = ActiveSupport::TimeZone["America/New_York"].local(2026, 9, 18, 12, 0)
+  RESUBMIT_GRACE_PERIOD = 3.days
+
+  # Statuses that represent a reviewer verdict. :superseded is excluded — the user pulled that ship
+  # out of the queue themselves and it never consumed a review.
+  REVIEWED_STATUSES = %w[approved returned rejected].freeze
+
   has_paper_trail
 
   belongs_to :project
@@ -386,7 +400,10 @@ class Ship < ApplicationRecord
     if status != new_status
       attrs = { status: new_status }
       # Aggregate reviewer feedback onto the ship so MailDeliveryService includes it in notifications
-      attrs[:feedback] = aggregate_return_feedback if new_status == "returned"
+      if new_status == "returned"
+        attrs[:feedback] = aggregate_return_feedback
+        attrs[:returned_at] = Time.current # Starts the resubmission grace window — see #resubmit_deadline
+      end
       # ship.approved_public_seconds is the *fully-approved* number — only populated when
       # the ship reaches :approved, cleared on any other transition. The TA-level value
       # (time_audit_review.approved_public_seconds) stays set independently when the TA
@@ -408,6 +425,19 @@ class Ship < ApplicationRecord
       lock_reviewed_journal_entries! if new_status == "approved"
     end
     cancel_pending_reviews! if returned? || rejected?
+  end
+
+  # Last instant this returned ship may be resubmitted, or nil if it isn't returned. Returns are dated
+  # by #returned_at (backfilled for pre-wind-down ships); updated_at is the fallback, exact for every
+  # ship except ones whose version history was trimmed, since terminal statuses never transition again.
+  def resubmit_deadline
+    return nil unless returned?
+
+    at = returned_at || updated_at
+    # Returns from before the wind-down get their grace period measured from the cutoff, unless they
+    # were already more than a grace period old when it started — those are past their deadline.
+    base = at.between?(FINAL_REVIEW_CUTOFF - RESUBMIT_GRACE_PERIOD, FINAL_REVIEW_CUTOFF) ? FINAL_REVIEW_CUTOFF : at
+    base + RESUBMIT_GRACE_PERIOD
   end
 
   # approved_public_seconds + DR/BR hours_adjustment. Phase 2 reviewers can credit

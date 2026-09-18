@@ -22,7 +22,7 @@ export interface Features {
   collaborators?: boolean
   shop?: boolean
   grant_fulfillment: true
-  limit_reships?: boolean
+  final_reviews?: boolean
 }
 
 export type IdentityGateState = 'unverified' | 'pending' | 'verified_no_address' | 'verified_with_address'
@@ -186,6 +186,7 @@ export interface ShipEvent {
   feedback: string | null
   created_at_iso: string
   updated_at_iso: string
+  resubmit_deadline_iso: string | null
   reviewer_display_name: string | null
   time_audit_status: string | null
   requirements_check_status: string | null

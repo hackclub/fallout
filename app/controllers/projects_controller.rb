@@ -57,6 +57,7 @@ class ProjectsController < ApplicationController
 
     collab_enabled = collaborators_enabled?
     project_policy = policy(@project)
+    final_reviews = project_policy.final_reviews_enabled? # Don't surface a resubmit deadline that isn't being enforced
     highlighted_journal_entry_id = highlighted_journal_entry_id(journal_entries)
 
     # Batch the per-entry markdown cache lookups into one fetch_multi so we
@@ -78,7 +79,7 @@ class ProjectsController < ApplicationController
       switchable_projects_for_journal: switchable_projects_for_journal,
       collaborators: @project.collaborators.includes(:user).map { |c| serialize_project_collaborator(c) },
       ships: @project.ships.includes(time_audit_review: :reviewer, requirements_check_review: :reviewer, design_review: :reviewer, build_review: :reviewer).order(created_at: :desc).map { |s|
-        { id: s.id, status: s.status, feedback: s.feedback, created_at_iso: s.created_at.iso8601, updated_at_iso: s.updated_at.iso8601, reviewer_display_name: s.returning_reviewer&.display_name, time_audit_status: s.time_audit_review&.status, requirements_check_status: s.requirements_check_review&.status, design_review_status: s.design_review&.status }
+        { id: s.id, status: s.status, feedback: s.feedback, created_at_iso: s.created_at.iso8601, updated_at_iso: s.updated_at.iso8601, resubmit_deadline_iso: (s.resubmit_deadline&.iso8601 if final_reviews), reviewer_display_name: s.returning_reviewer&.display_name, time_audit_status: s.time_audit_review&.status, requirements_check_status: s.requirements_check_review&.status, design_review_status: s.design_review&.status }
       },
       can: {
         update: project_policy.update?,
@@ -86,7 +87,7 @@ class ProjectsController < ApplicationController
         export_journal: project_policy.export_journal?,
         share: project_policy.share?, # Gates the "Copy share link" overflow menu item — true only for listed, non-discarded projects
         ship: project_policy.ship?,
-        ship_closed: project_policy.ship_closed?, # Submit blocked only by the :disable_new_submissions kill switch — button stays clickable and raises a popup
+        ship_block_reason: project_policy.ship_block_reason, # Why Submit is unavailable — the button stays clickable and raises a popup explaining it
         reship: project_policy.reship?, # Gates the "RESHIP!" action on a pending submission
 
         manage_collaborators: collab_enabled && project_policy.manage_collaborators?,

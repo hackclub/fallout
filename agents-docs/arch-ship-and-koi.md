@@ -98,7 +98,18 @@ Has-one: `time_audit_review`, `requirements_check_review`, `design_review`, `bui
 
 When a ship transitions to `returned` or `rejected`, `cancel_pending_reviews!` flips any still-pending sibling reviews to `cancelled` (uses `skip_ship_recompute = true` to avoid re-entrant recomputation).
 
-When ship status flips to `returned`, `aggregate_return_feedback` joins all returned reviews' `feedback` with `\n\n---\n\n` and stores on `ship.feedback` so `MailDeliveryService` includes it in the user notification.
+When ship status flips to `returned`, `aggregate_return_feedback` joins all returned reviews' `feedback` with `\n\n---\n\n` and stores on `ship.feedback` so `MailDeliveryService` includes it in the user notification. The same transition stamps `ships.returned_at`, which starts the resubmission grace window below.
+
+### Program wind-down (`:final_reviews`)
+
+Two rules, both gated by the `:final_reviews` Flipper flag with a per-user `:final_reviews_override` escape hatch, both keyed to `Ship::FINAL_REVIEW_CUTOFF`:
+
+1. **Resubmit deadline** — `Ship#resubmit_deadline` is `returned_at + Ship::RESUBMIT_GRACE_PERIOD` (3 days). Ships returned in the grace period *before* the cutoff measure from the cutoff instead, so nobody loses time they were never told about; ships returned earlier than that are already past their deadline. Enforced by `ProjectPolicy#resubmit_deadline_passed?`, which reads the latest non-`superseded` ship.
+2. **One final review** — any ship *created* on/after the cutoff permanently closes the project once it reaches a status in `Ship::REVIEWED_STATUSES` (`approved`/`returned`/`rejected`), whatever the verdict. `superseded` is deliberately excluded: the user pulled that ship back before a reviewer finished, so it consumed no review and `reship?` stays open until a verdict actually lands.
+
+`returned_at` was backfilled by `20260918143247_add_returned_at_to_ships` from the PaperTrail version recording the transition into `returned`, falling back to `updated_at`. Terminal statuses never transition again, so `updated_at` is exact for any ship whose version history was trimmed.
+
+**Gotcha**: rule 1 only ever grants a *new* window to a ship created before the cutoff, because any ship created after it is already terminal under rule 2. A project whose latest ship was `approved` before the cutoff has no deadline at all — it can still submit once, and that submission is then final.
 
 ### Carry-forward (Re-ship Optimization)
 
