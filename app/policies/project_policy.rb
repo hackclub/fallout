@@ -17,7 +17,11 @@ class ProjectPolicy < ApplicationPolicy
   end
 
   def onboarding?
-    true # Any authenticated user can view the project onboarding modal
+    # Headless policy call — `record` is the :project symbol, so the per-project transfer waiver can't
+    # apply; the :disable_new_submissions kill switch plus the per-user override gate the flow alone.
+    return false if user.present? && Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, user)
+
+    true # Otherwise any authenticated user can view the project onboarding modal
   end
 
   def show?
@@ -32,6 +36,7 @@ class ProjectPolicy < ApplicationPolicy
 
   def create?
     return false unless user.present?
+    return false if new_submissions_disabled? # Kill switch also closes new projects — a brand-new project has never shipped
     return !user.projects.kept.exists? if user.trial?
 
     true
@@ -73,14 +78,7 @@ class ProjectPolicy < ApplicationPolicy
     return false if record.ships.where(status: %i[pending awaiting_identity]).exists? # Block while a submission is queued or held for identity verification
     return false unless user.present?
 
-    # Kill switch for first-time submissions: when :disable_new_submissions is on, projects that have
-    # never been shipped are blocked, unless the user is granted the :new_submissions_override actor flag
-    # or the project was transferred from Blueprint/Stasis after TRANSFER_WAIVER_CUTOFF (late transferees
-    # still deserve their first submission).
-    if !record.ships.exists? && Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, user) && !recent_transfer?
-      return false
-    end
-
+    return false if !record.ships.exists? && new_submissions_disabled? # Kill switch blocks first-time submissions
     return false if return_reship_limit_reached? # Resubmitting a returned ship is capped post-cutoff under :limit_reships
 
     !user.trial? && owner? # Only verified project owners can submit for review
@@ -103,6 +101,16 @@ class ProjectPolicy < ApplicationPolicy
     !user.trial? && owner? # Cover refresh hits the GitHub API — verified owners only (mirrors ship?)
   end
 
+  # True when Submit is blocked *only* by the :disable_new_submissions kill switch — drives the
+  # still-clickable Submit button that raises the "submissions have closed" popup instead of disappearing.
+  def ship_closed?
+    return false if record.discarded?
+    return false unless user.present? && !user.trial? && owner?
+    return false if record.ships.exists? # Closure only applies to projects that have never shipped
+
+    new_submissions_disabled?
+  end
+
   def manage_collaborators?
     return false unless user.present? && !user.trial? && collaborators_enabled?
 
@@ -111,10 +119,27 @@ class ProjectPolicy < ApplicationPolicy
 
   private
 
+  # Kill switch for new projects and first-time submissions: on while :disable_new_submissions is
+  # enabled, unless the user holds the :new_submissions_override actor flag or the project was
+  # transferred from Blueprint/Stasis after TRANSFER_WAIVER_CUTOFF (late transferees still deserve
+  # their first submission).
+  def new_submissions_disabled?
+    return @new_submissions_disabled if defined?(@new_submissions_disabled) # Memoized — ship? and ship_closed? both ask on the same render
+
+    @new_submissions_disabled =
+      if !Flipper.enabled?(:disable_new_submissions) || Flipper.enabled?(:new_submissions_override, user)
+        false
+      else
+        !recent_transfer?
+      end
+  end
+
   # True when this project carries a Blueprint/Stasis transfer marker journal entry created after
   # TRANSFER_WAIVER_CUTOFF. Used to waive the :disable_new_submissions kill switch for late transferees.
   def recent_transfer?
-    record.kept_journal_entries
+    return @recent_transfer if defined?(@recent_transfer) # Memoized — scans every post-cutoff journal entry
+
+    @recent_transfer = record.kept_journal_entries
           .where("created_at > ?", TRANSFER_WAIVER_CUTOFF)
           .any? { |entry| entry.content&.match?(TRANSFER_MARKER) }
   end

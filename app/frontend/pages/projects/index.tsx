@@ -9,7 +9,7 @@ import ImagePlaceholder from '@/components/shared/ImagePlaceholder'
 import Input from '@/components/shared/Input'
 import MarqueeText from '@/components/shared/MarqueeText'
 import Pagination from '@/components/Pagination'
-import { notify } from '@/lib/notifications'
+import { notify, SUBMISSIONS_CLOSED_MESSAGE } from '@/lib/notifications'
 import { useLiveReload } from '@/lib/useLiveReload'
 import type { ProjectCard, PagyProps, SharedProps } from '@/types'
 
@@ -42,7 +42,8 @@ export default function ProjectsIndex({
 }) {
   const modalRef = useRef<{ close: () => void }>(null)
   const modal = useModal()
-  const authUser = usePage<SharedProps>().props.auth.user
+  const { auth, submissions_closed } = usePage<SharedProps>().props
+  const authUser = auth.user
   const [searchQuery, setSearchQuery] = useState(query)
 
   // Live-refresh the list across tabs when this user's projects/journals/critters/collaborations
@@ -102,7 +103,14 @@ export default function ProjectsIndex({
           </ModalLink>
         ) : (
           <button
-            onClick={() => notify('alert', 'Please verify your account to create another project.')}
+            onClick={() =>
+              notify(
+                'alert',
+                submissions_closed
+                  ? SUBMISSIONS_CLOSED_MESSAGE
+                  : 'Please verify your account to create another project.',
+              )
+            }
             className="bg-dark-brown text-light-brown rounded-full w-12 h-12 flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer shadow-md"
             aria-label="New Project"
           >

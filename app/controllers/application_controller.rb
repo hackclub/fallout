@@ -71,6 +71,13 @@ class ApplicationController < ActionController::Base
       limit_reships: Flipper.enabled?(:limit_reships) # Drives the "last chance" typed-confirmation modal on ship/reship
     }
   }
+  # Drives the "submissions have closed" popup on the project-creation entry points. Shared for trial
+  # users too (they can create projects), so it lives outside the full-user-only `features` block.
+  inertia_share submissions_closed: -> {
+    next false unless current_user
+
+    Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, current_user)
+  }
   # has_unread_mail and current_streak are scoped to PathController only (see PathController)
   # since they're only consumed by the path page's header. Skipping them on every other
   # authenticated request saves 2 queries per page.

@@ -26,3 +26,6 @@ export function subscribe(fn: Listener): () => void {
   pending.splice(0).forEach((p) => fn(p))
   return () => listeners.delete(fn)
 }
+
+// Shown when the :disable_new_submissions kill switch blocks creating a project or a first submission.
+export const SUBMISSIONS_CLOSED_MESSAGE = 'Fallout has ended and submissions have closed, thanks for participating!'

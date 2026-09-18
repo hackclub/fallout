@@ -86,6 +86,7 @@ class ProjectsController < ApplicationController
         export_journal: project_policy.export_journal?,
         share: project_policy.share?, # Gates the "Copy share link" overflow menu item — true only for listed, non-discarded projects
         ship: project_policy.ship?,
+        ship_closed: project_policy.ship_closed?, # Submit blocked only by the :disable_new_submissions kill switch — button stays clickable and raises a popup
         reship: project_policy.reship?, # Gates the "RESHIP!" action on a pending submission
 
         manage_collaborators: collab_enabled && project_policy.manage_collaborators?,

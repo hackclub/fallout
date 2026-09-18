@@ -13,7 +13,7 @@ import Input from '@/components/shared/Input'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { performModalMutation } from '@/lib/modalMutation'
-import { notify } from '@/lib/notifications'
+import { notify, SUBMISSIONS_CLOSED_MESSAGE } from '@/lib/notifications'
 import { relativeAgeParts } from '@/lib/relativeAge'
 import { useNowTick } from '@/lib/useNowTick'
 import TimeAgo from '@/components/shared/TimeAgo'
@@ -220,6 +220,7 @@ export default function ProjectsShow({
     export_journal: boolean
     share: boolean
     ship: boolean
+    ship_closed: boolean
     reship: boolean
     manage_collaborators: boolean
     create_journal_entry: boolean
@@ -992,6 +993,11 @@ export default function ProjectsShow({
             </div>
             {can.ship && (
               <Button onClick={requestShip} className="px-6 py-2 text-sm">
+                Submit
+              </Button>
+            )}
+            {can.ship_closed && (
+              <Button onClick={() => notify('alert', SUBMISSIONS_CLOSED_MESSAGE)} className="px-6 py-2 text-sm">
                 Submit
               </Button>
             )}

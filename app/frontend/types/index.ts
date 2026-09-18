@@ -43,6 +43,7 @@ export interface SharedProps {
   impersonation: Impersonation | null
   flash: FlashData
   features: Features
+  submissions_closed: boolean
   sign_in_path: string
   sign_out_path: string
   trial_session_path: string

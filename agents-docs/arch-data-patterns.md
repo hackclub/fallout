@@ -115,6 +115,8 @@ Non-exhaustive — `app/policies/` has grown to cover review queues, shop/orders
 | `:collaborators` | Project/journal collaboration features | Policies, controllers, shared props |
 | `:shop` | Shop/redemption features | Controllers, shared props |
 | `:hcb_top_ups` | HCB project funding top-ups | Controllers, shared props |
+| `:disable_new_submissions` / `:new_submissions_override` | End-of-program kill switch: blocks project creation (`create?`, `new?`, `onboarding?`) **and** first-time submissions (`ship?` on never-shipped projects). Waived per-user by the override flag, and per-project by a post-`TRANSFER_WAIVER_CUTOFF` Blueprint/Stasis transfer | `ProjectPolicy`, `submissions_closed` shared prop |
+| `:limit_reships` / `:reship_limit_override` | One returned-ship resubmission per project post-cutoff + per-user exemption | `ProjectPolicy`, `features` shared prop |
 | `:disable_ticket_claims` / `:ticket_claims_override` | Global kill switch for summit ticket claiming + per-user exemption (mirrors the submission/reship gate pattern); checked via `User#ticket_claims_disabled?` | `TicketClaimsController`, `ShopItemsController` |
 
 **Usage pattern:**
@@ -134,7 +136,21 @@ inertia_share features: -> {
     hcb_top_ups: Flipper.enabled?(:hcb_top_ups, current_user)
   }
 }
+
+# Shared separately from `features` because trial users create projects too (the `features` block
+# early-returns {} for them). Drives the "submissions have closed" popup.
+inertia_share submissions_closed: -> {
+  next false unless current_user
+  Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, current_user)
+}
 ```
+
+**Closed-program UX pattern**: when `:disable_new_submissions` blocks an action the button stays
+rendered and clickable and fires `notify('alert', SUBMISSIONS_CLOSED_MESSAGE)` (from
+`@/lib/notifications`) instead of navigating — a missing/disabled button reads as a bug. Entry points:
+the `+` button on `projects/index`, the first path star in `PathNode`, and the `Submit` button on
+`projects/show` (gated by the `can.ship_closed` prop, true only when the kill switch is the *sole*
+reason `ship?` is false).
 
 ## 4. PaperTrail Auditing
 

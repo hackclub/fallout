@@ -3,7 +3,7 @@ import { Link, usePage } from '@inertiajs/react'
 import { ModalLink, useModalStack } from '@inertiaui/modal-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
 import { PathCenterContext, ScrollToNodeContext } from '@/components/path/Path'
-import { notify } from '@/lib/notifications'
+import { notify, SUBMISSIONS_CLOSED_MESSAGE } from '@/lib/notifications'
 import type { SharedProps } from '@/types'
 
 const BILLBOARD_IMAGES = ['/path/1.webp', '/path/2.webp', '/path/3.webp']
@@ -32,6 +32,7 @@ export default function PathNode({
 
   const {
     auth: { user: authUser },
+    submissions_closed: submissionsClosed,
   } = usePage<SharedProps>().props
   const isTrial = authUser?.is_trial ?? false
 
@@ -85,9 +86,15 @@ export default function PathNode({
     <div style={{ pointerEvents: 'auto' }} className="cursor-pointer">
       {index === 0 ? (
         state === 'active' && interactive ? (
-          <Link href="/projects/onboarding" className="outline-0">
-            {starImage}
-          </Link>
+          submissionsClosed ? (
+            <button onClick={() => notify('alert', SUBMISSIONS_CLOSED_MESSAGE)} className="outline-0">
+              {starImage}
+            </button>
+          ) : (
+            <Link href="/projects/onboarding" className="outline-0">
+              {starImage}
+            </Link>
+          )
         ) : state === 'completed' && interactive ? (
           <button
             onClick={() =>

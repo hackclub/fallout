@@ -63,9 +63,10 @@ Ship (audit-trailed)
 
 **Policy (`app/policies/project_policy.rb`):**
 - `show?`: staff OR owner OR collaborator (flag-gated) OR listed (public). Discarded projects are admin-only.
-- `create?`: trial users limited to 1 project (`user.projects.kept`)
+- `create?`: trial users limited to 1 project (`user.projects.kept`); blocked entirely by the `:disable_new_submissions` kill switch (see [arch-data-patterns.md](arch-data-patterns.md))
 - `update?`/`destroy?`: owner only (admins edit via `/admin` or Airtable, not this policy). `destroy?` also blocked once any ship exists (audit integrity).
-- `ship?`: verified, non-trial owner; blocked while a `pending` or `awaiting_identity` ship exists.
+- `ship?`: verified, non-trial owner; blocked while a `pending` or `awaiting_identity` ship exists; first-time submissions blocked by `:disable_new_submissions`.
+- `ship_closed?`: true only when `:disable_new_submissions` is the sole reason `ship?` is false — serialized as `can.ship_closed` so the Submit button stays clickable and raises the "submissions have closed" popup.
 - `refresh_cover?`: verified, non-trial owner (mirrors `ship?` — hits the GitHub API).
 - `export_journal?`: admin OR owner.
 - `update_manual_seconds?` / `toggle_burnout?`: admin only.
