@@ -68,6 +68,23 @@ class Admin::ShopOrdersController < Admin::ApplicationController
       notice: "#{updated} #{'order'.pluralize(updated)} updated."
   end
 
+  # CSV download of the filtered orders (PII: shipping details), or a JSON row-count preview
+  # for the export panel. Same filters as index, plus multi-item, min quantity, and grouping.
+  def export
+    authorize ShopOrder, :export?
+
+    export = ShopOrderExport.new(
+      apply_filters(policy_scope(ShopOrder)),
+      group: params[:group].to_s,
+      min_quantity: params[:min_quantity]
+    )
+
+    respond_to do |format|
+      format.csv { send_data export.to_csv, filename: export.filename, type: "text/csv; charset=utf-8", disposition: "attachment" }
+      format.json { render json: { orders: export.orders.size, rows: export.rows.size } }
+    end
+  end
+
   private
 
   # Memoized loader shared by the deferred index props so the heavy query runs once per
@@ -102,6 +119,8 @@ class Admin::ShopOrdersController < Admin::ApplicationController
   def apply_filters(scope, include_state: true)
     scope = scope.where(state: params[:state]) if include_state && ShopOrder.states.key?(params[:state])
     scope = scope.where(shop_item_id: params[:shop_item_id]) if params[:shop_item_id].present?
+    item_ids = Array(params[:shop_item_ids]).map(&:to_i).reject(&:zero?)
+    scope = scope.where(shop_item_id: item_ids) if item_ids.any?
     scope = scope.where(user_id: params[:user_id]) if params[:user_id].present?
 
     if ShopItem::CURRENCIES.include?(params[:currency])

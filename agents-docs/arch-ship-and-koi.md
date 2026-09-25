@@ -595,6 +595,7 @@ If you change the rate (currently `7`) or the source-of-truth field (currently `
 - `validate :user_can_afford, on: :create` — for koi items checks `koi + gold >= total`; for gold items checks gold only. The split is computed and validated inside `ShopOrdersController#create`'s `current_user.with_lock` so concurrent orders can't double-spend.
 - Encrypts `phone` and `address` (PII of minors) at rest, non-deterministic.
 - `requires_shipping` items require `address` + `phone` validation.
+- **Admin CSV export** — `GET /admin/shop_orders/export.csv` (`Admin::ShopOrdersController#export`, `ShopOrderPolicy#export?` = admin only, contains shipping PII). Built by `ShopOrderExport` (`app/services/shop_order_export.rb`): reuses the index filters plus `shop_item_ids[]`, `min_quantity`, and `group=orders|packages`. `packages` combines orders per `[user_id, address]` and sums quantities per item (a buyer ordering the same item twice, or once with quantity 2, becomes one row with `qty_<item>` columns). `.json` returns `{orders, rows}` for the export panel's live preview (`ExportOrdersSheet.tsx`).
 
 ### Spending: Project Grants
 

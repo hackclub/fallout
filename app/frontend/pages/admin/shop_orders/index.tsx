@@ -29,6 +29,7 @@ import {
 } from '@/components/admin/ui/alert-dialog'
 import UserSearchCombobox, { type UserOption } from '@/components/admin/UserSearchCombobox'
 import ItemFilterCombobox, { type ItemOption } from '@/components/admin/shop/ItemFilterCombobox'
+import ExportOrdersSheet from '@/components/admin/shop/ExportOrdersSheet'
 import {
   type Currency,
   type OrderState,
@@ -283,9 +284,21 @@ export default function AdminShopOrdersIndex({
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Shop orders</h1>
-        <p className="text-sm text-muted-foreground">Work the fulfillment queue and trace who bought what.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Shop orders</h1>
+          <p className="text-sm text-muted-foreground">Work the fulfillment queue and trace who bought what.</p>
+        </div>
+        <ExportOrdersSheet
+          items={items}
+          defaults={{
+            state: state_filter,
+            shop_item_id: item_filter,
+            currency: currency_filter,
+            user_id: user_id_filter,
+            search: q,
+          }}
+        />
       </div>
 
       <div className="flex flex-wrap divide-x divide-border rounded-lg border border-border">

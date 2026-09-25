@@ -18,6 +18,10 @@ class ShopOrderPolicy < ApplicationPolicy
     admin? # Only admins can change order state
   end
 
+  def export?
+    admin? # Export includes shipping PII
+  end
+
   class Scope < ApplicationPolicy::Scope
     def resolve
       return scope.where(user: user) unless user.admin?

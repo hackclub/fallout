@@ -454,6 +454,7 @@ Rails.application.routes.draw do
       resources :shop_items, only: [ :index, :new, :create, :edit, :update, :destroy ] # Admin shop item management
       resources :shop_orders, only: [ :index, :show, :update ] do # Admin order management
         patch :bulk_update, on: :collection # Apply one state to many orders at once
+        get :export, on: :collection # CSV download / JSON preview of the filtered orders
       end
       resources :ticket_claims, only: [ :index ] do # Admin event ticket claim review
         member do
