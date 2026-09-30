@@ -102,7 +102,7 @@ When ship status flips to `returned`, `aggregate_return_feedback` joins all retu
 
 ### Program wind-down (`:final_reviews`)
 
-Two rules, both gated by the `:final_reviews` Flipper flag with a per-user `:final_reviews_override` escape hatch, both keyed to `Ship::FINAL_REVIEW_CUTOFF`:
+Two rules, both gated by the `:final_reviews` Flipper flag with per-user `:final_reviews_override` / `:hq_preview` escape hatches, both keyed to `Ship::FINAL_REVIEW_CUTOFF`:
 
 1. **Resubmit deadline** — `Ship#resubmit_deadline` is `returned_at + Ship::RESUBMIT_GRACE_PERIOD` (3 days). Ships returned in the grace period *before* the cutoff measure from the cutoff instead, so nobody loses time they were never told about; ships returned earlier than that are already past their deadline. Enforced by `ProjectPolicy#resubmit_deadline_passed?`, which reads the latest non-`superseded` ship.
 2. **One final review** — any ship *created* on/after the cutoff permanently closes the project once it reaches a status in `Ship::REVIEWED_STATUSES` (`approved`/`returned`/`rejected`), whatever the verdict. `superseded` is deliberately excluded: the user pulled that ship back before a reviewer finished, so it consumed no review and `reship?` stays open until a verdict actually lands.

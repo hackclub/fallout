@@ -117,6 +117,7 @@ Non-exhaustive — `app/policies/` has grown to cover review queues, shop/orders
 | `:hcb_top_ups` | HCB project funding top-ups | Controllers, shared props |
 | `:disable_new_submissions` / `:new_submissions_override` | End-of-program kill switch: blocks project creation (`create?`, `new?`, `onboarding?`) **and** first-time submissions (`ship?` on never-shipped projects). Waived per-user by the override flag, and per-project by a post-`TRANSFER_WAIVER_CUTOFF` Blueprint/Stasis transfer | `ProjectPolicy`, `submissions_closed` shared prop |
 | `:final_reviews` / `:final_reviews_override` | Program wind-down + per-user exemption: a returned ship must be resubmitted within `Ship::RESUBMIT_GRACE_PERIOD` (3 days), and any ship created on/after `Ship::FINAL_REVIEW_CUTOFF` is the project's last whatever its verdict | `ProjectPolicy`, `Ship#resubmit_deadline`, `features` shared prop |
+| `:hq_preview` | Per-user flag for HQ staff exploring the platform after the event ended: waives `:disable_new_submissions` and `:final_reviews` (same effect as holding both overrides) but **not** `:disable_ticket_claims`, since a ticket claim has real-world effects. Checked via `User#hq_preview?` | `ProjectPolicy`, `submissions_closed` + `features` shared props |
 | `:disable_ticket_claims` / `:ticket_claims_override` | Global kill switch for summit ticket claiming + per-user exemption (mirrors the submission/reship gate pattern); checked via `User#ticket_claims_disabled?` | `TicketClaimsController`, `ShopItemsController` |
 
 **Usage pattern:**
@@ -141,7 +142,7 @@ inertia_share features: -> {
 # early-returns {} for them). Drives the "submissions have closed" popup.
 inertia_share submissions_closed: -> {
   next false unless current_user
-  Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, current_user)
+  Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, current_user) && !current_user.hq_preview?
 }
 ```
 

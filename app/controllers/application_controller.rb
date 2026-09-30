@@ -68,7 +68,7 @@ class ApplicationController < ActionController::Base
       shop: Flipper.enabled?(:shop, current_user),
       grant_fulfillment: true,
       hcb_top_ups: Flipper.enabled?(:hcb_top_ups, current_user),
-      final_reviews: Flipper.enabled?(:final_reviews) && !Flipper.enabled?(:final_reviews_override, current_user) # Drives the "last chance" typed-confirmation modal on submit
+      final_reviews: Flipper.enabled?(:final_reviews) && !Flipper.enabled?(:final_reviews_override, current_user) && !current_user.hq_preview? # Drives the "last chance" typed-confirmation modal on submit
     }
   }
   # Drives the "submissions have closed" popup on the project-creation entry points. Shared for trial
@@ -76,7 +76,7 @@ class ApplicationController < ActionController::Base
   inertia_share submissions_closed: -> {
     next false unless current_user
 
-    Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, current_user)
+    Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, current_user) && !current_user.hq_preview?
   }
   # has_unread_mail and current_streak are scoped to PathController only (see PathController)
   # since they're only consumed by the path page's header. Skipping them on every other

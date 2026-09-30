@@ -526,6 +526,12 @@ class User < ApplicationRecord
     debt_hidden_at.present?
   end
 
+  # HQ staff exploring the platform after the event ended: bypasses the end-of-program kill switches
+  # (:disable_new_submissions, :final_reviews) but deliberately not ticket claims, which have real-world effects.
+  def hq_preview?
+    Flipper.enabled?(:hq_preview, self)
+  end
+
   # Global kill switch for ticket claiming, with a per-user exemption. Mirrors the
   # disable_new_submissions / new_submissions_override pattern.
   def ticket_claims_disabled?

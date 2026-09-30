@@ -9,4 +9,4 @@ shared:
   final_reviews_override: Per-user override exempting a user from the final_reviews deadline and one-final-review rule
   disable_ticket_claims: Block claiming a Fallout summit ticket entirely (existing claims are unaffected)
   ticket_claims_override: Per-user override allowing a user to claim a ticket even while disable_ticket_claims is on
-
+  hq_preview: Per-user flag letting HQ staff use the platform after the event ended — waives disable_new_submissions and final_reviews (not ticket claims)

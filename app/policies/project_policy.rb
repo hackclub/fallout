@@ -15,7 +15,7 @@ class ProjectPolicy < ApplicationPolicy
   def onboarding?
     # Headless policy call — `record` is the :project symbol, so the per-project transfer waiver can't
     # apply; the :disable_new_submissions kill switch plus the per-user override gate the flow alone.
-    return false if user.present? && Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, user)
+    return false if user.present? && Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, user) && !user.hq_preview?
 
     true # Otherwise any authenticated user can view the project onboarding modal
   end
@@ -119,7 +119,7 @@ class ProjectPolicy < ApplicationPolicy
   def final_reviews_enabled?
     return false unless user.present?
 
-    Flipper.enabled?(:final_reviews) && !Flipper.enabled?(:final_reviews_override, user)
+    Flipper.enabled?(:final_reviews) && !Flipper.enabled?(:final_reviews_override, user) && !user.hq_preview?
   end
 
   def manage_collaborators?
@@ -131,14 +131,14 @@ class ProjectPolicy < ApplicationPolicy
   private
 
   # Kill switch for new projects and first-time submissions: on while :disable_new_submissions is
-  # enabled, unless the user holds the :new_submissions_override actor flag or the project was
+  # enabled, unless the user holds the :new_submissions_override or :hq_preview actor flag or the project was
   # transferred from Blueprint/Stasis after TRANSFER_WAIVER_CUTOFF (late transferees still deserve
   # their first submission).
   def new_submissions_disabled?
     return @new_submissions_disabled if defined?(@new_submissions_disabled) # Memoized — ship? and ship_block_reason both ask on the same render
 
     @new_submissions_disabled =
-      if !Flipper.enabled?(:disable_new_submissions) || Flipper.enabled?(:new_submissions_override, user)
+      if !Flipper.enabled?(:disable_new_submissions) || Flipper.enabled?(:new_submissions_override, user) || user&.hq_preview?
         false
       else
         !recent_transfer?
