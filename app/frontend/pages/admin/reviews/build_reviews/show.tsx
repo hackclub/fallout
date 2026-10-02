@@ -383,7 +383,7 @@ function TopBar({
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="z-50 bg-muted/40 border-b border-border px-4 py-3 flex flex-wrap items-center gap-2 shrink-0">
+      <div className="relative z-50 bg-muted/40 border-b border-border px-4 py-3 flex flex-wrap items-center gap-2 shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="outline" size="default" asChild>
@@ -448,9 +448,10 @@ function TopBar({
           )}
         </span>
 
-        {center && <div className="mx-auto px-2">{center}</div>}
+        {/* Centered on the bar itself (not between the clusters), mirroring the yahri header grid */}
+        {center && <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">{center}</div>}
 
-        <div className="flex items-center flex-wrap gap-2 shrink-0">
+        <div className="ml-auto flex items-center flex-wrap gap-2 shrink-0">
           {isSafeUrl(project.repo_link) && (
             <>
               <Tooltip>
