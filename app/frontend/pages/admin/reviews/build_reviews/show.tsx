@@ -41,9 +41,11 @@ import {
   LayoutGridIcon,
   FolderIcon,
   FolderOpenIcon,
+  ClapperboardIcon,
 } from 'lucide-react'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import RepoWorkspace from '@/components/admin/review/RepoWorkspace'
+import WatchPanel from '@/components/admin/review/WatchPanel'
 import { ReviewTabBar, ReviewTabPanel, ReviewTabsRoot, type ReviewTab } from '@/components/admin/review/ReviewTabs'
 import RepoDiffCard from '@/components/admin/RepoDiffCard'
 import SlackFeedbackComposer from '@/components/admin/SlackFeedbackComposer'
@@ -347,11 +349,12 @@ function PreflightResults({ checks }: { checks: PreflightCheck[] }) {
   )
 }
 
-type ReviewView = 'overview' | 'repo'
+type ReviewView = 'overview' | 'repo' | 'watch'
 
 const REVIEW_TABS: ReviewTab[] = [
   { id: 'overview', title: 'Overview', icon: LayoutGridIcon, tint: 'green' },
   { id: 'repo', title: 'Repo', icon: FolderIcon, activeIcon: FolderOpenIcon, tint: 'violet' },
+  { id: 'watch', title: 'Watch', icon: ClapperboardIcon, tint: 'blue' },
 ]
 
 // --- Top Bar ---
@@ -811,6 +814,7 @@ export default function BuildReviewsShow({
       { key: '2', description: 'Toggle Previous Reviews' },
       { key: 'O', description: 'Overview view' },
       { key: '3', description: 'Repo view' },
+      { key: 'W', description: 'Watch view' },
       { key: '4', description: 'Toggle Journal' },
       { key: '5', description: 'Toggle Changes Since Last Review' },
     ],
@@ -899,6 +903,7 @@ export default function BuildReviewsShow({
     '1': { handler: () => toggleOverviewCard('build-preflight') },
     '2': { handler: () => toggleOverviewCard('build-previous-reviews') },
     '3': { handler: () => setView('repo') },
+    w: { handler: () => setView('watch') },
     '4': { handler: () => toggleOverviewCard('build-journal') },
     '5': { handler: () => toggleOverviewCard('build-repo-diff') },
   })
@@ -1154,6 +1159,19 @@ export default function BuildReviewsShow({
                 <RepoWorkspace data={repo_tree} repoLink={project.repo_link} />
               ) : (
                 <p className="p-6 text-sm text-muted-foreground">No repository tree is available for this ship yet.</p>
+              )}
+            </ReviewTabPanel>
+
+            <ReviewTabPanel value="watch">
+              {/* Mounted only while active so hidden players don't keep playing audio */}
+              {view === 'watch' && (
+                <WatchPanel
+                  links={[
+                    { label: 'Shipped demo', url: project.frozen_demo_link },
+                    { label: 'Demo video', url: project.demo_video_link },
+                    { label: 'Playable URL', url: project.demo_link },
+                  ]}
+                />
               )}
             </ReviewTabPanel>
 
