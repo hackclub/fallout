@@ -64,24 +64,29 @@ export default function RepoWorkspace({ data, repoLink }: { data: RepoTreeData; 
   const selectedRef = useRef(selected)
   selectedRef.current = selected
 
-  const { model } = useFileTree({
-    paths,
+  const treeOptions = {
     initialExpansion: 1,
     search: true,
     flattenEmptyDirectories: true,
     stickyFolders: true,
-    density: 'compact',
-    onSelectionChange: (sel) => {
+    onSelectionChange: (sel: readonly string[]) => {
       const path = sel[0]
       if (path && path !== selectedRef.current && sizes.has(path)) setSelected(path)
     },
-  })
+  } as const
+  // Density is fixed at construction, so Pinned gets its own relaxed tree — same folder
+  // hierarchy with non-signal files removed.
+  const { model: allModel } = useFileTree({ ...treeOptions, paths, density: 'compact' })
+  const { model: pinnedModel } = useFileTree({ ...treeOptions, paths: pinnedPaths, density: 'relaxed' })
+  const model = pinned ? pinnedModel : allModel
 
-  // Pinned keeps the folder hierarchy — it's the same tree with non-signal files removed.
   useEffect(() => {
-    model.resetPaths(pinned ? pinnedPaths : paths)
-    if (selectedRef.current) model.getItem(selectedRef.current)?.select()
-  }, [model, pinned, pinnedPaths, paths])
+    allModel.resetPaths(paths)
+  }, [allModel, paths])
+
+  useEffect(() => {
+    pinnedModel.resetPaths(pinnedPaths)
+  }, [pinnedModel, pinnedPaths])
 
   useEffect(() => {
     if (selected) model.getItem(selected)?.select()
@@ -121,7 +126,7 @@ export default function RepoWorkspace({ data, repoLink }: { data: RepoTreeData; 
   return (
     <div className="flex min-h-0 flex-1">
       <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-muted/40">
-        <FileTree model={model} style={treeStyle} className="min-h-0 flex-1" />
+        <FileTree key={pinned ? 'pinned' : 'all'} model={model} style={treeStyle} className="min-h-0 flex-1" />
         <div className="flex items-center gap-2 border-t border-border px-2 py-1.5 text-[11px] text-muted-foreground">
           <span className="min-w-0 truncate">
             {pinned ? `${pinnedPaths.length} of ${paths.length}` : paths.length} files · {branch}
