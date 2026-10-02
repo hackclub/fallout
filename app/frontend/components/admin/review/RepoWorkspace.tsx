@@ -5,6 +5,7 @@ import { Button } from '@/components/admin/ui/button'
 import { Kbd } from '@/components/admin/ui/kbd'
 import { cn } from '@/lib/utils'
 import RepoFileViewer, { type RepoFileRef } from './RepoFileViewer'
+import { REPO_TREE_ICONS } from './treeIcons'
 import { fileKind, fileName, isReadme, isSignalPath, KIND_LABEL } from '@/lib/repoFileKinds'
 import type { RepoTreeData } from '@/types'
 
@@ -65,6 +66,7 @@ export default function RepoWorkspace({ data, repoLink }: { data: RepoTreeData; 
   selectedRef.current = selected
 
   const treeOptions = {
+    icons: REPO_TREE_ICONS,
     initialExpansion: 1,
     search: true,
     flattenEmptyDirectories: true,
