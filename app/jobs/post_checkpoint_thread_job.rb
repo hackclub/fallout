@@ -24,7 +24,7 @@ class PostCheckpointThreadJob < ApplicationJob
       :requirements_check_review,
       :design_review,
       :build_review,
-      project: { user: {}, ships: [ :requirements_check_review, :design_review ] }
+      project: { user: {}, ships: [ :requirements_check_review, :design_review, :build_review ] }
     ).find(ship_id)
 
     cover_image_url = ReviewCardImageService.call(

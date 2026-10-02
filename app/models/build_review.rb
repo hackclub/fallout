@@ -5,6 +5,7 @@
 #  id                        :bigint           not null, primary key
 #  annotations               :jsonb
 #  backfill_claim_expires_at :datetime
+#  checkpoint_message_url    :string
 #  claim_expires_at          :datetime
 #  completed_at              :datetime
 #  feedback                  :text

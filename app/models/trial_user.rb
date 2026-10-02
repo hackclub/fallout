@@ -33,6 +33,7 @@
 #  reduced_expectations_reason        :string
 #  reduced_expectations_target        :decimal(, )
 #  reduced_expectations_until         :date
+#  reviewer_slack_token               :text
 #  roles                              :string           default([]), not null, is an Array
 #  slack_token                        :text
 #  streak_freezes                     :integer          default(1), not null

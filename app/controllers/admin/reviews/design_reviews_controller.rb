@@ -40,6 +40,7 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
       reviewer_notes: InertiaRails.defer { serialize_reviewer_notes(project) },
       reviewer_notes_path: admin_project_reviewer_notes_path(project),
       project_flagged: project.flagged?,
+      reviewer_slack: reviewer_slack_props,
       can: { update: policy(@review).update?, swap_type: policy(@review).swap_type? },
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_design_review_path(@review),
@@ -67,23 +68,35 @@ class Admin::Reviews::DesignReviewsController < Admin::Reviews::BaseController
     authorize @review
 
     submitting_terminal = %w[approved returned rejected].include?(params.dig(:design_review, :status))
+    formatted = format_review_feedback(:design_review)
     checkpoint_just_stored = false
     if submitting_terminal && @review.checkpoint_message_url.blank?
-      slack_id = @review.ship.project.user.slack_id
-      url, failure = resolve_checkpoint_message(slack_id, params.dig(:design_review, :checkpoint_message_url))
-      if url.nil?
-        msg = failure == :wrong_mention \
-          ? "That message doesn't mention @#{@review.ship.project.user.display_name}. Did you tag the wrong person?" \
-          : "No checkpoint message found in #fallout-checkpoint mentioning this user in the past 24 hours. Please paste the message link."
-        return redirect_back fallback_location: admin_reviews_design_review_path(@review),
-                             inertia: { errors: { checkpoint_message_url: [ msg ] } }
+      if post_feedback_to_slack?(formatted)
+        # Posting as the reviewer *is* the checkpoint message, so it replaces the channel search.
+        url, error = post_feedback_to_slack(formatted)
+        if url.nil?
+          return redirect_back fallback_location: admin_reviews_design_review_path(@review),
+                               inertia: { errors: { slack_post: [ error ] } }
+        end
+      else
+        slack_id = @review.ship.project.user.slack_id
+        url, failure = resolve_checkpoint_message(slack_id, params.dig(:design_review, :checkpoint_message_url))
+        if url.nil?
+          msg = failure == :wrong_mention \
+            ? "That message doesn't mention @#{@review.ship.project.user.display_name}. Did you tag the wrong person?" \
+            : "No checkpoint message found in #fallout-checkpoint mentioning this user in the past 24 hours. Please paste the message link."
+          return redirect_back fallback_location: admin_reviews_design_review_path(@review),
+                               inertia: { errors: { checkpoint_message_url: [ msg ] } }
+        end
       end
       @review.update_columns(checkpoint_message_url: url)
       checkpoint_just_stored = true
     end
 
+    attrs = review_params
+    attrs[:feedback] = formatted.feedback if attrs.key?(:feedback)
     @review.finalizing_user = current_user # Reviewable#stamp_finalizing_reviewer backfills reviewer_id on terminal save when claim was cleared mid-session
-    if @review.update(review_params)
+    if @review.update(attrs)
       if @review.approved? || @review.returned? || @review.rejected?
         if checkpoint_just_stored
           PostCheckpointThreadJob.perform_later(

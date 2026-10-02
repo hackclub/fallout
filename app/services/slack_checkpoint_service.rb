@@ -78,13 +78,28 @@ class SlackCheckpointService
     end
   end
 
+  # Posts reviewer-written feedback to the channel as the reviewer themselves, using the user
+  # token from the reviewer Slack app (not SLACK_BOT_TOKEN). Returns the message permalink;
+  # Slack errors propagate so the caller can tell the reviewer what went wrong.
+  def self.post_as_reviewer(token:, text:)
+    client = Slack::Web::Client.new(token: token)
+    response = client.chat_postMessage(channel: CHANNEL_ID, text: text, unfurl_links: false, unfurl_media: false)
+
+    begin
+      client.chat_getPermalink(channel: CHANNEL_ID, message_ts: response.ts).permalink
+    rescue Slack::Web::Api::Errors::SlackError, Faraday::Error
+      # The message is already live — never fail (and invite a duplicate repost) just because the permalink lookup did.
+      "https://hackclub.enterprise.slack.com/archives/#{CHANNEL_ID}/p#{response.ts.delete(".")}"
+    end
+  end
+
   # Posts a thread reply on the checkpoint message summarising the review outcome.
   # Only two blocks are sent: a plan block (timeline) and a card block (project info).
   # Tasks with pending/in_progress status are omitted — only complete and error are shown.
   #
   # message_ts      - Slack ts of the checkpoint message to reply to
   # ship            - Ship record (with reviews and their versions preloaded)
-  # review_type     - "requirements_check" or "design_review"
+  # review_type     - "requirements_check", "design_review", or "build_review"
   # review_status   - the terminal status just applied (unused directly; read from record)
   # cover_image_url - absolute URL for the project cover image, or nil
   # project_url     - absolute URL to the project page
@@ -167,7 +182,7 @@ class SlackCheckpointService
       .where(status: [ :returned, :rejected ])
       .where.not(id: ship.id)
       .order(:created_at)
-      .includes(:requirements_check_review, :design_review)
+      .includes(:requirements_check_review, :design_review, :build_review)
 
     # Collect prior feedback for the current review type to attach as output
     # on the current attempt's task rather than as separate standalone tasks.
@@ -175,6 +190,7 @@ class SlackCheckpointService
       past_review = case review_type
       when "requirements_check" then past_ship.requirements_check_review
       when "design_review"      then past_ship.design_review
+      when "build_review"       then past_ship.build_review
       end
       next if past_review.nil?
 
@@ -193,6 +209,10 @@ class SlackCheckpointService
       tasks << review_task(ship.time_audit_review, "time_audit")
       tasks << review_task(ship.requirements_check_review, "requirements_check", prior_output: prior_output)
       tasks << review_task(ship.design_review, "design_review", label_override: current_label)
+    when "build_review"
+      tasks << review_task(ship.time_audit_review, "time_audit")
+      tasks << review_task(ship.requirements_check_review, "requirements_check", prior_output: prior_output)
+      tasks << review_task(ship.build_review, "build_review", label_override: current_label)
     end
 
     tasks.compact

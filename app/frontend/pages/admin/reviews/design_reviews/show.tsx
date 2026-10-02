@@ -47,6 +47,7 @@ import {
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import RepoTree from '@/components/admin/RepoTree'
 import RepoDiffCard from '@/components/admin/RepoDiffCard'
+import SlackFeedbackComposer from '@/components/admin/SlackFeedbackComposer'
 import { notify } from '@/lib/notifications'
 import type {
   DesignReviewDetail,
@@ -59,6 +60,8 @@ import type {
   SiblingReview,
   SiblingReviews,
   PreviousReview,
+  MentionTarget,
+  ReviewerSlackProps,
 } from '@/types'
 
 function csrfToken(): string {
@@ -583,6 +586,7 @@ interface PageProps {
   reviewer_notes?: ReviewerNote[]
   reviewer_notes_path: string
   project_flagged: boolean
+  reviewer_slack?: ReviewerSlackProps
   can: { update: boolean; swap_type: boolean }
   skip: string | null
   heartbeat_path: string
@@ -604,6 +608,7 @@ export default function DesignReviewsShow({
   reviewer_notes,
   reviewer_notes_path,
   project_flagged,
+  reviewer_slack,
   can,
   skip,
   heartbeat_path,
@@ -619,6 +624,8 @@ export default function DesignReviewsShow({
   const { errors } = usePage<{ errors?: Record<string, string[]> }>().props
 
   const [feedback, setFeedback] = useState(review.feedback || '')
+  const [feedbackMentions, setFeedbackMentions] = useState<MentionTarget[]>([])
+  const [postToSlack, setPostToSlack] = useState(true)
   const [internalReason, setInternalReason] = useState(review.internal_reason || '')
   const [hoursAdjInput, setHoursAdjInput] = useState(
     review.hours_adjustment != null ? String(review.hours_adjustment / 3600) : '',
@@ -714,10 +721,13 @@ export default function DesignReviewsShow({
             koi_adjustment: koiAdjValue,
             ...(checkpointMessageUrl ? { checkpoint_message_url: checkpointMessageUrl } : {}),
           } as any,
+          post_to_slack: postToSlack,
+          feedback_mention_ids: feedbackMentions.map((m) => m.id),
         },
         {
           onSuccess: () => {
             setFeedback('')
+            setFeedbackMentions([])
             setInternalReason('')
             setPendingStatus(null)
           },
@@ -740,7 +750,7 @@ export default function DesignReviewsShow({
         },
       )
     },
-    [review.id, feedback, internalReason, hoursAdjInput, koiAdjInput, skip],
+    [review.id, feedback, feedbackMentions, postToSlack, internalReason, hoursAdjInput, koiAdjInput, skip],
   )
 
   // Backfill: save only the internal fields (internal reason + hours). Feedback, status,
@@ -1370,12 +1380,17 @@ export default function DesignReviewsShow({
                     Feedback <span className="text-muted-foreground/60">(shown to user)</span>
                     <Kbd variant="muted">{modKey}F</Kbd>
                   </label>
-                  <Textarea
-                    ref={feedbackRef}
+                  <SlackFeedbackComposer
                     value={feedback}
-                    onChange={(e) => setFeedback(e.target.value)}
-                    placeholder="Feedback for the project author..."
-                    className="h-20 text-sm resize-y"
+                    onChange={setFeedback}
+                    textareaRef={feedbackRef}
+                    project={project}
+                    mentions={feedbackMentions}
+                    onMentionsChange={setFeedbackMentions}
+                    reviewerSlack={reviewer_slack}
+                    postToSlack={postToSlack}
+                    onPostToSlackChange={setPostToSlack}
+                    draftKey={`design_review-feedback-draft:${review.id}`}
                   />
                 </div>
 
@@ -1439,10 +1454,10 @@ export default function DesignReviewsShow({
                 <div className="pt-2 space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <Button
-                      variant="outline"
+                      variant="raised-success"
                       disabled={submitting}
                       onClick={() => handleSubmit('approved')}
-                      className="border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-700 disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900"
+                      className="disabled:opacity-50"
                     >
                       {submitting && pendingStatus === 'approved' ? (
                         <LoaderIcon data-icon="inline-start" className="animate-spin" />
@@ -1450,17 +1465,15 @@ export default function DesignReviewsShow({
                         <CheckIcon data-icon="inline-start" />
                       )}
                       Approve
-                      <Kbd className="ml-1 border-emerald-300 bg-emerald-100 text-emerald-600 dark:border-emerald-700 dark:bg-emerald-900 dark:text-emerald-400">
-                        {modKey}P
-                      </Kbd>
+                      <Kbd className="ml-1 border-emerald-400 bg-emerald-600 text-emerald-50">{modKey}P</Kbd>
                     </Button>
 
                     <Button
-                      variant="outline"
+                      variant="raised-warning"
                       disabled={submitting || !feedback.trim()}
                       onClick={() => handleSubmit('returned')}
                       title={!feedback.trim() ? 'Feedback is required when returning' : undefined}
-                      className="border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-700 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+                      className="disabled:opacity-50"
                     >
                       {submitting && pendingStatus === 'returned' ? (
                         <LoaderIcon data-icon="inline-start" className="animate-spin" />

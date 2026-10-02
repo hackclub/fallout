@@ -33,6 +33,7 @@
 #  reduced_expectations_reason        :string
 #  reduced_expectations_target        :decimal(, )
 #  reduced_expectations_until         :date
+#  reviewer_slack_token               :text
 #  roles                              :string           default([]), not null, is an Array
 #  slack_token                        :text
 #  streak_freezes                     :integer          default(1), not null
@@ -155,6 +156,7 @@ class User < ApplicationRecord
   encrypts :hca_token
   encrypts :lapse_token
   encrypts :slack_token
+  encrypts :reviewer_slack_token # xoxp from the reviewer Slack app — posts DR/BR feedback as the reviewer
   encrypts :device_token, deterministic: true # Deterministic so find_by lookups work
 
   scope :verified, -> { where(type: nil) } # STI: verified users have type=nil; TrialUser subclass has type='TrialUser'

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_18_143247) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_02_060408) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -100,6 +100,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_18_143247) do
     t.jsonb "annotations"
     t.datetime "backfill_claim_expires_at"
     t.bigint "backfill_reviewer_id"
+    t.string "checkpoint_message_url"
     t.datetime "claim_expires_at"
     t.datetime "completed_at"
     t.datetime "created_at", null: false
@@ -1071,6 +1072,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_18_143247) do
     t.string "reduced_expectations_reason"
     t.decimal "reduced_expectations_target"
     t.date "reduced_expectations_until"
+    t.text "reviewer_slack_token"
     t.string "roles", default: [], null: false, array: true
     t.string "slack_id"
     t.text "slack_token"

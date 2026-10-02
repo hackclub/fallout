@@ -605,4 +605,43 @@ class Admin::Reviews::BaseController < Admin::ApplicationController
   def resolve_checkpoint_message(slack_id, provided_permalink)
     SlackCheckpointService.resolve(slack_id, provided_permalink)
   end
+
+  # -- Reviewer Slack (DR/BR feedback posted to #fallout-checkpoint as the reviewer) --
+
+  def reviewer_slack_props
+    {
+      configured: ENV["REVIEWER_SLACK_CLIENT_ID"].present?,
+      linked: current_user.reviewer_slack_token.present?,
+      connect_path: admin_reviewer_slack_connect_path(return_to: request.fullpath),
+      disconnect_path: admin_reviewer_slack_disconnect_path,
+      mentions_path: admin_reviewer_slack_mentions_path
+    }
+  end
+
+  def format_review_feedback(param_key)
+    ReviewFeedbackFormatter.call(
+      text: params.dig(param_key, :feedback),
+      project: @review.ship.project,
+      mention_ids: Array(params[:feedback_mention_ids]).filter_map { |id| Integer(id, exception: false) }
+    )
+  end
+
+  def post_feedback_to_slack?(formatted)
+    ActiveModel::Type::Boolean.new.cast(params[:post_to_slack]) &&
+      current_user.reviewer_slack_token.present? &&
+      formatted.slack_text.present?
+  end
+
+  # Returns [permalink, nil] on success or [nil, reviewer-facing error message].
+  def post_feedback_to_slack(formatted)
+    [ SlackCheckpointService.post_as_reviewer(token: current_user.reviewer_slack_token, text: formatted.slack_text), nil ]
+  rescue Slack::Web::Api::Errors::InvalidAuth, Slack::Web::Api::Errors::TokenRevoked, Slack::Web::Api::Errors::AccountInactive
+    current_user.update!(reviewer_slack_token: nil) # Dead token — clear it so the UI prompts a relink
+    [ nil, "Your Slack link expired. Link Slack again, or untick \"Post to Slack\" to submit without posting." ]
+  rescue Slack::Web::Api::Errors::NotInChannel, Slack::Web::Api::Errors::ChannelNotFound
+    [ nil, "You're not in #fallout-checkpoint. Join it in Slack, then submit again." ]
+  rescue Slack::Web::Api::Errors::SlackError, Faraday::Error => e
+    ErrorReporter.capture_exception(e, level: :warning, contexts: { reviewer_slack: { review_id: @review.id, user_id: current_user.id } })
+    [ nil, "Couldn't post to Slack (#{e.message}). Try again, or untick \"Post to Slack\"." ]
+  end
 end

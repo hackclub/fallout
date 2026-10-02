@@ -729,4 +729,19 @@ export interface BuildReviewDetail {
   user_display_name: string
   preflight_results: PreflightCheck[] | null
   created_at: string
+  checkpoint_message_url: string | null
+}
+
+export interface ReviewerSlackProps {
+  configured: boolean
+  linked: boolean
+  connect_path: string
+  disconnect_path: string
+  mentions_path: string
+}
+
+export interface MentionTarget {
+  id: number
+  display_name: string
+  avatar: string | null
 }

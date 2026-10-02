@@ -107,7 +107,7 @@ User messaging and channel management via bot token.
 - **Welcome channels**: `User::SLACK_WELCOME_CHANNELS` constant (invited on trial→full promotion)
 - **Error handling**: invites gracefully ignore `AlreadyInChannel`, warn on `UserIsRestricted`/`CantInvite`. `SlackMsgJob` serializes sends via `limits_concurrency to: 1` + a 1.1s sleep (Slack ~1 msg/sec workspace limit) and retries `TooManyRequestsError`/`TimeoutError` with backoff.
 - **Used by**: `AuthController#create` (post-HCA verification welcome), `User#refresh_profile_from_slack`
-- **Env**: `SLACK_BOT_TOKEN`
+- **Env**: `SLACK_BOT_TOKEN` (reviewer app: see below)
 
 #### Native link unfurls
 
@@ -118,6 +118,15 @@ User messaging and channel management via bot token.
   - `https://fallout.hackclub.com/projects/:id`
   - `https://fallout.hackclub.com/bulletin_board?project=:id`
 - **Response:** calls `chat.unfurl` with the same native `card` block structure used in review thread messages — built via the shared `SlackProjectCardService.build_card_block` (title/subtitle/body/actions/hero image/icon). Only resolves projects visible via `Project.public_for_explore`.
+
+#### Reviewer Slack app (DR/BR feedback posted as the reviewer)
+
+A **separate** Slack app (manifest: `config/slack/reviewer_app_manifest.yml`, env `REVIEWER_SLACK_CLIENT_ID` / `REVIEWER_SLACK_CLIENT_SECRET`) — not the profile-photo app (`SLACK_CLIENT_ID`) or the bot (`SLACK_BOT_TOKEN`).
+
+- **Linking:** `Admin::ReviewerSlackController` (`/admin/reviewer_slack/{connect,callback,disconnect,mentions}`), headless `ReviewerSlackPolicy` (Phase 2 reviewers + admins only). User scope `chat:write`; state + `return_to` (restricted to `/admin/` paths) ride in the encrypted `reviewer_slack_oauth` cookie (`OauthState`). The callback rejects a Slack account whose id ≠ `current_user.normalized_slack_id` (and revokes that token). Token stored in `users.reviewer_slack_token` (encrypted). Unlink calls `auth.revoke` and nils the column (hard delete).
+- **Posting:** `SlackCheckpointService.post_as_reviewer` posts to `#fallout-checkpoint` with the reviewer's token (unfurls off) and returns the permalink (falls back to a constructed URL if `chat.getPermalink` fails, so a live message never triggers a duplicate repost).
+- **Mention search:** `GET /admin/reviewer_slack/mentions?q=` matches `display_name` only (never email — open to non-admin reviewers) and returns `id`/`display_name`/`avatar`; Slack IDs are resolved server-side.
+- **Feedback tokens:** `ReviewFeedbackFormatter` (Ruby) + `app/frontend/lib/reviewFeedbackTokens.ts` (TS mirror — keep in sync) handle `@user` (owner), `@Display Name` (owner/collaborators/explicitly mentioned users via `feedback_mention_ids`), `/proj/` (project name → `<repo|name>` on Slack). Stored `feedback` gets plain text; Slack gets `<@U…>` mentions and the owner is auto-prepended if not tagged.
 
 ### MailDeliveryService — `app/services/mail_delivery_service.rb`
 

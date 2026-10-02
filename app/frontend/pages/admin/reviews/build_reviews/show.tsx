@@ -45,6 +45,7 @@ import {
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
 import RepoTree from '@/components/admin/RepoTree'
 import RepoDiffCard from '@/components/admin/RepoDiffCard'
+import SlackFeedbackComposer from '@/components/admin/SlackFeedbackComposer'
 import { notify } from '@/lib/notifications'
 import type {
   BuildReviewDetail,
@@ -57,6 +58,8 @@ import type {
   SiblingReview,
   SiblingReviews,
   PreviousReview,
+  MentionTarget,
+  ReviewerSlackProps,
 } from '@/types'
 
 function csrfToken(): string {
@@ -589,6 +592,7 @@ interface PageProps {
   reviewer_notes?: ReviewerNote[]
   reviewer_notes_path: string
   project_flagged: boolean
+  reviewer_slack?: ReviewerSlackProps
   pending_conversion_koi: number
   can: { update: boolean; swap_type: boolean }
   skip: string | null
@@ -611,6 +615,7 @@ export default function BuildReviewsShow({
   reviewer_notes,
   reviewer_notes_path,
   project_flagged,
+  reviewer_slack,
   pending_conversion_koi,
   can,
   skip,
@@ -625,6 +630,8 @@ export default function BuildReviewsShow({
   useReviewHeartbeat(heartbeat_path, backfill || !isTerminal)
 
   const [feedback, setFeedback] = useState(review.feedback || '')
+  const [feedbackMentions, setFeedbackMentions] = useState<MentionTarget[]>([])
+  const [postToSlack, setPostToSlack] = useState(true)
   const [internalReason, setInternalReason] = useState(review.internal_reason || '')
   const [hoursAdjInput, setHoursAdjInput] = useState(
     review.hours_adjustment != null ? String(review.hours_adjustment / 3600) : '',
@@ -718,10 +725,13 @@ export default function BuildReviewsShow({
             gold_adjustment: goldAdjValue,
           } as any,
           demo_link: demoLinkInput.trim(),
+          post_to_slack: postToSlack,
+          feedback_mention_ids: feedbackMentions.map((m) => m.id),
         },
         {
           onSuccess: () => {
             setFeedback('')
+            setFeedbackMentions([])
             setInternalReason('')
           },
           onError: (errs) => {
@@ -743,7 +753,17 @@ export default function BuildReviewsShow({
         },
       )
     },
-    [review.id, feedback, internalReason, hoursAdjInput, goldAdjInput, demoLinkInput, skip],
+    [
+      review.id,
+      feedback,
+      feedbackMentions,
+      postToSlack,
+      internalReason,
+      hoursAdjInput,
+      goldAdjInput,
+      demoLinkInput,
+      skip,
+    ],
   )
 
   // Backfill: save only the internal fields (internal reason + hours) plus the editable
@@ -1384,12 +1404,17 @@ export default function BuildReviewsShow({
                     Feedback <span className="text-muted-foreground/60">(shown to user)</span>
                     <Kbd variant="muted">{modKey}F</Kbd>
                   </label>
-                  <Textarea
-                    ref={feedbackRef}
+                  <SlackFeedbackComposer
                     value={feedback}
-                    onChange={(e) => setFeedback(e.target.value)}
-                    placeholder="Feedback for the project author..."
-                    className="h-20 text-sm resize-y"
+                    onChange={setFeedback}
+                    textareaRef={feedbackRef}
+                    project={project}
+                    mentions={feedbackMentions}
+                    onMentionsChange={setFeedbackMentions}
+                    reviewerSlack={reviewer_slack}
+                    postToSlack={postToSlack}
+                    onPostToSlackChange={setPostToSlack}
+                    draftKey={`build_review-feedback-draft:${review.id}`}
                   />
                 </div>
 
@@ -1475,7 +1500,7 @@ export default function BuildReviewsShow({
                 <div className="space-y-2 pt-2">
                   <Button
                     className="w-full"
-                    variant="default"
+                    variant="raised-success"
                     disabled={submitting}
                     onClick={() => handleSubmit('approved')}
                   >
@@ -1485,12 +1510,12 @@ export default function BuildReviewsShow({
                       <CheckIcon data-icon="inline-start" />
                     )}
                     Approve
-                    <Kbd className="ml-1">{modKey}P</Kbd>
+                    <Kbd className="ml-1 border-emerald-400 bg-emerald-600 text-emerald-50">{modKey}P</Kbd>
                   </Button>
 
                   <Button
                     className="w-full"
-                    variant="outline"
+                    variant="raised-warning"
                     disabled={submitting || !feedback.trim()}
                     onClick={() => handleSubmit('returned')}
                     title={!feedback.trim() ? 'Feedback is required when returning' : undefined}

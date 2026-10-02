@@ -54,6 +54,7 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
       reviewer_notes_path: admin_project_reviewer_notes_path(project),
       project_flagged: project.flagged?,
       pending_conversion_koi: pending_conversion_koi,
+      reviewer_slack: reviewer_slack_props,
       can: { update: policy(@review).update?, swap_type: policy(@review).swap_type? },
       skip: params[:skip],
       heartbeat_path: heartbeat_admin_reviews_build_review_path(@review),
@@ -86,9 +87,36 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
       @review.ship.project.update_column(:demo_link, params[:demo_link].presence)
     end
 
+    formatted = format_review_feedback(:build_review)
+    checkpoint_just_stored = false
+    # BR has no mandatory checkpoint message — only post when the reviewer has linked Slack and opted in.
+    if %w[approved returned rejected].include?(params.dig(:build_review, :status)) &&
+        @review.checkpoint_message_url.blank? && post_feedback_to_slack?(formatted)
+      url, error = post_feedback_to_slack(formatted)
+      if url.nil?
+        return redirect_back fallback_location: admin_reviews_build_review_path(@review),
+                             inertia: { errors: { slack_post: [ error ] } }
+      end
+      @review.update_columns(checkpoint_message_url: url)
+      checkpoint_just_stored = true
+    end
+
+    attrs = review_params
+    attrs[:feedback] = formatted.feedback if attrs.key?(:feedback)
     @review.finalizing_user = current_user # Reviewable#stamp_finalizing_reviewer backfills reviewer_id on terminal save when claim was cleared mid-session
-    if @review.update(review_params)
+    if @review.update(attrs)
       if @review.approved? || @review.returned? || @review.rejected?
+        if checkpoint_just_stored
+          PostCheckpointThreadJob.perform_later(
+            message_ts: SlackCheckpointService.extract_ts(@review.checkpoint_message_url),
+            ship_id: @review.ship_id,
+            review_type: "build_review",
+            review_status: @review.status,
+            base_url: request.base_url,
+            project_url: project_url(@review.ship.project),
+            repo_url: @review.ship.project.repo_link
+          )
+        end
         redirect_to_next_or_index(notice: "Build review #{@review.status}.")
       else
         redirect_to admin_reviews_build_review_path(@review, skip: params[:skip]), notice: "Build review updated."
@@ -155,7 +183,8 @@ class Admin::Reviews::BuildReviewsController < Admin::Reviews::BaseController
       project_name: ship.project.name,
       user_display_name: ship.project.user.display_name,
       preflight_results: ship.preflight_results,
-      created_at: review.created_at.strftime("%B %d, %Y")
+      created_at: review.created_at.strftime("%B %d, %Y"),
+      checkpoint_message_url: review.checkpoint_message_url
     }
   end
 end

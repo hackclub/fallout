@@ -378,6 +378,12 @@ Rails.application.routes.draw do
 
       resources :project_flags, only: [ :index, :create, :destroy ]
 
+      # Reviewer Slack app: DR/BR reviewers link a user token so feedback posts to #fallout-checkpoint as them
+      get    "reviewer_slack/connect"    => "reviewer_slack#connect",    as: :reviewer_slack_connect
+      get    "reviewer_slack/callback"   => "reviewer_slack#callback",   as: :reviewer_slack_callback
+      delete "reviewer_slack/disconnect" => "reviewer_slack#disconnect", as: :reviewer_slack_disconnect
+      get    "reviewer_slack/mentions"   => "reviewer_slack#mentions",   as: :reviewer_slack_mentions
+
       resources :projects, only: [ :index, :show ] do
         resources :reviewer_notes, only: [ :create, :update, :destroy ]
       end

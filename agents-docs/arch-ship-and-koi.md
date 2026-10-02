@@ -165,6 +165,12 @@ RC, DR, and BR show pages surface a `RepoDiffCard` (`repo_diff` jsonb column) su
 
 Admin-only swap (`Ship#swap_phase_two_type!`) moves a pending Phase 2 review between DR and BR. The swap maps DR's `koi_adjustment` ↔ BR's `gold_adjustment` (same semantic knob — a signed integer credit/debit on the hours-derived currency) and preserves the review's `created_at` so queue wait time stays intact.
 
+### Checkpoint messages & posting feedback to Slack (DR/BR)
+
+DR and BR show pages use `SlackFeedbackComposer` for the Feedback field: highlighted `@` mentions with autocomplete (owner/collaborators locally, others via the mention search), `/proj/`, and a "Post to #fallout-checkpoint as you" toggle once the reviewer links the reviewer Slack app (see arch-services-infra.md → Reviewer Slack app). The draft is stashed in `sessionStorage` across the OAuth round-trip.
+
+On a terminal submit with `post_to_slack` on, a linked token, and non-blank feedback, the controller posts the feedback as the reviewer *before* saving the review, stores the permalink in `checkpoint_message_url` (both DR and BR now have the column), then enqueues `PostCheckpointThreadJob` (which now supports `build_review`). An existing `checkpoint_message_url` short-circuits reposting on retry. Slack failures return `errors.slack_post` without saving; dead tokens are cleared. Otherwise DR falls back to the old flow (channel search / pasted permalink, still mandatory); BR stays optional (no message → no thread).
+
 ### Phase 2 Backfill Queues (DR Backfill / BR Backfill)
 
 Mandatory internal justification (`internal_reason`) was dropped from the normal DR/BR flow so reviewers could clear the queue faster, on the plan to add it later. Two dedicated queues backfill it:

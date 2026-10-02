@@ -1,0 +1,18 @@
+# Slack app manifest for "Fallout Reviewer" — lets DR/BR reviewers post feedback to
+# #fallout-checkpoint as themselves. Separate from the existing app (SLACK_CLIENT_ID / SLACK_BOT_TOKEN).
+# Create at https://api.slack.com/apps → "From a manifest", then set REVIEWER_SLACK_CLIENT_ID and
+# REVIEWER_SLACK_CLIENT_SECRET from Basic Information. Add a localhost redirect URL for development.
+display_information:
+  name: Fallout Reviewer
+  description: Post your Fallout review feedback to #fallout-checkpoint as you.
+  background_color: "#3d2b1f"
+oauth_config:
+  redirect_urls:
+    - https://fallout.hackclub.com/admin/reviewer_slack/callback
+  scopes:
+    user:
+      - chat:write
+settings:
+  org_deploy_enabled: true
+  socket_mode_enabled: false
+  token_rotation_enabled: false
