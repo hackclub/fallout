@@ -13,6 +13,6 @@ oauth_config:
     user:
       - chat:write
 settings:
-  org_deploy_enabled: true
+  org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false

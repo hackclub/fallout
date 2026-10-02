@@ -304,19 +304,17 @@ export default function SlackFeedbackComposer({
                 <span>
                   Post to <span className="font-medium text-foreground">{CHANNEL}</span> as you
                 </span>
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <span className="size-1.5 rounded-full bg-emerald-500" />
-                  Linked
-                </span>
               </label>
               <Button
-                variant="ghost"
+                variant="raised"
                 size="xs"
-                className="text-muted-foreground"
+                title="Unlink Slack"
                 onClick={() =>
                   router.delete(reviewerSlack.disconnect_path, { preserveScroll: true, preserveState: true })
                 }
               >
+                <img src="/logos/slack.svg" alt="" className="size-3" />
+                <span className="size-1.5 rounded-full bg-emerald-500" />
                 Unlink
               </Button>
             </>
@@ -325,6 +323,7 @@ export default function SlackFeedbackComposer({
               <span className="text-muted-foreground">Link Slack to post this feedback to {CHANNEL} as you</span>
               <Button variant="raised" size="xs" asChild>
                 <a href={reviewerSlack.connect_path} onClick={saveDraft}>
+                  <img src="/logos/slack.svg" alt="" className="size-3" />
                   Link Slack
                 </a>
               </Button>
