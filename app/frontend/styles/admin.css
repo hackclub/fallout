@@ -310,3 +310,131 @@
     transition: none !important;
   }
 }
+
+/* ---- Review console tab bar (ported from yahri's ReviewConsole) ----
+   Segmented bar + one raised pill that glides between tabs on a Motion spring.
+   Base tabs are muted and faded; the full-opacity, tinted twin lives in the color
+   layer and is clipped to the pill, so the reveal is the clip wiping across. */
+.admin {
+  --rc-shadow-raise: 0 1px 2px rgba(24, 24, 32, 0.06), 0 0 0 1px var(--border);
+  --rc-chip-green-ink: oklch(0.55 0.15 155);
+  --rc-chip-blue-ink: oklch(0.55 0.17 262);
+  --rc-chip-amber-ink: oklch(0.55 0.13 75);
+  --rc-chip-violet-ink: oklch(0.52 0.18 295);
+  --rc-chip-gray-ink: oklch(0.5 0 0);
+}
+.admin.dark {
+  --rc-shadow-raise: 0 1px 2px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--border);
+  --rc-chip-green-ink: oklch(0.8 0.14 155);
+  --rc-chip-blue-ink: oklch(0.78 0.12 262);
+  --rc-chip-amber-ink: oklch(0.8 0.13 80);
+  --rc-chip-violet-ink: oklch(0.78 0.13 295);
+  --rc-chip-gray-ink: oklch(0.72 0 0);
+}
+.rc-tabbar {
+  position: relative; /* anchors the sliding indicator */
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.22rem;
+  background: var(--muted);
+  border-radius: 999px;
+}
+.rc-tab {
+  position: relative;
+  z-index: 1; /* content rides above the indicator pill */
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 0.84rem;
+  /* constant weight — a weight change mid-slide makes neighbors jitter */
+  font-weight: 600;
+  color: var(--foreground);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  /* extra left inset balances the icon chip against the label's right padding —
+     it lives in padding (not margin) so the indicator pill grows to match */
+  padding: 0.32rem 0.8rem 0.32rem 0.65rem;
+  cursor: pointer;
+}
+.rc-tabbar > .rc-tab { opacity: 0.5; }
+.rc-tab:hover:not([data-state='active']) { opacity: 0.8; }
+/* label + chip wrapper — rides the drag rubber-band at half strength */
+.rc-tab-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: transform 120ms ease-out;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rc-tab-inner { transition: none; }
+}
+/* the active tab doubles as the pill's drag handle */
+.rc-tab[data-state='active'] { cursor: grab; touch-action: none; }
+.rc-tabbar[data-dragging], .rc-tabbar[data-dragging] .rc-tab { cursor: grabbing; }
+.rc-tabbar[data-dragging] { user-select: none; }
+.rc-tab:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+/* the raised pill — one element gliding between tabs (Motion spring) */
+.rc-tab-indicator {
+  position: absolute;
+  z-index: 0;
+  background: var(--card);
+  box-shadow: var(--rc-shadow-raise);
+  border-radius: 999px;
+}
+.rc-tab-chip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: inherit;
+}
+/* colored twin of the tab row, stacked over the base and clipped to the pill.
+   identical box model to .rc-tabbar so its tabs land exactly over the real ones. */
+.rc-tab-colorlayer {
+  position: absolute;
+  inset: 0;
+  z-index: 2; /* above the real tabs (z1) and the pill surface (z0) */
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.22rem;
+}
+.rc-tab-colorlayer .rc-tab { color: var(--foreground); }
+.rc-tab-colorlayer .rc-tab-chip[data-tint='green'] { color: var(--rc-chip-green-ink); }
+.rc-tab-colorlayer .rc-tab-chip[data-tint='blue'] { color: var(--rc-chip-blue-ink); }
+.rc-tab-colorlayer .rc-tab-chip[data-tint='amber'] { color: var(--rc-chip-amber-ink); }
+.rc-tab-colorlayer .rc-tab-chip[data-tint='violet'] { color: var(--rc-chip-violet-ink); }
+.rc-tab-colorlayer .rc-tab-chip[data-tint='gray'] { color: var(--rc-chip-gray-ink); }
+
+/* every view stays mounted so viewer state survives switching; hidden ones collapse */
+.rc-view { display: flex; flex: 1 1 0%; min-height: 0; flex-direction: column; }
+.rc-view[hidden],
+.rc-view[data-state='inactive'] { display: none !important; }
+
+/* ---- Repo viewer surfaces ---- */
+.repo-checker {
+  background-color: var(--muted);
+  background-image:
+    linear-gradient(45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+.repo-gerber-board { background: oklch(0.2 0.03 265); }
+.repo-gerber-board svg { width: 100%; height: 100%; }
+/* highlight.js ships one theme per stylesheet; re-skin it for admin dark mode */
+.admin.dark .hljs { background: var(--background); color: var(--foreground); }
+.admin.dark .hljs-comment, .admin.dark .hljs-quote { color: oklch(0.65 0 0); }
+.admin.dark .hljs-keyword, .admin.dark .hljs-selector-tag, .admin.dark .hljs-meta { color: oklch(0.78 0.14 350); }
+.admin.dark .hljs-string, .admin.dark .hljs-attr, .admin.dark .hljs-regexp { color: oklch(0.8 0.1 230); }
+.admin.dark .hljs-number, .admin.dark .hljs-literal, .admin.dark .hljs-variable { color: oklch(0.8 0.12 200); }
+.admin.dark .hljs-title, .admin.dark .hljs-section, .admin.dark .hljs-name { color: oklch(0.78 0.13 300); }
+.admin.dark .hljs-built_in, .admin.dark .hljs-type { color: oklch(0.82 0.11 80); }

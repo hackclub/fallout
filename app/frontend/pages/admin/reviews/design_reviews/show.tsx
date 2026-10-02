@@ -27,7 +27,6 @@ import {
   AlertDialogAction,
 } from '@/components/admin/ui/alert-dialog'
 import {
-  UserIcon,
   GitBranchIcon,
   CheckIcon,
   XCircleIcon,
@@ -39,13 +38,15 @@ import {
   LoaderIcon,
   GlobeIcon,
   ChevronDownIcon,
-  ArrowUpRightIcon,
-  CopyIcon,
   KeyboardIcon,
   CornerDownLeftIcon,
+  LayoutGridIcon,
+  FolderIcon,
+  FolderOpenIcon,
 } from 'lucide-react'
 import ProjectNotesWindow from '@/components/admin/ProjectNotesWindow'
-import RepoTree from '@/components/admin/RepoTree'
+import RepoWorkspace from '@/components/admin/review/RepoWorkspace'
+import { ReviewTabBar, ReviewTabPanel, ReviewTabsRoot, type ReviewTab } from '@/components/admin/review/ReviewTabs'
 import RepoDiffCard from '@/components/admin/RepoDiffCard'
 import SlackFeedbackComposer from '@/components/admin/SlackFeedbackComposer'
 import { notify } from '@/lib/notifications'
@@ -340,6 +341,13 @@ function PreflightResults({ checks }: { checks: PreflightCheck[] }) {
   )
 }
 
+type ReviewView = 'overview' | 'repo'
+
+const REVIEW_TABS: ReviewTab[] = [
+  { id: 'overview', title: 'Overview', icon: LayoutGridIcon, tint: 'green' },
+  { id: 'repo', title: 'Repo', icon: FolderIcon, activeIcon: FolderOpenIcon, tint: 'violet' },
+]
+
 // --- Top Bar ---
 
 function TopBar({
@@ -349,6 +357,7 @@ function TopBar({
   flagging,
   endSessionHref,
   showFlag = true,
+  center,
   onSkip,
   onToggleNotes,
   onFlag,
@@ -359,12 +368,12 @@ function TopBar({
   flagging: boolean
   endSessionHref: string
   showFlag?: boolean
+  center?: ReactNode
   onSkip: () => void
   onToggleNotes: () => void
   onFlag: (reason: string) => void
 }) {
   const [flagReason, setFlagReason] = useState('')
-  const hurtUrl = project.repo_link ? `https://hurt-xi.vercel.app/?repo=${encodeURIComponent(project.repo_link)}` : null
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -433,21 +442,9 @@ function TopBar({
           )}
         </span>
 
-        <div className="flex items-center flex-wrap gap-2 ml-auto">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="default" asChild>
-                <a href={`/admin/users/${project.user_id}`} target="_blank" rel="noopener noreferrer">
-                  <UserIcon data-icon="inline-start" />
-                  See User
-                  <Kbd variant="muted" className="ml-1">
-                    U
-                  </Kbd>
-                </a>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Open user in new tab</TooltipContent>
-          </Tooltip>
+        {center && <div className="mx-auto px-2">{center}</div>}
+
+        <div className="flex items-center flex-wrap gap-2 shrink-0">
           {isSafeUrl(project.repo_link) && (
             <>
               <Tooltip>
@@ -463,38 +460,6 @@ function TopBar({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Open repo on GitHub</TooltipContent>
-              </Tooltip>
-              {hurtUrl && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="default" asChild>
-                      <a href={hurtUrl} target="_blank" rel="noopener noreferrer">
-                        <ArrowUpRightIcon data-icon="inline-start" />
-                        HURT
-                        <Kbd variant="muted" className="ml-1">
-                          H
-                        </Kbd>
-                      </a>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Open repo in HURT</TooltipContent>
-                </Tooltip>
-              )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => navigator.clipboard.writeText(project.repo_link!)}
-                  >
-                    <CopyIcon className="size-3.5" />
-                    Copy
-                    <Kbd variant="muted" className="ml-1">
-                      C
-                    </Kbd>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Copy repo URL</TooltipContent>
               </Tooltip>
             </>
           )}
@@ -533,12 +498,16 @@ function TopBar({
               <Badge variant="destructive">Flagged</Badge>
             ) : (
               <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="default">
-                    <FlagIcon data-icon="inline-start" />
-                    Flag Project
-                  </Button>
-                </AlertDialogTrigger>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="icon" aria-label="Flag project">
+                        <FlagIcon />
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Flag project</TooltipContent>
+                </Tooltip>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Flag Project for Fraud</AlertDialogTitle>
@@ -639,6 +608,7 @@ export default function DesignReviewsShow({
   const [checkpointLinkInput, setCheckpointLinkInput] = useState('')
   const [pendingStatus, setPendingStatus] = useState<'approved' | 'returned' | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [view, setView] = useState<ReviewView>('overview')
   const [buildDialogOpen, setBuildDialogOpen] = useState(false)
   const feedbackRef = useRef<HTMLTextAreaElement>(null)
   const internalReasonRef = useRef<HTMLTextAreaElement>(null)
@@ -827,12 +797,19 @@ export default function DesignReviewsShow({
       { key: '?', description: 'Show this cheatsheet' },
       { key: '1', description: 'Toggle Preflight Checks' },
       { key: '2', description: 'Toggle Previous Reviews' },
-      { key: '3', description: 'Toggle Repo Info' },
+      { key: 'O', description: 'Overview view' },
+      { key: '3', description: 'Repo view' },
       { key: '4', description: 'Toggle Journal' },
       { key: '5', description: 'Toggle Changes Since Last Review' },
     ],
     [modKey],
   )
+
+  // Card toggles live in the Overview view — switch there first so the toggle is visible.
+  const toggleOverviewCard = useCallback((key: string) => {
+    setView('overview')
+    ;(document.querySelector(`[data-card-key="${key}"]`) as HTMLElement | null)?.click()
+  }, [])
 
   useReviewShortcuts({
     p: {
@@ -906,497 +883,308 @@ export default function DesignReviewsShow({
       },
       requireModifier: true,
     },
-    '1': { handler: () => (document.querySelector('[data-card-key="design-preflight"]') as HTMLElement)?.click() },
-    '2': {
-      handler: () => (document.querySelector('[data-card-key="design-previous-reviews"]') as HTMLElement)?.click(),
-    },
-    '3': { handler: () => (document.querySelector('[data-card-key="design-repo"]') as HTMLElement)?.click() },
-    '4': { handler: () => (document.querySelector('[data-card-key="design-journal"]') as HTMLElement)?.click() },
-    '5': { handler: () => (document.querySelector('[data-card-key="design-repo-diff"]') as HTMLElement)?.click() },
+    o: { handler: () => setView('overview') },
+    '1': { handler: () => toggleOverviewCard('design-preflight') },
+    '2': { handler: () => toggleOverviewCard('design-previous-reviews') },
+    '3': { handler: () => setView('repo') },
+    '4': { handler: () => toggleOverviewCard('design-journal') },
+    '5': { handler: () => toggleOverviewCard('design-repo-diff') },
   })
 
   return (
     <>
-      <div className="h-screen flex flex-col overflow-hidden border-t-3 border-purple-500">
-        <TopBar
-          project={project}
-          notesCount={notes.length}
-          projectFlagged={isFlagged}
-          flagging={flagging}
-          endSessionHref={index_path}
-          showFlag={!backfill}
-          onSkip={handleSkip}
-          onToggleNotes={() => setNotesOpen((v) => !v)}
-          onFlag={handleFlag}
-        />
-
-        {notesOpen && reviewer_notes && (
-          <ProjectNotesWindow
-            notes={notes}
-            setNotes={setNotes}
-            notesPath={reviewer_notes_path}
-            shipId={review.ship_id}
-            reviewStage="design_review"
-            onClose={() => setNotesOpen(false)}
+      <ReviewTabsRoot value={view} onValueChange={(v) => setView(v as ReviewView)} asChild>
+        <div className="h-screen flex flex-col overflow-hidden border-t-3 border-purple-500">
+          <TopBar
+            center={<ReviewTabBar tabs={REVIEW_TABS} value={view} onValueChange={(v) => setView(v as ReviewView)} />}
+            project={project}
+            notesCount={notes.length}
+            projectFlagged={isFlagged}
+            flagging={flagging}
+            endSessionHref={index_path}
+            showFlag={!backfill}
+            onSkip={handleSkip}
+            onToggleNotes={() => setNotesOpen((v) => !v)}
+            onFlag={handleFlag}
           />
-        )}
 
-        <div className="flex-1 min-h-0 flex">
-          {/* Left: project info + preflight + journal */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Project overview */}
-            <div className="rounded-md border border-border overflow-hidden">
-              <div className="p-3 space-y-1">
-                <h1 className="text-base font-semibold leading-snug">
-                  <a
-                    href={`/admin/projects/${project.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:underline"
-                  >
-                    {project.name}
-                  </a>
-                </h1>
-                {project.description && (
-                  <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
-                )}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                  <a
-                    href={`/admin/users/${project.user_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-foreground hover:underline"
-                  >
-                    <img src={project.user_avatar} alt="" className="size-4 rounded-full" />
-                    <span>{project.user_display_name}</span>
-                  </a>
-                  {project.collaborators.map((c) => (
-                    <a
-                      key={c.id}
-                      href={`/admin/users/${c.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-foreground hover:underline"
-                    >
-                      <img src={c.avatar} alt="" className="size-4 rounded-full" />
-                      <span>{c.display_name}</span>
-                    </a>
-                  ))}
-                  <span>|</span>
-                  <span>{project.created_at}</span>
-                  {project.tags.length > 0 && (
-                    <>
+          {notesOpen && reviewer_notes && (
+            <ProjectNotesWindow
+              notes={notes}
+              setNotes={setNotes}
+              notesPath={reviewer_notes_path}
+              shipId={review.ship_id}
+              reviewStage="design_review"
+              onClose={() => setNotesOpen(false)}
+            />
+          )}
+
+          <div className="flex-1 min-h-0 flex">
+            <ReviewTabPanel value="overview">
+              {/* Left: project info + preflight + journal */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Project overview */}
+                <div className="rounded-md border border-border overflow-hidden">
+                  <div className="p-3 space-y-1">
+                    <h1 className="text-base font-semibold leading-snug">
+                      <a
+                        href={`/admin/projects/${project.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline"
+                      >
+                        {project.name}
+                      </a>
+                    </h1>
+                    {project.description && (
+                      <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
+                    )}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      <a
+                        href={`/admin/users/${project.user_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-foreground hover:underline"
+                      >
+                        <img src={project.user_avatar} alt="" className="size-4 rounded-full" />
+                        <span>{project.user_display_name}</span>
+                      </a>
+                      {project.collaborators.map((c) => (
+                        <a
+                          key={c.id}
+                          href={`/admin/users/${c.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-foreground hover:underline"
+                        >
+                          <img src={c.avatar} alt="" className="size-4 rounded-full" />
+                          <span>{c.display_name}</span>
+                        </a>
+                      ))}
                       <span>|</span>
-                      <span className="text-foreground">{project.tags.join(', ')}</span>
-                    </>
-                  )}
-                  <span>|</span>
-                  <WaitingLabel waitingSince={project.waiting_since} cycleStartedAt={project.cycle_started_at} />
-                </div>
-              </div>
+                      <span>{project.created_at}</span>
+                      {project.tags.length > 0 && (
+                        <>
+                          <span>|</span>
+                          <span className="text-foreground">{project.tags.join(', ')}</span>
+                        </>
+                      )}
+                      <span>|</span>
+                      <WaitingLabel waitingSince={project.waiting_since} cycleStartedAt={project.cycle_started_at} />
+                    </div>
+                  </div>
 
-              {/* Stats row */}
-              <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
-                <div className="px-3 py-2">
-                  <p className="text-xs text-muted-foreground mb-0.5">Type</p>
-                  <p className="text-sm font-medium capitalize">{project.ship_type}</p>
-                </div>
-                <div className="px-3 py-2">
-                  <p className="text-xs text-muted-foreground mb-0.5">Hours Approved</p>
-                  <p className="text-sm">
-                    <HoursDisplay
-                      publicHours={project.approved_public_hours}
-                      internalHours={project.approved_internal_hours}
-                      loggedHours={project.ship_logged_hours}
-                    />
-                  </p>
-                </div>
-                <div className="px-3 py-2">
-                  <p className="text-xs text-muted-foreground mb-0.5">Entries</p>
-                  <p className="text-sm font-mono">{project.entry_count}</p>
-                </div>
-              </div>
-
-              {/* Links row */}
-              {(isSafeUrl(project.frozen_repo_link) || isSafeUrl(project.frozen_demo_link)) && (
-                <div
-                  className={`grid divide-x divide-border border-t border-border ${
-                    isSafeUrl(project.frozen_repo_link) && isSafeUrl(project.frozen_demo_link)
-                      ? 'grid-cols-2'
-                      : 'grid-cols-1'
-                  }`}
-                >
-                  {isSafeUrl(project.frozen_repo_link) && (
+                  {/* Stats row */}
+                  <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
                     <div className="px-3 py-2">
-                      <p className="text-xs text-muted-foreground mb-0.5">Repository</p>
-                      <a
-                        href={project.frozen_repo_link!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
-                      >
-                        {project.frozen_repo_link}
-                      </a>
+                      <p className="text-xs text-muted-foreground mb-0.5">Type</p>
+                      <p className="text-sm font-medium capitalize">{project.ship_type}</p>
+                    </div>
+                    <div className="px-3 py-2">
+                      <p className="text-xs text-muted-foreground mb-0.5">Hours Approved</p>
+                      <p className="text-sm">
+                        <HoursDisplay
+                          publicHours={project.approved_public_hours}
+                          internalHours={project.approved_internal_hours}
+                          loggedHours={project.ship_logged_hours}
+                        />
+                      </p>
+                    </div>
+                    <div className="px-3 py-2">
+                      <p className="text-xs text-muted-foreground mb-0.5">Entries</p>
+                      <p className="text-sm font-mono">{project.entry_count}</p>
+                    </div>
+                  </div>
+
+                  {/* Links row */}
+                  {(isSafeUrl(project.frozen_repo_link) || isSafeUrl(project.frozen_demo_link)) && (
+                    <div
+                      className={`grid divide-x divide-border border-t border-border ${
+                        isSafeUrl(project.frozen_repo_link) && isSafeUrl(project.frozen_demo_link)
+                          ? 'grid-cols-2'
+                          : 'grid-cols-1'
+                      }`}
+                    >
+                      {isSafeUrl(project.frozen_repo_link) && (
+                        <div className="px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-0.5">Repository</p>
+                          <a
+                            href={project.frozen_repo_link!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
+                          >
+                            {project.frozen_repo_link}
+                          </a>
+                        </div>
+                      )}
+                      {isSafeUrl(project.frozen_demo_link) && (
+                        <div className="px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-0.5">Demo</p>
+                          <a
+                            href={project.frozen_demo_link!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
+                          >
+                            {project.frozen_demo_link}
+                          </a>
+                        </div>
+                      )}
                     </div>
                   )}
-                  {isSafeUrl(project.frozen_demo_link) && (
-                    <div className="px-3 py-2">
-                      <p className="text-xs text-muted-foreground mb-0.5">Demo</p>
-                      <a
-                        href={project.frozen_demo_link!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline truncate block"
-                      >
-                        {project.frozen_demo_link}
-                      </a>
-                    </div>
-                  )}
+
+                  {/* Sibling review statuses */}
+                  <div className="px-3 py-2 border-t border-border flex items-center gap-3 text-xs">
+                    <span className="text-muted-foreground">Reviews:</span>
+                    <SiblingBadge label="Time Audit" review={sibling_statuses.time_audit} />
+                    <SiblingBadge label="Requirements" review={sibling_statuses.requirements_check} />
+                    <SiblingBadge label="Design" review={sibling_statuses.design_review} />
+                    <SiblingBadge label="Build" review={sibling_statuses.build_review} />
+                  </div>
                 </div>
+
+                {/* Previous reviews from prior ships */}
+                {previous_reviews.length > 0 && (
+                  <CollapsibleCard
+                    title="Previous Reviews"
+                    storageKey="design-previous-reviews"
+                    summary={
+                      <span className="flex items-center gap-1">
+                        {[...previous_reviews].reverse().map((r) => (
+                          <ReviewStatusBadge
+                            key={`${r.ship_id}-${r.review_type}`}
+                            status={r.status}
+                            className="shrink-0"
+                          />
+                        ))}
+                      </span>
+                    }
+                    trailing={<Kbd variant="muted">2</Kbd>}
+                  >
+                    <div className="divide-y divide-border">
+                      {previous_reviews.map((r) => (
+                        <div key={`${r.ship_id}-${r.review_type}`} className="p-3 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <ReviewStatusBadge status={r.status} />
+                              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+                                {r.review_type === 'requirements_check_review'
+                                  ? 'RC'
+                                  : r.review_type === 'design_review'
+                                    ? 'Design'
+                                    : 'Build'}
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {r.reviewer_display_name && `${r.reviewer_display_name} · `}
+                              {r.reviewed_at}
+                            </span>
+                          </div>
+                          {r.feedback && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-0.5">Feedback</p>
+                              <p className="text-sm whitespace-pre-wrap">{r.feedback}</p>
+                            </div>
+                          )}
+                          {r.internal_reason && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-0.5">Internal Reason</p>
+                              <p className="text-sm whitespace-pre-wrap text-muted-foreground">{r.internal_reason}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleCard>
+                )}
+
+                {/* Preflight checks */}
+                {preflight.length > 0 && <PreflightResults checks={preflight} />}
+
+                {/* Changes since the last DR/BR — re-ship review aid */}
+                {project.repo_link && (
+                  <RepoDiffCard
+                    data={repo_diff}
+                    repoLink={project.repo_link}
+                    storageKey="design-repo-diff"
+                    trailing={<Kbd variant="muted">5</Kbd>}
+                  />
+                )}
+
+                {/* Journal — all entries shown inline */}
+                {allEntries.length > 0 && (
+                  <CollapsibleCard
+                    title="Journal"
+                    storageKey="design-journal"
+                    summary={
+                      <>
+                        Count: {allEntries.length}
+                        {' | '}Total: {(allEntries.reduce((s, e) => s + e.total_duration, 0) / 3600).toFixed(1)}h{' | '}
+                        Avg:{' '}
+                        {(allEntries.reduce((s, e) => s + e.total_duration, 0) / allEntries.length / 3600).toFixed(2)}h
+                        {' | '}
+                        Range: {(Math.min(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h –{' '}
+                        {(Math.max(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h
+                      </>
+                    }
+                    defaultOpen
+                    trailing={<Kbd variant="muted">4</Kbd>}
+                  >
+                    <JournalEntriesList entries={allEntries} />
+                  </CollapsibleCard>
+                )}
+              </div>
+            </ReviewTabPanel>
+
+            <ReviewTabPanel value="repo">
+              {repo_tree && repo_tree.entries?.length > 0 && project.repo_link ? (
+                <RepoWorkspace data={repo_tree} repoLink={project.repo_link} />
+              ) : (
+                <p className="p-6 text-sm text-muted-foreground">No repository tree is available for this ship yet.</p>
               )}
+            </ReviewTabPanel>
 
-              {/* Sibling review statuses */}
-              <div className="px-3 py-2 border-t border-border flex items-center gap-3 text-xs">
-                <span className="text-muted-foreground">Reviews:</span>
-                <SiblingBadge label="Time Audit" review={sibling_statuses.time_audit} />
-                <SiblingBadge label="Requirements" review={sibling_statuses.requirements_check} />
-                <SiblingBadge label="Design" review={sibling_statuses.design_review} />
-                <SiblingBadge label="Build" review={sibling_statuses.build_review} />
-              </div>
-            </div>
+            {/* Divider */}
+            <div className="w-px shrink-0 bg-border" />
 
-            {/* Previous reviews from prior ships */}
-            {previous_reviews.length > 0 && (
-              <CollapsibleCard
-                title="Previous Reviews"
-                storageKey="design-previous-reviews"
-                summary={
-                  <span className="flex items-center gap-1">
-                    {[...previous_reviews].reverse().map((r) => (
-                      <ReviewStatusBadge key={`${r.ship_id}-${r.review_type}`} status={r.status} className="shrink-0" />
-                    ))}
-                  </span>
-                }
-                trailing={<Kbd variant="muted">2</Kbd>}
-              >
-                <div className="divide-y divide-border">
-                  {previous_reviews.map((r) => (
-                    <div key={`${r.ship_id}-${r.review_type}`} className="p-3 space-y-1.5">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <ReviewStatusBadge status={r.status} />
-                          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
-                            {r.review_type === 'requirements_check_review'
-                              ? 'RC'
-                              : r.review_type === 'design_review'
-                                ? 'Design'
-                                : 'Build'}
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {r.reviewer_display_name && `${r.reviewer_display_name} · `}
-                          {r.reviewed_at}
-                        </span>
-                      </div>
-                      {r.feedback && (
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-0.5">Feedback</p>
-                          <p className="text-sm whitespace-pre-wrap">{r.feedback}</p>
-                        </div>
-                      )}
-                      {r.internal_reason && (
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-0.5">Internal Reason</p>
-                          <p className="text-sm whitespace-pre-wrap text-muted-foreground">{r.internal_reason}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CollapsibleCard>
-            )}
-
-            {/* Preflight checks */}
-            {preflight.length > 0 && <PreflightResults checks={preflight} />}
-
-            {/* Repo tree — GitHub projects only */}
-            {repo_tree && repo_tree.entries?.length > 0 && project.repo_link && (
-              <CollapsibleCard
-                title="Repository"
-                storageKey="design-repo"
-                summary={
-                  repo_tree.entries.filter((e) => e.type === 'tree').length +
-                  ' dirs | ' +
-                  repo_tree.entries.filter((e) => e.type === 'blob').length +
-                  ' files'
-                }
-                trailing={
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={`https://hurt-xi.vercel.app/?repo=${encodeURIComponent(project.repo_link)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1 rounded border border-foreground bg-foreground px-2 py-0.5 text-xs font-semibold text-background hover:opacity-80 transition-opacity"
-                    >
-                      Open in HURT
-                      <ArrowUpRightIcon className="size-3" />
-                      <Kbd className="ml-0.5 border-white/30 bg-white/10 text-white/80">H</Kbd>
-                    </a>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigator.clipboard.writeText(project.repo_link!)
-                      }}
-                      title="Copy repo URL"
-                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                    >
-                      <CopyIcon className="size-3.5" />
-                    </button>
-                    <Kbd variant="muted">3</Kbd>
-                  </div>
-                }
-              >
-                <RepoTree data={repo_tree} repoLink={project.repo_link} bare />
-              </CollapsibleCard>
-            )}
-
-            {/* Changes since the last DR/BR — re-ship review aid */}
-            {project.repo_link && (
-              <RepoDiffCard
-                data={repo_diff}
-                repoLink={project.repo_link}
-                storageKey="design-repo-diff"
-                trailing={<Kbd variant="muted">5</Kbd>}
-              />
-            )}
-
-            {/* Journal — all entries shown inline */}
-            {allEntries.length > 0 && (
-              <CollapsibleCard
-                title="Journal"
-                storageKey="design-journal"
-                summary={
-                  <>
-                    Count: {allEntries.length}
-                    {' | '}Total: {(allEntries.reduce((s, e) => s + e.total_duration, 0) / 3600).toFixed(1)}h{' | '}Avg:{' '}
-                    {(allEntries.reduce((s, e) => s + e.total_duration, 0) / allEntries.length / 3600).toFixed(2)}h
-                    {' | '}
-                    Range: {(Math.min(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h –{' '}
-                    {(Math.max(...allEntries.map((e) => e.total_duration)) / 3600).toFixed(1)}h
-                  </>
-                }
-                defaultOpen
-                trailing={<Kbd variant="muted">4</Kbd>}
-              >
-                <JournalEntriesList entries={allEntries} />
-              </CollapsibleCard>
-            )}
-          </div>
-
-          {/* Divider */}
-          <div className="w-px shrink-0 bg-border" />
-
-          {/* Right: review form / read-only summary */}
-          <div className="w-80 shrink-0 overflow-y-auto p-4 space-y-4">
-            {backfill ? (
-              <>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Backfill Internal Reason
-                </h3>
-
-                <div className="flex items-center gap-2">
-                  <Badge
-                    className={
-                      review.status === 'approved'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                        : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                    }
-                  >
-                    {review.status}
-                  </Badge>
-                  {review.reviewer_display_name && (
-                    <span className="text-xs text-muted-foreground">by {review.reviewer_display_name}</span>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    Internal Reason <span className="text-muted-foreground/60">(not shown to user)</span>
-                    <Kbd variant="muted">{modKey}J</Kbd>
-                  </label>
-                  <Textarea
-                    ref={internalReasonRef}
-                    value={internalReason}
-                    onChange={(e) => setInternalReason(e.target.value)}
-                    placeholder="Justify the original decision..."
-                    className="h-24 text-sm resize-y"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">
-                    Modify Hours <span className="text-muted-foreground/60">(not shown to user)</span>
-                  </label>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground font-mono whitespace-nowrap">
-                      {userFacingHours.toFixed(1)}h
-                    </span>
-                    <span className="text-muted-foreground">→</span>
-                    <Input
-                      type="number"
-                      step="0.5"
-                      value={hoursAdjInput}
-                      onChange={(e) => setHoursAdjInput(e.target.value)}
-                      placeholder="0"
-                      className="h-8 text-sm font-mono w-20 text-center"
-                    />
-                    <span className="text-muted-foreground">→</span>
-                    <span
-                      className={`font-mono whitespace-nowrap ${hoursAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
-                    >
-                      {internalHours.toFixed(1)}h
-                    </span>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {review.feedback && (
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">
-                      Feedback <span className="text-muted-foreground/60">(locked)</span>
-                    </label>
-                    <p className="text-sm whitespace-pre-wrap rounded-md border border-border bg-muted/40 px-2.5 py-2">
-                      {review.feedback}
-                    </p>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">Koi (locked):</span>
-                  <span className="font-mono">
-                    {finalKoi}
-                    {review.koi_adjustment != null && review.koi_adjustment !== 0
-                      ? ` (${review.koi_adjustment >= 0 ? '+' : ''}${review.koi_adjustment} adj)`
-                      : ''}
-                  </span>
-                </div>
-
-                <div className="pt-2">
-                  <Button
-                    className="w-full"
-                    variant="default"
-                    disabled={submitting || !internalReason.trim()}
-                    onClick={handleBackfillSave}
-                  >
-                    {submitting ? (
-                      <LoaderIcon data-icon="inline-start" className="animate-spin" />
-                    ) : (
-                      <CheckIcon data-icon="inline-start" />
-                    )}
-                    Save Backfill
-                    <Kbd className="ml-1">{modKey}↵</Kbd>
-                  </Button>
-                </div>
-              </>
-            ) : isTerminal ? (
-              <>
-                <div className="space-y-2">
+            {/* Right: review form / read-only summary */}
+            <div className="w-80 shrink-0 overflow-y-auto p-4 space-y-4">
+              {backfill ? (
+                <>
                   <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Review Complete
+                    Backfill Internal Reason
                   </h3>
-                  <Badge
-                    className={
-                      review.status === 'approved'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                        : review.status === 'returned'
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
-                          : review.status === 'rejected'
-                            ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
-                            : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                    }
-                  >
-                    {review.status}
-                  </Badge>
-                  {review.reviewer_display_name && (
-                    <p className="text-xs text-muted-foreground">by {review.reviewer_display_name}</p>
-                  )}
-                </div>
-                {review.internal_reason && (
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Internal Reason</label>
-                    <p className="text-sm whitespace-pre-wrap">{review.internal_reason}</p>
-                  </div>
-                )}
-                {review.feedback && (
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Feedback</label>
-                    <p className="text-sm whitespace-pre-wrap">{review.feedback}</p>
-                  </div>
-                )}
-                {(review.hours_adjustment != null || review.koi_adjustment != null) && (
-                  <div className="space-y-1.5 pt-1">
-                    {review.hours_adjustment != null && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">Hours adj:</span>
-                        <span className="font-mono">
-                          {review.hours_adjustment >= 0 ? '+' : ''}
-                          {(review.hours_adjustment / 3600).toFixed(1)}h
-                        </span>
-                      </div>
-                    )}
-                    {review.koi_adjustment != null && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">Koi adj:</span>
-                        <span className="font-mono">
-                          {review.koi_adjustment >= 0 ? '+' : ''}
-                          {review.koi_adjustment}
-                        </span>
-                      </div>
+
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={
+                        review.status === 'approved'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                          : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                      }
+                    >
+                      {review.status}
+                    </Badge>
+                    {review.reviewer_display_name && (
+                      <span className="text-xs text-muted-foreground">by {review.reviewer_display_name}</span>
                     )}
                   </div>
-                )}
-              </>
-            ) : (
-              <>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Submit Review</h3>
 
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    Internal Reason <span className="text-muted-foreground/60">(not shown to user)</span>
-                    <Kbd variant="muted">{modKey}J</Kbd>
-                  </label>
-                  <Textarea
-                    ref={internalReasonRef}
-                    value={internalReason}
-                    onChange={(e) => setInternalReason(e.target.value)}
-                    placeholder="Justify your decision..."
-                    className="h-20 text-sm resize-y"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      Internal Reason <span className="text-muted-foreground/60">(not shown to user)</span>
+                      <Kbd variant="muted">{modKey}J</Kbd>
+                    </label>
+                    <Textarea
+                      ref={internalReasonRef}
+                      value={internalReason}
+                      onChange={(e) => setInternalReason(e.target.value)}
+                      placeholder="Justify the original decision..."
+                      className="h-24 text-sm resize-y"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    Feedback <span className="text-muted-foreground/60">(shown to user)</span>
-                    <Kbd variant="muted">{modKey}F</Kbd>
-                  </label>
-                  <SlackFeedbackComposer
-                    value={feedback}
-                    onChange={setFeedback}
-                    textareaRef={feedbackRef}
-                    project={project}
-                    mentions={feedbackMentions}
-                    onMentionsChange={setFeedbackMentions}
-                    reviewerSlack={reviewer_slack}
-                    postToSlack={postToSlack}
-                    onPostToSlackChange={setPostToSlack}
-                    draftKey={`design_review-feedback-draft:${review.id}`}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
                   <div className="space-y-1.5">
                     <label className="text-xs text-muted-foreground">
                       Modify Hours <span className="text-muted-foreground/60">(not shown to user)</span>
@@ -1414,7 +1202,7 @@ export default function DesignReviewsShow({
                         placeholder="0"
                         className="h-8 text-sm font-mono w-20 text-center"
                       />
-                      .<span className="text-muted-foreground">→</span>
+                      <span className="text-muted-foreground">→</span>
                       <span
                         className={`font-mono whitespace-nowrap ${hoursAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
                       >
@@ -1423,102 +1211,266 @@ export default function DesignReviewsShow({
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">
-                      Modify Koi <span className="text-muted-foreground/60">(shown to user)</span>
-                    </label>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground font-mono whitespace-nowrap">
-                        {baseKoi}
-                        <span className="text-[10px] ml-0.5 opacity-60">{userFacingHours}h×7</span>
-                      </span>
-                      <span className="text-muted-foreground">→</span>
-                      <Input
-                        type="number"
-                        step="1"
-                        value={koiAdjInput}
-                        onChange={(e) => setKoiAdjInput(e.target.value)}
-                        placeholder="0"
-                        className="h-8 text-sm font-mono w-20 text-center"
-                      />
-                      <span className="text-muted-foreground">→</span>
-                      <span
-                        className={`font-mono whitespace-nowrap ${koiAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
-                      >
-                        {finalKoi}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                  <Separator />
 
-                <div className="pt-2 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
+                  {review.feedback && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">
+                        Feedback <span className="text-muted-foreground/60">(locked)</span>
+                      </label>
+                      <p className="text-sm whitespace-pre-wrap rounded-md border border-border bg-muted/40 px-2.5 py-2">
+                        {review.feedback}
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">Koi (locked):</span>
+                    <span className="font-mono">
+                      {finalKoi}
+                      {review.koi_adjustment != null && review.koi_adjustment !== 0
+                        ? ` (${review.koi_adjustment >= 0 ? '+' : ''}${review.koi_adjustment} adj)`
+                        : ''}
+                    </span>
+                  </div>
+
+                  <div className="pt-2">
                     <Button
-                      variant="raised-success"
-                      disabled={submitting}
-                      onClick={() => handleSubmit('approved')}
-                      className="disabled:opacity-50"
+                      className="w-full"
+                      variant="default"
+                      disabled={submitting || !internalReason.trim()}
+                      onClick={handleBackfillSave}
                     >
-                      {submitting && pendingStatus === 'approved' ? (
+                      {submitting ? (
                         <LoaderIcon data-icon="inline-start" className="animate-spin" />
                       ) : (
                         <CheckIcon data-icon="inline-start" />
                       )}
-                      Approve
-                      <Kbd className="ml-1 border-emerald-400 bg-emerald-600 text-emerald-50">{modKey}P</Kbd>
-                    </Button>
-
-                    <Button
-                      variant="raised-warning"
-                      disabled={submitting || !feedback.trim()}
-                      onClick={() => handleSubmit('returned')}
-                      title={!feedback.trim() ? 'Feedback is required when returning' : undefined}
-                      className="disabled:opacity-50"
-                    >
-                      {submitting && pendingStatus === 'returned' ? (
-                        <LoaderIcon data-icon="inline-start" className="animate-spin" />
-                      ) : (
-                        <CornerDownLeftIcon data-icon="inline-start" />
-                      )}
-                      Return
-                      <Kbd className="ml-1 border-amber-300 bg-amber-100 text-amber-600 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-400">
-                        {modKey}E
-                      </Kbd>
+                      Save Backfill
+                      <Kbd className="ml-1">{modKey}↵</Kbd>
                     </Button>
                   </div>
-
-                  {can.swap_type && (
-                    <AlertDialog open={buildDialogOpen} onOpenChange={setBuildDialogOpen}>
-                      <AlertDialogTrigger asChild>
-                        <Button className="w-full justify-between" variant="ghost" size="sm" disabled={submitting}>
-                          Move to Build Review
-                          <Kbd variant="muted">{modKey}B</Kbd>
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Move to Build Review?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This ship will be moved into the Build Review queue. Queued-at timestamp and current
-                            in-progress fields (feedback, internal reason, hours/currency adjustments) are preserved.
-                            This replaces the Design Review record.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => swap_type_path && router.post(swap_type_path)}>
-                            Move to Build Review
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                </>
+              ) : isTerminal ? (
+                <>
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Review Complete
+                    </h3>
+                    <Badge
+                      className={
+                        review.status === 'approved'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                          : review.status === 'returned'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                            : review.status === 'rejected'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
+                              : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                      }
+                    >
+                      {review.status}
+                    </Badge>
+                    {review.reviewer_display_name && (
+                      <p className="text-xs text-muted-foreground">by {review.reviewer_display_name}</p>
+                    )}
+                  </div>
+                  {review.internal_reason && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Internal Reason</label>
+                      <p className="text-sm whitespace-pre-wrap">{review.internal_reason}</p>
+                    </div>
                   )}
-                </div>
-              </>
-            )}
+                  {review.feedback && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Feedback</label>
+                      <p className="text-sm whitespace-pre-wrap">{review.feedback}</p>
+                    </div>
+                  )}
+                  {(review.hours_adjustment != null || review.koi_adjustment != null) && (
+                    <div className="space-y-1.5 pt-1">
+                      {review.hours_adjustment != null && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">Hours adj:</span>
+                          <span className="font-mono">
+                            {review.hours_adjustment >= 0 ? '+' : ''}
+                            {(review.hours_adjustment / 3600).toFixed(1)}h
+                          </span>
+                        </div>
+                      )}
+                      {review.koi_adjustment != null && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">Koi adj:</span>
+                          <span className="font-mono">
+                            {review.koi_adjustment >= 0 ? '+' : ''}
+                            {review.koi_adjustment}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Submit Review</h3>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      Internal Reason <span className="text-muted-foreground/60">(not shown to user)</span>
+                      <Kbd variant="muted">{modKey}J</Kbd>
+                    </label>
+                    <Textarea
+                      ref={internalReasonRef}
+                      value={internalReason}
+                      onChange={(e) => setInternalReason(e.target.value)}
+                      placeholder="Justify your decision..."
+                      className="h-20 text-sm resize-y"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      Feedback <span className="text-muted-foreground/60">(shown to user)</span>
+                      <Kbd variant="muted">{modKey}F</Kbd>
+                    </label>
+                    <SlackFeedbackComposer
+                      value={feedback}
+                      onChange={setFeedback}
+                      textareaRef={feedbackRef}
+                      project={project}
+                      mentions={feedbackMentions}
+                      onMentionsChange={setFeedbackMentions}
+                      reviewerSlack={reviewer_slack}
+                      postToSlack={postToSlack}
+                      onPostToSlackChange={setPostToSlack}
+                      draftKey={`design_review-feedback-draft:${review.id}`}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground">
+                        Modify Hours <span className="text-muted-foreground/60">(not shown to user)</span>
+                      </label>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground font-mono whitespace-nowrap">
+                          {userFacingHours.toFixed(1)}h
+                        </span>
+                        <span className="text-muted-foreground">→</span>
+                        <Input
+                          type="number"
+                          step="0.5"
+                          value={hoursAdjInput}
+                          onChange={(e) => setHoursAdjInput(e.target.value)}
+                          placeholder="0"
+                          className="h-8 text-sm font-mono w-20 text-center"
+                        />
+                        .<span className="text-muted-foreground">→</span>
+                        <span
+                          className={`font-mono whitespace-nowrap ${hoursAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
+                        >
+                          {internalHours.toFixed(1)}h
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground">
+                        Modify Koi <span className="text-muted-foreground/60">(shown to user)</span>
+                      </label>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground font-mono whitespace-nowrap">
+                          {baseKoi}
+                          <span className="text-[10px] ml-0.5 opacity-60">{userFacingHours}h×7</span>
+                        </span>
+                        <span className="text-muted-foreground">→</span>
+                        <Input
+                          type="number"
+                          step="1"
+                          value={koiAdjInput}
+                          onChange={(e) => setKoiAdjInput(e.target.value)}
+                          placeholder="0"
+                          className="h-8 text-sm font-mono w-20 text-center"
+                        />
+                        <span className="text-muted-foreground">→</span>
+                        <span
+                          className={`font-mono whitespace-nowrap ${koiAdj !== 0 ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}
+                        >
+                          {finalKoi}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="raised-success"
+                        disabled={submitting}
+                        onClick={() => handleSubmit('approved')}
+                        className="disabled:opacity-50"
+                      >
+                        {submitting && pendingStatus === 'approved' ? (
+                          <LoaderIcon data-icon="inline-start" className="animate-spin" />
+                        ) : (
+                          <CheckIcon data-icon="inline-start" />
+                        )}
+                        Approve
+                        <Kbd className="ml-1 border-emerald-400 bg-emerald-600 text-emerald-50">{modKey}P</Kbd>
+                      </Button>
+
+                      <Button
+                        variant="raised-warning"
+                        disabled={submitting || !feedback.trim()}
+                        onClick={() => handleSubmit('returned')}
+                        title={!feedback.trim() ? 'Feedback is required when returning' : undefined}
+                        className="disabled:opacity-50"
+                      >
+                        {submitting && pendingStatus === 'returned' ? (
+                          <LoaderIcon data-icon="inline-start" className="animate-spin" />
+                        ) : (
+                          <CornerDownLeftIcon data-icon="inline-start" />
+                        )}
+                        Return
+                        <Kbd className="ml-1 border-amber-300 bg-amber-100 text-amber-600 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-400">
+                          {modKey}E
+                        </Kbd>
+                      </Button>
+                    </div>
+
+                    {can.swap_type && (
+                      <AlertDialog open={buildDialogOpen} onOpenChange={setBuildDialogOpen}>
+                        <AlertDialogTrigger asChild>
+                          <Button className="w-full justify-between" variant="ghost" size="sm" disabled={submitting}>
+                            Move to Build Review
+                            <Kbd variant="muted">{modKey}B</Kbd>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Move to Build Review?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This ship will be moved into the Build Review queue. Queued-at timestamp and current
+                              in-progress fields (feedback, internal reason, hours/currency adjustments) are preserved.
+                              This replaces the Design Review record.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => swap_type_path && router.post(swap_type_path)}>
+                              Move to Build Review
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </ReviewTabsRoot>
 
       {/* Checkpoint message dialog — shown when backend finds no #fallout-checkpoint message */}
       <AlertDialog open={!!errors?.checkpoint_message_url && !!pendingStatus}>

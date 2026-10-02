@@ -165,6 +165,10 @@ RC, DR, and BR show pages surface a `RepoDiffCard` (`repo_diff` jsonb column) su
 
 Admin-only swap (`Ship#swap_phase_two_type!`) moves a pending Phase 2 review between DR and BR. The swap maps DR's `koi_adjustment` ↔ BR's `gold_adjustment` (same semantic knob — a signed integer credit/debit on the hours-derived currency) and preserves the review's `created_at` so queue wait time stays intact.
 
+### DR/BR console views: Overview / Repo
+
+The DR and BR show pages wrap their body in `ReviewTabsRoot` with two views switched from the top bar's segmented pill (`ReviewTabBar`, see arch-frontend.md → `components/admin/review/`). **Overview** is the original left column (project card, previous reviews, preflight, repo diff, journal). **Repo** is `RepoWorkspace`: the RC's cached `repo_tree` rendered as a searchable file tree (with a **Pinned** toggle for hardware files only) and inline previews for everything HURT handled — markdown, code, images, CSV (Glide grid), PDF, STL/OBJ/GLB/3MF/PLY, STEP (OpenCascade wasm in a worker), KiCad (vendored KiCanvas), Gerber files and zips, EasyEDA — so reviewers never leave the platform; the old collapsible "Repository" tree card and every HURT link are gone. The decision rail on the right stays visible in both views. Shortcuts: `O` → Overview, `3` → Repo (it used to toggle the repo card); `1`/`2`/`4`/`5` still toggle their Overview cards and jump to Overview first. `U` and `C` keep working as hidden shortcuts even though their top-bar buttons were removed; `H` (open in HURT) still exists on the page as a hidden shortcut only.
+
 ### Checkpoint messages & posting feedback to Slack (DR/BR)
 
 DR and BR show pages use `SlackFeedbackComposer` for the Feedback field: highlighted `@` mentions with autocomplete (owner/collaborators locally, others via the mention search), `/proj/`, and a "Post to #fallout-checkpoint as you" toggle once the reviewer links the reviewer Slack app (see arch-services-infra.md → Reviewer Slack app). The draft is stashed in `sessionStorage` across the OAuth round-trip.

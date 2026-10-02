@@ -43,5 +43,7 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'app/frontend'),
     },
+    // Libraries whose peer range lags React 19 (glide-data-grid) must still share our single React copy.
+    dedupe: ['react', 'react-dom'],
   },
 })
