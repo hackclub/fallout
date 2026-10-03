@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import Markdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import hljs from 'highlight.js/lib/common'
 import 'highlight.js/styles/github.css'
 import { ArrowUpRightIcon, FileIcon } from 'lucide-react'
@@ -18,22 +19,17 @@ const GerberViewer = lazy(() => import('./viewers/GerberViewer'))
 const EasyEdaViewer = lazy(() => import('./viewers/EasyEdaViewer'))
 
 const MAX_TEXT_BYTES = 1_500_000
-// GitHub READMEs lean on raw HTML (<img width=…>), so rehype-raw is on; these tags never render.
-const MARKDOWN_BLOCKED_ELEMENTS = [
-  'script',
-  'style',
-  'iframe',
-  'object',
-  'embed',
-  'link',
-  'meta',
-  'base',
-  'form',
-  'input',
-  'button',
-  'textarea',
-  'select',
-]
+// READMEs are untrusted student HTML rendered inside the admin origin. rehype-raw is needed for
+// GitHub-style <img width>/<picture>, so it MUST be followed by this allowlist (GitHub's own schema):
+// a blocklist misses vectors like inline style overlays or <svg><animate attributeName=href>.
+const MARKDOWN_SANITIZE_SCHEMA = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    img: [...(defaultSchema.attributes?.img ?? []), 'height', 'align'],
+    source: [...(defaultSchema.attributes?.source ?? []), 'media'],
+  },
+}
 
 export interface RepoFileRef {
   path: string
@@ -159,10 +155,8 @@ function MarkdownView({ file }: { file: RepoFileRef }) {
     <div className="markdown-content max-w-3xl p-6 text-sm">
       <Markdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
         urlTransform={resolve}
-        disallowedElements={MARKDOWN_BLOCKED_ELEMENTS}
-        unwrapDisallowed
       >
         {text}
       </Markdown>
