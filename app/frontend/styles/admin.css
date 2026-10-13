@@ -167,6 +167,18 @@
   color: oklch(0.9 0 0);
 }
 
+.admin .markdown-content {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.admin .markdown-content pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .admin .t-admin-page {
   position: relative;
   /* Clip horizontal overflow so wide tables don't spill outside the scroll area */
