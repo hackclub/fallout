@@ -140,6 +140,10 @@ class LapseArchiveService
 
   def verify_video(lapse_timelapse, meta, problems, deep:)
     vid = meta.dig("assets", "video")
+    # Pruned: R2 video deliberately removed because identical footage is still live at source_url
+    # (tmp/r2_lapse_prune.rb); the manifest keeps sha256/byte_size. Re-archive with force: true to restore.
+    return if vid.is_a?(Hash) && vid["pruned_at"].present?
+
     archived = vid.is_a?(Hash) && vid["key"].present?
     # Metadata-only archive (footage-less): no checksum, no video — that's expected.
     if lapse_timelapse.archive_checksum.present? && !archived
