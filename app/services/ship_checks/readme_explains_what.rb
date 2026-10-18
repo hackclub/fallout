@@ -13,7 +13,7 @@ module ShipChecks
         )
       end
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         You are reviewing a hardware/electronics project README for a grant program.
         Does this README clearly explain WHAT the project is? It should include a short description and highlight what makes it unique.

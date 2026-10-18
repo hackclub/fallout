@@ -117,7 +117,7 @@ gem "flipper", "~> 1.4"
 gem "flipper-active_record", "~> 1.3"
 gem "flipper-ui", "~> 1.4"
 
-gem "ruby_llm", "~> 1.14"
+gem "ruby_llm", "~> 2.1"
 
 gem "scoped_search", "~> 4.3"
 

@@ -13,7 +13,7 @@ module ShipChecks
         )
       end
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         You are reviewing a hardware/electronics project README for a grant program.
         Does this README clearly explain HOW to use AND build the project? It should include detailed instructions so someone else could replicate it.

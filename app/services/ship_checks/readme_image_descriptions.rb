@@ -32,7 +32,7 @@ module ShipChecks
 
       project_desc = ctx.project.description.presence || "a hardware/electronics project"
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(
         <<~PROMPT,
           You are reviewing images for a hardware/electronics grant project: #{project_desc}
@@ -41,7 +41,8 @@ module ShipChecks
 
           Format your response as a numbered list, one line per image. No other text.
         PROMPT
-        with: tempfiles.map(&:path)
+        # Low-detail vision caps image token cost (~85 tokens per image regardless of resolution)
+        with: tempfiles.map { |f| { source: f.path, resolution: :low } }
       )
 
       response.content.strip.lines.filter_map do |line|

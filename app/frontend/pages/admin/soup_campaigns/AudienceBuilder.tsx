@@ -13,16 +13,7 @@ import { PlusIcon, XIcon, UsersIcon, PencilIcon } from 'lucide-react'
 
 type Op = '>=' | '>' | '=' | '<' | '<='
 type Kind =
-  | 'logged'
-  | 'submitted'
-  | 'approved'
-  | 'qualified'
-  | 'has_ticket'
-  | 'has_ships'
-  | 'ids'
-  | 'koi'
-  | 'gold'
-  | 'raw'
+  'logged' | 'submitted' | 'approved' | 'qualified' | 'has_ticket' | 'has_ships' | 'ids' | 'koi' | 'gold' | 'raw'
 type Mode = 'all' | 'any'
 
 interface Row {

@@ -25,9 +25,9 @@ export default function CertificateVerificationShow({ full_name, avatar, project
       <img src={avatar} alt="" className="w-20 h-20 rounded-full border-2 border-dark-brown mb-4" />
       <p className="text-lg font-bold mb-4">{full_name}</p>
       <p className="text-sm mb-4">
-        Fallout is a six month long program ran by Hack Club where teenagers spent 60 hours building hardware
-        projects. By earning this certification, students have proven themselves as technically adept and have shipped
-        open source hardware.
+        Fallout is a six month long program ran by Hack Club where teenagers spent 60 hours building hardware projects.
+        By earning this certification, students have proven themselves as technically adept and have shipped open source
+        hardware.
       </p>
       <p className="text-sm mb-6">All submitted projects were evaluated and approved by members of the Fallout team.</p>
 

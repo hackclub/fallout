@@ -20,7 +20,7 @@ export default function PdfViewer({ url }: { url: string }) {
     setShown(PAGE_BATCH)
     const task = pdfjs.getDocument({ url })
     task.promise.then(
-      (d) => (cancelled ? d.destroy() : setDoc(d)),
+      (d) => !cancelled && setDoc(d),
       (e: Error) => !cancelled && setError(e.message),
     )
     return () => {

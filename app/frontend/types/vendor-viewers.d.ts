@@ -34,6 +34,5 @@ interface StepWorkerMesh {
 }
 
 type StepWorkerRequest =
-  | { type: 'init'; scriptUrl: string; wasmUrl: string }
-  | { type: 'parse'; id: number; buffer: ArrayBuffer }
+  { type: 'init'; scriptUrl: string; wasmUrl: string } | { type: 'parse'; id: number; buffer: ArrayBuffer }
 type StepWorkerResponse = { id: number; ok: true; meshes: StepWorkerMesh[] } | { id: number; ok: false; error: string }

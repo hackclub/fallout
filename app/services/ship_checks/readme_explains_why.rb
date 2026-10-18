@@ -13,7 +13,7 @@ module ShipChecks
         )
       end
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         You are reviewing a hardware/electronics project README for a grant program.
         Does this README explain WHY the project was made? It should convey personal motivation — a problem being solved, curiosity, or a specific goal.

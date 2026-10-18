@@ -13,7 +13,7 @@ module ShipChecks
         )
       end
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         You are reviewing a hardware project submission. Based on these image descriptions from the project's README, does at least one image show a 3D model, render, or photo of the completed build in real life?
 

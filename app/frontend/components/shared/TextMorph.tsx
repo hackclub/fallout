@@ -1,9 +1,9 @@
-import { type CSSProperties, type ElementType, memo, useId, useMemo } from 'react'
+import { type CSSProperties, type ElementType, type ReactNode, memo, useId, useMemo } from 'react'
 import { AnimatePresence, motion, type Transition, type Variants, useReducedMotion } from 'motion/react'
 
 export type TextMorphProps = {
   children: string
-  as?: ElementType
+  as?: ElementType<{ className?: string; style?: CSSProperties; 'aria-label'?: string; children?: ReactNode }>
   className?: string
   style?: CSSProperties
   variants?: Variants

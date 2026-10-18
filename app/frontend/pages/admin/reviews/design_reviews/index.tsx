@@ -106,9 +106,7 @@ export default function DesignReviewsIndex({
             columns={pendingColumns}
             data={pending_reviews ?? []}
             noun="pending reviews"
-            rowClassName={(row) =>
-              row.previously_reviewed_by_me ? 'bg-blue-50 dark:bg-blue-950/20' : undefined
-            }
+            rowClassName={(row) => (row.previously_reviewed_by_me ? 'bg-blue-50 dark:bg-blue-950/20' : undefined)}
           />
         </Deferred>
       </div>

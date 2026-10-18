@@ -69,7 +69,7 @@ module ShipChecks
 
       project_desc = ctx.project.description.presence || "a hardware/electronics project"
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         A hackathon submission zine is a single-page promotional poster (PDF or image) summarizing a project — a poster-like document with the project name, description, photos, and creator info.
 
@@ -101,7 +101,7 @@ module ShipChecks
 
       project_desc = ctx.project.description.presence || "a hardware/electronics project"
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         You are reviewing #{descriptions.size} images from the README for project: #{project_desc}
 
@@ -132,7 +132,7 @@ module ShipChecks
       name = ctx.project.name.presence || "this project"
       description = ctx.project.description.presence || "a hardware/electronics project"
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         These images were extracted from the project's GitHub repository's README. This project is called #{name} with the description #{description}.
 

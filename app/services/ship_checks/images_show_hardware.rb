@@ -37,7 +37,7 @@ module ShipChecks
 
       numbered = descriptions.map.with_index(1) { |d, i| "#{i}. #{d}" }.join("\n")
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         You are reviewing a hardware project submission. Based on these image descriptions from the project's README, evaluate two criteria:
 

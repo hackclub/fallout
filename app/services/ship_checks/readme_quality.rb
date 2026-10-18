@@ -33,7 +33,7 @@ module ShipChecks
         end
       end
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         You are reviewing a hardware/electronics project README for a grant program.
         Evaluate the README on three criteria:

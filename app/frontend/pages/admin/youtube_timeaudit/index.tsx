@@ -142,7 +142,9 @@ export default function YouTubeTimeauditIndex({ videos: initialVideos }: { video
   )
 
   const processAll = useCallback(async () => {
-    const ids = videosRef.current.filter((v) => v.processing_status === 'unqueued' || v.processing_status === 'failed').map((v) => v.id)
+    const ids = videosRef.current
+      .filter((v) => v.processing_status === 'unqueued' || v.processing_status === 'failed')
+      .map((v) => v.id)
     if (ids.length === 0) return
     markQueued(ids)
     startPolling()

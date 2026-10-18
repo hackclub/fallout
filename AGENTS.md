@@ -16,7 +16,7 @@ Detailed architecture docs live in [agents-docs/](agents-docs/INDEX.md). Before 
 
 # Stack
 
-Ruby 3.4.4, Rails 8.1.3, React 19, Tailwind 4.1.18 via inertia-rails. Only suggest changes applicable to these versions. Prefer CLI-generated boilerplate over manual file creation — you can always modify generated output.
+Ruby 3.4.11, Rails 8.1.4, React 19, Tailwind 4.1.18 via inertia-rails. Only suggest changes applicable to these versions. Prefer CLI-generated boilerplate over manual file creation — you can always modify generated output.
 
 In-house services: HCA is our unified authentication system. Hackatime is the time tracking system, where Lapse is the timelapse tool for Hackatime. HCB is our "bank" (real US dollars).
 

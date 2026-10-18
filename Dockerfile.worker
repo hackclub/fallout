@@ -4,7 +4,7 @@
 # Worker image for Solid Queue job processing. Processes all queues including
 # `heavy` (image/video reprocessing), so it needs ffmpeg, imagemagick, and libvips.
 
-ARG RUBY_VERSION=3.4.4
+ARG RUBY_VERSION=3.4.11
 FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 
 WORKDIR /rails

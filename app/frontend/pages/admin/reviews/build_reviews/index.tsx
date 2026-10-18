@@ -62,11 +62,7 @@ export default function BuildReviewsIndex({
           </div>
         </div>
         <Deferred data="pending_reviews" fallback={<DataTableSkeleton columns={pendingColumns.length} />}>
-          <DataTable
-            columns={pendingColumns}
-            data={pending_reviews ?? []}
-            noun="pending reviews"
-          />
+          <DataTable columns={pendingColumns} data={pending_reviews ?? []} noun="pending reviews" />
         </Deferred>
       </div>
 

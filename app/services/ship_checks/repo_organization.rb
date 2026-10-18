@@ -14,7 +14,7 @@ module ShipChecks
         )
       end
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         You are reviewing a hardware/electronics project repository for a grant program.
         The repository should make sense to a reasonable person. Don't be too strict about following conventions, but folders should be named and grouped logically - not dumped in the root directory or one folder.

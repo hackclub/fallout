@@ -50,7 +50,7 @@ module ShipChecks
       descriptions = ctx.image_descriptions
       return false if descriptions.nil? || descriptions.empty?
 
-      chat = RubyLLM.chat
+      chat = RubyLLM.chat(provider: :openrouter)
       response = chat.ask(<<~PROMPT)
         Based on these image descriptions from a hardware project README, does any image appear to be a zine page, poster, or flyer? A zine page is a single-page promotional poster that showcases the project with a central graphic, project description, and personal info.
 
