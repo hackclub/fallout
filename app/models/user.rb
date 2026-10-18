@@ -696,7 +696,12 @@ class User < ApplicationRecord
       "Email Verified" => ->(u) { !u.trial? },
       "Is Active" => ->(u, pre) { pre[:last_journal_at][u.id].present? && pre[:last_journal_at][u.id] >= 8.days.ago },
       "DB Hours Logged" => ->(u, pre) { pre[:db_hours][u.id] || 0 },
-      "Ontrack" => ->(u, pre) { pre[:on_track][u.id] || false }
+      "Ontrack" => ->(u, pre) { pre[:on_track][u.id] || false },
+      # "UTC" is the placeholder until the browser reports a zone, so leave it blank rather than claim +0
+      "UTC Offset" => ->(u) {
+        tz = ActiveSupport::TimeZone[u.timezone] unless u.timezone == "UTC"
+        tz && (tz.now.utc_offset / 3600.0)
+      }
     }
   end
 
