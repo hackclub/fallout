@@ -40,7 +40,7 @@ class SoupCampaign < ApplicationRecord
     U05EZRFKRV4 U07BN55GN3D U078J6H1XL3 U093FC28A82 U06U80G86H1
     U07ACECRYM6 U080A3QP42C U03UBRVG2MS U07DJMFAQQP U09UE480JHH
   ].freeze
-  # "HQ" for the `hq:` audience filter: members of these Slack channels or anyone with this email domain.
+  # "HQ" — always excluded from campaigns: members of these Slack channels or anyone with this email domain.
   HQ_CHANNEL_IDS = %w[G01QNNEUA10 C07K5TA9P9S].freeze
   HQ_EMAIL_DOMAIN = "hackclub.com"
   MAX_BUTTONS = 5
@@ -217,25 +217,38 @@ class SoupCampaign < ApplicationRecord
     } ]
   end
 
+  # Slack IDs of HQ: members of HQ_CHANNEL_IDS plus users with an HQ_EMAIL_DOMAIN email. Raises
+  # ArgumentError when the channels can't be read so callers fail closed instead of messaging HQ.
+  def self.hq_slack_ids!
+    # The bot isn't in the private HQ channels, so read them with a staff member's user token (groups:read, channels:read).
+    token = ENV["SLACK_HQ_MEMBERS_TOKEN"].presence || ENV.fetch("SLACK_BOT_TOKEN", nil)
+    channel_ids = HQ_CHANNEL_IDS.flat_map { |channel_id| fetch_channel_member_ids!(channel_id, token:) }
+    email_ids = User.kept.where("LOWER(users.email) LIKE ?", "%@#{HQ_EMAIL_DOMAIN}").where.not(slack_id: nil).pluck(:slack_id)
+    (channel_ids + email_ids).to_set
+  rescue Slack::Web::Api::Errors::SlackError => e
+    raise ArgumentError, "couldn't read HQ Slack channels (#{e.message}) — is SLACK_HQ_MEMBERS_TOKEN set and its owner in them?"
+  end
+
+  # Raises ArgumentError when the audience can't be resolved safely (HQ or Fallen lookups failing).
   def projected_recipients
     recipients = {}
 
-    if targeted?
-      target_users.find_each do |user|
-        recipients[user.slack_id] ||= { user_id: user.id, slack_id: user.slack_id, display_name: user.display_name }
-      end
-    else
-      User.verified.kept.where.not(slack_id: nil).find_each do |user|
-        recipients[user.slack_id] ||= { user_id: user.id, slack_id: user.slack_id, display_name: user.display_name }
-      end
-
-      self.class.fetch_fallout_channel_member_ids.each do |slack_id|
-        recipients[slack_id] ||= { user_id: nil, slack_id: slack_id, display_name: nil }
-      end
+    (targeted? ? target_users : User.verified.kept.where.not(slack_id: nil)).find_each do |user|
+      recipients[user.slack_id] ||= { user_id: user.id, slack_id: user.slack_id, display_name: user.display_name }
     end
 
+    # #fallout members without a verified Fallout account. Targeted campaigns keep only those the
+    # query can judge from a Slack ID alone (see channel_member_passes).
+    known_slack_ids = User.verified.kept.where.not(slack_id: nil).pluck(:slack_id).to_set
+    channel_only = self.class.fetch_fallout_channel_member_ids.reject { |slack_id| known_slack_ids.include?(slack_id) }
+    channel_only = filter_channel_members(channel_only) if targeted?
+    channel_only.each do |slack_id|
+      recipients[slack_id] ||= { user_id: nil, slack_id: slack_id, display_name: nil }
+    end
+
+    excluded = self.class.hq_slack_ids! | BLOCKLIST
     recipients
-      .reject { |slack_id, _| BLOCKLIST.include?(slack_id) }
+      .reject { |slack_id, _| excluded.include?(slack_id) }
       .values
       .sort_by { |recipient| [ recipient[:display_name].presence&.downcase || "zzzzzz", recipient[:slack_id] ] }
   end
@@ -256,6 +269,32 @@ class SoupCampaign < ApplicationRecord
     return unless targeting_supported?
 
     self.target_user_ids = Array(target_user_ids).filter_map { |id| Integer(id, exception: false) }.select(&:positive?).uniq
+  end
+
+  def filter_channel_members(slack_ids)
+    mode, filters = extract_match_mode(self[:target_query].to_s.lines.map(&:strip).reject(&:blank?))
+    sets = filters.map { |filter| channel_member_passes(filter, slack_ids) }
+    (mode == :any ? sets.reduce(:|) : sets.reduce(:&)).to_a
+  end
+
+  # Filters on a channel member with no Fallout account: age always passes (no birthday, so we
+  # over-send), Fallen and HQ are checked by Slack ID, and anything needing account data fails.
+  def channel_member_passes(filter, slack_ids)
+    all = slack_ids.to_set
+    case filter
+    when /\Aage_on\s/i
+      all
+    when /\Afallen_signed_up:\s*(true|false)\z/i
+      fallen = FallenSignups.identifiers[:slack_ids]
+      Regexp.last_match(1).downcase == "true" ? all & fallen : all - fallen
+    when /\Ahq:\s*(true|false)\z/i
+      hq = self.class.hq_slack_ids!
+      Regexp.last_match(1).downcase == "true" ? all & hq : all - hq
+    else
+      Set.new
+    end
+  rescue FallenSignups::Error => e
+    raise ArgumentError, "fallen_signed_up: #{e.message}"
   end
 
   def resolve_target_user_ids(query)
@@ -548,14 +587,8 @@ class SoupCampaign < ApplicationRecord
   end
 
   def filter_by_hq(scope, hq)
-    # The bot isn't in the private HQ channels, so read them with a staff member's user token (groups:read, channels:read).
-    token = ENV["SLACK_HQ_MEMBERS_TOKEN"].presence || ENV.fetch("SLACK_BOT_TOKEN", nil)
-    hq_slack_ids = HQ_CHANNEL_IDS.flat_map { |channel_id| self.class.fetch_channel_member_ids!(channel_id, token:) }.uniq
-    matching = scope.where(slack_id: hq_slack_ids).or(scope.where("LOWER(users.email) LIKE ?", "%@#{HQ_EMAIL_DOMAIN}"))
+    matching = scope.where(slack_id: self.class.hq_slack_ids!.to_a).or(scope.where("LOWER(users.email) LIKE ?", "%@#{HQ_EMAIL_DOMAIN}"))
     hq ? matching : scope.where.not(id: matching.select(:id))
-  rescue Slack::Web::Api::Errors::SlackError => e
-    # Fail closed: an unreadable HQ channel must not silently let HQ through a `hq: false` filter.
-    raise ArgumentError, "hq: couldn't read HQ Slack channels (#{e.message}) — is SLACK_HQ_MEMBERS_TOKEN set and its owner in them?"
   end
 
   def filter_by_ticket_qualification(scope, qualified)

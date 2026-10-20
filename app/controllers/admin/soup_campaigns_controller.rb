@@ -22,8 +22,14 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     campaign = SoupCampaign.find(params[:id])
     authorize campaign
 
+    audience_error = nil
     if campaign.draft?
-      recipients, recipients_pagy = paginate_projected_recipients(campaign.projected_recipients)
+      begin
+        recipients, recipients_pagy = paginate_projected_recipients(campaign.projected_recipients)
+      rescue ArgumentError => e
+        audience_error = e.message
+        recipients, recipients_pagy = paginate_projected_recipients([])
+      end
     else
       pagy, recipient_records = pagy(
         campaign.soup_campaign_recipients.order(created_at: :asc),
@@ -43,7 +49,8 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       recipients_pagy:,
       stats: campaign.recipient_stats(status_counts),
       progress: campaign.progress_percent(status_counts),
-      audience_query_help: audience_query_help
+      audience_query_help: audience_query_help,
+      audience_error:
     }
   end
 
@@ -130,6 +137,14 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       return
     end
 
+    # Resolve the audience now (HQ/Fallen lookups are cached) so an unreadable HQ list blocks the send here.
+    begin
+      preview_campaign.projected_recipients
+    rescue ArgumentError => e
+      redirect_to admin_soup_campaign_path(campaign), alert: e.message
+      return
+    end
+
     SendSoupCampaignJob.perform_later(campaign.id)
     redirect_to admin_soup_campaign_path(campaign), notice: "Campaign is now sending!"
   end
@@ -152,6 +167,8 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       recipients_pagy: recipients_pagy,
       targeted: preview_campaign.targeted?
     }
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   def test_send
@@ -296,8 +313,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       "total_time_submitted_seconds < 216000",
       "total_time_approved_seconds >= 216000",
       "age_on 2027-12-16 < 19",
-      "fallen_signed_up: false",
-      "hq: false"
+      "fallen_signed_up: false"
     ]
   end
 

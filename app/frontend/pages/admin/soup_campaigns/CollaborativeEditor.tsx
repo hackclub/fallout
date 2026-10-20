@@ -993,7 +993,8 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
                 <p className="mt-1 text-xs text-destructive">{audiencePreviewError}</p>
               ) : audiencePreview ? (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {audiencePreview.count} {audiencePreview.targeted ? 'targeted users' : 'full-audience recipients'}
+                  {audiencePreview.count}{' '}
+                  {audiencePreview.targeted ? 'targeted recipients' : 'full-audience recipients'}
                 </p>
               ) : (
                 <p className="mt-1 text-xs text-muted-foreground">Loading audience preview…</p>

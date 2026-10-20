@@ -24,7 +24,6 @@ type Kind =
   | 'gold'
   | 'age'
   | 'fallen'
-  | 'hq'
   | 'raw'
 type Mode = 'all' | 'any'
 
@@ -83,7 +82,6 @@ const FIELD_META: Record<
   gold: { label: 'Gold balance', type: 'numeric', unit: 'gold' },
   age: { label: 'Age on date', type: 'age', title: 'Users without a birthday from HCA always match' },
   fallen: { label: 'Signed up for Fallen', type: 'bool', title: "Any account in Fallen's Airtable, trials included" },
-  hq: { label: 'Is HQ', type: 'bool', title: 'In the HQ Slack channels or has a @hackclub.com email' },
 }
 
 let _uid = 0
@@ -129,8 +127,6 @@ function parseQuery(text: string): Query {
         rows.push({ id: `p${i}`, kind: 'age', date: m[1], op: m[2] as Op, amount: m[3] })
       else if ((m = line.match(/^fallen_signed_up:\s*(true|false)$/i)))
         rows.push({ id: `p${i}`, kind: 'fallen', bool: m[1].toLowerCase() === 'true' })
-      else if ((m = line.match(/^hq:\s*(true|false)$/i)))
-        rows.push({ id: `p${i}`, kind: 'hq', bool: m[1].toLowerCase() === 'true' })
       else rows.push({ id: `p${i}`, kind: 'raw', raw: line })
     })
   return { mode, rows }
@@ -168,8 +164,6 @@ function serializeRow(r: Row): string {
     }
     case 'fallen':
       return `fallen_signed_up: ${r.bool ? 'true' : 'false'}`
-    case 'hq':
-      return `hq: ${r.bool ? 'true' : 'false'}`
     case 'raw':
       return r.raw ?? ''
   }
@@ -194,7 +188,6 @@ function defaultRow(kind: Kind, id: string): Row {
     case 'has_ships':
       return { id, kind, bool: true }
     case 'fallen':
-    case 'hq':
       return { id, kind, bool: false }
     case 'age':
       return { id, kind, op: '<', amount: '19', date: '' }
@@ -277,7 +270,7 @@ export default function AudienceBuilder({
         </Button>
       </div>
       <p className="text-xs text-muted-foreground mb-3">
-        Leave empty to send to everyone in Soup. Add filters to narrow the audience.
+        Leave empty to send to everyone in Soup. Add filters to narrow the audience. HQ is always excluded.
       </p>
 
       {advanced ? (

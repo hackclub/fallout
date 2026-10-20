@@ -9,10 +9,20 @@ class SendSoupCampaignJob < ApplicationJob
     return unless campaign
     return if campaign.sent? || campaign.cancelled?
 
+    begin
+      recipients = campaign.projected_recipients
+    rescue ArgumentError => e
+      # Audience couldn't be resolved safely (e.g. HQ list unreadable) — leave the campaign as is rather than send to the wrong people.
+      Rails.logger.tagged("SendSoupCampaignJob") do
+        Rails.logger.error({ event: "audience_unresolved", campaign_id: campaign_id, error: e.message }.to_json)
+      end
+      return
+    end
+
     campaign.update!(status: :sending) if campaign.draft?
 
     # Build recipient list if not already built
-    populate_recipients(campaign)
+    populate_recipients(campaign, recipients)
 
     # Enqueue a job for each pending recipient
     campaign.soup_campaign_recipients.unsent.find_each do |recipient|
@@ -25,8 +35,8 @@ class SendSoupCampaignJob < ApplicationJob
 
   private
 
-  def populate_recipients(campaign)
-    campaign.projected_recipients.each do |recipient|
+  def populate_recipients(campaign, recipients)
+    recipients.each do |recipient|
       campaign.soup_campaign_recipients.find_or_create_by!(slack_id: recipient[:slack_id]) do |r|
         r.display_name = recipient[:display_name]
         r.status = :pending

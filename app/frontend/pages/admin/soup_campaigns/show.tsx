@@ -65,6 +65,7 @@ interface Props {
   stats: Campaign['stats']
   progress: number
   audience_query_help?: string[]
+  audience_error?: string | null
 }
 
 const STATUS_BADGE: Record<
@@ -268,6 +269,7 @@ export default function SoupCampaignsShow({
   recipients_pagy,
   stats,
   progress,
+  audience_error,
 }: Props) {
   const [testSlackId, setTestSlackId] = useState('')
   const [testState, setTestState] = useState<'idle' | 'sending' | 'ok' | 'error'>('idle')
@@ -435,8 +437,8 @@ export default function SoupCampaignsShow({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Send campaign?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will DM {recipients_pagy.count} {isTargeted ? 'targeted Fallout users' : 'recipients'} as
-                      Soup. This cannot be undone.
+                      This will DM {recipients_pagy.count} {isTargeted ? 'targeted recipients' : 'recipients'} as Soup.
+                      This cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -540,6 +542,9 @@ export default function SoupCampaignsShow({
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {audience_error && (
+                <p className="mb-3 text-sm text-destructive">Couldn't build the audience: {audience_error}</p>
+              )}
               <DataTable
                 columns={recipientColumns(isDraft, togglingId, handleToggleUnsubscribe)}
                 data={recipients}
