@@ -7,6 +7,7 @@
 #  ban_reason                         :text
 #  ban_type                           :string
 #  bio                                :text
+#  birthday                           :date
 #  certificate_token                  :string
 #  country                            :string
 #  debt_hidden_at                     :datetime
@@ -307,12 +308,14 @@ class User < ApplicationRecord
     new_last = identity["last_name"].presence
     primary_country = identity["addresses"].is_a?(Array) ? identity["addresses"].find { |a| a["primary"] }&.dig("country") : nil
     new_country = User.normalize_country_code(primary_country)
+    new_birthday = User.parse_hca_birthday(identity["birthday"])
 
     unchanged = new_status == verification_status.to_s &&
                 new_has_addr == has_hca_address? &&
                 new_first == first_name &&
                 new_last == last_name &&
-                new_country == country
+                new_country == country &&
+                new_birthday == birthday
     return false if unchanged
 
     was_gated = fully_identity_gated?
@@ -321,7 +324,8 @@ class User < ApplicationRecord
       has_hca_address: new_has_addr,
       first_name: new_first,
       last_name: new_last,
-      country: new_country
+      country: new_country,
+      birthday: new_birthday
     )
     Ship.promote_awaiting_identity_for(self) if !was_gated && fully_identity_gated?
     true
@@ -806,16 +810,17 @@ class User < ApplicationRecord
   end
 
   def self.determine_is_adult(identity)
-    birthday_str = identity["birthday"]
-    return false if birthday_str.blank?
+    birthday = parse_hca_birthday(identity["birthday"])
+    return false if birthday.nil?
 
-    begin
-      birthday = Date.parse(birthday_str)
-      age_today = (Date.today - birthday.to_date) / 365.25
-      age_today >= 19
-    rescue ArgumentError
-      false
-    end
+    age_today = (Date.today - birthday) / 365.25
+    age_today >= 19
+  end
+
+  def self.parse_hca_birthday(value)
+    value.present? ? Date.parse(value.to_s) : nil
+  rescue ArgumentError
+    nil
   end
 
   def self.fetch_slack_user_info(slack_id)

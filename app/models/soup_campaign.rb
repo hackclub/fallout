@@ -4,6 +4,8 @@
 #
 #  id                             :bigint           not null, primary key
 #  body                           :text             not null
+#  buttons                        :jsonb            not null
+#  buttons_text                   :text
 #  footer                         :text
 #  image_url                      :string
 #  name                           :string           not null
@@ -38,6 +40,11 @@ class SoupCampaign < ApplicationRecord
     U05EZRFKRV4 U07BN55GN3D U078J6H1XL3 U093FC28A82 U06U80G86H1
     U07ACECRYM6 U080A3QP42C U03UBRVG2MS U07DJMFAQQP U09UE480JHH
   ].freeze
+  # "HQ" for the `hq:` audience filter: members of these Slack channels or anyone with this email domain.
+  HQ_CHANNEL_IDS = %w[G01QNNEUA10 C07K5TA9P9S].freeze
+  HQ_EMAIL_DOMAIN = "hackclub.com"
+  MAX_BUTTONS = 5
+  BUTTON_STYLES = %w[primary danger].freeze
 
   # Skip yjs_state — large binary collab-editing blob with no audit value.
   has_paper_trail skip: %i[yjs_state]
@@ -52,6 +59,7 @@ class SoupCampaign < ApplicationRecord
   # Rendered into <img src>; restrict to https:// so javascript:/data: URLs can't reach the DOM.
   # Anchored at both ends (\A and \z) and no newlines — required to pass brakeman's ValidationRegex.
   validates :image_url, format: { with: /\Ahttps:\/\/[^\s]*\z/, message: "must start with https://" }, allow_blank: true
+  validate :buttons_text_must_parse
 
   before_validation :generate_unsubscribe_token, on: :create
   before_validation :normalize_target_user_ids
@@ -63,13 +71,23 @@ class SoupCampaign < ApplicationRecord
   end
 
   def self.fetch_fallout_channel_member_ids
-    Rails.cache.fetch("soup_campaigns/fallout_channel_members", expires_in: 5.minutes) do
-      client = Slack::Web::Client.new(token: ENV.fetch("SLACK_BOT_TOKEN", nil))
+    fetch_channel_member_ids!(FALLOUT_CHANNEL_ID)
+  rescue Slack::Web::Api::Errors::SlackError => e
+    Rails.logger.tagged("SoupCampaign") do
+      Rails.logger.error({ event: "channel_members_fetch_failed", error: e.message }.to_json)
+    end
+    []
+  end
+
+  # Raises on Slack errors. Private channels require the token's owner (bot or user) to be a member.
+  def self.fetch_channel_member_ids!(channel_id, token: ENV.fetch("SLACK_BOT_TOKEN", nil))
+    Rails.cache.fetch("soup_campaigns/channel_members/#{channel_id}", expires_in: 5.minutes) do
+      client = Slack::Web::Client.new(token:)
       members = []
       cursor = nil
 
       loop do
-        response = client.conversations_members(channel: FALLOUT_CHANNEL_ID, limit: 200, cursor: cursor)
+        response = client.conversations_members(channel: channel_id, limit: 200, cursor: cursor)
         members.concat(response.members)
         cursor = response.response_metadata&.next_cursor
         break if cursor.blank?
@@ -77,11 +95,42 @@ class SoupCampaign < ApplicationRecord
 
       members
     end
-  rescue Slack::Web::Api::Errors::SlackError => e
-    Rails.logger.tagged("SoupCampaign") do
-      Rails.logger.error({ event: "channel_members_fetch_failed", error: e.message }.to_json)
+  end
+
+  # One button per line: `Label | url=https://… | webhook=https://… | value=… | style=primary`.
+  # A webhook button POSTs the clicker's Slack ID to the webhook URL (SoupCampaignButtonWebhook).
+  def self.parse_buttons(text)
+    lines = text.to_s.lines.map(&:strip).reject(&:blank?)
+    raise ArgumentError, "at most #{MAX_BUTTONS} buttons" if lines.size > MAX_BUTTONS
+
+    lines.each_with_index.map do |line, i|
+      label, *parts = line.split("|").map(&:strip)
+      button = { "label" => label.to_s }
+      parts.each do |part|
+        key, value = part.split("=", 2).map(&:strip)
+        raise ArgumentError, "button #{i + 1}: expected key=value, got #{part.inspect}" if value.nil?
+
+        case key.downcase
+        when "url" then button["url"] = value
+        when "webhook" then button["webhook_url"] = value
+        when "value" then button["value"] = value
+        when "style" then button["style"] = value.downcase
+        else raise ArgumentError, "button #{i + 1}: unknown option #{key.inspect}"
+        end
+      end
+      validate_button!(button, i + 1)
+      button
     end
-    []
+  end
+
+  def self.validate_button!(button, number)
+    raise ArgumentError, "button #{number}: label is required" if button["label"].blank?
+    raise ArgumentError, "button #{number}: label must be at most 75 characters" if button["label"].length > 75
+    raise ArgumentError, "button #{number}: needs a url= or webhook=" if button["url"].blank? && button["webhook_url"].blank?
+    raise ArgumentError, "button #{number}: url must start with http:// or https://" if button["url"].present? && !button["url"].match?(/\Ahttps?:\/\/\S+\z/)
+    raise ArgumentError, "button #{number}: webhook must start with https://" if button["webhook_url"].present? && !button["webhook_url"].match?(/\Ahttps:\/\/\S+\z/)
+    raise ArgumentError, "button #{number}: value must be at most 500 characters" if button["value"].to_s.length > 500
+    raise ArgumentError, "button #{number}: style must be #{BUTTON_STYLES.join(' or ')}" if button["style"].present? && !BUTTON_STYLES.include?(button["style"])
   end
 
   # status_counts: optional precomputed `group(:status).count` hash (integer-keyed) so callers
@@ -129,6 +178,43 @@ class SoupCampaign < ApplicationRecord
 
     self.target_query = self.class.parse_target_query(value)
     self.target_user_ids = resolve_target_user_ids(target_query)
+  end
+
+  def buttons_text=(value)
+    self[:buttons_text] = value.to_s.strip
+    self.buttons = self.class.parse_buttons(buttons_text)
+  rescue ArgumentError => e
+    errors.add(:buttons_text, e.message)
+    self.buttons = []
+  end
+
+  # Signs [campaign_id, button_index, slack_id] into button click URLs so a click identifies the
+  # recipient without Slack interactivity. Only Fallout can mint these, so a click can't be forged
+  # for someone else's Slack ID.
+  def self.button_click_verifier
+    @button_click_verifier ||= ActiveSupport::MessageVerifier.new(
+      Rails.application.key_generator.generate_key("soup_campaign_button_click", 32), url_safe: true
+    )
+  end
+
+  # Slack actions block for one recipient. Every button links to SoupCampaignButtonClicksController,
+  # which fires the webhook (if any) and redirects to the button's URL (if any).
+  def button_blocks(slack_id)
+    return [] if buttons.blank?
+
+    [ {
+      type: "actions",
+      elements: buttons.each_with_index.map do |button, i|
+        token = self.class.button_click_verifier.generate([ id, i, slack_id ], purpose: :soup_button_click)
+        {
+          type: "button",
+          action_id: "soup_button_#{i}",
+          text: { type: "plain_text", text: button["label"], emoji: true },
+          url: Rails.application.routes.url_helpers.soup_campaign_button_click_url(token:, host: ENV.fetch("APP_HOST", "fallout.hackclub.com"), protocol: "https"),
+          style: button["style"].presence
+        }.compact
+      end
+    } ]
   end
 
   def projected_recipients
@@ -228,6 +314,14 @@ class SoupCampaign < ApplicationRecord
       filter_by_currency(scope, :koi, Regexp.last_match(1), Regexp.last_match(2).to_i)
     when /\Agold\s*(>=|<=|=|>|<)\s*(\d+)\z/i
       filter_by_currency(scope, :gold, Regexp.last_match(1), Regexp.last_match(2).to_i)
+    when /\Aage_on\s+(\d{4}-\d{2}-\d{2})\s*(>=|<=|=|>|<)\s*(\d+)\z/i
+      raw_date, operator, years = Regexp.last_match.captures
+      date = Date.iso8601(raw_date) rescue raise(ArgumentError, "age_on: invalid date #{raw_date}")
+      filter_by_age_on(scope, date, operator, years.to_i)
+    when /\Afallen_signed_up:\s*(true|false)\z/i
+      filter_by_fallen_signup(scope, Regexp.last_match(1).downcase == "true")
+    when /\Ahq:\s*(true|false)\z/i
+      filter_by_hq(scope, Regexp.last_match(1).downcase == "true")
     else
       raise ArgumentError, "unsupported audience filter: #{filter}"
     end
@@ -431,6 +525,39 @@ class SoupCampaign < ApplicationRecord
     totals
   end
 
+  # Age on `date` compared to `years`, via birthday cutoffs. Users without a cached birthday always
+  # match — better to over-send than to miss someone we just don't have a birthday for.
+  def filter_by_age_on(scope, date, operator, years)
+    born_by = ->(n) { date - n.years } # turns n on or before `date` iff birthday <= born_by(n)
+    range = case operator
+    when ">=" then ..born_by.(years)
+    when ">"  then ..born_by.(years + 1)
+    when "<"  then (born_by.(years) + 1.day)..
+    when "<=" then (born_by.(years + 1) + 1.day)..
+    when "="  then (born_by.(years + 1) + 1.day)..born_by.(years)
+    end
+    scope.where(birthday: range).or(scope.where(birthday: nil))
+  end
+
+  def filter_by_fallen_signup(scope, signed_up)
+    fallen = FallenSignups.identifiers
+    matching = scope.where(slack_id: fallen[:slack_ids].to_a).or(scope.where("LOWER(users.email) IN (?)", fallen[:emails].to_a.presence || [ "" ]))
+    signed_up ? matching : scope.where.not(id: matching.select(:id))
+  rescue FallenSignups::Error => e
+    raise ArgumentError, "fallen_signed_up: #{e.message}"
+  end
+
+  def filter_by_hq(scope, hq)
+    # The bot isn't in the private HQ channels, so read them with a staff member's user token (groups:read, channels:read).
+    token = ENV["SLACK_HQ_MEMBERS_TOKEN"].presence || ENV.fetch("SLACK_BOT_TOKEN", nil)
+    hq_slack_ids = HQ_CHANNEL_IDS.flat_map { |channel_id| self.class.fetch_channel_member_ids!(channel_id, token:) }.uniq
+    matching = scope.where(slack_id: hq_slack_ids).or(scope.where("LOWER(users.email) LIKE ?", "%@#{HQ_EMAIL_DOMAIN}"))
+    hq ? matching : scope.where.not(id: matching.select(:id))
+  rescue Slack::Web::Api::Errors::SlackError => e
+    # Fail closed: an unreadable HQ channel must not silently let HQ through a `hq: false` filter.
+    raise ArgumentError, "hq: couldn't read HQ Slack channels (#{e.message}) — is SLACK_HQ_MEMBERS_TOKEN set and its owner in them?"
+  end
+
   def filter_by_ticket_qualification(scope, qualified)
     approved_claims = User.joins(:ticket_claim).merge(TicketClaim.approved).select(:id)
 
@@ -441,6 +568,12 @@ class SoupCampaign < ApplicationRecord
     with_claims = User.joins(:ticket_claim).select(:id)
 
     has_ticket ? scope.where(id: with_claims) : scope.where.not(id: with_claims)
+  end
+
+  def buttons_text_must_parse
+    self.class.parse_buttons(buttons_text)
+  rescue ArgumentError => e
+    errors.add(:buttons_text, e.message)
   end
 
   def generate_unsubscribe_token

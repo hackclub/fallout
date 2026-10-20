@@ -79,6 +79,12 @@ class SoupCampaignChannel < ApplicationCable::Channel
       updates["target_query"] = preview_campaign.target_query
       updates["target_user_ids"] = preview_campaign.target_user_ids
     end
+    if fields.key?("buttons_text")
+      preview_campaign = @campaign.dup
+      preview_campaign.buttons_text = fields["buttons_text"]
+      updates["buttons_text"] = preview_campaign.buttons_text
+      updates["buttons"] = preview_campaign.buttons
+    end
     @campaign.update_columns(updates) if updates.any?
   end
 

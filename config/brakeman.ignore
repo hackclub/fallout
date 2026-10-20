@@ -1,0 +1,12 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Redirect",
+      "fingerprint": "8f9ffe7ec67694886fb8521fc866064b535f5aa249dc35da586f40b8f5c7f49a",
+      "file": "app/controllers/soup_campaign_button_clicks_controller.rb",
+      "line": 17,
+      "note": "Intentional: redirects to an admin-set soup campaign button URL (validated http(s) in SoupCampaign.validate_button!), reachable only via a token signed by SoupCampaign.button_click_verifier."
+    }
+  ],
+  "brakeman_version": "8.0"
+}

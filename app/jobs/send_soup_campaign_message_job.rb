@@ -30,7 +30,7 @@ class SendSoupCampaignMessageJob < ApplicationJob
     client.chat_postMessage(
       channel: recipient.slack_id,
       text: interpolate(campaign.notification_preview.presence || campaign.body, personalization), # Fallback text for notifications/push previews
-      blocks: build_blocks(campaign, unsubscribe_url, personalization).to_json
+      blocks: build_blocks(campaign, recipient.slack_id, unsubscribe_url, personalization).to_json
     )
 
     recipient.update!(status: :sent, sent_at: Time.current)
@@ -47,7 +47,7 @@ class SendSoupCampaignMessageJob < ApplicationJob
 
   private
 
-  def build_blocks(campaign, unsubscribe_url, personalization)
+  def build_blocks(campaign, slack_id, unsubscribe_url, personalization)
     blocks = []
 
     blocks << { type: "section", text: { type: "mrkdwn", text: interpolate(campaign.body, personalization) } }
@@ -60,6 +60,8 @@ class SendSoupCampaignMessageJob < ApplicationJob
     if campaign.image_url.present?
       blocks << { type: "image", image_url: campaign.image_url, alt_text: campaign.name }
     end
+
+    blocks.concat(campaign.button_blocks(slack_id))
 
     # Divider before context footer
     blocks << { type: "divider" }

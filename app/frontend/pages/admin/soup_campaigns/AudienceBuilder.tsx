@@ -13,7 +13,19 @@ import { PlusIcon, XIcon, UsersIcon, PencilIcon } from 'lucide-react'
 
 type Op = '>=' | '>' | '=' | '<' | '<='
 type Kind =
-  'logged' | 'submitted' | 'approved' | 'qualified' | 'has_ticket' | 'has_ships' | 'ids' | 'koi' | 'gold' | 'raw'
+  | 'logged'
+  | 'submitted'
+  | 'approved'
+  | 'qualified'
+  | 'has_ticket'
+  | 'has_ships'
+  | 'ids'
+  | 'koi'
+  | 'gold'
+  | 'age'
+  | 'fallen'
+  | 'hq'
+  | 'raw'
 type Mode = 'all' | 'any'
 
 interface Row {
@@ -22,7 +34,8 @@ interface Row {
   op?: Op // logged / submitted / koi / gold
   hours?: string // logged / submitted fixed value (string so the field can be empty mid-edit)
   hoursVar?: string // logged / submitted variable name (e.g. 'ticket_hours') — mutually exclusive with hours
-  amount?: string // koi / gold numeric value
+  amount?: string // koi / gold numeric value, age in years
+  date?: string // age: YYYY-MM-DD the age is measured on
   bool?: boolean // qualified / has_ships
   ids?: string // ids (comma-separated)
   raw?: string // unrecognized line, preserved verbatim
@@ -57,7 +70,7 @@ const TIME_OPS: { value: Op; label: string }[] = [
 
 const FIELD_META: Record<
   Exclude<Kind, 'raw'>,
-  { label: string; type: 'time' | 'bool' | 'ids' | 'numeric'; unit?: string }
+  { label: string; type: 'time' | 'bool' | 'ids' | 'numeric' | 'age'; unit?: string; title?: string }
 > = {
   logged: { label: 'Logged hours', type: 'time' },
   submitted: { label: 'Submitted hours', type: 'time' },
@@ -68,6 +81,9 @@ const FIELD_META: Record<
   ids: { label: 'Specific user IDs', type: 'ids' },
   koi: { label: 'Koi balance', type: 'numeric', unit: 'koi' },
   gold: { label: 'Gold balance', type: 'numeric', unit: 'gold' },
+  age: { label: 'Age on date', type: 'age', title: 'Users without a birthday from HCA always match' },
+  fallen: { label: 'Signed up for Fallen', type: 'bool', title: "Any account in Fallen's Airtable, trials included" },
+  hq: { label: 'Is HQ', type: 'bool', title: 'In the HQ Slack channels or has a @hackclub.com email' },
 }
 
 let _uid = 0
@@ -109,6 +125,12 @@ function parseQuery(text: string): Query {
         })
       } else if ((m = line.match(/^(koi|gold)\s*(>=|<=|=|>|<)\s*(\d+)$/i)))
         rows.push({ id: `p${i}`, kind: m[1].toLowerCase() as Kind, op: m[2] as Op, amount: m[3] })
+      else if ((m = line.match(/^age_on\s+(\d{4}-\d{2}-\d{2})\s*(>=|<=|=|>|<)\s*(\d+)$/i)))
+        rows.push({ id: `p${i}`, kind: 'age', date: m[1], op: m[2] as Op, amount: m[3] })
+      else if ((m = line.match(/^fallen_signed_up:\s*(true|false)$/i)))
+        rows.push({ id: `p${i}`, kind: 'fallen', bool: m[1].toLowerCase() === 'true' })
+      else if ((m = line.match(/^hq:\s*(true|false)$/i)))
+        rows.push({ id: `p${i}`, kind: 'hq', bool: m[1].toLowerCase() === 'true' })
       else rows.push({ id: `p${i}`, kind: 'raw', raw: line })
     })
   return { mode, rows }
@@ -139,6 +161,15 @@ function serializeRow(r: Row): string {
       if (!isFinite(n) || (r.amount ?? '').trim() === '') return ''
       return `${r.kind} ${r.op ?? '>='} ${n}`
     }
+    case 'age': {
+      const n = parseInt(r.amount ?? '', 10)
+      if (!isFinite(n) || !/^\d{4}-\d{2}-\d{2}$/.test(r.date ?? '')) return ''
+      return `age_on ${r.date} ${r.op ?? '<'} ${n}`
+    }
+    case 'fallen':
+      return `fallen_signed_up: ${r.bool ? 'true' : 'false'}`
+    case 'hq':
+      return `hq: ${r.bool ? 'true' : 'false'}`
     case 'raw':
       return r.raw ?? ''
   }
@@ -162,6 +193,11 @@ function defaultRow(kind: Kind, id: string): Row {
     case 'has_ticket':
     case 'has_ships':
       return { id, kind, bool: true }
+    case 'fallen':
+    case 'hq':
+      return { id, kind, bool: false }
+    case 'age':
+      return { id, kind, op: '<', amount: '19', date: '' }
     case 'ids':
       return { id, kind, ids: '' }
     case 'koi':
@@ -330,7 +366,7 @@ function FieldSelect({ value, onChange }: { value: Exclude<Kind, 'raw'>; onChang
       </SelectTrigger>
       <SelectContent>
         {(Object.keys(FIELD_META) as Exclude<Kind, 'raw'>[]).map((k) => (
-          <SelectItem key={k} value={k}>
+          <SelectItem key={k} value={k} title={FIELD_META[k].title}>
             {FIELD_META[k].label}
           </SelectItem>
         ))}
@@ -471,6 +507,44 @@ function RowEditor({
               aria-label={`${meta.label} threshold`}
             />
             <span className="text-sm text-muted-foreground">{meta.unit}</span>
+          </div>
+        </>
+      )}
+
+      {meta.type === 'age' && (
+        <>
+          <Input
+            type="date"
+            value={row.date ?? ''}
+            onChange={(e) => onUpdate(row.id, { date: e.target.value })}
+            className="h-8 w-[10rem]"
+            aria-label="Date the age is measured on"
+          />
+          <Select value={row.op ?? '<'} onValueChange={(v) => onUpdate(row.id, { op: v as Op })}>
+            <SelectTrigger className="h-8 w-[8.5rem] shrink-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TIME_OPS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              value={row.amount ?? ''}
+              onChange={(e) => onUpdate(row.id, { amount: e.target.value })}
+              placeholder="19"
+              className="h-8 w-20"
+              aria-label="Age in years"
+            />
+            <span className="text-sm text-muted-foreground">years old</span>
           </div>
         </>
       )}

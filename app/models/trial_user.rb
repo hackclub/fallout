@@ -7,6 +7,7 @@
 #  ban_reason                         :text
 #  ban_type                           :string
 #  bio                                :text
+#  birthday                           :date
 #  certificate_token                  :string
 #  country                            :string
 #  debt_hidden_at                     :datetime

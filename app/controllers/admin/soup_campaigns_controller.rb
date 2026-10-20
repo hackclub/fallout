@@ -124,8 +124,9 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
 
     preview_campaign = campaign.dup
     preview_campaign.target_user_ids_text = campaign.target_query
+    preview_campaign.buttons_text = campaign.buttons_text
     if preview_campaign.errors.any?
-      redirect_to admin_soup_campaign_path(campaign), alert: preview_campaign.errors[:target_user_ids_text].first
+      redirect_to admin_soup_campaign_path(campaign), alert: preview_campaign.errors.first.message
       return
     end
 
@@ -177,7 +178,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     client.chat_postMessage(
       channel: slack_id,
       text: "[TEST] #{interpolate_campaign_text(campaign.notification_preview.presence || campaign.body, personalization)}",
-      blocks: build_test_blocks(campaign, unsubscribe_url, personalization).to_json
+      blocks: build_test_blocks(campaign, slack_id, unsubscribe_url, personalization).to_json
     )
 
     render json: { ok: true }
@@ -216,11 +217,11 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
 
   def campaign_params
     params.expect(
-      soup_campaign: [ :name, :body, :footer, :target_user_ids_text, :unsubscribe_label, :image_url, :notification_preview ]
+      soup_campaign: [ :name, :body, :footer, :target_user_ids_text, :unsubscribe_label, :image_url, :notification_preview, :buttons_text ]
     )
   end
 
-  def build_test_blocks(campaign, unsubscribe_url, personalization)
+  def build_test_blocks(campaign, slack_id, unsubscribe_url, personalization)
     blocks = []
 
     blocks << { type: "section", text: { type: "mrkdwn", text: "[TEST] #{interpolate_campaign_text(campaign.body, personalization)}" } }
@@ -232,6 +233,8 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
     if campaign.image_url.present?
       blocks << { type: "image", image_url: campaign.image_url, alt_text: campaign.name }
     end
+
+    blocks.concat(campaign.button_blocks(slack_id))
 
     blocks << { type: "divider" }
 
@@ -267,6 +270,7 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       unsubscribe_label: campaign.unsubscribe_label,
       image_url: campaign.image_url,
       notification_preview: campaign.notification_preview,
+      buttons_text: campaign.buttons_text,
       status: campaign.status,
       sent_at: campaign.sent_at&.iso8601,
       scheduled_at: campaign.scheduled_at&.iso8601,
@@ -290,7 +294,10 @@ class Admin::SoupCampaignsController < Admin::ApplicationController
       "has_ships: false",
       "total_time_logged_seconds >= 72000",
       "total_time_submitted_seconds < 216000",
-      "total_time_approved_seconds >= 216000"
+      "total_time_approved_seconds >= 216000",
+      "age_on 2027-12-16 < 19",
+      "fallen_signed_up: false",
+      "hq: false"
     ]
   end
 

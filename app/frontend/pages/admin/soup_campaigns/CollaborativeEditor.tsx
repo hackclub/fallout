@@ -23,6 +23,7 @@ import {
 } from '@/components/admin/ui/alert-dialog'
 import { ArrowLeftIcon, TrashIcon, SendIcon, WifiIcon, WifiOffIcon } from 'lucide-react'
 import AudienceBuilder from './AudienceBuilder'
+import ButtonsBuilder, { parseButtons } from './ButtonsBuilder'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ interface Campaign {
   unsubscribe_label: string
   image_url: string
   notification_preview: string
+  buttons_text: string | null
   status: string
 }
 
@@ -73,6 +75,7 @@ const FIELDS = [
   'unsubscribe_label',
   'image_url',
   'notification_preview',
+  'buttons_text',
 ] as const
 type Field = (typeof FIELDS)[number]
 
@@ -368,7 +371,8 @@ function CollabEditor({
 // ── Slack preview ─────────────────────────────────────────────────────────────
 
 function SlackPreview({ fields }: { fields: Record<Field, string> }) {
-  const { body, footer, unsubscribe_label, image_url } = fields
+  const { body, footer, unsubscribe_label, image_url, buttons_text } = fields
+  const buttons = parseButtons(buttons_text)
   const label = unsubscribe_label.trim() || DEFAULT_UNSUBSCRIBE_LABEL
   const now = new Date()
   const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -408,6 +412,25 @@ function SlackPreview({ fields }: { fields: Record<Field, string> }) {
                 ;(e.target as HTMLImageElement).style.display = 'none'
               }}
             />
+          )}
+          {buttons.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-1 mb-2">
+              {buttons.map((b, i) => (
+                <span
+                  key={i}
+                  title={b.webhook ? 'Sends a webhook when clicked' : undefined}
+                  className={`rounded border px-3 py-1 text-xs font-bold ${
+                    b.style === 'primary'
+                      ? 'bg-[#007a5a] border-[#007a5a] text-white'
+                      : b.style === 'danger'
+                        ? 'bg-[#e01e5a] border-[#e01e5a] text-white'
+                        : 'border-[#4d5359] text-[#d1d2d3]'
+                  }`}
+                >
+                  {b.label || 'Button'}
+                </span>
+              ))}
+            </div>
           )}
           <div className="border-t border-[#3d3d3d] my-2" />
           <div className="text-[#ababad] text-xs">
@@ -449,6 +472,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
     unsubscribe_label: campaign.unsubscribe_label,
     image_url: campaign.image_url ?? '',
     notification_preview: campaign.notification_preview ?? '',
+    buttons_text: campaign.buttons_text ?? '',
   })
 
   // ── Init Yjs doc + Awareness ─────────────────────────────────────────────────
@@ -473,6 +497,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
           doc.getText('unsubscribe_label').insert(0, campaign.unsubscribe_label)
           doc.getText('image_url').insert(0, campaign.image_url ?? '')
           doc.getText('notification_preview').insert(0, campaign.notification_preview ?? '')
+          doc.getText('buttons_text').insert(0, campaign.buttons_text ?? '')
         }
       } catch (e) {
         console.error('Failed to parse yjs_state, falling back to DB fields:', e)
@@ -483,6 +508,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
         doc.getText('unsubscribe_label').insert(0, campaign.unsubscribe_label)
         doc.getText('image_url').insert(0, campaign.image_url ?? '')
         doc.getText('notification_preview').insert(0, campaign.notification_preview ?? '')
+        doc.getText('buttons_text').insert(0, campaign.buttons_text ?? '')
       }
       isSyncedRef.current = true
     } else {
@@ -494,6 +520,7 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
       doc.getText('unsubscribe_label').insert(0, campaign.unsubscribe_label)
       doc.getText('image_url').insert(0, campaign.image_url ?? '')
       doc.getText('notification_preview').insert(0, campaign.notification_preview ?? '')
+      doc.getText('buttons_text').insert(0, campaign.buttons_text ?? '')
       isSyncedRef.current = true
     }
     ydocRef.current = doc
@@ -875,6 +902,24 @@ export default function SoupCampaignCollaborativeEditor({ campaign, current_user
                 minHeight="6rem"
                 mono
                 onFocus={() => handleFieldFocus('target_user_ids')}
+                onBlur={handleFieldBlur}
+              />
+            }
+          />
+
+          <ButtonsBuilder
+            yText={ydoc.getText('buttons_text')}
+            ydoc={ydoc}
+            onFocus={() => handleFieldFocus('buttons_text')}
+            onBlur={handleFieldBlur}
+            rawEditor={
+              <CollabEditor
+                yText={ydoc.getText('buttons_text')}
+                awareness={awareness}
+                placeholderText={'Join Fallen | webhook=https://… | style=primary'}
+                minHeight="4rem"
+                mono
+                onFocus={() => handleFieldFocus('buttons_text')}
                 onBlur={handleFieldBlur}
               />
             }

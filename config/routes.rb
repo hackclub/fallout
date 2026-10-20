@@ -231,6 +231,7 @@
 #                                        infill_2026 GET    /infill-2026(.:format)                                                                        tracking_redirects#show {slug: "infill-2026"}
 #                                         rmrrf_2026 GET    /rmrrf-2026(.:format)                                                                         tracking_redirects#show {slug: "rmrrf-2026"}
 #                                                faq GET    /faq(.:format)                                                                                redirect(301, /docs/faq)
+#                        soup_campaign_button_click GET    /soup/buttons/:token(.:format)                                                                soup_campaign_button_clicks#show
 #                          soup_campaign_unsubscribe GET    /unsubscribe/soup/:token(.:format)                                                            soup_campaign_unsubscribes#show
 #                                                    POST   /unsubscribe/soup/:token(.:format)                                                            soup_campaign_unsubscribes#create
 #                                               info GET    /info(.:format)                                                                               redirect(301, /docs)
@@ -674,6 +675,7 @@ Rails.application.routes.draw do
   get "guide" => redirect("/docs/guide") # Participant's guide
 
   get "faq" => redirect("/docs/faq") # Shortcut to FAQ docs page
+  get "soup/buttons/:token" => "soup_campaign_button_clicks#show", as: :soup_campaign_button_click
   get "unsubscribe/soup/:token" => "soup_campaign_unsubscribes#show", as: :soup_campaign_unsubscribe
   post "unsubscribe/soup/:token" => "soup_campaign_unsubscribes#create"
   get "info" => redirect("/docs")

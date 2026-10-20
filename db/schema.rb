@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_02_060408) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_20_173454) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -973,6 +973,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_02_060408) do
     t.string "unsubscribe_token", null: false
     t.datetime "updated_at", null: false
     t.binary "yjs_state"
+    t.text "buttons_text"
+    t.jsonb "buttons", default: [], null: false
     t.index ["created_by_id"], name: "index_soup_campaigns_on_created_by_id"
     t.index ["status"], name: "index_soup_campaigns_on_status"
     t.index ["unsubscribe_token"], name: "index_soup_campaigns_on_unsubscribe_token", unique: true
@@ -1085,6 +1087,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_02_060408) do
     t.string "type"
     t.datetime "updated_at", null: false
     t.string "verification_status"
+    t.date "birthday"
     t.index "((to_tsvector('simple'::regconfig, COALESCE((display_name)::text, ''::text)) || to_tsvector('simple'::regconfig, COALESCE((email)::text, ''::text))))", name: "index_users_on_search_tsvector", using: :gin
     t.index ["certificate_token"], name: "index_users_on_certificate_token", unique: true
     t.index ["debt_hidden_by_id"], name: "index_users_on_debt_hidden_by_id"
