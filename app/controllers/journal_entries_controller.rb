@@ -17,7 +17,7 @@ class JournalEntriesController < ApplicationController
 
     if params[:project_id]
       @project = projects.find(params[:project_id])
-      authorize @project, :show? # User must own or have access to the project
+      authorize JournalEntry.new(user: current_user, project: @project), :create? # Access + end-of-program journaling lock
     else
       skip_authorization # No specific project to authorize against
     end
@@ -27,7 +27,7 @@ class JournalEntriesController < ApplicationController
     streak_data = streak_data_for_warning(current_user)
 
     render inertia: "journal_entries/new", props: {
-      projects: projects.map { |p| serialize_project_for_journal(p) },
+      projects: projects.reject { |p| ProjectPolicy.new(current_user, p).journaling_locked? }.map { |p| serialize_project_for_journal(p) }, # Hide projects closed to journaling
       selected_project_id: @project&.id,
       lapse_connected: lapse_connected,
       is_modal: request.headers["X-InertiaUI-Modal"].present?,

@@ -3,6 +3,7 @@
 class JournalEntryPolicy < ApplicationPolicy
   def create?
     return false unless user.present?
+    return false if record.project && ProjectPolicy.new(user, record.project).journaling_locked? # End-of-program lock: no journaling or uploads on projects that can no longer be submitted
     return true if record.project&.user_id == user.id # Project owner can always create (preserves trial user behavior)
     collaborators_enabled? && !user.trial? && record.project&.collaborator?(user) # Collaborators must be verified and flag-gated
   end

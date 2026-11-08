@@ -533,7 +533,7 @@ class User < ApplicationRecord
   end
 
   # HQ staff exploring the platform after the event ended: bypasses the end-of-program kill switches
-  # (:disable_new_submissions, :final_reviews) but deliberately not ticket claims, which have real-world effects.
+  # (:disable_new_submissions, :disable_new_projects, :final_reviews) but deliberately not ticket claims, which have real-world effects.
   def hq_preview?
     Flipper.enabled?(:hq_preview, self)
   end
@@ -542,6 +542,11 @@ class User < ApplicationRecord
   # disable_new_submissions / new_submissions_override pattern.
   def ticket_claims_disabled?
     Flipper.enabled?(:disable_ticket_claims) && !Flipper.enabled?(:ticket_claims_override, self)
+  end
+
+  # Global kill switch for creating projects, with a per-user exemption. hq_preview also waives it.
+  def new_projects_disabled?
+    Flipper.enabled?(:disable_new_projects) && !Flipper.enabled?(:new_projects_override, self) && !hq_preview?
   end
 
   # Global kill switch for placing shop orders, with a per-user exemption. Same pattern as ticket_claims_disabled?.

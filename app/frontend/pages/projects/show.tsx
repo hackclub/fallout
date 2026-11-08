@@ -13,7 +13,7 @@ import Input from '@/components/shared/Input'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/shared/Tooltip'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { performModalMutation } from '@/lib/modalMutation'
-import { notify, SHIP_BLOCK_MESSAGES, SUBMISSIONS_CLOSED_MESSAGE } from '@/lib/notifications'
+import { notify, SHIP_BLOCK_MESSAGES, SUBMISSIONS_CLOSED_MESSAGE, JOURNALING_CLOSED_MESSAGE } from '@/lib/notifications'
 import { relativeAgeParts } from '@/lib/relativeAge'
 import { useNowTick } from '@/lib/useNowTick'
 import TimeAgo from '@/components/shared/TimeAgo'
@@ -225,6 +225,7 @@ export default function ProjectsShow({
     reship: boolean
     manage_collaborators: boolean
     create_journal_entry: boolean
+    create_journal_entry_closed: boolean
     create_journal_entry_locked_for_trial: boolean
     refresh_cover: boolean
   }
@@ -678,6 +679,24 @@ export default function ProjectsShow({
             >
               <Feather className="w-5 h-5" />
             </ModalLink>
+          </TooltipTrigger>
+          <TooltipContent>New journal entry</TooltipContent>
+        </Tooltip>
+      )
+    }
+
+    if (can.create_journal_entry_closed) {
+      return (
+        <Tooltip side="top" gap={8}>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => notify('alert', JOURNALING_CLOSED_MESSAGE)}
+              aria-label="New journal entry"
+              className={iconButtonClasses}
+            >
+              <Feather className="w-5 h-5" />
+            </button>
           </TooltipTrigger>
           <TooltipContent>New journal entry</TooltipContent>
         </Tooltip>

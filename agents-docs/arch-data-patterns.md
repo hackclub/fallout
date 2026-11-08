@@ -115,11 +115,14 @@ Non-exhaustive — `app/policies/` has grown to cover review queues, shop/orders
 | `:collaborators` | Project/journal collaboration features | Policies, controllers, shared props |
 | `:shop` | Shop/redemption features | Controllers, shared props |
 | `:hcb_top_ups` | HCB project funding top-ups | Controllers, shared props |
-| `:disable_new_submissions` / `:new_submissions_override` | End-of-program kill switch: blocks project creation (`create?`, `new?`, `onboarding?`) **and** first-time submissions (`ship?` on never-shipped projects). Waived per-user by the override flag, and per-project by a post-`TRANSFER_WAIVER_CUTOFF` Blueprint/Stasis transfer | `ProjectPolicy`, `submissions_closed` shared prop |
+| `:disable_new_submissions` / `:new_submissions_override` | End-of-program kill switch: blocks first-time submissions (`ship?` on never-shipped projects). Waived per-user by the override flag, and per-project by a post-`TRANSFER_WAIVER_CUTOFF` Blueprint/Stasis transfer. Also drives `ProjectPolicy#journaling_locked?` (see below) | `ProjectPolicy`, `JournalEntryPolicy` |
+| `:disable_new_projects` / `:new_projects_override` | End-of-program kill switch for project creation (`create?`, `new?`, `onboarding?`) + per-user exemption; waived by `:hq_preview`. Checked via `User#new_projects_disabled?`. Entry points fire `FALLOUT_ENDED_MESSAGE` | `ProjectPolicy`, `projects_closed` shared prop |
 | `:final_reviews` / `:final_reviews_override` | Program wind-down + per-user exemption: a returned ship must be resubmitted within `Ship::RESUBMIT_GRACE_PERIOD` (3 days), and any ship created on/after `Ship::FINAL_REVIEW_CUTOFF` is the project's last whatever its verdict | `ProjectPolicy`, `Ship#resubmit_deadline`, `features` shared prop |
-| `:hq_preview` | Per-user flag for HQ staff exploring the platform after the event ended: waives `:disable_new_submissions` and `:final_reviews` (same effect as holding both overrides) but **not** `:disable_ticket_claims`, since a ticket claim has real-world effects. Checked via `User#hq_preview?` | `ProjectPolicy`, `submissions_closed` + `features` shared props |
+| `:hq_preview` | Per-user flag for HQ staff exploring the platform after the event ended: waives `:disable_new_submissions`, `:disable_new_projects` and `:final_reviews` (same effect as holding those overrides) but **not** `:disable_ticket_claims` or `:disable_shop_orders`, since those have real-world effects. Checked via `User#hq_preview?` | `ProjectPolicy`, `projects_closed` + `features` shared props |
 | `:disable_ticket_claims` / `:ticket_claims_override` | Global kill switch for summit ticket claiming + per-user exemption (mirrors the submission/reship gate pattern); checked via `User#ticket_claims_disabled?` | `TicketClaimsController`, `ShopItemsController` |
-| `:disable_shop_orders` / `:shop_orders_override` | Global kill switch for placing shop orders + per-user exemption (applies to admins too); shop stays browsable and existing orders are unaffected. Checked via `User#shop_orders_disabled?`. The Buy button stays clickable and fires `SHOP_ORDERS_CLOSED_MESSAGE` | `ShopOrderPolicy#create?`/`new?`, `ShopItemsController` (`orders_closed` prop) |
+| `:disable_shop_orders` / `:shop_orders_override` | Global kill switch for placing shop orders + per-user exemption (applies to admins too); shop stays browsable and existing orders are unaffected. Checked via `User#shop_orders_disabled?`. The Buy button stays clickable and fires `FALLOUT_ENDED_MESSAGE` | `ShopOrderPolicy#create?`/`new?`, `ShopItemsController` (`orders_closed` prop) |
+
+**Journaling lock**: `ProjectPolicy#journaling_locked?` is true when a project can never be submitted or resubmitted again — never shipped while `:disable_new_submissions` applies, or blocked by the `:final_reviews` rules (`final_review_used?`, `resubmit_deadline_passed?`). `JournalEntryPolicy#create?` denies it, which also blocks image/recording uploads (they only attach through journal creation) and `switch_project` into such a project. `JournalEntriesController#new` hides locked projects from the picker; `projects/show` keeps the feather button clickable via `can.create_journal_entry_closed` and fires `JOURNALING_CLOSED_MESSAGE`.
 
 **Usage pattern:**
 ```ruby
@@ -140,17 +143,18 @@ inertia_share features: -> {
 }
 
 # Shared separately from `features` because trial users create projects too (the `features` block
-# early-returns {} for them). Drives the "submissions have closed" popup.
-inertia_share submissions_closed: -> {
+# early-returns {} for them). Drives the "Fallout has ended" popup on project-creation entry points.
+inertia_share projects_closed: -> {
   next false unless current_user
-  Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, current_user) && !current_user.hq_preview?
+  current_user.new_projects_disabled?
 }
 ```
 
-**Closed-program UX pattern**: when `:disable_new_submissions` blocks an action the button stays
-rendered and clickable and fires `notify('alert', SUBMISSIONS_CLOSED_MESSAGE)` (from
-`@/lib/notifications`) instead of navigating — a missing/disabled button reads as a bug. Entry points:
-the `+` button on `projects/index`, the first path star in `PathNode`, and the `Submit` button on
+**Closed-program UX pattern**: when a kill switch blocks an action the button stays rendered and
+clickable and fires `notify('alert', …)` (messages in `@/lib/notifications`) instead of navigating — a
+missing/disabled button reads as a bug. Entry points: the `+` button on `projects/index` and the first
+path star in `PathNode` (`projects_closed` → `FALLOUT_ENDED_MESSAGE`), the shop Buy button, the journal
+feather button on `projects/show` (`JOURNALING_CLOSED_MESSAGE`), and the `Submit` button on
 `projects/show` (gated by the `can.ship_block_reason` prop, which also names *which* rule blocked it so
 the popup can explain itself — see `SHIP_BLOCK_MESSAGES`).
 

@@ -63,10 +63,11 @@ Ship (audit-trailed)
 
 **Policy (`app/policies/project_policy.rb`):**
 - `show?`: staff OR owner OR collaborator (flag-gated) OR listed (public). Discarded projects are admin-only.
-- `create?`: trial users limited to 1 project (`user.projects.kept`); blocked entirely by the `:disable_new_submissions` kill switch (see [arch-data-patterns.md](arch-data-patterns.md))
+- `create?`: trial users limited to 1 project (`user.projects.kept`); blocked entirely by the `:disable_new_projects` kill switch (see [arch-data-patterns.md](arch-data-patterns.md))
 - `update?`/`destroy?`: owner only (admins edit via `/admin` or Airtable, not this policy). `destroy?` also blocked once any ship exists (audit integrity).
 - `ship?`: verified, non-trial owner; blocked while a `pending` or `awaiting_identity` ship exists; first-time submissions blocked by `:disable_new_submissions`; also blocked by the two `:final_reviews` wind-down rules (`final_review_used?`, `resubmit_deadline_passed?`).
 - `reship?`: same owner gate, requires a `pending` ship, and blocked by `final_review_used?` — swapping an in-flight ship stays allowed right up until a reviewer verdict lands.
+- `journaling_locked?`: true when the project can never be submitted or resubmitted again (`:disable_new_submissions` on a never-shipped project, or a `:final_reviews` rule). `JournalEntryPolicy#create?` denies journaling (and so image/recording uploads) on it.
 - `ship_block_reason`: `:submissions_closed` / `:final_review_used` / `:deadline_passed` / `nil` — serialized as `can.ship_block_reason` so the Submit button stays clickable and raises the matching popup (`SHIP_BLOCK_MESSAGES` in `@/lib/notifications`). Returns `nil` for anyone who has no business submitting, so the button stays hidden for them.
 - `refresh_cover?`: verified, non-trial owner (mirrors `ship?` — hits the GitHub API).
 - `export_journal?`: admin OR owner.

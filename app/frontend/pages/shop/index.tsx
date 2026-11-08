@@ -10,7 +10,7 @@ import ImagePlaceholder from '@/components/shared/ImagePlaceholder'
 import PathDialogOverlay from '@/components/path/PathDialogOverlay'
 import type { DialogScript } from '@/components/path/PathDialogOverlay'
 import type { SharedProps } from '@/types'
-import { notify, SHOP_ORDERS_CLOSED_MESSAGE } from '@/lib/notifications'
+import { notify, FALLOUT_ENDED_MESSAGE } from '@/lib/notifications'
 
 gsap.registerPlugin(Flip)
 
@@ -379,7 +379,7 @@ export default function ShopIndex({
                 ) : buyable && orders_closed ? (
                   <button
                     type="button"
-                    onClick={() => notify('alert', SHOP_ORDERS_CLOSED_MESSAGE)}
+                    onClick={() => notify('alert', FALLOUT_ENDED_MESSAGE)}
                     className="mt-auto w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center text-2xl cursor-pointer"
                   >
                     Buy

@@ -3,12 +3,14 @@ shared:
   collaborators: Allow users to add collaborators to their projects
   grant_fulfillment: User-facing project-funding requests and the admin approval/HCB topup flow
   hcb_top_ups: User-funded top-ups via HCB donations onto the user's grant card
-  disable_new_submissions: Block creating new projects and submitting projects that have never been shipped before (resubmissions of already-shipped projects still allowed)
-  new_submissions_override: Per-user override allowing project creation and first-time submissions even while disable_new_submissions is on
+  disable_new_submissions: Block submitting projects that have never been shipped before (resubmissions of already-shipped projects still allowed). Also closes journaling (and its file uploads) on any project that can no longer be submitted or resubmitted
+  new_submissions_override: Per-user override allowing first-time submissions even while disable_new_submissions is on
+  disable_new_projects: Block creating new projects
+  new_projects_override: Per-user override allowing project creation even while disable_new_projects is on
   final_reviews: Program wind-down — a returned ship must be resubmitted within 3 days of being returned, and any submission made on/after the cutoff is the project's last regardless of its outcome
   final_reviews_override: Per-user override exempting a user from the final_reviews deadline and one-final-review rule
   disable_ticket_claims: Block claiming a Fallout summit ticket entirely (existing claims are unaffected)
   ticket_claims_override: Per-user override allowing a user to claim a ticket even while disable_ticket_claims is on
   disable_shop_orders: Block placing new shop orders (shop stays browsable; existing orders are unaffected)
   shop_orders_override: Per-user override allowing a user to place shop orders even while disable_shop_orders is on
-  hq_preview: Per-user flag letting HQ staff use the platform after the event ended — waives disable_new_submissions and final_reviews (not ticket claims)
+  hq_preview: Per-user flag letting HQ staff use the platform after the event ended — waives disable_new_submissions, disable_new_projects and final_reviews (not ticket claims or shop orders)
