@@ -30,6 +30,10 @@ export function subscribe(fn: Listener): () => void {
 // Shown when the :disable_new_submissions kill switch blocks creating a project or a first submission.
 export const SUBMISSIONS_CLOSED_MESSAGE = 'Fallout has ended and submissions have closed, thanks for participating!'
 
+// Shown when the :disable_shop_orders kill switch blocks buying a shop item.
+export const SHOP_ORDERS_CLOSED_MESSAGE =
+  'The shop is closed for new orders right now. Your existing orders are not affected.'
+
 // Why the Submit button is unavailable, keyed by ProjectPolicy#ship_block_reason.
 export const SHIP_BLOCK_MESSAGES: Record<string, string> = {
   submissions_closed: SUBMISSIONS_CLOSED_MESSAGE,

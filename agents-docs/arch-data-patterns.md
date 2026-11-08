@@ -119,6 +119,7 @@ Non-exhaustive — `app/policies/` has grown to cover review queues, shop/orders
 | `:final_reviews` / `:final_reviews_override` | Program wind-down + per-user exemption: a returned ship must be resubmitted within `Ship::RESUBMIT_GRACE_PERIOD` (3 days), and any ship created on/after `Ship::FINAL_REVIEW_CUTOFF` is the project's last whatever its verdict | `ProjectPolicy`, `Ship#resubmit_deadline`, `features` shared prop |
 | `:hq_preview` | Per-user flag for HQ staff exploring the platform after the event ended: waives `:disable_new_submissions` and `:final_reviews` (same effect as holding both overrides) but **not** `:disable_ticket_claims`, since a ticket claim has real-world effects. Checked via `User#hq_preview?` | `ProjectPolicy`, `submissions_closed` + `features` shared props |
 | `:disable_ticket_claims` / `:ticket_claims_override` | Global kill switch for summit ticket claiming + per-user exemption (mirrors the submission/reship gate pattern); checked via `User#ticket_claims_disabled?` | `TicketClaimsController`, `ShopItemsController` |
+| `:disable_shop_orders` / `:shop_orders_override` | Global kill switch for placing shop orders + per-user exemption (applies to admins too); shop stays browsable and existing orders are unaffected. Checked via `User#shop_orders_disabled?`. The Buy button stays clickable and fires `SHOP_ORDERS_CLOSED_MESSAGE` | `ShopOrderPolicy#create?`/`new?`, `ShopItemsController` (`orders_closed` prop) |
 
 **Usage pattern:**
 ```ruby

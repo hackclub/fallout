@@ -10,8 +10,9 @@ class ShopOrderPolicy < ApplicationPolicy
   end
 
   def create?
-    # Only fully identity-gated users (HCA verified + at least one address) can claim prizes
-    !user.trial? && user.fully_identity_gated? && Flipper.enabled?(:shop, user)
+    # Only fully identity-gated users (HCA verified + at least one address) can claim prizes;
+    # the :disable_shop_orders kill switch blocks everyone (admins included) unless overridden
+    !user.trial? && user.fully_identity_gated? && Flipper.enabled?(:shop, user) && !user.shop_orders_disabled?
   end
 
   def update?

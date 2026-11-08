@@ -544,6 +544,11 @@ class User < ApplicationRecord
     Flipper.enabled?(:disable_ticket_claims) && !Flipper.enabled?(:ticket_claims_override, self)
   end
 
+  # Global kill switch for placing shop orders, with a per-user exemption. Same pattern as ticket_claims_disabled?.
+  def shop_orders_disabled?
+    Flipper.enabled?(:disable_shop_orders) && !Flipper.enabled?(:shop_orders_override, self)
+  end
+
   # Hours-only ticket qualification on TA-APPROVED hours — the real claim gate. Mirrors the
   # rounding the ticket claim flow uses. Does NOT consider the identity gate.
   #
