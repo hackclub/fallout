@@ -96,6 +96,8 @@ class ProjectsController < ApplicationController
         create_journal_entry: !current_user&.trial? && JournalEntryPolicy.new(current_user, @project.journal_entries.build(user: current_user)).create?,
         # Trial owner or trial collaborator who would gain create access on verifying — drives the "locked" feather button with a verify prompt.
         # Strangers (incl. unauthenticated visitors on the public project page) get false and see no button.
+        # Owner/collaborator on a project closed by the end-of-program journaling lock — feather button stays and explains why.
+        create_journal_entry_closed: !current_user&.trial? && current_user.present? && project_policy.journaling_locked? && (@project.user_id == current_user.id || (collab_enabled && @project.collaborator?(current_user))),
         create_journal_entry_locked_for_trial: current_user&.trial? && (@project.user_id == current_user.id || (collab_enabled && @project.collaborator?(current_user)))
       },
       initial_tab: highlighted_journal_entry_id ? "journal" : "timeline",

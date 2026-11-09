@@ -27,8 +27,14 @@ export function subscribe(fn: Listener): () => void {
   return () => listeners.delete(fn)
 }
 
-// Shown when the :disable_new_submissions kill switch blocks creating a project or a first submission.
+// Shown when the :disable_new_submissions kill switch blocks a first submission.
 export const SUBMISSIONS_CLOSED_MESSAGE = 'Fallout has ended and submissions have closed, thanks for participating!'
+
+// Shown when the :disable_new_projects or :disable_shop_orders kill switch blocks an action.
+export const FALLOUT_ENDED_MESSAGE = 'Fallout has ended! Thanks for participating'
+
+// Shown when the end-of-program journaling lock closes a project to new journal entries.
+export const JOURNALING_CLOSED_MESSAGE = 'This project can no longer be submitted, so new journal entries are closed.'
 
 // Why the Submit button is unavailable, keyed by ProjectPolicy#ship_block_reason.
 export const SHIP_BLOCK_MESSAGES: Record<string, string> = {

@@ -19,6 +19,7 @@ class ShopItemsController < ApplicationController
       has_approved_project: current_user.ships.approved.exists?,
       is_modal: request.headers["X-InertiaUI-Modal"].present?,
       user_id: current_user.id,
+      orders_closed: current_user.shop_orders_disabled?,
       pending_dialog: shop_pending_dialog
     }
   end

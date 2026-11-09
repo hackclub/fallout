@@ -9,7 +9,7 @@ import ImagePlaceholder from '@/components/shared/ImagePlaceholder'
 import Input from '@/components/shared/Input'
 import MarqueeText from '@/components/shared/MarqueeText'
 import Pagination from '@/components/Pagination'
-import { notify, SUBMISSIONS_CLOSED_MESSAGE } from '@/lib/notifications'
+import { notify, FALLOUT_ENDED_MESSAGE } from '@/lib/notifications'
 import { useLiveReload } from '@/lib/useLiveReload'
 import type { ProjectCard, PagyProps, SharedProps } from '@/types'
 
@@ -42,7 +42,7 @@ export default function ProjectsIndex({
 }) {
   const modalRef = useRef<{ close: () => void }>(null)
   const modal = useModal()
-  const { auth, submissions_closed } = usePage<SharedProps>().props
+  const { auth, projects_closed } = usePage<SharedProps>().props
   const authUser = auth.user
   const [searchQuery, setSearchQuery] = useState(query)
 
@@ -106,9 +106,7 @@ export default function ProjectsIndex({
             onClick={() =>
               notify(
                 'alert',
-                submissions_closed
-                  ? SUBMISSIONS_CLOSED_MESSAGE
-                  : 'Please verify your account to create another project.',
+                projects_closed ? FALLOUT_ENDED_MESSAGE : 'Please verify your account to create another project.',
               )
             }
             className="bg-dark-brown text-light-brown rounded-full w-12 h-12 flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer shadow-md"

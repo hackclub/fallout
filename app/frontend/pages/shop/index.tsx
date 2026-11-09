@@ -10,6 +10,7 @@ import ImagePlaceholder from '@/components/shared/ImagePlaceholder'
 import PathDialogOverlay from '@/components/path/PathDialogOverlay'
 import type { DialogScript } from '@/components/path/PathDialogOverlay'
 import type { SharedProps } from '@/types'
+import { notify, FALLOUT_ENDED_MESSAGE } from '@/lib/notifications'
 
 gsap.registerPlugin(Flip)
 
@@ -32,6 +33,7 @@ export default function ShopIndex({
   user_hours,
   has_approved_project,
   user_id,
+  orders_closed,
   pending_dialog,
 }: {
   is_modal: boolean
@@ -41,6 +43,7 @@ export default function ShopIndex({
   user_hours: number
   has_approved_project: boolean
   user_id: number
+  orders_closed: boolean
   pending_dialog: string | null
 }) {
   const { identity_gate } = usePage<SharedProps>().props
@@ -373,6 +376,14 @@ export default function ShopIndex({
                       Claim when hours are approved
                     </span>
                   </div>
+                ) : buyable && orders_closed ? (
+                  <button
+                    type="button"
+                    onClick={() => notify('alert', FALLOUT_ENDED_MESSAGE)}
+                    className="mt-auto w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center text-2xl cursor-pointer"
+                  >
+                    Buy
+                  </button>
                 ) : buyable && identityBlocked ? (
                   <div className="mt-auto w-full h-10 bg-brown border-2 border-dark-brown rounded-sm text-light-brown font-bold flex items-center justify-center cursor-not-allowed text-base px-2 text-center">
                     {identity_gate?.state === 'verified_no_address'

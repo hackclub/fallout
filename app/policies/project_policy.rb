@@ -13,9 +13,7 @@ class ProjectPolicy < ApplicationPolicy
   end
 
   def onboarding?
-    # Headless policy call — `record` is the :project symbol, so the per-project transfer waiver can't
-    # apply; the :disable_new_submissions kill switch plus the per-user override gate the flow alone.
-    return false if user.present? && Flipper.enabled?(:disable_new_submissions) && !Flipper.enabled?(:new_submissions_override, user) && !user.hq_preview?
+    return false if user.present? && user.new_projects_disabled? # Onboarding creates a project — closed by the :disable_new_projects kill switch
 
     true # Otherwise any authenticated user can view the project onboarding modal
   end
@@ -32,7 +30,7 @@ class ProjectPolicy < ApplicationPolicy
 
   def create?
     return false unless user.present?
-    return false if new_submissions_disabled? # Kill switch also closes new projects — a brand-new project has never shipped
+    return false if user.new_projects_disabled? # :disable_new_projects kill switch
     return !user.projects.kept.exists? if user.trial?
 
     true
@@ -114,6 +112,14 @@ class ProjectPolicy < ApplicationPolicy
     nil
   end
 
+  # The project can never be submitted or resubmitted again under the end-of-program rules, so new
+  # journal entries (and the image/recording uploads that ride on them) are closed too.
+  def journaling_locked?
+    return false if record.discarded?
+
+    (!record.ships.exists? && new_submissions_disabled?) || final_review_used? || resubmit_deadline_passed?
+  end
+
   # The wind-down rules are live for this user: the :final_reviews flag is on and they hold no per-user
   # exemption. Public so callers can avoid surfacing a resubmit deadline that isn't actually enforced.
   def final_reviews_enabled?
@@ -130,7 +136,7 @@ class ProjectPolicy < ApplicationPolicy
 
   private
 
-  # Kill switch for new projects and first-time submissions: on while :disable_new_submissions is
+  # Kill switch for first-time submissions: on while :disable_new_submissions is
   # enabled, unless the user holds the :new_submissions_override or :hq_preview actor flag or the project was
   # transferred from Blueprint/Stasis after TRANSFER_WAIVER_CUTOFF (late transferees still deserve
   # their first submission).
