@@ -189,6 +189,9 @@ class User < ApplicationRecord
   # (pre-approval) hours already clear the full bar. Deliberately not surfaced to users.
   TICKET_HOURS_GRACE = 5
 
+  # How long after a ship's approval its owner may still place shop orders while :disable_shop_orders is on.
+  SHOP_GRACE_AFTER_APPROVAL = 3.days
+
   # Ban types in priority order (highest first). Higher-priority bans take precedence.
   BAN_PRIORITY = %w[fallout conduct hcb hardware age hackatime].freeze
   # Ban types set/managed manually by humans — UserBanCheckJob will not override these
@@ -550,16 +553,22 @@ class User < ApplicationRecord
   end
 
   # Global kill switch for placing shop orders, with a per-user exemption. Users whose review is still
-  # in flight are exempt so they can spend what that review earns them.
+  # in flight, or was just approved, are exempt so they can spend what that review earns them.
   def shop_orders_disabled?
-    Flipper.enabled?(:disable_shop_orders) && !Flipper.enabled?(:shop_orders_override, self) && !review_in_flight?
+    Flipper.enabled?(:disable_shop_orders) && !Flipper.enabled?(:shop_orders_override, self) && !shop_window_open?
   end
 
-  # Owns a kept project with a ship in the review queue, or whose latest ship was returned and is still
-  # inside its Ship::RESUBMIT_GRACE_PERIOD window.
-  def review_in_flight?
+  # Owns a kept project with a ship in the review queue, a ship approved within SHOP_GRACE_AFTER_APPROVAL,
+  # or whose latest ship was returned and is still inside its Ship::RESUBMIT_GRACE_PERIOD window.
+  def shop_window_open?
     owned_ships = Ship.where(project: projects.kept)
     return true if owned_ships.where(status: %i[pending awaiting_identity]).exists?
+
+    # A ship is approved by its phase-two review, so that review's completed_at is the approval time.
+    approved_since = (SHOP_GRACE_AFTER_APPROVAL.ago..)
+    recently_approved = owned_ships.approved.where(id: DesignReview.approved.where(completed_at: approved_since).select(:ship_id))
+                                   .or(owned_ships.approved.where(id: BuildReview.approved.where(completed_at: approved_since).select(:ship_id)))
+    return true if recently_approved.exists?
 
     latest_per_project = owned_ships.where.not(status: :superseded)
                                     .select("DISTINCT ON (ships.project_id) ships.*")

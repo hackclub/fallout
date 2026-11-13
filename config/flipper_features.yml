@@ -11,6 +11,6 @@ shared:
   final_reviews_override: Per-user override exempting a user from the final_reviews deadline and one-final-review rule
   disable_ticket_claims: Block claiming a Fallout summit ticket entirely (existing claims are unaffected)
   ticket_claims_override: Per-user override allowing a user to claim a ticket even while disable_ticket_claims is on
-  disable_shop_orders: Block placing new shop orders, except for users with a ship in the review queue or a returned ship still inside its 3-day resubmit window (shop stays browsable; existing orders are unaffected)
+  disable_shop_orders: Block placing new shop orders, except for users with a ship in the review queue, a ship approved in the last 3 days, or a returned ship still inside its 3-day resubmit window (shop stays browsable; existing orders are unaffected)
   shop_orders_override: Per-user override allowing a user to place shop orders even while disable_shop_orders is on
   hq_preview: Per-user flag letting HQ staff use the platform after the event ended — waives disable_new_submissions, disable_new_projects and final_reviews (not ticket claims or shop orders)
