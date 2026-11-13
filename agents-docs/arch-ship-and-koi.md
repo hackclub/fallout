@@ -147,7 +147,7 @@ Re-ships after a prior approval start a fresh cycle — counters reset, and the 
 - `RequirementsCheckReview` (RC) — assigned to `requirements_checker` OR `pass2_reviewer`. Has `repo_tree` jsonb (populated by `FetchRepoTreeJob` on `after_create_commit`). The controller exposes a `refresh_tree` member action (`POST /admin/reviews/requirements_checks/:id/refresh_tree`) to re-fetch the tree on demand.
 
 ### Phase 2 (Single, type-conditional)
-Created by `Ship#ensure_phase_two_review!` only after `phase_one_complete?` (both TA and RC approved — checked via direct DB existence query, not association cache, for concurrency).
+Created by `Ship#ensure_phase_two_review!` only after `phase_one_complete?` (both TA and RC approved — checked via direct DB existence query, not association cache, for concurrency). Skipped (and `derive_status` never approves) when `Ship#stale_cycle?` — the ship owns no recordings *and* a newer ship exists on the project (its entries were re-claimed). Owning no recordings alone isn't stale: a build ship submitted after approved design work can carry no new entries.
 
 - `DesignReview` if `ship_type == design` (default).
 - `BuildReview` if `ship_type == build`.

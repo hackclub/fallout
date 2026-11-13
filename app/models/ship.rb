@@ -321,7 +321,7 @@ class Ship < ApplicationRecord
 
   def ensure_phase_two_review!
     return unless phase_one_complete?
-    return unless owns_recordings? # Superseded ship — keep it out of the phase-two queue (see #derive_status)
+    return if stale_cycle? # Superseded ship — keep it out of the phase-two queue (see #derive_status)
 
     review_class = ship_type_design? ? DesignReview : BuildReview
     review_class.find_or_create_by!(ship: self)
@@ -332,6 +332,13 @@ class Ship < ApplicationRecord
   # Queried directly so the check is correct under concurrency.
   def owns_recordings?
     journal_entries.kept.joins(:recordings).exists?
+  end
+
+  # Owns no recordings because a newer ship on the project re-claimed them. Owning none is not
+  # enough on its own: a build ship submitted after approved design work legitimately carries no
+  # new journal entries, and must still reach phase two and approval.
+  def stale_cycle?
+    !owns_recordings? && project.ships.where("created_at > ?", created_at).exists?
   end
 
   # Admin-only swap between DesignReview and BuildReview for a pending ship. Carries
@@ -571,8 +578,8 @@ class Ship < ApplicationRecord
     # A superseded ship — one whose journal entries were all re-claimed by a newer cycle,
     # so it owns no kept recordings — must never reach :approved, or a stale/duplicate ship
     # can be approved for currency already paid on the live ship (2026-06-10 incident: ship
-    # #260 was a duplicate of #323). Legitimate ships always own recordings.
-    return "pending" unless owns_recordings?
+    # #260 was a duplicate of #323). See #stale_cycle? for why owning none isn't enough.
+    return "pending" if stale_cycle?
     "approved"
   end
 
