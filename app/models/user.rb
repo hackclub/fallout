@@ -549,9 +549,22 @@ class User < ApplicationRecord
     Flipper.enabled?(:disable_new_projects) && !Flipper.enabled?(:new_projects_override, self) && !hq_preview?
   end
 
-  # Global kill switch for placing shop orders, with a per-user exemption. Same pattern as ticket_claims_disabled?.
+  # Global kill switch for placing shop orders, with a per-user exemption. Users whose review is still
+  # in flight are exempt so they can spend what that review earns them.
   def shop_orders_disabled?
-    Flipper.enabled?(:disable_shop_orders) && !Flipper.enabled?(:shop_orders_override, self)
+    Flipper.enabled?(:disable_shop_orders) && !Flipper.enabled?(:shop_orders_override, self) && !review_in_flight?
+  end
+
+  # Owns a kept project with a ship in the review queue, or whose latest ship was returned and is still
+  # inside its Ship::RESUBMIT_GRACE_PERIOD window.
+  def review_in_flight?
+    owned_ships = Ship.where(project: projects.kept)
+    return true if owned_ships.where(status: %i[pending awaiting_identity]).exists?
+
+    latest_per_project = owned_ships.where.not(status: :superseded)
+                                    .select("DISTINCT ON (ships.project_id) ships.*")
+                                    .reorder("ships.project_id, ships.created_at DESC")
+    latest_per_project.any? { |ship| ship.resubmit_deadline&.future? }
   end
 
   # Hours-only ticket qualification on TA-APPROVED hours — the real claim gate. Mirrors the
