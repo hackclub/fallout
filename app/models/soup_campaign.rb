@@ -40,8 +40,7 @@ class SoupCampaign < ApplicationRecord
     U05EZRFKRV4 U07BN55GN3D U078J6H1XL3 U093FC28A82 U06U80G86H1
     U07ACECRYM6 U080A3QP42C U03UBRVG2MS U07DJMFAQQP U09UE480JHH
   ].freeze
-  # "HQ" — always excluded from campaigns: members of these Slack channels or anyone with this email domain.
-  HQ_CHANNEL_IDS = %w[G01QNNEUA10 C07K5TA9P9S].freeze
+  # "HQ" — always excluded from campaigns: anyone with this email domain.
   HQ_EMAIL_DOMAIN = "hackclub.com"
   MAX_BUTTONS = 5
   BUTTON_STYLES = %w[primary danger].freeze
@@ -217,19 +216,12 @@ class SoupCampaign < ApplicationRecord
     } ]
   end
 
-  # Slack IDs of HQ: members of HQ_CHANNEL_IDS plus users with an HQ_EMAIL_DOMAIN email. Raises
-  # ArgumentError when the channels can't be read so callers fail closed instead of messaging HQ.
-  def self.hq_slack_ids!
-    # The bot isn't in the private HQ channels, so read them with a staff member's user token (groups:read, channels:read).
-    token = ENV["SLACK_HQ_MEMBERS_TOKEN"].presence || ENV.fetch("SLACK_BOT_TOKEN", nil)
-    channel_ids = HQ_CHANNEL_IDS.flat_map { |channel_id| fetch_channel_member_ids!(channel_id, token:) }
-    email_ids = User.kept.where("LOWER(users.email) LIKE ?", "%@#{HQ_EMAIL_DOMAIN}").where.not(slack_id: nil).pluck(:slack_id)
-    (channel_ids + email_ids).to_set
-  rescue Slack::Web::Api::Errors::SlackError => e
-    raise ArgumentError, "couldn't read HQ Slack channels (#{e.message}) — is SLACK_HQ_MEMBERS_TOKEN set and its owner in them?"
+  # Slack IDs of HQ: users with an HQ_EMAIL_DOMAIN email.
+  def self.hq_slack_ids
+    User.kept.where("LOWER(users.email) LIKE ?", "%@#{HQ_EMAIL_DOMAIN}").where.not(slack_id: nil).pluck(:slack_id).to_set
   end
 
-  # Raises ArgumentError when the audience can't be resolved safely (HQ or Fallen lookups failing).
+  # Raises ArgumentError when the audience can't be resolved safely (Fallen lookup failing).
   def projected_recipients
     recipients = {}
 
@@ -246,7 +238,7 @@ class SoupCampaign < ApplicationRecord
       recipients[slack_id] ||= { user_id: nil, slack_id: slack_id, display_name: nil }
     end
 
-    excluded = self.class.hq_slack_ids! | BLOCKLIST
+    excluded = self.class.hq_slack_ids | BLOCKLIST
     recipients
       .reject { |slack_id, _| excluded.include?(slack_id) }
       .values
@@ -288,7 +280,7 @@ class SoupCampaign < ApplicationRecord
       fallen = FallenSignups.identifiers[:slack_ids]
       Regexp.last_match(1).downcase == "true" ? all & fallen : all - fallen
     when /\Ahq:\s*(true|false)\z/i
-      hq = self.class.hq_slack_ids!
+      hq = self.class.hq_slack_ids
       Regexp.last_match(1).downcase == "true" ? all & hq : all - hq
     else
       Set.new
@@ -587,7 +579,7 @@ class SoupCampaign < ApplicationRecord
   end
 
   def filter_by_hq(scope, hq)
-    matching = scope.where(slack_id: self.class.hq_slack_ids!.to_a).or(scope.where("LOWER(users.email) LIKE ?", "%@#{HQ_EMAIL_DOMAIN}"))
+    matching = scope.where(slack_id: self.class.hq_slack_ids.to_a).or(scope.where("LOWER(users.email) LIKE ?", "%@#{HQ_EMAIL_DOMAIN}"))
     hq ? matching : scope.where.not(id: matching.select(:id))
   end
 
