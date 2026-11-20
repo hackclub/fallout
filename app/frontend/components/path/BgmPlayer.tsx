@@ -51,7 +51,7 @@ export default function BgmPlayer({ hasProjects = false }: { hasProjects?: boole
 
   useEffect(() => {
     const audio = new Audio()
-    audio.preload = 'auto'
+    audio.preload = 'metadata'
     audio.loop = true
     audio.volume = hasProjects ? volumeRef.current : 0
     audioRef.current = audio
@@ -63,7 +63,8 @@ export default function BgmPlayer({ hasProjects = false }: { hasProjects?: boole
 
     // Defer the download until the browser is idle / page has loaded
     const loadSrc = () => {
-      audio.src = TRACKS[trackIndexRef.current].src
+      // Reassigning src (even to the same URL) restarts the download, and both idle + load fire
+      if (!audio.src) audio.src = TRACKS[trackIndexRef.current].src
     }
     const idleId = 'requestIdleCallback' in window ? window.requestIdleCallback(loadSrc) : undefined
     const fallbackTimer = idleId === undefined ? window.setTimeout(loadSrc, 0) : undefined

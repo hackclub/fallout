@@ -345,14 +345,14 @@ export default function LandingIndex() {
   useEffect(() => {
     const BASE_SPEED = 1.5
     carouselTargetSpeedRef.current = BASE_SPEED
-    let rafId: number
+    let rafId: number | null = null
+    let singleSetWidth = 0
+    const track = carouselTrackRef.current
 
     const animate = () => {
-      const track = carouselTrackRef.current
-      if (track) {
+      if (track && singleSetWidth > 0) {
         carouselSpeedRef.current += (carouselTargetSpeedRef.current - carouselSpeedRef.current) * 0.08
         carouselOffsetRef.current += carouselDirectionRef.current * carouselSpeedRef.current
-        const singleSetWidth = track.scrollWidth / 2
         if (carouselOffsetRef.current <= -singleSetWidth) carouselOffsetRef.current += singleSetWidth
         if (carouselOffsetRef.current >= 0) carouselOffsetRef.current -= singleSetWidth
         track.style.transform = `translateX(${carouselOffsetRef.current}px)`
@@ -360,7 +360,20 @@ export default function LandingIndex() {
       rafId = requestAnimationFrame(animate)
     }
 
-    rafId = requestAnimationFrame(animate)
+    const resizeObserver = new ResizeObserver(() => {
+      if (track) singleSetWidth = track.scrollWidth / 2
+    })
+    if (track) resizeObserver.observe(track)
+
+    const visibilityObserver = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && rafId === null) {
+        rafId = requestAnimationFrame(animate)
+      } else if (!entry.isIntersecting && rafId !== null) {
+        cancelAnimationFrame(rafId)
+        rafId = null
+      }
+    })
+    if (carouselSectionRef.current) visibilityObserver.observe(carouselSectionRef.current)
 
     const onWheel = (e: WheelEvent) => {
       carouselDirectionRef.current = e.deltaY > 0 ? 1 : -1
@@ -378,7 +391,9 @@ export default function LandingIndex() {
     section?.addEventListener('mouseleave', onLeave)
 
     return () => {
-      cancelAnimationFrame(rafId)
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      resizeObserver.disconnect()
+      visibilityObserver.disconnect()
       section?.removeEventListener('wheel', onWheel)
       section?.removeEventListener('mouseenter', onEnter)
       section?.removeEventListener('mouseleave', onLeave)
@@ -591,7 +606,12 @@ export default function LandingIndex() {
 
         <div ref={belowFoldRef} className="relative">
           <div className="w-full bg-transparent -mt-10">
-            <img src="/landing/clouds/banner.png" className="object-cover object-bottom select-none" />
+            <img
+              src="/landing/clouds/banner.webp"
+              loading="lazy"
+              decoding="async"
+              className="object-cover object-bottom select-none"
+            />
           </div>
 
           <div className="w-full bg-beige px-3 sm:px-6 md:px-8 lg:px-18 xl:px-36 2xl:px-54 ">
@@ -1233,7 +1253,14 @@ export default function LandingIndex() {
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <img src="/landing/letter.png" alt="hackclub/dns" title="hackclub/dns" className="h-40 w-full" />
+                  <img
+                    src="/landing/letter.webp"
+                    loading="lazy"
+                    decoding="async"
+                    alt="hackclub/dns"
+                    title="hackclub/dns"
+                    className="h-40 w-full"
+                  />
                 </div>
               </div>
             </div>
