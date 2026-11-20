@@ -225,10 +225,12 @@ Rails Active Record encryption enabled for sensitive fields:
 - `user.hca_token` — HCA OAuth access token
 - `user.lapse_token` — Lapse OAuth token
 - `user.slack_token` — Slack OAuth token
-- `user.device_token` — deterministic encryption (for `find_by` lookups)
+- `user.device_token` — deterministic encryption (for `find_by` lookups), declared `deterministic: { fixed: false }`. Rails' default (`fixed`) keeps writing deterministic columns with the *oldest* previous key, which would defeat a key rotation.
 - `ship.frozen_hca_data` — user identity snapshot at submission
 - `shop_order.phone`, `shop_order.legacy_address`, `shop_order.structured_address` — shipping PII. `structured_address` is an HCA-shaped hash (first_name/last_name/line_1/line_2/city/state/postal_code/country) serialized to JSON then encrypted; new orders write it. `legacy_address` holds the pre-refactor formatted-blob string for orders not yet backfilled. `ShopOrder#address` returns a display string, preferring `structured_address` and falling back to `legacy_address`.
 - `hcb_connection.access_token`, `hcb_connection.refresh_token` — HCB OAuth tokens
+
+**Key rotation** (`lib/tasks/key_rotation.rake`): `primary_key` in credentials can be a list (last encrypts, all decrypt). The deterministic key can't, so `config/initializers/active_record_encryption_rotation.rb` adds a previous deterministic scheme from `active_record_encryption.previous_deterministic_key` when present. `key_rotation:reencrypt` re-encrypts every encrypted column (HcbConnection excluded); it reads stored ciphertext strictly, because `support_unencrypted_data = true` otherwise returns an undecryptable value as raw ciphertext and re-encryption would wrap it in a second layer. Prove old keys are unneeded by dry-running it under new-only credentials. Rotating `SECRET_KEY_BASE` invalidates Active Storage signed IDs embedded in journal markdown: `key_rotation:export_signed_ids` (run under the old secret) then `key_rotation:rewrite_signed_ids` (under the new one). In development and test Rails ignores the `SECRET_KEY_BASE` env var, and `.env` points the test env at the development database, so rehearse with an explicit `DATABASE_URL`.
 
 Session cookie: standard Rails cookie encryption (`_fallout_session`, 3-month expiry).
 Trial device token: `cookies.encrypted[:trial_device_token]` (httponly, secure, strict, 1-year expiry).

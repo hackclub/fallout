@@ -158,7 +158,9 @@ class User < ApplicationRecord
   encrypts :lapse_token
   encrypts :slack_token
   encrypts :reviewer_slack_token # xoxp from the reviewer Slack app — posts DR/BR feedback as the reviewer
-  encrypts :device_token, deterministic: true # Deterministic so find_by lookups work
+  # Deterministic so find_by lookups work. fixed: false writes with the current key instead of the
+  # oldest previous one, so key rotation actually replaces the old deterministic key.
+  encrypts :device_token, deterministic: { fixed: false }
 
   scope :verified, -> { where(type: nil) } # STI: verified users have type=nil; TrialUser subclass has type='TrialUser'
   scope :debt_hidden, -> { where.not(debt_hidden_at: nil) } # excluded from the debt console + its export
