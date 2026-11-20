@@ -71,7 +71,8 @@ class User < ApplicationRecord
   include MeiliSearch::Rails
   include Flipper::Identifier # Enables per-user feature flags via Flipper
 
-  has_paper_trail
+  # Tokens are skipped so version history never holds copies of them (plaintext or under an old key).
+  has_paper_trail skip: %i[hca_token lapse_token slack_token reviewer_slack_token device_token]
 
   pg_search_scope :search, against: [ :display_name, :email ], using: { tsearch: { prefix: true } }
 

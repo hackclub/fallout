@@ -162,6 +162,8 @@ the popup can explain itself — see `SHIP_BLOCK_MESSAGES`).
 
 **Models with `has_paper_trail`**: User, Project, JournalEntry, Ship, Collaborator, CollaborationInvite, PendingCollaborationInvite, MailMessage, StreakDay, StreakGoal, ProjectFlag, ReviewerNote, plus the `Reviewable` concern (mixed into the review models) and the HCB models (HcbConnection, HcbDonationRequest, HcbTransaction, HcbGrantCard, HcbGrantSetting, ProjectGrantOrder, ProjectFundingTopup).
 
+Encrypted secrets are kept out of history with `skip:`: User skips its five token columns, ShopOrder its address/phone columns, HcbConnection its OAuth tokens. Versions written before the User skip (2026-11-20) still hold token copies, some in plaintext; they're due to be deleted after the Orchard migration.
+
 Stores all changes in `versions` table. Particularly important for Ships (review workflow transparency — frozen fields + status changes + reviewer assignment all tracked) and MailMessages (notification audit trail).
 
 ## 5. Authentication Before-Action Chain
