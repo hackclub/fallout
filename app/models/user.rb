@@ -561,6 +561,12 @@ class User < ApplicationRecord
     Flipper.enabled?(:disable_shop_orders) && !Flipper.enabled?(:shop_orders_override, self) && !shop_window_open?
   end
 
+  # Funding is a reward for shipped work. project_grants_override is a temporary per-user exemption
+  # from the approved-ship requirement only; every other grant order validation still applies.
+  def project_grants_eligible?
+    ships.approved.exists? || Flipper.enabled?(:project_grants_override, self)
+  end
+
   # Owns a kept project with a ship in the review queue, a ship approved within SHOP_GRACE_AFTER_APPROVAL,
   # or whose latest ship was returned and is still inside its Ship::RESUBMIT_GRACE_PERIOD window.
   def shop_window_open?

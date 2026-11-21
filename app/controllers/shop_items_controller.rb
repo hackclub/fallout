@@ -16,7 +16,7 @@ class ShopItemsController < ApplicationController
       gold_balance: current_user.gold,
       user_hours: (current_user.total_time_logged_seconds / 3600.0).floor,
       # Gates the project-funding Request button — grants require an approved project
-      has_approved_project: current_user.ships.approved.exists?,
+      has_approved_project: current_user.project_grants_eligible?,
       is_modal: request.headers["X-InertiaUI-Modal"].present?,
       user_id: current_user.id,
       orders_closed: current_user.shop_orders_disabled?,

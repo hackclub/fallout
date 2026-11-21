@@ -97,7 +97,7 @@ class ProjectGrantOrder < ApplicationRecord
 
   def user_must_have_approved_project
     return unless user
-    return if user.ships.approved.exists?
+    return if user.project_grants_eligible?
 
     errors.add(:base, "You need to have approved projects to redeem funding")
   end
