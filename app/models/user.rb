@@ -716,12 +716,29 @@ class User < ApplicationRecord
       h[u.id] = (u.shipped_time_logged_seconds / 3600.0).round(1) >= u.ticket_hours_threshold
     end
 
+    # Approved time is a subset of logged time, so users with no logged hours are skipped
+    approved_hours = where(id: user_ids).each_with_object({}) do |u, h|
+      next if db_hours[u.id].to_i.zero?
+      h[u.id] = (u.approved_time_logged_seconds / 3600.0).round(1)
+    end
+
+    # Certificate requests in Airtable are gated on this ID; the public /verify page resolves it.
+    # Same bar as certificates:generate (strict approved hours, verified, kept, not banned), but anyone
+    # already issued a token keeps it, since earlier batches certified a few users just under the bar.
+    certificate_ids = verified.kept.not_banned.where(id: user_ids).each_with_object({}) do |u, h|
+      next unless u.certificate_token.present? || approved_hours[u.id].to_f >= u.ticket_hours_threshold
+      u.generate_certificate_token!
+      h[u.id] = u.certificate_token
+    end
+
     {
       first_project_created_at: Project.kept.where(user_id: user_ids).group(:user_id).minimum(:created_at),
       latest_visit_country: latest_visit_country,
       last_journal_at: JournalEntry.kept.where(user_id: user_ids).group(:user_id).maximum(:created_at),
       db_hours: db_hours,
-      on_track: on_track
+      on_track: on_track,
+      approved_hours: approved_hours,
+      certificate_ids: certificate_ids
     }
   end
 
@@ -742,6 +759,10 @@ class User < ApplicationRecord
       "Is Active" => ->(u, pre) { pre[:last_journal_at][u.id].present? && pre[:last_journal_at][u.id] >= 8.days.ago },
       "DB Hours Logged" => ->(u, pre) { pre[:db_hours][u.id] || 0 },
       "Ontrack" => ->(u, pre) { pre[:on_track][u.id] || false },
+      # Unique per person (trial rows share emails); the certificate form's login matches on this column
+      "Verified Email" => ->(u) { u.email if !u.trial? && !u.discarded? },
+      "DB Hours Approved" => ->(u, pre) { pre[:approved_hours][u.id] || 0 },
+      "Certificate ID" => ->(u, pre) { pre[:certificate_ids][u.id] },
       # "UTC" is the placeholder until the browser reports a zone, so leave it blank rather than claim +0
       "UTC Offset" => ->(u) {
         tz = ActiveSupport::TimeZone[u.timezone] unless u.timezone == "UTC"
