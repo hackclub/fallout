@@ -192,6 +192,9 @@ class User < ApplicationRecord
   # (pre-approval) hours already clear the full bar. Deliberately not surfaced to users.
   TICKET_HOURS_GRACE = 5
 
+  # Flat approved-hours bar for a Fallout certificate. Unlike tickets, there are no per-user overrides.
+  CERTIFICATE_HOURS_THRESHOLD = 60
+
   # How long after a ship's approval its owner may still place shop orders while :disable_shop_orders is on.
   SHOP_GRACE_AFTER_APPROVAL = 3.days
 
@@ -726,7 +729,7 @@ class User < ApplicationRecord
     # Same bar as certificates:generate: strict approved hours, verified, kept, not banned. A token issued
     # earlier (tests, hours later clawed back in audits) isn't enough on its own; /verify still honours it.
     certificate_ids = verified.kept.not_banned.where(id: approved_hours.keys).each_with_object({}) do |u, h|
-      next unless approved_hours[u.id] >= u.ticket_hours_threshold
+      next unless approved_hours[u.id] >= CERTIFICATE_HOURS_THRESHOLD
       u.generate_certificate_token!
       h[u.id] = u.certificate_token
     end
