@@ -723,10 +723,10 @@ class User < ApplicationRecord
     end
 
     # Certificate requests in Airtable are gated on this ID; the public /verify page resolves it.
-    # Same bar as certificates:generate (strict approved hours, verified, kept, not banned), but anyone
-    # already issued a token keeps it, since earlier batches certified a few users just under the bar.
-    certificate_ids = verified.kept.not_banned.where(id: user_ids).each_with_object({}) do |u, h|
-      next unless u.certificate_token.present? || approved_hours[u.id].to_f >= u.ticket_hours_threshold
+    # Same bar as certificates:generate: strict approved hours, verified, kept, not banned. A token issued
+    # earlier (tests, hours later clawed back in audits) isn't enough on its own; /verify still honours it.
+    certificate_ids = verified.kept.not_banned.where(id: approved_hours.keys).each_with_object({}) do |u, h|
+      next unless approved_hours[u.id] >= u.ticket_hours_threshold
       u.generate_certificate_token!
       h[u.id] = u.certificate_token
     end
